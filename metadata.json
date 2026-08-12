@@ -1,0 +1,6 @@
+{
+  "name": "Exam Schedule Manager",
+  "description": "A web tool to view, manage, and filter student exam schedules from CSV files.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

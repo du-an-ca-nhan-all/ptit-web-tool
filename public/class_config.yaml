@@ -1,0 +1,29 @@
+# Cấu hình danh sách các lớp đã biết
+classes:
+  # Ví dụ mẫu 1
+  - classCode: "D25TXCN11-K"
+    monitorPhone: "0966211618"
+    # Danh sách mã sinh viên ngoại lệ (khác mã lớp nhưng thuộc lớp này)
+    includedStudents:
+      - "B25DTCN048"
+      - "B25DTCN049"
+      - "B23LKCN003"
+    # Danh sách mã sinh viên đã nghỉ học, chuyển lớp (không còn ở lớp này)
+    excludedStudents:
+      - "B25DTCN047"
+      - "K25DTCN414"
+      - "K25DTCN407"
+      - "K25DTCN397"
+      - "K25DTCN395"
+      - "K25DTCN394"
+      - "K25DTCN389"
+      - "K25DTCN385"
+      - "K25DTCN384"
+      - "K25DTCN378"
+      - "K25DTCN376"
+      - "K25DTCN371"
+      - "K25DTCN359"
+      - "K25DTCN357"
+      - "K25DTCN356"
+      - "K25DTCN349"
+      - "K25DTCN347"
