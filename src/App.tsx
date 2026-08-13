@@ -67,7 +67,7 @@ export default function App() {
 
   const isMonitor = currentUser?.role === 'lop_truong';
 
-  const [courseCompareData, setCourseCompareData] = useState<{main: any, subAccount: any} | null>(null);
+  const [courseCompareData, setCourseCompareData] = useState<{main: any, subAccount: any, allSubAccounts?: any[]} | null>(null);
   const [showCourseCompare, setShowCourseCompare] = useState(false);
 
   const handleTabChange = (tab: any) => {
@@ -105,7 +105,7 @@ export default function App() {
           const currentUsername = currentUser.username.toLowerCase();
           const subAcc = subAccountsData.find((acc: any) => acc.username.toLowerCase() === currentUsername);
           if (subAcc) {
-            setCourseCompareData({ main: mainData, subAccount: subAcc });
+            setCourseCompareData({ main: mainData, subAccount: subAcc, allSubAccounts: subAccountsData });
             setShowCourseCompare(true);
           } else {
             setShowCourseCompare(false);
