@@ -345,7 +345,7 @@ export default function App() {
   };
 
   if (loginUsers.length > 0 && !currentUser) {
-    return <LoginScreen users={loginUsers} onLogin={(user) => {
+    return <LoginScreen users={loginUsers} records={records} onLogin={(user) => {
       setCurrentUser(user);
       localStorage.setItem('currentUser', JSON.stringify(user));
     }} />;

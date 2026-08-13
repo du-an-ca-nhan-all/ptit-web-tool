@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { hashSHA512 } from '../utils/crypto';
-import { LoginUser } from '../types';
+import { LoginUser, ExamRecord } from '../types';
 import { LogIn, Lock, User } from 'lucide-react';
 
 interface LoginScreenProps {
   users: LoginUser[];
+  records: ExamRecord[];
   onLogin: (user: LoginUser) => void;
 }
 
-export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
+export default function LoginScreen({ users, records, onLogin }: LoginScreenProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -28,30 +29,46 @@ export default function LoginScreen({ users, onLogin }: LoginScreenProps) {
     try {
       const normalizedInput = username.trim().toLowerCase();
       const user = users.find(u => u.username.toLowerCase() === normalizedInput);
-      if (!user) {
-        setError('Tài khoản hoặc mật khẩu không chính xác');
-        setIsLoading(false);
-        return;
-      }
-
-      if (user.password_hash) {
-        const hash = await hashSHA512(password);
-        if (hash !== user.password_hash) {
-          setError('Tài khoản hoặc mật khẩu không chính xác');
-          setIsLoading(false);
-          return;
+      
+      if (user) {
+        if (user.password_hash) {
+          const hash = await hashSHA512(password);
+          if (hash !== user.password_hash) {
+            setError('Tài khoản hoặc mật khẩu không chính xác');
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          if (password !== user.username.toUpperCase()) {
+            setError('Tài khoản hoặc mật khẩu không chính xác');
+            setIsLoading(false);
+            return;
+          }
         }
+        // Success for user in yaml
+        const { password_hash, ...safeUser } = user;
+        onLogin(safeUser as LoginUser);
       } else {
-        if (password !== user.username.toUpperCase()) {
+        // Fallback: check if username matches password (uppercase) and exists in records
+        const upperInput = username.trim().toUpperCase();
+        if (password.trim().toUpperCase() === upperInput) {
+          const exists = records.some(r => r.MaSV?.toUpperCase() === upperInput);
+          if (exists) {
+            const studentRecord = records.find(r => r.MaSV?.toUpperCase() === upperInput);
+            const fallbackUser: LoginUser = {
+              username: upperInput,
+              role: 'sinh_vien',
+              lop: studentRecord?.MaLop || '',
+              // password_hash is omitted or empty
+            };
+            onLogin(fallbackUser);
+          } else {
+            setError('Tài khoản không tồn tại trong hệ thống');
+          }
+        } else {
           setError('Tài khoản hoặc mật khẩu không chính xác');
-          setIsLoading(false);
-          return;
         }
       }
-
-      // Success
-      const { password_hash, ...safeUser } = user;
-      onLogin(safeUser as LoginUser);
     } catch (err) {
       console.error(err);
       setError('Đã xảy ra lỗi khi đăng nhập');
