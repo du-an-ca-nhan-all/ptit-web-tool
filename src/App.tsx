@@ -503,7 +503,7 @@ export default function App() {
           </div>
         </header>
 
-        <section className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-hidden">
+        <section className="flex-1 flex flex-col min-h-0 overflow-y-auto">
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>

@@ -211,7 +211,7 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
   }
 
   return (
-    <div className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-hidden h-full">
+    <div className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-y-auto min-h-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -385,8 +385,13 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
       </div>
 
       {splitSession && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-xl flex flex-col max-h-[90vh]">
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-start justify-center z-50 overflow-y-auto p-3 sm:p-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSplitSession(null);
+          }}
+        >
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl flex flex-col my-auto max-h-[85vh] sm:max-h-[90vh] border border-slate-200">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Calculator className="w-5 h-5 text-blue-600" />
