@@ -388,6 +388,17 @@ export default function App() {
               <User className="w-4 h-4" /> Lịch Thi Cá Nhân
             </button>
           )}
+          {currentUser && !isMonitor && (
+            <button 
+              onClick={() => {
+                if (currentUser.lop) setMonitorClass(currentUser.lop);
+                handleTabChange('members');
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${activeTab === 'members' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
+            >
+              <Users className="w-4 h-4" /> Thành Viên Lớp Mình
+            </button>
+          )}
           {currentUser && showCourseCompare && (
              <button 
              onClick={() => handleTabChange('course_compare')}
@@ -584,6 +595,13 @@ export default function App() {
               records={records}
               selectedClass={monitorClass}
               onClassChange={setMonitorClass}
+              currentUser={currentUser}
+              loginUsers={loginUsers}
+              onSelectStudentSchedule={(studentId) => {
+                setSearchInput(studentId);
+                setFilters(prev => ({ ...prev, search: studentId }));
+                setActiveTab('personal_schedule');
+              }}
             />
           )}
         </section>
