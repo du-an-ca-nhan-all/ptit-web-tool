@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { ExamRecord, LoginUser } from '../types';
-import { Mail, MapPin, Users, Info, Calculator, X } from 'lucide-react';
+import { ExamRecord, LoginUser, ExamSession } from '../types';
+import { Mail, MapPin, Users, Info, Calculator, X, DollarSign, Download } from 'lucide-react';
+import { calculateRoomPrice, formatCurrency } from '../config/pricingConfig';
 
 interface SessionEnvelope {
   id: string;
@@ -14,29 +15,34 @@ interface SessionEnvelope {
 }
 
 interface RoomEnvelopeManagerProps {
+  sessions: ExamSession[];
+
   records: ExamRecord[];
   selectedClass: string;
   onClassChange: (cls: string) => void;
   loginUsers?: LoginUser[];
+hideClassSelector?: boolean;
 }
 
-export default function RoomEnvelopeManager({ records, selectedClass, onClassChange, loginUsers = [] }: RoomEnvelopeManagerProps) {
+export default function RoomEnvelopeManager({ sessions = [], records, selectedClass, onClassChange, loginUsers = [], hideClassSelector = false }: RoomEnvelopeManagerProps) {
   const [splitSession, setSplitSession] = useState<SessionEnvelope | null>(null);
   const [envelopeAmount, setEnvelopeAmount] = useState<string>('100000');
   const [includedClasses, setIncludedClasses] = useState<Set<string>>(new Set());
+  const [filterDate, setFilterDate] = useState<string>('');
+  const [filterResponsibleOnly, setFilterResponsibleOnly] = useState<boolean>(false);
   const classes = useMemo(() => {
     const cls = new Set(records.map((r) => r.MaLop).filter(Boolean));
     return Array.from(cls).sort();
   }, [records]);
 
   useEffect(() => {
-    if (classes.length > 0 && (!selectedClass || !classes.includes(selectedClass))) {
+    if (!hideClassSelector && classes.length > 0 && (!selectedClass || !classes.includes(selectedClass))) {
       onClassChange(classes[0]);
     }
-  }, [classes, selectedClass, onClassChange]);
+  }, [classes, selectedClass, onClassChange, hideClassSelector]);
 
-  const sessions = useMemo(() => {
-    if (!selectedClass || records.length === 0) return [];
+  const monitorEnvelopes = useMemo(() => {
+    if (!selectedClass || sessions.length === 0) return [];
 
     const classRecords = records.filter(r => r.MaLop === selectedClass);
     const sessionKeys = new Set(classRecords.map(r => `${r.MAPTHI}|${r.NgayThi}|${r.GioThi}|${r.TenMH}`));
@@ -47,6 +53,7 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
       time: string;
       subject: string;
       subjectCode: string;
+      examFormat: string;
       counts: Map<string, number>;
     }>();
 
@@ -60,6 +67,7 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
             time: r.GioThi,
             subject: r.TenMH,
             subjectCode: r.MaMH,
+            examFormat: r.MaHTThi || '',
             counts: new Map<string, number>()
           });
         }
@@ -70,15 +78,10 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
     });
 
     const result: SessionEnvelope[] = Array.from(sessionMap.entries()).map(([id, session]) => {
-      const classCounts = Array.from(session.counts.entries())
-        .map(([className, count]) => ({ className, count }))
-        .sort((a, b) => b.count - a.count);
-
-      const maxCount = classCounts[0]?.count || 0;
-      const selectedClassCount = session.counts.get(selectedClass) || 0;
+      const classCounts = Array.from(session.counts.entries()).map(([className, count]) => ({ className, count })).sort((a, b) => b.count - a.count);
       
-      // Lớp mình đi phong bì nếu số sinh viên của lớp mình bằng với số sinh viên lớn nhất trong phòng đó (có thể đồng hạng)
-      const isResponsible = selectedClassCount === maxCount && selectedClassCount > 0;
+      const responsibleClass = classCounts[0]?.className;
+      const isResponsible = selectedClass === responsibleClass && classCounts[0]?.count > 0;
 
       return {
         id,
@@ -87,6 +90,7 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
         time: session.time,
         subject: session.subject,
         subjectCode: session.subjectCode,
+        examFormat: session.examFormat,
         classCounts,
         isResponsible
       };
@@ -126,11 +130,66 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
     });
   }, [records, selectedClass]);
 
-  const responsibleCount = sessions.filter(s => s.isResponsible).length;
+  const availableDates = useMemo(() => {
+    const dates = new Set(monitorEnvelopes.map(s => s.date));
+    return Array.from(dates).sort();
+  }, [monitorEnvelopes]);
+
+  const filteredEnvelopes = useMemo(() => {
+    return monitorEnvelopes.filter(s => {
+      if (filterDate && s.date !== filterDate) return false;
+      if (filterResponsibleOnly && !s.isResponsible) return false;
+      return true;
+    });
+  }, [monitorEnvelopes, filterDate, filterResponsibleOnly]);
+
+  const responsibleCount = filteredEnvelopes.filter(s => s.isResponsible).length;
+  const totalExpectedMoney = filteredEnvelopes.filter(s => s.isResponsible).reduce((acc, s) => acc + calculateRoomPrice(s.subject, s.subjectCode, s.room, s.examFormat), 0);
 
   const monitorClasses = useMemo(() => {
     return new Set(loginUsers.filter(u => u.role === 'lop_truong' && u.lop).map(u => u.lop as string));
   }, [loginUsers]);
+
+  
+  const handleExportCSV = () => {
+    const headers = [
+      'STT',
+      'Ngày thi',
+      'Giờ thi',
+      'Phòng thi',
+      'Môn thi',
+      'Mã MH',
+      'Cơ cấu sinh viên',
+      'Bồi dưỡng dự kiến (VNĐ)',
+      'Trách nhiệm lấy PB'
+    ];
+    
+    const rows = filteredEnvelopes.map((session, index) => {
+      const studentStructure = session.classCounts.map(c => `${c.className} (${c.count})`).join(', ');
+      const money = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat);
+      const isResponsibleStr = session.isResponsible ? 'Lớp mình' : `${session.classCounts[0]?.className || ''} (${session.classCounts[0]?.count || 0} SV)`;
+      return [
+        index + 1,
+        session.date,
+        session.time,
+        session.room,
+        `"${session.subject}"`,
+        session.subjectCode,
+        `"${studentStructure}"`,
+        money,
+        `"${isResponsibleStr}"`
+      ].join(',');
+    });
+    
+    const csvContent = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Phan_Cong_Phong_Bi_${selectedClass || 'Tat_Ca'}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleOpenSplit = (session: SessionEnvelope) => {
     setSplitSession(session);
@@ -143,7 +202,7 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
     setIncludedClasses(initialIncluded);
   };
 
-  if (records.length === 0) {
+  if (sessions.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <p className="text-slate-500 font-medium">Vui lòng tải dữ liệu trước.</p>
@@ -157,11 +216,11 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <Mail className="w-6 h-6 text-blue-600" />
-            Phân Công Phong Bì
+            {hideClassSelector ? "Phân Công Phong Bì Lớp Mình" : "Phân Công Phong Bì"}
           </h2>
           <p className="text-sm text-slate-500 mt-1">Quản lý và theo dõi trách nhiệm phong bì phòng thi theo nguyên tắc: Lớp đông sinh viên nhất sẽ phụ trách.</p>
         </div>
-        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm w-full sm:w-auto">
+        {!hideClassSelector && <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm w-full sm:w-auto">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Lớp:</span>
           <select
             className="bg-transparent text-sm font-semibold outline-none text-slate-700 w-full min-w-[120px]"
@@ -170,17 +229,48 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
           >
             {classes.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-        </div>
+        </div>}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
+      
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between shrink-0">
+        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+          <select 
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 min-w-[150px]"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+          >
+            <option value="">Tất cả các ngày</option>
+            {availableDates.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={filterResponsibleOnly}
+              onChange={(e) => setFilterResponsibleOnly(e.target.checked)}
+              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-slate-300"
+            />
+            Chỉ hiện các phòng lớp mình đi lấy PB
+          </label>
+        </div>
+
+        <button 
+          onClick={handleExportCSV}
+          className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-slate-50 text-slate-700 w-full md:w-auto justify-center"
+        >
+          <Download className="w-4 h-4" /> Xuất CSV
+        </button>
+
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
             <MapPin className="w-6 h-6 text-blue-600" />
           </div>
           <div>
             <p className="text-sm text-blue-600 font-semibold uppercase tracking-wider">Tổng số phòng thi</p>
-            <p className="text-3xl font-bold text-blue-900">{sessions.length}</p>
+            <p className="text-3xl font-bold text-blue-900">{filteredEnvelopes.length}</p>
           </div>
         </div>
         <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4">
@@ -188,8 +278,18 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
             <Mail className="w-6 h-6 text-emerald-600" />
           </div>
           <div>
-            <p className="text-sm text-emerald-600 font-semibold uppercase tracking-wider">Số phòng lớp mình phụ trách</p>
+            <p className="text-sm text-emerald-600 font-semibold uppercase tracking-wider">Số phòng lớp phụ trách</p>
             <p className="text-3xl font-bold text-emerald-900">{responsibleCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
+          <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center shrink-0">
+            <DollarSign className="w-6 h-6 text-amber-600" />
+          </div>
+          <div>
+            <p className="text-sm text-amber-600 font-semibold uppercase tracking-wider">Dự kiến bồi dưỡng</p>
+            <p className="text-2xl sm:text-3xl font-bold text-amber-900">{formatCurrency(totalExpectedMoney)}</p>
           </div>
         </div>
       </div>
@@ -203,18 +303,19 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-48">Thời gian</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-64">Phòng & Môn</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">Cơ cấu sinh viên</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 whitespace-nowrap">Bồi dưỡng</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-48 text-right">Trách nhiệm</th>
               </tr>
             </thead>
             <tbody>
-              {sessions.length === 0 ? (
+              {filteredEnvelopes.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">
                     Không có lịch thi nào cho lớp này.
                   </td>
                 </tr>
               ) : (
-                sessions.map((session, index) => (
+                filteredEnvelopes.map((session, index) => (
                   <tr key={session.id} className={`hover:bg-slate-50 transition-colors ${index % 2 === 1 ? 'bg-slate-50/30' : ''} ${session.isResponsible ? 'bg-emerald-50/10' : ''}`}>
                     <td className="px-6 py-4 text-sm text-slate-500 font-medium">{index + 1}</td>
                     <td className="px-6 py-4">
@@ -226,7 +327,7 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="font-bold text-rose-600 text-base">{session.room}</span>
-                        <span className="text-slate-700 font-medium text-sm mt-0.5" title={session.subject}>{session.subject}</span>
+                        <span className="text-slate-700 font-medium text-sm mt-0.5 break-words whitespace-normal" title={session.subject}>{session.subject}</span>
                         <span className="text-slate-400 text-xs">{session.subjectCode}</span>
                       </div>
                     </td>
@@ -247,6 +348,11 @@ export default function RoomEnvelopeManager({ records, selectedClass, onClassCha
                           </span>
                         ))}
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-block bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded-md text-xs border border-amber-200 whitespace-nowrap">
+                        {formatCurrency(calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat))}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       {session.isResponsible ? (

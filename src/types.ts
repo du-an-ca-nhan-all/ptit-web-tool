@@ -44,3 +44,21 @@ export interface LoginUser {
 export interface LoginConfig {
   users: LoginUser[];
 }
+
+export interface SessionClassCount {
+  className: string;
+  count: number;
+}
+
+export interface ExamSession {
+  id: string; // MAPTHI|NgayThi|GioThi|TenMH
+  room: string;
+  date: string;
+  time: string;
+  subject: string;
+  subjectCode: string;
+  examFormat: string;
+  classCounts: SessionClassCount[];
+  totalStudents: number;
+  records: ExamRecord[];
+}

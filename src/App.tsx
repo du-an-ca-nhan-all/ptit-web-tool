@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { CalendarDays, LogOut, LayoutDashboard, Calendar, Users, FileText, Search, Download, Wrench, ChevronDown, ChevronRight, GraduationCap, Mail, Settings, User, BookOpen, Menu, X } from 'lucide-react';
+import { CalendarDays, Crown, ArrowLeftRight, LogOut, LayoutDashboard, Calendar, Users, FileText, Search, Download, Wrench, ChevronDown, ChevronRight, GraduationCap, Mail, Settings, User, BookOpen, Menu, X, DollarSign } from 'lucide-react';
 import Papa from 'papaparse';
 import { parse as parseYaml } from 'yaml';
 import UploadSection from './components/UploadSection';
@@ -8,18 +8,20 @@ import DataTable, { SortKey, SortDirection } from './components/DataTable';
 import ClassMonitorTools from './components/ClassMonitorTools';
 import ClassMembers from './components/ClassMembers';
 import RoomEnvelopeManager from './components/RoomEnvelopeManager';
-import SettingsPanel from './components/SettingsPanel';
+import AllMonitorsEnvelopes from './components/AllMonitorsEnvelopes';
 import LoginScreen from './components/LoginScreen';
 import ExamRoomMembers from './components/ExamRoomMembers';
 import MonitorsList from './components/MonitorsList';
 import CourseCompare from './components/CourseCompare';
-import { ExamRecord, LoginUser } from './types';
+import SettlementManager from './components/SettlementManager';
+import { ExamRecord, LoginUser, ExamSession } from './types';
+import { buildSessions } from './utils/dataModel';
 
 const getInitialState = () => {
   const hash = window.location.hash.replace(/^#/, '');
   const params = new URLSearchParams(hash);
   return {
-    tab: (params.get('tab') as 'schedule' | 'personal_schedule' | 'monitor' | 'members' | 'envelope' | 'settings' | 'monitors_list' | 'course_compare') || 'personal_schedule',
+    tab: (params.get('tab') as 'schedule' | 'personal_schedule' | 'monitor' | 'members' | 'envelope' | 'envelope_all' | 'settlement' | 'settings' | 'monitors_list' | 'course_compare') || 'personal_schedule',
     search: params.get('search') || '',
 
     classCode: params.get('classCode') || '',
@@ -33,13 +35,17 @@ const getInitialState = () => {
 
 export default function App() {
   const [records, setRecords] = useState<ExamRecord[]>([]);
+  const [sessions, setSessions] = useState<ExamSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const initialState = useMemo(getInitialState, []);
-  const [activeTab, setActiveTab] = useState<'schedule' | 'personal_schedule' | 'monitor' | 'members' | 'envelope' | 'settings' | 'monitors_list' | 'course_compare'>(initialState.tab as any);
+  const [activeTab, setActiveTab] = useState<'schedule' | 'personal_schedule' | 'monitor' | 'members' | 'envelope' | 'envelope_all' | 'settlement' | 'settings' | 'monitors_list' | 'course_compare'>(initialState.tab as any);
   
-  const [defaultClass, setDefaultClass] = useState<string>(() => localStorage.getItem('defaultClass') || '');
-  const [monitorClass, setMonitorClass] = useState<string>(initialState.monitorClass || defaultClass);
+    const [monitorClass, setMonitorClass] = useState<string>(initialState.monitorClass || (() => {
+    const saved = localStorage.getItem('currentUser');
+    const user = saved ? JSON.parse(saved) : null;
+    return user?.lop || '';
+  })());
   const [filters, setFilters] = useState<FilterState>({
     search: initialState.search,
     classCode: initialState.classCode,
@@ -76,7 +82,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!isMonitor && ['monitor', 'envelope', 'settings'].includes(activeTab)) {
+    if (!isMonitor && ['monitor', 'envelope', 'envelope_all', 'settlement', 'settings'].includes(activeTab)) {
       setActiveTab('personal_schedule');
     }
   }, [isMonitor, activeTab]);
@@ -162,7 +168,32 @@ export default function App() {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
-          let cleanedData = results.data.filter(row => row.MaSV);
+          let validData = results.data.filter(row => row.MaSV);
+          
+          // Tự động tìm lớp chính của sinh viên (ưu tiên các mã lớp có dạng D... hoặc C... và không có dấu phẩy)
+          const studentMainClassMap = new Map<string, string>();
+          validData.forEach(row => {
+            if (row.MaSV && row.MaLop && !row.MaLop.includes(',')) {
+               // Nếu lớp có dạng chuẩn D25... thì ưu tiên
+               const isStandard = /^[DC]\d{2}/i.test(row.MaLop);
+               if (isStandard || !studentMainClassMap.has(row.MaSV)) {
+                  studentMainClassMap.set(row.MaSV, row.MaLop);
+               }
+            }
+          });
+
+          let cleanedData = validData
+            .filter(row => !excludedSet.has(row.MaSV))
+            .map(row => {
+              if (includedMap.has(row.MaSV)) {
+                return { ...row, MaLop: includedMap.get(row.MaSV)! };
+              }
+              // Ghi đè mã lớp môn học bằng mã lớp chính của sinh viên nếu có
+              if (studentMainClassMap.has(row.MaSV)) {
+                return { ...row, MaLop: studentMainClassMap.get(row.MaSV)! };
+              }
+              return row;
+            });
           
           // Lọc sinh viên không còn học/nghỉ học, map lại sinh viên ngoại lệ vào lớp tương ứng
           cleanedData = cleanedData
@@ -175,6 +206,7 @@ export default function App() {
             });
 
           setRecords(cleanedData);
+          setSessions(buildSessions(cleanedData));
           setIsLoading(false);
         }
       });
@@ -236,12 +268,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  const handleDefaultClassChange = (cls: string) => {
-    setDefaultClass(cls);
-    localStorage.setItem('defaultClass', cls);
-    setMonitorClass(cls);
-  };
-
+  
   // Extract unique values for filters
   const baseRecords = useMemo(() => {
     if (activeTab === 'personal_schedule' && currentUser) {
@@ -312,6 +339,7 @@ export default function App() {
 
   const handleReset = () => {
     setRecords([]);
+    setSessions([]);
     setFilters({ search: '', classCode: '', subjectCode: '', date: '' });
     setSearchInput('');
   };
@@ -337,6 +365,7 @@ export default function App() {
             <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">S</div>
             <h1 className="text-white font-semibold text-lg tracking-tight">S-Exam Portal</h1>
           </div>
+
           <button 
             className="md:hidden text-slate-400 hover:text-white"
             onClick={() => setIsMobileMenuOpen(false)}
@@ -344,79 +373,78 @@ export default function App() {
             <X className="w-6 h-6" />
           </button>
         </div>
-        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
-          <div className="space-y-1">
+        <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1 scrollbar-hide">
+          <button 
+            onClick={() => handleTabChange('schedule')}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${activeTab === 'schedule' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
+          >
+            <CalendarDays className="w-4 h-4" /> Lịch Thi Tổng Hợp
+          </button>
+          {currentUser && (
             <button 
               onClick={() => handleTabChange('personal_schedule')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'personal_schedule' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${activeTab === 'personal_schedule' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
             >
-              <User className="w-5 h-5" /> Lịch Thi Cá Nhân
+              <User className="w-4 h-4" /> Lịch Thi Cá Nhân
             </button>
-            <button 
-              onClick={() => handleTabChange('schedule')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'schedule' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
-            >
-              <Calendar className="w-5 h-5" /> Lịch Thi Tổng
-            </button>
-            <button 
-              onClick={() => handleTabChange('monitors_list')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'monitors_list' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
-            >
-              <Users className="w-5 h-5" /> Danh Sách Lớp Trưởng
-            </button>
-            {showCourseCompare && (
-              <button 
-                onClick={() => handleTabChange('course_compare')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'course_compare' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
-              >
-                <BookOpen className="w-5 h-5" /> So sánh ĐKMH
-              </button>
-            )}
-            <button 
-              onClick={() => handleTabChange('members')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${activeTab === 'members' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
-            >
-              <Users className="w-5 h-5" /> Danh Sách Lớp
-            </button>
-          </div>
+          )}
+          {currentUser && showCourseCompare && (
+             <button 
+             onClick={() => handleTabChange('course_compare')}
+             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${activeTab === 'course_compare' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
+           >
+             <ArrowLeftRight className="w-4 h-4" /> So Sánh ĐKMH
+           </button>
+          )}
+
+          <button 
+            onClick={() => handleTabChange('monitors_list')}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors mt-2 ${activeTab === 'monitors_list' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
+          >
+            <Crown className="w-4 h-4" /> Danh Sách Lớp Trưởng
+          </button>
 
           {isMonitor && (
-            <div className="pt-2">
-              <button 
+            <div className="mt-4 flex flex-col gap-1">
+              <div 
+                className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between cursor-pointer hover:text-slate-300"
                 onClick={() => setIsClassGroupOpen(!isClassGroupOpen)}
-                className="w-full flex items-center justify-between px-4 py-2 text-slate-400 hover:text-white transition-colors group"
               >
-                <div className="flex items-center gap-3 font-medium">
-                  <GraduationCap className="w-5 h-5" /> Quản Lý Lớp
-                </div>
-                {isClassGroupOpen ? <ChevronDown className="w-4 h-4 opacity-50" /> : <ChevronRight className="w-4 h-4 opacity-50" />}
-              </button>
-
+                Công cụ lớp trưởng
+                <ChevronDown className={`w-4 h-4 transition-transform ${isClassGroupOpen ? 'rotate-180' : ''}`} />
+              </div>
               {isClassGroupOpen && (
-                <div className="mt-1 ml-4 pl-4 border-l border-slate-800 space-y-1">
+                <div className="pl-2 flex flex-col gap-1 mt-1 border-l-2 border-slate-800 ml-5">
                   <button 
-                    onClick={() => handleTabChange('monitor')}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${activeTab === 'monitor' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
+                    onClick={() => handleTabChange('members')}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${activeTab === 'members' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
                   >
-                    <Wrench className="w-4 h-4" /> Công Cụ & Thông Báo
+                    <Users className="w-4 h-4" /> Danh Sách Lớp
                   </button>
                   <button 
                     onClick={() => handleTabChange('envelope')}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${activeTab === 'envelope' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
                   >
-                    <Mail className="w-4 h-4" /> Phân Công Phong Bì
+                    <Mail className="w-4 h-4" /> PB Lớp Mình
                   </button>
                   <button 
-                    onClick={() => handleTabChange('settings')}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${activeTab === 'settings' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
+                    onClick={() => handleTabChange('envelope_all')}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${activeTab === 'envelope_all' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
                   >
-                    <Settings className="w-4 h-4" /> Cài Đặt
+                    <BookOpen className="w-4 h-4" /> PB Lớp Khác
+                  </button>
+                  <button 
+                    onClick={() => handleTabChange('settlement')}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${activeTab === 'settlement' ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'}`}
+                  >
+                    <DollarSign className="w-4 h-4" /> Bù Trừ Thanh Toán
                   </button>
                 </div>
               )}
             </div>
           )}
         </nav>
+
         <div className="p-6 border-t border-slate-800 text-slate-500 text-xs text-center uppercase tracking-widest">
           HK2 2025 - 2026
         </div>
@@ -435,7 +463,7 @@ export default function App() {
               <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">S</div>
             </div>
             <h2 className="text-lg md:text-xl font-bold text-slate-800 hidden sm:block">
-              {activeTab === 'schedule' ? 'Lịch Thi Tổng' : activeTab === 'personal_schedule' ? 'Lịch Thi Cá Nhân' : activeTab === 'monitors_list' ? 'Danh Sách Lớp Trưởng' : activeTab === 'course_compare' ? 'So Sánh ĐKMH' : activeTab === 'members' ? 'Danh Sách Lớp' : activeTab === 'envelope' ? 'Phân Công Phong Bì' : activeTab === 'settings' ? 'Cài Đặt' : 'Công Cụ Lớp Trưởng'}
+              {activeTab === 'schedule' ? 'Lịch Thi Tổng' : activeTab === 'personal_schedule' ? 'Lịch Thi Cá Nhân' : activeTab === 'monitors_list' ? 'Danh Sách Lớp Trưởng' : activeTab === 'course_compare' ? 'So Sánh ĐKMH' : activeTab === 'members' ? 'Danh Sách Lớp' : activeTab === 'envelope' ? 'Phân Công Phong Bì Lớp Mình' : activeTab === 'envelope_all' ? 'Phân Công Phong Bì Lớp Trưởng' : activeTab === 'settlement' ? 'Bù Trừ Thanh Toán' : 'Công Cụ Lớp Trưởng'}
             </h2>
             
             {records.length > 0 && (activeTab === 'schedule' || activeTab === 'personal_schedule') && (
@@ -521,16 +549,24 @@ export default function App() {
             />
           ) : activeTab === 'envelope' ? (
             <RoomEnvelopeManager
+              sessions={sessions}
               records={records}
-              selectedClass={monitorClass}
+              selectedClass={currentUser?.lop || monitorClass}
               onClassChange={setMonitorClass}
               loginUsers={loginUsers}
+              hideClassSelector={true}
             />
-          ) : activeTab === 'settings' ? (
-            <SettingsPanel
+          ) : activeTab === 'envelope_all' ? (
+            <AllMonitorsEnvelopes
               records={records}
-              defaultClass={defaultClass}
-              onDefaultClassChange={handleDefaultClassChange}
+              sessions={sessions}
+              loginUsers={loginUsers}
+            />
+          ) : activeTab === 'settlement' ? (
+            <SettlementManager
+              records={records}
+              sessions={sessions}
+              loginUsers={loginUsers}
             />
           ) : activeTab === 'monitors_list' ? (
             <MonitorsList 
