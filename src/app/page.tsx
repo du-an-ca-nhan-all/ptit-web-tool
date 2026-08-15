@@ -26,6 +26,7 @@ import {
   ShieldAlert,
   GraduationCap,
   Check,
+  History,
 } from 'lucide-react';
 import UploadSection from '../components/UploadSection';
 import FilterBar, { FilterState } from '../components/FilterBar';
@@ -43,6 +44,7 @@ import UserProfileScreen from '../components/UserProfileScreen';
 import StudentCourseRegistration from '../components/StudentCourseRegistration';
 import ExamBatchManagement from '../components/ExamBatchManagement';
 import AdminExternalAccounts from '../components/AdminExternalAccounts';
+import ActivityLogsManager from '../components/ActivityLogsManager';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
 import { buildSessions } from '../utils/dataModel';
 
@@ -77,6 +79,7 @@ const getInitialState = () => {
         | 'monitors_list'
         | 'batches'
         | 'external_accounts_admin'
+        | 'activity_logs'
         | 'course_compare') || 'personal_schedule',
     search: params.get('search') || '',
     classCode: params.get('classCode') || '',
@@ -110,6 +113,7 @@ export default function Home() {
     | 'monitors_list'
     | 'batches'
     | 'external_accounts_admin'
+    | 'activity_logs'
     | 'course_compare'
   >(initialState.tab as any);
 
@@ -179,14 +183,40 @@ export default function Home() {
     if (currentUser) {
       localStorage.setItem('active_role_' + currentUser.username, newRole);
     }
+
+    // Log client-side role switch action
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      fetch('/api/activity-logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          action: 'SWITCH_ROLE',
+          targetType: 'ROLE',
+          targetId: newRole,
+          description: `Chuyển vai trò làm việc sang ${
+            newRole === 'admin'
+              ? '👑 Quản Trị Viên (Admin)'
+              : newRole === 'lop_truong'
+              ? '🛡️ Lớp Trưởng'
+              : '🎓 Sinh Viên'
+          }`,
+          metadata: { previousRole: activeRole, newRole },
+        }),
+      }).catch(() => {});
+    } catch {}
+
     // Auto redirect tab if current tab is not accessible in the new role
     if (newRole === 'sinh_vien') {
-      const monitorAdminTabs = ['batches', 'external_accounts_admin', 'members', 'monitor', 'envelope', 'envelope_all', 'settlement', 'monitors_list'];
+      const monitorAdminTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'members', 'monitor', 'envelope', 'envelope_all', 'settlement', 'monitors_list'];
       if (monitorAdminTabs.includes(activeTab)) {
         setActiveTab(hasExamSchedule ? 'personal_schedule' : 'registered_courses');
       }
     } else if (newRole === 'lop_truong') {
-      const adminOnlyTabs = ['batches', 'external_accounts_admin'];
+      const adminOnlyTabs = ['batches', 'external_accounts_admin', 'activity_logs'];
       if (adminOnlyTabs.includes(activeTab)) {
         setActiveTab('members');
       }
@@ -792,6 +822,17 @@ export default function Home() {
                       >
                         <Globe className="w-4 h-4 text-indigo-400" /> Tài Khoản QLĐT Từ Xa
                       </button>
+
+                      <button
+                        onClick={() => handleTabChange('activity_logs')}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                          activeTab === 'activity_logs'
+                            ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+                        }`}
+                      >
+                        <History className="w-4 h-4 text-indigo-400" /> Nhật Ký Hoạt Động
+                      </button>
                     </>
                   )}
                 </div>
@@ -1146,6 +1187,8 @@ export default function Home() {
             />
           ) : activeTab === 'external_accounts_admin' && isAdmin ? (
             <AdminExternalAccounts currentUser={effectiveUser!} />
+          ) : activeTab === 'activity_logs' && isAdmin ? (
+            <ActivityLogsManager currentUser={effectiveUser!} />
           ) : activeTab === 'batches' ? (
             <ExamBatchManagement
               currentUser={effectiveUser!}

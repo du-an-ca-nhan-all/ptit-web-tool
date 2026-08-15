@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { getAuthUser, createAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
+import { logActivity } from '@/src/lib/activityLog';
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,6 +46,18 @@ export async function POST(req: NextRequest) {
       lop: adminUser.student?.maLop || null,
       impersonatedBy: null,
     };
+
+    await logActivity({
+      req,
+      userId: adminUser.id,
+      username: adminUsername,
+      userRole: adminUser.role,
+      action: 'REVERT_IMPERSONATE',
+      targetType: 'USER',
+      targetId: authUser.username,
+      description: `Admin ${adminUsername} đã thoát chế độ giả lập từ tài khoản ${authUser.username} và trở về tài khoản Admin`,
+      metadata: { fromUsername: authUser.username },
+    });
 
     const token = await createAuthToken(adminPayload);
 

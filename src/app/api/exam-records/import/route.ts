@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Papa from 'papaparse';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
+import { logActivity } from '@/src/lib/activityLog';
 
 export async function POST(req: NextRequest) {
   try {
@@ -133,6 +134,18 @@ export async function POST(req: NextRequest) {
         data: chunk,
       });
     }
+
+    await logActivity({
+      req,
+      userId: authUser.id,
+      username: authUser.username,
+      userRole: authUser.role,
+      action: 'IMPORT_EXAM_SCHEDULE',
+      targetType: 'EXAM_RECORD',
+      targetId: file.name,
+      description: `Nhập ${examRecordsList.length} bản ghi lịch thi từ file "${file.name}" (Chế độ: ${mode})`,
+      metadata: { fileName: file.name, mode, totalRecords: examRecordsList.length, totalStudents: studentArray.length },
+    });
 
     return NextResponse.json({
       success: true,

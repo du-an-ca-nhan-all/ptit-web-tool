@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { verifyPassword, createAuthToken, checkIsAdmin, checkIsMonitor, getUserRoles } from '@/src/lib/auth';
+import { logActivity } from '@/src/lib/activityLog';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +26,16 @@ export async function POST(req: NextRequest) {
     if (user) {
       const isValid = await verifyPassword(password, user.passwordHash, user.username);
       if (!isValid) {
+        await logActivity({
+          req,
+          userId: user.id,
+          username: user.username,
+          userRole: user.role,
+          action: 'LOGIN_FAILED',
+          targetType: 'AUTH',
+          targetId: user.username,
+          description: `Đăng nhập thất bại cho tài khoản ${user.username}: Sai mật khẩu`,
+        });
         return NextResponse.json(
           { error: 'Tài khoản hoặc mật khẩu không chính xác' },
           { status: 401 }
@@ -52,6 +63,17 @@ export async function POST(req: NextRequest) {
         phoneNumber: user.student?.soDienThoai || null,
         lop: user.student?.maLop || null,
       };
+
+      await logActivity({
+        req,
+        userId: user.id,
+        username: user.username,
+        userRole: user.role,
+        action: 'LOGIN',
+        targetType: 'AUTH',
+        targetId: user.username,
+        description: `Người dùng ${user.username} (${authPayload.fullName}) đăng nhập thành công`,
+      });
 
       const token = await createAuthToken(authPayload);
       const response = NextResponse.json({
@@ -101,6 +123,17 @@ export async function POST(req: NextRequest) {
           lop: student.maLop || null,
         };
 
+        await logActivity({
+          req,
+          userId: user.id,
+          username: user.username,
+          userRole: user.role,
+          action: 'LOGIN_FIRST_TIME',
+          targetType: 'AUTH',
+          targetId: user.username,
+          description: `Sinh viên ${user.username} (${authPayload.fullName}) đăng nhập lần đầu bằng MSSV`,
+        });
+
         const token = await createAuthToken(authPayload);
         const response = NextResponse.json({
           success: true,
@@ -119,6 +152,15 @@ export async function POST(req: NextRequest) {
         return response;
       }
     }
+
+    await logActivity({
+      req,
+      username: normalizedUsername,
+      action: 'LOGIN_FAILED',
+      targetType: 'AUTH',
+      targetId: normalizedUsername,
+      description: `Đăng nhập thất bại: Không tìm thấy tài khoản hoặc sinh viên ${normalizedUsername}`,
+    });
 
     return NextResponse.json(
       { error: 'Tài khoản hoặc mật khẩu không chính xác' },

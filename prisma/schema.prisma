@@ -22,6 +22,9 @@ model User {
   // Quan hệ 1-N với ExternalAccount
   externalAccounts ExternalAccount[]
   
+  // Quan hệ 1-N với ActivityLog
+  activityLogs     ActivityLog[]
+  
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -161,4 +164,27 @@ model ExternalAccount {
   @@unique([username, systemKey])
   @@index([username])
   @@index([systemKey])
+}
+
+// 8. Bảng ActivityLog: Lưu vết và ghi nhật ký toàn bộ hành động trên hệ thống
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     // User ID thực hiện hành động
+  username    String?  // Username/Mã SV thực hiện
+  userRole    String?  // Vai trò của user tại thời điểm thao tác
+  action      String   // Mã hành động: "LOGIN", "LOGOUT", "CHANGE_PASSWORD", "IMPERSONATE", "REVERT_IMPERSONATE", "TRANSFER_STUDENT", "UPDATE_STUDENT", "CREATE_BATCH", "UPDATE_BATCH", "DELETE_BATCH", "IMPORT_BATCH", "IMPORT_EXAM_SCHEDULE", "SAVE_EXTERNAL_ACCOUNT", "TEST_EXTERNAL_ACCOUNT", "PULL_EXTERNAL_ACCOUNT", "DELETE_EXTERNAL_ACCOUNT", "SYNC_COURSE_REGISTRATION", "SYNC_CLASS_REGISTRATION", "DELETE_COURSE_REGISTRATION"
+  targetType  String?  // Loại đối tượng: "AUTH", "STUDENT", "USER", "EXAM_BATCH", "EXAM_RECORD", "COURSE_REGISTRATION", "EXTERNAL_ACCOUNT"
+  targetId    String?  // Định danh đối tượng (Mã SV, Mã đợt thi, Tên hệ thống...)
+  description String   // Diễn giải chi tiết hành động
+  metadata    String?  // Thông tin bổ sung dạng JSON (param, old/new values, IP, agent...)
+  ipAddress   String?  // Địa chỉ IP
+  userAgent   String?  // Trình duyệt / thiết bị
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [username], references: [username], onDelete: SetNull)
+
+  @@index([username])
+  @@index([action])
+  @@index([targetType])
+  @@index([createdAt])
 }

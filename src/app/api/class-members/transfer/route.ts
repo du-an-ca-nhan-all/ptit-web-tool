@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
+import { logActivity } from '@/src/lib/activityLog';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -158,6 +159,18 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'RECEIVE_STUDENT',
+        targetType: 'STUDENT',
+        targetId: cleanMaSV,
+        description: `Tiếp nhận sinh viên ${cleanMaSV} vào lớp ${cleanTargetClass} (${transferNote})`,
+        metadata: { cleanMaSV, cleanTargetClass, oldClass, reason },
+      });
+
       return NextResponse.json({
         success: true,
         message: `Đã tiếp nhận thành công sinh viên ${cleanMaSV} vào lớp ${cleanTargetClass}`,
@@ -227,6 +240,18 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'EXCLUDE_STUDENT',
+        targetType: 'STUDENT',
+        targetId: cleanMaSV,
+        description: `Điều chuyển/cập nhật trạng thái sinh viên ${cleanMaSV} thuộc lớp ${cleanCurrentClass}: ${statusNote}`,
+        metadata: { cleanMaSV, cleanCurrentClass, actionType, targetTrangThai, targetClass, reason },
+      });
+
       return NextResponse.json({
         success: true,
         message: `Đã cập nhật trạng thái (${statusNote}) cho sinh viên ${cleanMaSV}`,
@@ -260,6 +285,18 @@ export async function POST(req: NextRequest) {
           trangThai: 'DANG_HOC',
           ghiChu: updatedNote,
         },
+      });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'RESTORE_STUDENT',
+        targetType: 'STUDENT',
+        targetId: cleanMaSV,
+        description: `Khôi phục sinh viên ${cleanMaSV} quay trở lại học tại lớp ${cleanTargetClass}`,
+        metadata: { cleanMaSV, cleanTargetClass },
       });
 
       return NextResponse.json({

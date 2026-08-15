@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { fetchStudentCoursesFromQLDTTX } from '@/src/lib/qldttx-service';
+import { logActivity } from '@/src/lib/activityLog';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -181,6 +182,18 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'SYNC_CLASS_REGISTRATION',
+        targetType: 'COURSE_REGISTRATION',
+        targetId: targetClass,
+        description: `Đồng bộ ĐKMH từ QLDTTX cho cả lớp ${targetClass}: ${successCount} SV thành công, ${failCount} thất bại`,
+        metadata: { targetClass, successCount, failCount },
+      });
+
       return NextResponse.json({
         success: true,
         message: `Đã đồng bộ kết quả ĐKMH cho lớp ${targetClass}: ${successCount} thành công, ${failCount} thất bại.`,
@@ -248,6 +261,18 @@ export async function POST(req: NextRequest) {
     });
 
     const coursesList = fetchedResult.data?.data?.ds_kqdkmh || [];
+
+    await logActivity({
+      req,
+      userId: authUser.id,
+      username: authUser.username,
+      userRole: authUser.role,
+      action: 'SYNC_COURSE_REGISTRATION',
+      targetType: 'COURSE_REGISTRATION',
+      targetId: effectiveUsername,
+      description: `Đồng bộ ĐKMH từ QLDTTX cho sinh viên ${effectiveUsername} (${finalClassCode}): ${fetchedResult.totalCourses} môn (${fetchedResult.totalCredits} tín chỉ)`,
+      metadata: { effectiveUsername, finalClassCode, totalCourses: fetchedResult.totalCourses, totalCredits: fetchedResult.totalCredits },
+    });
 
     return NextResponse.json({
       success: true,

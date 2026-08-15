@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { getAuthUser, verifyPassword, hashPassword } from '@/src/lib/auth';
+import { logActivity } from '@/src/lib/activityLog';
 
 export async function POST(req: NextRequest) {
   try {
@@ -58,6 +59,17 @@ export async function POST(req: NextRequest) {
       data: {
         passwordHash: hashedPassword,
       },
+    });
+
+    await logActivity({
+      req,
+      userId: user.id,
+      username: user.username,
+      userRole: user.role,
+      action: 'CHANGE_PASSWORD',
+      targetType: 'USER',
+      targetId: user.username,
+      description: `Người dùng ${user.username} đã thay đổi mật khẩu tài khoản thành công`,
     });
 
     return NextResponse.json({

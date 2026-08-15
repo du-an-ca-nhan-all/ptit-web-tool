@@ -3,6 +3,7 @@ import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { AVAILABLE_EXTERNAL_SYSTEMS } from '@/src/types';
 import { loginAndGetToken, validateToken, getValidTokenOrRefresh } from '@/src/lib/qldttx-service';
+import { logActivity } from '@/src/lib/activityLog';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -200,6 +201,18 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'BATCH_GET_TOKENS',
+        targetType: 'EXTERNAL_ACCOUNT',
+        targetId: 'ALL',
+        description: `Admin làm mới token hàng loạt cho ${allAccounts.length} tài khoản QLDTTX (${successCount} thành công, ${failCount} thất bại)`,
+        metadata: { total: allAccounts.length, successCount, failCount },
+      });
+
       return NextResponse.json({
         success: true,
         message: `Đã làm mới token cho ${allAccounts.length} tài khoản (${successCount} thành công, ${failCount} thất bại).`,
@@ -223,6 +236,18 @@ export async function POST(req: NextRequest) {
           username: effectiveUsername,
           systemKey: systemKey,
         },
+      });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'DELETE_EXTERNAL_ACCOUNT',
+        targetType: 'EXTERNAL_ACCOUNT',
+        targetId: effectiveUsername,
+        description: `Hủy liên kết tài khoản hệ thống "${finalSystemName}" cho sinh viên ${effectiveUsername}`,
+        metadata: { effectiveUsername, systemKey, finalSystemName },
       });
 
       return NextResponse.json({
@@ -308,6 +333,18 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'SAVE_EXTERNAL_ACCOUNT',
+        targetType: 'EXTERNAL_ACCOUNT',
+        targetId: effectiveUsername,
+        description: `Lưu cấu hình liên kết ${finalSystemName} cho ${effectiveUsername} (Trạng thái: ${status})`,
+        metadata: { effectiveUsername, systemKey, status, hasToken: !!fetchedToken },
+      });
+
       return NextResponse.json({
         success: true,
         message: fetchedToken
@@ -366,6 +403,18 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        await logActivity({
+          req,
+          userId: authUser.id,
+          username: authUser.username,
+          userRole: authUser.role,
+          action: 'TEST_EXTERNAL_ACCOUNT',
+          targetType: 'EXTERNAL_ACCOUNT',
+          targetId: effectiveUsername,
+          description: `Kiểm tra/làm mới kết nối ${finalSystemName} cho ${effectiveUsername}: Thành công (${isNew ? 'Cấp token mới' : 'Token hợp lệ'})`,
+          metadata: { effectiveUsername, isNew },
+        });
+
         return NextResponse.json({
           success: true,
           message: isNew
@@ -382,6 +431,18 @@ export async function POST(req: NextRequest) {
             status: 'ERROR',
             syncMessage: `Lỗi lấy Token: ${loginErr.message}`,
           },
+        });
+
+        await logActivity({
+          req,
+          userId: authUser.id,
+          username: authUser.username,
+          userRole: authUser.role,
+          action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
+          targetType: 'EXTERNAL_ACCOUNT',
+          targetId: effectiveUsername,
+          description: `Kiểm tra kết nối ${finalSystemName} cho ${effectiveUsername} thất bại: ${loginErr.message}`,
+          metadata: { effectiveUsername, error: loginErr.message },
         });
 
         return NextResponse.json(

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
+import { logActivity } from '@/src/lib/activityLog';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -123,6 +124,18 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'CREATE_BATCH',
+        targetType: 'EXAM_BATCH',
+        targetId: cleanCode,
+        description: `Tạo mới đợt thi: ${newBatch.name} (Mã: ${cleanCode})`,
+        metadata: { cleanCode, name, semester, academicYear, isActive },
+      });
+
       return NextResponse.json({
         success: true,
         message: `Đã tạo thành công đợt thi ${newBatch.name}`,
@@ -145,6 +158,17 @@ export async function POST(req: NextRequest) {
       const activated = await prisma.examBatch.update({
         where: { code: cleanCode },
         data: { isActive: true },
+      });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'UPDATE_BATCH',
+        targetType: 'EXAM_BATCH',
+        targetId: cleanCode,
+        description: `Đặt đợt thi "${activated.name}" (${cleanCode}) làm đợt thi mặc định kích hoạt`,
       });
 
       return NextResponse.json({
@@ -170,6 +194,19 @@ export async function POST(req: NextRequest) {
       const updated = await prisma.examBatch.update({
         where: { code: cleanCode },
         data: { isActive: newActive },
+      });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'UPDATE_BATCH',
+        targetType: 'EXAM_BATCH',
+        targetId: cleanCode,
+        description: newActive
+          ? `BẬT trạng thái đợt thi "${updated.name}" (${cleanCode})`
+          : `TẮT trạng thái đợt thi "${updated.name}" (${cleanCode})`,
       });
 
       return NextResponse.json({
@@ -204,6 +241,18 @@ export async function POST(req: NextRequest) {
           description: description !== undefined ? String(description).trim() : undefined,
           isActive: isActive !== undefined ? !!isActive : undefined,
         },
+      });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'UPDATE_BATCH',
+        targetType: 'EXAM_BATCH',
+        targetId: cleanCode,
+        description: `Cập nhật thông tin đợt thi: ${updated.name} (${cleanCode})`,
+        metadata: { cleanCode, name, semester, academicYear, isActive },
       });
 
       return NextResponse.json({
@@ -253,6 +302,20 @@ export async function POST(req: NextRequest) {
           await prisma.examBatch.update({ where: { id: latest.id }, data: { isActive: true } });
         }
       }
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'DELETE_BATCH',
+        targetType: 'EXAM_BATCH',
+        targetId: cleanCode,
+        description: deleteRecords
+          ? `Xóa đợt thi ${cleanCode} và toàn bộ dữ liệu lịch thi liên quan`
+          : `Xóa đợt thi ${cleanCode} (bảo lưu dữ liệu lịch thi)`,
+        metadata: { cleanCode, deleteRecords },
+      });
 
       return NextResponse.json({
         success: true,
