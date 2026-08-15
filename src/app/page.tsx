@@ -684,222 +684,226 @@ export default function Home() {
             <X className="w-6 h-6" />
           </button>
         </div>
-        <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1 scrollbar-hide">
-          {/* 0. Hồ sơ cá nhân */}
-          {currentUser && (
-            <button
-              onClick={() => handleTabChange('profile')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                activeTab === 'profile'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-              }`}
-            >
-              <User className="w-4 h-4" /> Hồ Sơ Cá Nhân
-            </button>
-          )}
+        <nav className="flex-1 overflow-y-auto py-3 px-3 flex flex-col gap-5 scrollbar-hide">
+          {/* SECTION 1: SINH VIÊN & TRA CỨU */}
+          <div className="flex flex-col gap-1">
+            <div className="px-3 py-1 text-[11px] font-extrabold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">
+              <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
+              <span>Sinh Viên & Tra Cứu</span>
+            </div>
 
-          {/* 1. Lịch thi tổng hợp (Chỉ hiển thị khi có lịch thi) */}
-          {hasExamSchedule && (
-            <button
-              onClick={() => handleTabChange('schedule')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                activeTab === 'schedule'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-              }`}
-            >
-              <CalendarDays className="w-4 h-4" /> Lịch Thi Tổng Hợp
-            </button>
-          )}
-
-          {/* 2. Lịch thi cá nhân (Chỉ hiển thị khi có lịch thi) */}
-          {currentUser && hasExamSchedule && (
-            <button
-              onClick={() => handleTabChange('personal_schedule')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                activeTab === 'personal_schedule'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-              }`}
-            >
-              <User className="w-4 h-4" /> Lịch Thi Cá Nhân
-            </button>
-          )}
-
-          {/* 3. Thành viên lớp mình */}
-          {currentUser && !isMonitor && (
-            <button
-              onClick={() => {
-                if (currentUser.lop) setMonitorClass(currentUser.lop);
-                handleTabChange('members');
-              }}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                activeTab === 'members'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-              }`}
-            >
-              <Users className="w-4 h-4" /> Thành Viên Lớp Mình
-            </button>
-          )}
-
-          {/* 4. Môn học đã đăng ký */}
-          {currentUser && (
-            <button
-              onClick={() => handleTabChange('registered_courses')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                activeTab === 'registered_courses'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-              }`}
-            >
-              <BookOpen className="w-4 h-4 text-emerald-400" /> Môn Học Đã Đăng Ký
-            </button>
-          )}
-
-          {/* 5. So sánh ĐKMH */}
-          {currentUser && (
-            <button
-              onClick={() => handleTabChange('course_compare')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                activeTab === 'course_compare'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-              }`}
-            >
-              <ArrowLeftRight className="w-4 h-4" /> So Sánh ĐKMH
-            </button>
-          )}
-
-          {/* 5. Danh sách lớp trưởng */}
-          <button
-            onClick={() => handleTabChange('monitors_list')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors mt-2 ${
-              activeTab === 'monitors_list'
-                ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-            }`}
-          >
-            <Crown className="w-4 h-4" /> Danh Sách Lớp Trưởng
-          </button>
-
-          {/* 6. Công cụ Admin & Lớp Trưởng */}
-          {canAccessMonitorTools && (
-            <div className="mt-4 flex flex-col gap-1">
-              <div
-                className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between cursor-pointer hover:text-slate-300"
-                onClick={() => setIsClassGroupOpen(!isClassGroupOpen)}
+            {/* Hồ sơ cá nhân */}
+            {currentUser && (
+              <button
+                onClick={() => handleTabChange('profile')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'profile'
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
               >
-                {isAdmin ? (isMonitor ? 'Công Cụ Admin & Lớp Trưởng' : 'Công Cụ Quản Trị Viên') : 'Công cụ lớp trưởng'}
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform ${isClassGroupOpen ? 'rotate-180' : ''}`}
-                />
-              </div>
-              {isClassGroupOpen && (
-                <div className="pl-2 flex flex-col gap-1 mt-1 border-l-2 border-slate-800 ml-5">
-                  <button
-                    onClick={() => handleTabChange('members')}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                      activeTab === 'members'
-                        ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                    }`}
-                  >
-                    <Users className="w-4 h-4" /> Danh Sách Lớp
-                  </button>
+                <User className="w-4 h-4 text-blue-400" /> Hồ Sơ Cá Nhân
+              </button>
+            )}
 
-                  {/* PB Lớp Mình (Chỉ hiển thị khi có lịch thi) */}
-                  {hasExamSchedule && (
-                    <button
-                      onClick={() => handleTabChange('envelope')}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                        activeTab === 'envelope'
-                          ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                      }`}
-                    >
-                      <Mail className="w-4 h-4" /> PB Lớp Mình
-                    </button>
-                  )}
+            {/* Lịch thi cá nhân */}
+            {currentUser && hasExamSchedule && (
+              <button
+                onClick={() => handleTabChange('personal_schedule')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'personal_schedule'
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <User className="w-4 h-4 text-sky-400" /> Lịch Thi Cá Nhân
+              </button>
+            )}
 
-                  {/* PB Lớp Khác (Chỉ hiển thị khi có lịch thi) */}
-                  {hasExamSchedule && (
-                    <button
-                      onClick={() => handleTabChange('envelope_all')}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                        activeTab === 'envelope_all'
-                          ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                      }`}
-                    >
-                      <BookOpen className="w-4 h-4" /> PB Lớp Khác
-                    </button>
-                  )}
+            {/* Lịch thi tổng hợp */}
+            {hasExamSchedule && (
+              <button
+                onClick={() => handleTabChange('schedule')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'schedule'
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <CalendarDays className="w-4 h-4 text-indigo-400" /> Lịch Thi Tổng Hợp
+              </button>
+            )}
 
-                  {/* Bù Trừ Thanh Toán (Chỉ hiển thị khi có lịch thi) */}
-                  {hasExamSchedule && (
-                    <button
-                      onClick={() => handleTabChange('settlement')}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                        activeTab === 'settlement'
-                          ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                      }`}
-                    >
-                      <DollarSign className="w-4 h-4" /> Bù Trừ Thanh Toán
-                    </button>
-                  )}
+            {/* Môn học đã đăng ký */}
+            {currentUser && (
+              <button
+                onClick={() => handleTabChange('registered_courses')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'registered_courses'
+                    ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <BookOpen className="w-4 h-4 text-emerald-400" /> Môn Học Đã Đăng Ký
+              </button>
+            )}
 
-                  {isAdmin && (
-                    <>
-                      <button
-                        onClick={() => handleTabChange('batches')}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
-                          activeTab === 'batches'
-                            ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                        }`}
-                      >
-                        <Layers className="w-4 h-4 text-indigo-400" /> Quản Lý Đợt Thi
-                      </button>
+            {/* So sánh ĐKMH */}
+            {currentUser && (
+              <button
+                onClick={() => handleTabChange('course_compare')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'course_compare'
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <ArrowLeftRight className="w-4 h-4 text-cyan-400" /> So Sánh ĐKMH
+              </button>
+            )}
 
-                      <button
-                        onClick={() => handleTabChange('external_accounts_admin')}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
-                          activeTab === 'external_accounts_admin'
-                            ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                        }`}
-                      >
-                        <Globe className="w-4 h-4 text-indigo-400" /> Tài Khoản QLĐT Từ Xa
-                      </button>
+            {/* Danh sách lớp trưởng */}
+            <button
+              onClick={() => handleTabChange('monitors_list')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                activeTab === 'monitors_list'
+                  ? 'bg-amber-600/20 text-amber-400 border border-amber-500/30 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+              }`}
+            >
+              <Crown className="w-4 h-4 text-amber-400" /> Danh Sách Lớp Trưởng
+            </button>
+          </div>
 
-                      <button
-                        onClick={() => handleTabChange('activity_logs')}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
-                          activeTab === 'activity_logs'
-                            ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                        }`}
-                      >
-                        <History className="w-4 h-4 text-indigo-400" /> Nhật Ký Hoạt Động
-                      </button>
-
-                      <button
-                        onClick={() => handleTabChange('telegram_admin')}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
-                          activeTab === 'telegram_admin'
-                            ? 'bg-sky-600/20 text-sky-400 border border-sky-600/30 font-bold'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                        }`}
-                      >
-                        <Bot className="w-4 h-4 text-sky-400" /> Bot Telegram Toàn Cục
-                      </button>
-                    </>
-                  )}
+          {/* SECTION 2: CÔNG CỤ LỚP TRƯỞNG */}
+          {canAccessMonitorTools && (
+            <div className="flex flex-col gap-1 pt-3 border-t border-slate-800/80">
+              <div className="px-3 py-1 text-[11px] font-extrabold text-amber-400 tracking-wider uppercase flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Công Cụ Lớp Trưởng</span>
                 </div>
+                <span className="px-1.5 py-0.5 bg-amber-400/10 text-amber-300 rounded text-[9px] font-mono border border-amber-400/20">
+                  Lớp Trưởng
+                </span>
+              </div>
+
+              {/* Danh sách & Thành viên lớp */}
+              <button
+                onClick={() => handleTabChange('members')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'members'
+                    ? 'bg-amber-600/20 text-amber-400 border border-amber-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Users className="w-4 h-4 text-amber-400" /> Danh Sách & Điểm Danh
+              </button>
+
+              {/* PB Lớp Mình */}
+              {hasExamSchedule && (
+                <button
+                  onClick={() => handleTabChange('envelope')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                    activeTab === 'envelope'
+                      ? 'bg-amber-600/20 text-amber-400 border border-amber-500/30 font-bold'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                  }`}
+                >
+                  <Mail className="w-4 h-4 text-amber-400" /> Phân Công Phong Bì Lớp Mình
+                </button>
               )}
+
+              {/* PB Lớp Khác */}
+              {hasExamSchedule && (
+                <button
+                  onClick={() => handleTabChange('envelope_all')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                    activeTab === 'envelope_all'
+                      ? 'bg-amber-600/20 text-amber-400 border border-amber-500/30 font-bold'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4 text-amber-400" /> Phân Công Phong Bì Toàn Trường
+                </button>
+              )}
+
+              {/* Bù Trừ Thanh Toán */}
+              {hasExamSchedule && (
+                <button
+                  onClick={() => handleTabChange('settlement')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                    activeTab === 'settlement'
+                      ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 font-bold'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                  }`}
+                >
+                  <DollarSign className="w-4 h-4 text-emerald-400" /> Bù Trừ Thanh Toán
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* SECTION 3: QUẢN TRỊ VIÊN HỆ THỐNG */}
+          {isAdmin && (
+            <div className="flex flex-col gap-1 pt-3 border-t border-slate-800/80">
+              <div className="px-3 py-1 text-[11px] font-extrabold text-indigo-400 tracking-wider uppercase flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Quản Trị Viên</span>
+                </div>
+                <span className="px-1.5 py-0.5 bg-indigo-400/10 text-indigo-300 rounded text-[9px] font-mono border border-indigo-400/20">
+                  Admin
+                </span>
+              </div>
+
+              {/* Quản lý đợt thi */}
+              <button
+                onClick={() => handleTabChange('batches')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'batches'
+                    ? 'bg-indigo-600/25 text-indigo-400 border border-indigo-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Layers className="w-4 h-4 text-indigo-400" /> Quản Lý Đợt Thi
+              </button>
+
+              {/* Tài khoản QLĐT từ xa */}
+              <button
+                onClick={() => handleTabChange('external_accounts_admin')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'external_accounts_admin'
+                    ? 'bg-indigo-600/25 text-indigo-400 border border-indigo-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Globe className="w-4 h-4 text-indigo-400" /> Tài Khoản QLĐT Từ Xa
+              </button>
+
+              {/* Bot Telegram Toàn Cục */}
+              <button
+                onClick={() => handleTabChange('telegram_admin')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'telegram_admin'
+                    ? 'bg-sky-600/25 text-sky-400 border border-sky-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Bot className="w-4 h-4 text-sky-400" /> Bot Telegram Toàn Cục
+              </button>
+
+              {/* Nhật ký hoạt động */}
+              <button
+                onClick={() => handleTabChange('activity_logs')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'activity_logs'
+                    ? 'bg-indigo-600/25 text-indigo-400 border border-indigo-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <History className="w-4 h-4 text-indigo-400" /> Nhật Ký Hoạt Động
+              </button>
             </div>
           )}
         </nav>
