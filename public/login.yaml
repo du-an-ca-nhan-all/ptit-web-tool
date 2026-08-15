@@ -2,12 +2,17 @@
 system: QuanLyLopHoc
 version: '1.0'
 users:
+  - username: "admin"
+    role: "admin"
+    password_hash: "263fec58861449aacc1c328a4aff64aff4c62df4a2d50b3f207fa89b6e242c9aa778e7a8baeffef85b6ca6d2e7dc16ff0a760d59c13c238f6bcdc32f8ce9cc62"
+    fullName: "Quản Trị Viên Hệ Thống"
+    phoneNumber: "0966211618"
+
   - username: "K25DTCN402"
-    role: "lop_truong"
+    role: "admin,lop_truong"
     password_hash: "263fec58861449aacc1c328a4aff64aff4c62df4a2d50b3f207fa89b6e242c9aa778e7a8baeffef85b6ca6d2e7dc16ff0a760d59c13c238f6bcdc32f8ce9cc62"
     fullName: "Lê Văn Thành"
     phoneNumber: "0966211618"
-    email: "loptruong@example.com"
     lop: "D25TXCN11-K"
   - username: "K24DTCN468"
     role: "lop_truong"

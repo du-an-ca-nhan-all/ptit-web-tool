@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { verifyPassword, createAuthToken } from '@/src/lib/auth';
+import { verifyPassword, createAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,10 +37,15 @@ export async function POST(req: NextRequest) {
         data: { lastLogin: new Date() },
       });
 
+      const isAdmin = checkIsAdmin(user.role);
+      const isMonitor = checkIsMonitor(user.role);
+
       const authPayload = {
         id: user.id,
         username: user.username,
         role: user.role,
+        isAdmin,
+        isMonitor,
         fullName: user.student?.hoTen || user.student?.ten || user.username,
         phoneNumber: user.student?.soDienThoai || null,
         lop: user.student?.maLop || null,
@@ -85,6 +90,8 @@ export async function POST(req: NextRequest) {
           id: user.id,
           username: user.username,
           role: user.role,
+          isAdmin: false,
+          isMonitor: false,
           fullName: student.hoTen || student.ten || user.username,
           phoneNumber: student.soDienThoai || null,
           lop: student.maLop || null,

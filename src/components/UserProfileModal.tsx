@@ -39,7 +39,8 @@ export default function UserProfileModal({
   const [errorMsg, setErrorMsg] = useState('');
   const [copiedMssv, setCopiedMssv] = useState(false);
 
-  const isMonitor = currentUser.role === 'lop_truong';
+  const isAdmin = currentUser?.isAdmin || (currentUser?.role ? currentUser.role.includes('admin') : false);
+  const isMonitor = currentUser?.isMonitor || (currentUser?.role ? currentUser.role.includes('lop_truong') : false);
   const fullName = student?.hoTen || currentUser.fullName || currentUser.username;
   const maSV = currentUser.username;
   const maLop = student?.maLop || currentUser.lop || 'Chưa cập nhật';
@@ -124,11 +125,17 @@ export default function UserProfileModal({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-xl font-black tracking-tight truncate">{fullName}</h2>
-                {isMonitor ? (
+                {isAdmin && (
+                  <span className="bg-rose-500 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
+                    <Crown className="w-3 h-3 text-amber-300" /> Admin
+                  </span>
+                )}
+                {isMonitor && (
                   <span className="bg-amber-400 text-slate-900 text-[11px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
                     <Crown className="w-3 h-3" /> Lớp Trưởng
                   </span>
-                ) : (
+                )}
+                {!isAdmin && !isMonitor && (
                   <span className="bg-white/20 backdrop-blur-sm text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
                     <GraduationCap className="w-3 h-3" /> Sinh Viên
                   </span>

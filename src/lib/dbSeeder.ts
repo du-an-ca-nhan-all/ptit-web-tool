@@ -237,13 +237,17 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         studentCount += chunk.length;
       }
 
-      // 4b. Batch insert Users (username = maSV, no duplicate fullName/email in User table)
+      // 4b. Batch insert Users (username = maSV, support multiple roles like 'admin,lop_truong')
       const userList = studentArray.map((s) => {
         const loginUser = loginUsersMap.get(s.maSV);
+        const role = Array.isArray(loginUser?.role)
+          ? loginUser.role.join(',')
+          : String(loginUser?.role || 'sinh_vien');
+
         return {
           username: s.maSV,
           passwordHash: loginUser?.password_hash || '',
-          role: loginUser?.role || 'sinh_vien',
+          role,
           isActive: true,
         };
       });

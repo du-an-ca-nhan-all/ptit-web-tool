@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
+import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
 import { prisma } from '@/src/lib/prisma';
 
 export async function GET(req: NextRequest) {
@@ -35,11 +35,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ user: null }, { status: 401 });
     }
 
+    const isAdmin = checkIsAdmin(user.role);
+    const isMonitor = checkIsMonitor(user.role);
+
     return NextResponse.json({
       user: {
         id: user.id,
         username: user.username,
         role: user.role,
+        isAdmin,
+        isMonitor,
         fullName: user.student?.hoTen || user.student?.ten || user.username,
         phoneNumber: user.student?.soDienThoai || null,
         lop: user.student?.maLop || null,

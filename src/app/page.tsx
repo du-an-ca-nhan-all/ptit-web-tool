@@ -123,7 +123,9 @@ export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  const isMonitor = currentUser?.role === 'lop_truong';
+  const isAdmin = currentUser?.isAdmin || (currentUser?.role ? currentUser.role.includes('admin') : false);
+  const isMonitor = currentUser?.isMonitor || (currentUser?.role ? currentUser.role.includes('lop_truong') : false);
+  const canAccessMonitorTools = isMonitor || isAdmin;
 
   const [courseCompareData, setCourseCompareData] = useState<{
     main: any;
@@ -186,10 +188,10 @@ export default function Home() {
   }, [loadDataFromApi]);
 
   useEffect(() => {
-    if (!isMonitor && ['monitor', 'envelope', 'envelope_all', 'settlement', 'settings'].includes(activeTab)) {
+    if (!canAccessMonitorTools && ['monitor', 'envelope', 'envelope_all', 'settlement', 'settings'].includes(activeTab)) {
       setActiveTab('personal_schedule');
     }
-  }, [isMonitor, activeTab]);
+  }, [canAccessMonitorTools, activeTab]);
 
   useEffect(() => {
     setSelectedExamRoom(null);
@@ -472,13 +474,13 @@ export default function Home() {
             <Crown className="w-4 h-4" /> Danh Sách Lớp Trưởng
           </button>
 
-          {isMonitor && (
+          {canAccessMonitorTools && (
             <div className="mt-4 flex flex-col gap-1">
               <div
                 className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between cursor-pointer hover:text-slate-300"
                 onClick={() => setIsClassGroupOpen(!isClassGroupOpen)}
               >
-                Công cụ lớp trưởng
+                {isAdmin ? (isMonitor ? 'Công Cụ Admin & Lớp Trưởng' : 'Công Cụ Quản Trị Viên') : 'Công cụ lớp trưởng'}
                 <ChevronDown
                   className={`w-4 h-4 transition-transform ${isClassGroupOpen ? 'rotate-180' : ''}`}
                 />

@@ -34,11 +34,14 @@ export interface ClassConfig {
 export interface LoginUser {
   id?: number;
   username: string; // Mã sinh viên
-  role?: string;    // 'admin' | 'lop_truong' | 'sinh_vien'
+  role?: string;    // 'admin' | 'lop_truong' | 'admin,lop_truong' | 'sinh_vien'
+  isAdmin?: boolean;
+  isMonitor?: boolean;
   password_hash?: string;
   fullName?: string; // Lấy từ Student.hoTen
   phoneNumber?: string; // Lấy từ Student.soDienThoai
   lop?: string;      // Lấy từ Student.maLop
+  student?: any;
 }
 
 export interface StudentProfile {

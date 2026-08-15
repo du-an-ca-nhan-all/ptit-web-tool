@@ -12,9 +12,21 @@ export interface AuthUser {
   id: number;
   username: string;
   role: string;
+  isAdmin: boolean;
+  isMonitor: boolean;
   fullName?: string | null;
   phoneNumber?: string | null;
   lop?: string | null;
+}
+
+export function checkIsAdmin(role?: string | null): boolean {
+  if (!role) return false;
+  return role.split(',').map((r) => r.trim().toLowerCase()).includes('admin');
+}
+
+export function checkIsMonitor(role?: string | null): boolean {
+  if (!role) return false;
+  return role.split(',').map((r) => r.trim().toLowerCase()).includes('lop_truong');
 }
 
 export function hashSHA512(str: string): string {
@@ -57,6 +69,8 @@ export async function createAuthToken(user: AuthUser): Promise<string> {
     id: user.id,
     username: user.username,
     role: user.role,
+    isAdmin: user.isAdmin,
+    isMonitor: user.isMonitor,
     fullName: user.fullName,
     phoneNumber: user.phoneNumber,
     lop: user.lop,
@@ -70,7 +84,17 @@ export async function createAuthToken(user: AuthUser): Promise<string> {
 export async function verifyAuthToken(token: string): Promise<AuthUser | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload as unknown as AuthUser;
+    const p = payload as any;
+    return {
+      id: p.id,
+      username: p.username,
+      role: p.role,
+      isAdmin: p.isAdmin !== undefined ? p.isAdmin : checkIsAdmin(p.role),
+      isMonitor: p.isMonitor !== undefined ? p.isMonitor : checkIsMonitor(p.role),
+      fullName: p.fullName,
+      phoneNumber: p.phoneNumber,
+      lop: p.lop,
+    };
   } catch (err) {
     return null;
   }
@@ -93,10 +117,15 @@ export async function getCurrentUserFromCookie(): Promise<AuthUser | null> {
 
     if (!user) return null;
 
+    const isAdmin = checkIsAdmin(user.role);
+    const isMonitor = checkIsMonitor(user.role);
+
     return {
       id: user.id,
       username: user.username,
       role: user.role,
+      isAdmin,
+      isMonitor,
       fullName: user.student?.hoTen || user.student?.ten || user.username,
       phoneNumber: user.student?.soDienThoai || null,
       lop: user.student?.maLop || null,
