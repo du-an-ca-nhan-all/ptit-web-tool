@@ -3,6 +3,7 @@ import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { fetchStudentCoursesFromQLDTTX } from '@/src/lib/qldttx-service';
 import { logActivity } from '@/src/lib/activityLog';
+import { dispatchCourseRegistrationSynced } from '@/src/lib/telegram-dispatcher';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -273,6 +274,14 @@ export async function POST(req: NextRequest) {
       description: `Đồng bộ ĐKMH từ QLDTTX cho sinh viên ${effectiveUsername} (${finalClassCode}): ${fetchedResult.totalCourses} môn (${fetchedResult.totalCredits} tín chỉ)`,
       metadata: { effectiveUsername, finalClassCode, totalCourses: fetchedResult.totalCourses, totalCredits: fetchedResult.totalCredits },
     });
+
+    // Asynchronously dispatch Telegram notification to student
+    dispatchCourseRegistrationSynced({
+      username: effectiveUsername,
+      courseList: coursesList,
+      tuitionFee: fetchedResult.tuitionFee,
+      totalCredits: fetchedResult.totalCredits,
+    }).catch((err) => console.error('Dispatch course registration synced error:', err));
 
     return NextResponse.json({
       success: true,

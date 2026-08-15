@@ -239,3 +239,18 @@ model TelegramGlobalConfig {
 
   @@index([isActive])
 }
+
+// 11. Bảng ExamReminderLog: Nhật ký nhắc lịch thi tự động để tránh gửi trùng
+model ExamReminderLog {
+  id           Int      @id @default(autoincrement())
+  username     String   // Mã SV
+  examRecordId Int      // ID bản ghi ExamRecord
+  reminderType String   // '1_DAY_BEFORE' (Nhắc trước 1 ngày) | 'SAME_DAY_MORNING' (Nhắc 7h sáng hôm thi)
+  targetDate   String   // Ngày thi (DD/MM/YYYY)
+  sentAt       DateTime @default(now())
+
+  @@unique([username, examRecordId, reminderType])
+  @@index([username])
+  @@index([targetDate])
+  @@index([reminderType])
+}

@@ -3,6 +3,7 @@ import { prisma } from '@/src/lib/prisma';
 import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
 import { logActivity } from '@/src/lib/activityLog';
+import { dispatchExamPostponed } from '@/src/lib/telegram-dispatcher';
 
 export async function GET(req: NextRequest) {
   try {
@@ -252,6 +253,18 @@ export async function PATCH(req: NextRequest) {
         } cho ${targetDesc || maSV || 'bản ghi'}`,
         metadata: { id, ids, maSV, maMH, mapThi, ngayThi, gioThi, isPostponed, updatedCount },
       }).catch(() => {});
+    }
+
+    // 5. Dispatch Telegram notification asynchronously
+    if (maSV) {
+      dispatchExamPostponed({
+        username: String(maSV).trim(),
+        subjectCode: maMH ? String(maMH).trim() : undefined,
+        isPostponed,
+        examDate: ngayThi ? String(ngayThi).trim() : undefined,
+        examTime: gioThi ? String(gioThi).trim() : undefined,
+        examRoom: mapThi ? String(mapThi).trim() : undefined,
+      }).catch((err) => console.error('Dispatch exam postponed error:', err));
     }
 
     return NextResponse.json({

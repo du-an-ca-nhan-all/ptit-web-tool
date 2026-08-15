@@ -15,7 +15,8 @@ export function getPrismaClient(): PrismaClient {
   if (
     !client ||
     (client as any).telegramConfig === undefined ||
-    (client as any).telegramGlobalConfig === undefined
+    (client as any).telegramGlobalConfig === undefined ||
+    (client as any).examReminderLog === undefined
   ) {
     client = createPrismaClient();
     if (process.env.NODE_ENV !== 'production') {

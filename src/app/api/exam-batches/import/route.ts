@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
 import { logActivity } from '@/src/lib/activityLog';
+import { dispatchExamScheduleUpdated } from '@/src/lib/telegram-dispatcher';
 
 // POST /api/exam-batches/import
 // Upload CSV exam schedule specifically for an Exam Batch
@@ -179,6 +180,14 @@ export async function POST(req: NextRequest) {
       description: `Nhập ${examRecordsList.length} bản ghi lịch thi từ file "${file.name}" vào đợt thi "${batch.name}" (Chế độ: ${mode})`,
       metadata: { fileName: file.name, batchCode: cleanBatchCode, mode, totalRecords: examRecordsList.length, totalStudents: studentArray.length },
     });
+
+    // Asynchronously dispatch Telegram notifications to registered students
+    dispatchExamScheduleUpdated({
+      usernames: studentArray.map((s) => s.maSV),
+      batchCode: cleanBatchCode,
+      batchName: batch.name,
+      totalRecords: examRecordsList.length,
+    }).catch((err) => console.error('Dispatch exam schedule updated error:', err));
 
     return NextResponse.json({
       success: true,
