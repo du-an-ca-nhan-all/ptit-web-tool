@@ -11,7 +11,7 @@ function createPrismaClient(): PrismaClient {
 }
 
 let client = globalForPrisma.prisma;
-if (!client || (client as any).telegramConfig === undefined) {
+if (!client || (client as any).telegramConfig === undefined || (client as any).telegramGlobalConfig === undefined) {
   client = createPrismaClient();
   if (process.env.NODE_ENV !== 'production') {
     globalForPrisma.prisma = client;

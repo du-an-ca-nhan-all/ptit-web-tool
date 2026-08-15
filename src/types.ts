@@ -120,7 +120,7 @@ export const AVAILABLE_EXTERNAL_SYSTEMS = [
 export interface TelegramConfigItem {
   id?: number;
   username: string;
-  botToken: string;
+  botToken?: string | null;
   chatId: string;
   threadId?: string | null;
   isEnabled: boolean;
@@ -134,4 +134,14 @@ export interface TelegramConfigItem {
   botFirstName?: string | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface SystemTelegramBotInfo {
+  isConfigured: boolean;
+  botUsername?: string | null;
+  botFirstName?: string | null;
+  botUrl?: string | null;
+  addToGroupUrl?: string | null;
+  addToChannelUrl?: string | null;
+  updatedAt?: string | null;
 }

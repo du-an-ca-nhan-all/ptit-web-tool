@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TelegramConfigItem, LoginUser } from '../types';
+import { TelegramConfigItem, SystemTelegramBotInfo, LoginUser } from '../types';
 import {
   Send,
   Bot,
@@ -19,11 +19,16 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
+  Clock,
   Layers,
   Check,
   Zap,
   ListFilter,
   X as CloseIcon,
+  Users,
+  Settings,
+  ShieldCheck,
+  Globe,
 } from 'lucide-react';
 import TelegramTopicSelectorModal from './TelegramTopicSelectorModal';
 
@@ -39,10 +44,14 @@ export default function TelegramConfigSection({
   onConfigUpdated,
 }: TelegramConfigSectionProps) {
   const [config, setConfig] = useState<TelegramConfigItem | null>(null);
+  const [systemBot, setSystemBot] = useState<SystemTelegramBotInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Bot mode toggle: false = System Bot (default), true = Custom Bot
+  const [isCustomBot, setIsCustomBot] = useState(false);
 
   // Form states
   const [botToken, setBotToken] = useState('');
@@ -54,6 +63,13 @@ export default function TelegramConfigSection({
   const [notifyExamSchedule, setNotifyExamSchedule] = useState(true);
   const [notifyCourseRegistration, setNotifyCourseRegistration] = useState(true);
   const [notifyClassActivity, setNotifyClassActivity] = useState(true);
+
+  // Admin System Bot Config states
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [adminSystemToken, setAdminSystemToken] = useState('');
+  const [isSavingSystemBot, setIsSavingSystemBot] = useState(false);
+  const [systemBotMsg, setSystemBotMsg] = useState('');
+  const [systemBotError, setSystemBotError] = useState('');
 
   // UI helpers
   const [showToken, setShowToken] = useState(false);
@@ -67,9 +83,10 @@ export default function TelegramConfigSection({
     error?: string;
   } | null>(null);
 
+  const isAdmin = currentUser?.isAdmin || (currentUser?.role ? currentUser.role.includes('admin') : false);
   const usernameToQuery = targetUsername || currentUser?.username;
 
-  // Fetch current user's Telegram config
+  // Fetch current user's Telegram config and System Bot info
   const fetchConfig = async () => {
     if (!usernameToQuery) return;
     setIsLoading(true);
@@ -81,8 +98,17 @@ export default function TelegramConfigSection({
       const res = await fetch(url);
       const data = await res.json();
       if (res.ok && data.success) {
+        if (data.systemBot) {
+          setSystemBot(data.systemBot);
+        }
+        if (data.systemBotConfig && data.systemBotConfig.botToken) {
+          setAdminSystemToken(data.systemBotConfig.botToken);
+        }
+
         if (data.config) {
           setConfig(data.config);
+          const hasCustom = !!data.config.botToken;
+          setIsCustomBot(hasCustom);
           setBotToken(data.config.botToken || '');
           setChatId(data.config.chatId || '');
           setThreadId(data.config.threadId || '');
@@ -100,7 +126,7 @@ export default function TelegramConfigSection({
           }
         } else {
           setConfig(null);
-          // Don't wipe if user already typed
+          setIsCustomBot(false);
         }
       }
     } catch (err: any) {
@@ -114,14 +140,51 @@ export default function TelegramConfigSection({
     fetchConfig();
   }, [usernameToQuery]);
 
-  // Handle Save Configuration
+  // Admin Save System Bot (Global Config)
+  const handleSaveSystemBot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminSystemToken.trim()) {
+      setSystemBotError('Vui lòng nhập Bot Token cho hệ thống.');
+      return;
+    }
+
+    setIsSavingSystemBot(true);
+    setSystemBotMsg('');
+    setSystemBotError('');
+
+    try {
+      const res = await fetch('/api/telegram-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SAVE_SYSTEM_BOT',
+          botToken: adminSystemToken.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSystemBotMsg(data.message || 'Đã lưu Bot Hệ Thống thành công!');
+        fetchConfig();
+        setTimeout(() => setSystemBotMsg(''), 5000);
+      } else {
+        setSystemBotError(data.error || 'Không thể lưu Bot Hệ Thống.');
+      }
+    } catch (err) {
+      setSystemBotError('Lỗi kết nối khi lưu Bot Hệ Thống.');
+    } finally {
+      setIsSavingSystemBot(false);
+    }
+  };
+
+  // Handle Save User Configuration
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!botToken.trim()) {
-      setErrorMsg('Vui lòng nhập Telegram Bot Token.');
+    if (isCustomBot && !botToken.trim()) {
+      setErrorMsg('Vui lòng nhập Telegram Bot Token riêng.');
       return;
     }
     if (!chatId.trim()) {
@@ -137,7 +200,7 @@ export default function TelegramConfigSection({
         body: JSON.stringify({
           action: 'SAVE',
           targetUsername: targetUsername || undefined,
-          botToken: botToken.trim(),
+          botToken: isCustomBot ? botToken.trim() : null,
           chatId: chatId.trim(),
           threadId: threadId.trim() || null,
           isEnabled,
@@ -151,13 +214,6 @@ export default function TelegramConfigSection({
       if (res.ok && data.success) {
         setSuccessMsg(data.message || 'Đã lưu cấu hình Telegram thành công!');
         setConfig(data.config);
-        if (data.botInfo) {
-          setTestResult((prev) => ({
-            success: true,
-            message: `Xác thực Bot @${data.botInfo.username || data.botInfo.firstName} thành công`,
-            botInfo: data.botInfo,
-          }));
-        }
         if (onConfigUpdated) onConfigUpdated(data.config);
         setTimeout(() => setSuccessMsg(''), 4000);
       } else {
@@ -176,8 +232,8 @@ export default function TelegramConfigSection({
     setSuccessMsg('');
     setTestResult(null);
 
-    if (!botToken.trim()) {
-      setErrorMsg('Vui lòng nhập Telegram Bot Token trước khi gửi thử nghiệm.');
+    if (isCustomBot && !botToken.trim()) {
+      setErrorMsg('Vui lòng nhập Telegram Bot Token riêng trước khi gửi thử nghiệm.');
       return;
     }
     if (!chatId.trim()) {
@@ -193,7 +249,7 @@ export default function TelegramConfigSection({
         body: JSON.stringify({
           action: 'TEST',
           targetUsername: targetUsername || undefined,
-          botToken: botToken.trim(),
+          botToken: isCustomBot ? botToken.trim() : undefined,
           chatId: chatId.trim(),
           threadId: threadId.trim() || null,
         }),
@@ -252,7 +308,9 @@ export default function TelegramConfigSection({
         setBotToken('');
         setChatId('');
         setThreadId('');
+        setSelectedTopicName(null);
         setTestResult(null);
+        setIsCustomBot(false);
         if (onConfigUpdated) onConfigUpdated(null);
         setTimeout(() => setSuccessMsg(''), 4000);
       } else {
@@ -275,6 +333,8 @@ export default function TelegramConfigSection({
   }
 
   const isConnected = !!config?.id;
+  const activeBotUsername =
+    !isCustomBot ? systemBot?.botUsername : (config?.botUsername || 'CustomBot');
 
   return (
     <div className="flex flex-col gap-6">
@@ -304,63 +364,131 @@ export default function TelegramConfigSection({
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-white/20"
             >
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>{showGuide ? 'Ẩn Hướng Dẫn Cài Đặt' : 'Xem Hướng Dẫn Lấy Token & Chat ID'}</span>
+              <span>{showGuide ? 'Ẩn Hướng Dẫn' : 'Xem Hướng Dẫn Cài Đặt'}</span>
               {showGuide ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setIsAdminPanelOpen(!isAdminPanelOpen)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-400/25 hover:bg-amber-400/35 text-amber-100 rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-amber-300/30"
+              >
+                <Settings className="w-3.5 h-3.5 text-amber-300" />
+                <span>{isAdminPanelOpen ? 'Đóng Quản Trị Bot Hệ Thống' : 'Cấu Hình Bot Toàn Trường (Admin)'}</span>
+              </button>
+            )}
 
             {isConnected && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/25 border border-emerald-300/40 text-emerald-100 rounded-2xl text-xs font-bold">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-                <span>Đã kết nối</span>
-                {config.botUsername && <span className="opacity-90">(@{config.botUsername})</span>}
+                <span>Đã kết nối ({isCustomBot ? 'Bot Riêng' : 'Bot Hệ Thống'})</span>
+                {activeBotUsername && <span className="opacity-90">(@{activeBotUsername})</span>}
               </span>
             )}
           </div>
         </div>
       </div>
 
+      {/* ADMIN GLOBAL BOT CONFIGURATION PANEL */}
+      {isAdmin && isAdminPanelOpen && (
+        <div className="bg-gradient-to-br from-amber-500/10 via-amber-50 to-orange-50 border-2 border-amber-300 rounded-3xl p-6 sm:p-8 shadow-sm animate-in slide-in-from-top-3 duration-200">
+          <div className="flex items-center justify-between border-b border-amber-200 pb-4 mb-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-500 text-white rounded-2xl shadow-sm shadow-amber-300">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  Cấu Hình Bot Telegram Hệ Thống (Toàn Trường)
+                </h3>
+                <p className="text-xs text-slate-600">
+                  Dành riêng cho Quản trị viên: Lưu vào bảng <code className="font-mono text-indigo-700 font-bold">TelegramGlobalConfig</code>. Toàn bộ sinh viên có thể dùng bot này mà không cần tự tạo bot.
+                </p>
+              </div>
+            </div>
+
+            {systemBot?.isConfigured && (
+              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Đang Hoạt Động (@{systemBot.botUsername})</span>
+              </span>
+            )}
+          </div>
+
+          {systemBotMsg && (
+            <div className="mb-4 p-3.5 bg-emerald-100 border border-emerald-300 rounded-2xl text-emerald-900 text-xs font-bold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>{systemBotMsg}</span>
+            </div>
+          )}
+
+          {systemBotError && (
+            <div className="mb-4 p-3.5 bg-rose-100 border border-rose-300 rounded-2xl text-rose-900 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
+              <span>{systemBotError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSaveSystemBot} className="flex flex-col gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                System Bot API Token
+              </label>
+              <input
+                type="text"
+                value={adminSystemToken}
+                onChange={(e) => setAdminSystemToken(e.target.value)}
+                placeholder="Nhập Token của Bot hệ thống (ví dụ: 123456789:ABCdef...)"
+                className="w-full bg-white border border-amber-300 rounded-2xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                required
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Tạo 1 bot đại diện duy nhất (ví dụ: <code className="font-bold">@PTIT_EduSync_Bot</code>) qua @BotFather và dán token vào đây.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={isSavingSystemBot}
+                className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl text-xs font-bold transition-all shadow-sm shadow-amber-300 cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSavingSystemBot ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Check className="w-3.5 h-3.5" />
+                )}
+                <span>Lưu & Kích Hoạt Bot Toàn Trường</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Quick Setup Guide Accordion */}
       {showGuide && (
         <div className="bg-slate-50 border border-sky-200 rounded-3xl p-6 shadow-sm animate-in fade-in duration-200">
           <div className="flex items-center gap-2 mb-4 text-sky-800 font-black text-sm">
             <Sparkles className="w-4 h-4 text-sky-600" />
-            <span>4 Bước Đơn Giản Để Cấu Hình Telegram Bot</span>
+            <span>Hướng Dẫn Sử Dụng Bot Telegram Trong 3 Bước</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col gap-1.5">
               <div className="flex items-center gap-2 font-bold text-slate-800">
                 <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px]">1</span>
-                <span>Tạo Bot & Lấy Bot Token</span>
+                <span>Thêm Bot Vào Kênh / Chat Riêng</span>
               </div>
               <p className="text-slate-600 leading-relaxed">
-                Mở ứng dụng Telegram, tìm kiếm bot{' '}
-                <a
-                  href="https://t.me/BotFather"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold text-sky-600 hover:underline inline-flex items-center gap-0.5"
-                >
-                  @BotFather <ExternalLink className="w-3 h-3" />
-                </a>
-                . Gửi lệnh <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-600 font-mono">/newbot</code> và làm theo hướng dẫn để nhận API Token dạng: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[11px]">123456789:ABCdefGhI...</code>
+                Nếu dùng <strong>Bot Hệ Thống</strong>, chỉ cần bấm nút <em>"Mở Bot & Nhấn Start"</em> hoặc <em>"Thêm Bot vào Nhóm"</em>. Nếu dùng Bot Riêng, tạo bot qua @BotFather và dán token.
               </p>
             </div>
 
             <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col gap-1.5">
               <div className="flex items-center gap-2 font-bold text-slate-800">
                 <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px]">2</span>
-                <span>Khởi Động Bot (/start)</span>
-              </div>
-              <p className="text-slate-600 leading-relaxed">
-                Sau khi tạo bot, hãy bấm vào liên kết bot của bạn và nhấn nút <span className="font-bold text-emerald-600">Start (/start)</span>. Nếu bạn muốn gửi vào Nhóm lớp, hãy thêm bot vào nhóm đó và cấp quyền nhắn tin.
-              </p>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 font-bold text-slate-800">
-                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px]">3</span>
-                <span>Lấy Chat ID Người Nhận</span>
+                <span>Lấy Chat ID Nhận Tin</span>
               </div>
               <p className="text-slate-600 leading-relaxed">
                 Chat với{' '}
@@ -372,24 +500,24 @@ export default function TelegramConfigSection({
                 >
                   @userinfobot <ExternalLink className="w-3 h-3" />
                 </a>{' '}
-                để xem ID tài khoản của bạn (Ví dụ: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-indigo-600">987654321</code>). Nếu là Nhóm chat, ID nhóm thường bắt đầu bằng dấu trừ (Ví dụ: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-indigo-600">-100123456789</code>).
+                để lấy ID cá nhân (ví dụ: <code className="bg-slate-100 px-1 py-0.2 rounded font-mono text-indigo-600">987654321</code>). Nếu là Nhóm, ID thường có dấu trừ (<code className="bg-slate-100 px-1 py-0.2 rounded font-mono text-indigo-600">-100123456789</code>).
               </p>
             </div>
 
             <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col gap-1.5">
               <div className="flex items-center gap-2 font-bold text-slate-800">
-                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px]">4</span>
-                <span>Thread ID / Topic ID (Tùy chọn)</span>
+                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px]">3</span>
+                <span>Chọn Topic & Lưu</span>
               </div>
               <p className="text-slate-600 leading-relaxed">
-                Nếu nhóm Telegram của bạn bật tính năng <span className="font-medium">Forum Topics</span> và bạn muốn tin nhắn chỉ gửi vào một Topic cụ thể (ví dụ topic "Lịch Thi"), hãy nhập ID của Topic đó. Để trống nếu là Chat cá nhân hoặc nhóm thường.
+                Nếu nhóm có bật <em>Forum Topics</em>, bấm nút <strong>"Quét / Chọn Topic"</strong> để chọn chủ đề nhận thông báo, sau đó bấm <strong>"Gửi Thử Tin Nhắn"</strong> để kiểm tra.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Notifications / Alerts */}
+      {/* Feedback Alerts */}
       {successMsg && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2.5 animate-in fade-in">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
@@ -450,7 +578,7 @@ export default function TelegramConfigSection({
               <Bot className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-800">Thông Tin Cấu Hình Telegram Bot</h3>
+              <h3 className="text-base font-black text-slate-800">Cấu Hình Thông Báo Telegram</h3>
               <p className="text-xs text-slate-500">
                 Tài khoản: <span className="font-mono font-bold text-indigo-600">{usernameToQuery}</span>
               </p>
@@ -472,47 +600,160 @@ export default function TelegramConfigSection({
           </label>
         </div>
 
-        <form onSubmit={handleSave} className="flex flex-col gap-5">
-          {/* Input 1: Bot Token */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5 text-slate-500" />
-                <span>Telegram Bot API Token</span>
-                <span className="text-rose-500">*</span>
-              </label>
-              <span className="text-[11px] text-slate-400">Được cấp bởi @BotFather</span>
-            </div>
-            <div className="relative flex items-center">
-              <input
-                type={showToken ? 'text' : 'password'}
-                value={botToken}
-                onChange={(e) => setBotToken(e.target.value)}
-                placeholder="Ví dụ: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-20 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
-                required
-              />
-              <div className="absolute right-2 flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setShowToken(!showToken)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
-                  title={showToken ? 'Ẩn Token' : 'Hiện Token'}
-                >
-                  {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+        {/* BOT MODE SELECTOR */}
+        <div className="flex flex-col gap-2.5">
+          <label className="text-xs font-bold text-slate-800">Lựa Chọn Bot Sử Dụng</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Option 1: System Bot */}
+            <div
+              onClick={() => {
+                setIsCustomBot(false);
+                setBotToken('');
+              }}
+              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col gap-2 relative ${
+                !isCustomBot
+                  ? 'bg-sky-50/70 border-sky-500 ring-2 ring-sky-200'
+                  : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                  <Globe className="w-4 h-4 text-sky-600" />
+                  <span>Sử Dụng Bot Hệ Thống (Khuyên Dùng)</span>
+                </div>
+                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full">
+                  Tiện Lợi Nhất
+                </span>
               </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Sử dụng bot chính thức của trường. Bạn chỉ cần thêm bot vào nhóm/kênh hoặc chat riêng mà không cần tạo bot.
+              </p>
+            </div>
+
+            {/* Option 2: Custom Bot */}
+            <div
+              onClick={() => setIsCustomBot(true)}
+              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col gap-2 relative ${
+                isCustomBot
+                  ? 'bg-indigo-50/70 border-indigo-500 ring-2 ring-indigo-200'
+                  : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                  <Key className="w-4 h-4 text-indigo-600" />
+                  <span>Tự Tạo & Cấu Hình Bot Riêng</span>
+                </div>
+                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full">
+                  Tùy chỉnh
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Dành cho bạn muốn dùng bot riêng của cá nhân. Yêu cầu nhập Telegram Bot API Token từ @BotFather.
+              </p>
             </div>
           </div>
+        </div>
+
+        {/* SYSTEM BOT SHORTCUT ACTIONS CARD */}
+        {!isCustomBot && (
+          <div className="bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border border-sky-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-sky-500 text-white flex items-center justify-center font-bold shrink-0 shadow-sm shadow-sky-300">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-xs text-slate-900">
+                    {systemBot?.botFirstName || 'PTIT EduSync Official Bot'}
+                  </span>
+                  {systemBot?.botUsername && (
+                    <span className="font-mono text-[11px] text-sky-700 font-bold bg-sky-100 px-2 py-0.2 rounded-md">
+                      @{systemBot.botUsername}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Bot hệ thống đã sẵn sàng kết nối và gửi thông báo tự động.
+                </p>
+              </div>
+            </div>
+
+            {systemBot?.botUsername ? (
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <a
+                  href={systemBot.botUrl || `https://t.me/${systemBot.botUsername}?start=start`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 bg-white hover:bg-sky-50 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5 text-sky-600" />
+                  <span>Mở Bot & Nhấn Start</span>
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </a>
+
+                <a
+                  href={systemBot.addToGroupUrl || `https://t.me/${systemBot.botUsername}?startgroup=true`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Thêm Bot Vào Nhóm Lớp</span>
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </a>
+              </div>
+            ) : (
+              <div className="text-xs text-amber-700 font-bold bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
+                ⚠️ Admin chưa cấu hình Bot Toàn Trường.
+              </div>
+            )}
+          </div>
+        )}
+
+        <form onSubmit={handleSave} className="flex flex-col gap-5">
+          {/* Custom Bot Token Input (Only when isCustomBot is true) */}
+          {isCustomBot && (
+            <div className="animate-in fade-in duration-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Telegram Bot API Token Riêng</span>
+                  <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[11px] text-slate-400">Từ @BotFather</span>
+              </div>
+              <div className="relative flex items-center">
+                <input
+                  type={showToken ? 'text' : 'password'}
+                  value={botToken}
+                  onChange={(e) => setBotToken(e.target.value)}
+                  placeholder="Ví dụ: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-20 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  required={isCustomBot}
+                />
+                <div className="absolute right-2 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowToken(!showToken)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
+                    title={showToken ? 'Ẩn Token' : 'Hiện Token'}
+                  >
+                    {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Grid: Chat ID and Thread ID */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Input 2: Chat ID */}
+            {/* Input 1: Chat ID */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                   <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Chat ID / Group ID</span>
+                  <span>Chat ID / Group ID Nhận Tin</span>
                   <span className="text-rose-500">*</span>
                 </label>
                 <span className="text-[11px] text-slate-400">@userinfobot</span>
@@ -526,11 +767,11 @@ export default function TelegramConfigSection({
                 required
               />
               <p className="text-[11px] text-slate-500 mt-1">
-                ID cá nhân hoặc ID của Nhóm/Kênh nhận thông báo.
+                ID tài khoản cá nhân hoặc ID của Nhóm/Kênh nhận thông báo.
               </p>
             </div>
 
-            {/* Input 3: Message Thread ID */}
+            {/* Input 2: Message Thread ID / Topic Selector */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -542,12 +783,12 @@ export default function TelegramConfigSection({
                   type="button"
                   onClick={() => {
                     setErrorMsg('');
-                    if (!botToken.trim()) {
-                      setErrorMsg('Vui lòng nhập Telegram Bot Token trước khi quét Topic.');
-                      return;
-                    }
                     if (!chatId.trim()) {
                       setErrorMsg('Vui lòng nhập Chat ID nhóm trước khi quét Topic.');
+                      return;
+                    }
+                    if (isCustomBot && !botToken.trim()) {
+                      setErrorMsg('Vui lòng nhập Bot Token riêng trước khi quét Topic.');
                       return;
                     }
                     setIsTopicModalOpen(true);
@@ -567,19 +808,19 @@ export default function TelegramConfigSection({
                     setThreadId(e.target.value);
                     setSelectedTopicName(null);
                   }}
-                  placeholder="Ví dụ: 24 (để trống nếu không dùng Topic)"
+                  placeholder="Ví dụ: 24 (để trống nếu là chat thường)"
                   className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-28 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => {
                     setErrorMsg('');
-                    if (!botToken.trim()) {
-                      setErrorMsg('Vui lòng nhập Telegram Bot Token trước khi quét Topic.');
-                      return;
-                    }
                     if (!chatId.trim()) {
                       setErrorMsg('Vui lòng nhập Chat ID nhóm trước khi quét Topic.');
+                      return;
+                    }
+                    if (isCustomBot && !botToken.trim()) {
+                      setErrorMsg('Vui lòng nhập Bot Token riêng trước khi quét Topic.');
                       return;
                     }
                     setIsTopicModalOpen(true);
@@ -611,7 +852,7 @@ export default function TelegramConfigSection({
               )}
 
               <p className="text-[11px] text-slate-500 mt-1">
-                Bấm <strong>"Chọn Topic"</strong> để quét danh sách các chủ đề diễn đàn trong nhóm Telegram.
+                Bấm <strong>"Chọn Topic"</strong> để tự động quét danh sách các chủ đề trong nhóm Telegram.
               </p>
             </div>
           </div>
@@ -684,7 +925,7 @@ export default function TelegramConfigSection({
               <button
                 type="button"
                 onClick={handleTest}
-                disabled={isTesting || !botToken || !chatId}
+                disabled={isTesting || !chatId || (isCustomBot && !botToken)}
                 className="px-5 py-2.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
                 title="Gửi một tin nhắn mẫu tới Telegram để kiểm tra kết nối"
               >
@@ -729,7 +970,7 @@ export default function TelegramConfigSection({
         <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2 text-xs font-bold text-sky-400">
             <Zap className="w-3.5 h-3.5" />
-            <span>Mẫu Tin Nhắn Sẽ Nhận Trên Telegram</span>
+            <span>Mẫu Tin Nhắn Sẽ Nhận Trên Telegram ({!isCustomBot ? 'Bot Hệ Thống' : 'Bot Riêng'})</span>
           </div>
           <span className="text-[11px] text-slate-500 font-mono">HTML Format</span>
         </div>
@@ -744,7 +985,7 @@ export default function TelegramConfigSection({
             👤 <b>Họ và tên:</b> {currentUser?.fullName || currentUser?.username || 'Nguyễn Văn A'}<br />
             🆔 <b>Mã sinh viên:</b> <code className="bg-slate-700 px-1 rounded text-sky-200">{currentUser?.username || 'B25DCCN001'}</code><br />
             🏫 <b>Lớp:</b> <b>{currentUser?.lop || 'D25TXCN11-K'}</b><br />
-            🤖 <b>Bot gửi:</b> <b>{config?.botUsername ? `@${config.botUsername}` : '@MyPTITBot'}</b><br />
+            🤖 <b>Bot gửi:</b> <b>{activeBotUsername ? `@${activeBotUsername}` : '@PTIT_Notification_bot'}</b><br />
             📌 <b>Chat ID nhận:</b> <code className="bg-slate-700 px-1 rounded text-sky-200">{chatId || '123456789'}</code><br />
             {threadId && (
               <>
@@ -764,7 +1005,7 @@ export default function TelegramConfigSection({
       <TelegramTopicSelectorModal
         isOpen={isTopicModalOpen}
         onClose={() => setIsTopicModalOpen(false)}
-        botToken={botToken}
+        botToken={isCustomBot ? botToken : undefined}
         chatId={chatId}
         currentSelectedThreadId={threadId}
         onSelectTopic={(topic) => {

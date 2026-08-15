@@ -31,7 +31,7 @@ export interface ForumTopicItem {
 interface TelegramTopicSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  botToken: string;
+  botToken?: string;
   chatId: string;
   currentSelectedThreadId?: string;
   onSelectTopic: (topic: { threadId: string; name: string }) => void;
@@ -40,7 +40,7 @@ interface TelegramTopicSelectorModalProps {
 export default function TelegramTopicSelectorModal({
   isOpen,
   onClose,
-  botToken,
+  botToken = '',
   chatId,
   currentSelectedThreadId,
   onSelectTopic,
@@ -59,8 +59,8 @@ export default function TelegramTopicSelectorModal({
 
   // Fetch / Pull topics from API
   const handlePullTopics = async () => {
-    if (!botToken.trim() || !chatId.trim()) {
-      setErrorMsg('Vui lòng nhập Bot Token và Chat ID trước khi quét Topic.');
+    if (!chatId.trim()) {
+      setErrorMsg('Vui lòng nhập Chat ID nhóm trước khi quét Topic.');
       return;
     }
 
@@ -72,7 +72,7 @@ export default function TelegramTopicSelectorModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'PULL_TOPICS',
-          botToken: botToken.trim(),
+          botToken: botToken.trim() || undefined,
           chatId: chatId.trim(),
         }),
       });
@@ -122,7 +122,7 @@ export default function TelegramTopicSelectorModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'CREATE_TOPIC',
-          botToken: botToken.trim(),
+          botToken: botToken.trim() || undefined,
           chatId: chatId.trim(),
           topicName: newTopicName.trim(),
         }),

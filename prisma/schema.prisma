@@ -200,7 +200,7 @@ model TelegramConfig {
   username                String    @unique // Mã sinh viên / Username
   user                    User      @relation(fields: [username], references: [username], onDelete: Cascade)
   
-  botToken                String    // Token Bot do @BotFather cấp (ví dụ: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ)
+  botToken                String?   // Token Bot riêng tùy chọn (để trống nếu dùng Bot Hệ Thống)
   chatId                  String    // ID cuộc trò chuyện / Nhóm / Kênh (ví dụ: 123456789 hoặc -100123456789)
   threadId                String?   // ID topic/thread trong nhóm (message_thread_id) nếu có
   
@@ -220,4 +220,22 @@ model TelegramConfig {
 
   @@index([username])
   @@index([isEnabled])
+}
+
+// 10. Bảng TelegramGlobalConfig: Cấu hình Bot Telegram chung toàn hệ thống (Do Admin thiết lập)
+model TelegramGlobalConfig {
+  id              Int       @id @default(autoincrement())
+  botToken        String    // Token Bot Telegram chung do @BotFather cấp
+  botUsername     String?   // Username Telegram của Bot (ví dụ: PTIT_Notification_bot)
+  botFirstName    String?   // Tên hiển thị của Bot (ví dụ: PTIT EduSync Official Bot)
+  botId           String?   // Telegram Bot ID
+  isActive        Boolean   @default(true) // Trạng thái hoạt động của Bot hệ thống
+  description     String?   // Ghi chú / mô tả
+  lastTestedAt    DateTime? // Thời điểm Admin test gần nhất
+  lastTestStatus  String?   // 'SUCCESS' | 'FAILED'
+  lastTestError   String?   // Lỗi test gần nhất nếu có
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([isActive])
 }

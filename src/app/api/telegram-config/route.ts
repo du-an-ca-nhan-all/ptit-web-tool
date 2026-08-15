@@ -6,6 +6,10 @@ import {
   verifyTelegramBot,
   pullForumTopics,
   createTelegramForumTopic,
+  getSystemTelegramBotPublicInfo,
+  getSystemTelegramBotConfig,
+  saveSystemTelegramBot,
+  resolveEffectiveBotToken,
 } from '@/src/lib/telegram-service';
 import { logActivity } from '@/src/lib/activityLog';
 
@@ -33,6 +37,9 @@ export async function GET(req: NextRequest) {
     const viewAll = searchParams.get('view') === 'all' || searchParams.get('admin') === 'true';
     const targetUsername = searchParams.get('username');
 
+    // Fetch system bot public info (safe for all users)
+    const systemBotPublic = await getSystemTelegramBotPublicInfo();
+
     // ADMIN: View all users' Telegram configs
     if (viewAll) {
       if (!authUser.isAdmin) {
@@ -53,6 +60,8 @@ export async function GET(req: NextRequest) {
         orderBy: { updatedAt: 'desc' },
       });
 
+      const systemBotFull = await getSystemTelegramBotConfig();
+
       const formattedConfigs = allConfigs.map((cfg) => {
         const student = cfg.user?.student;
         return {
@@ -61,8 +70,9 @@ export async function GET(req: NextRequest) {
           fullName: student?.hoTen || cfg.username,
           maLop: student?.maLop || 'Chưa phân lớp',
           soDienThoai: student?.soDienThoai || '',
+          isCustomBot: !!cfg.botToken,
           botToken: cfg.botToken ? `${cfg.botToken.substring(0, 10)}...${cfg.botToken.slice(-5)}` : '',
-          rawBotToken: cfg.botToken, // For admin testing
+          rawBotToken: cfg.botToken,
           chatId: cfg.chatId,
           threadId: cfg.threadId,
           isEnabled: cfg.isEnabled,
@@ -83,6 +93,8 @@ export async function GET(req: NextRequest) {
         success: true,
         configs: formattedConfigs,
         totalConfigs: formattedConfigs.length,
+        systemBot: systemBotPublic,
+        systemBotConfig: systemBotFull,
       });
     }
 
@@ -106,13 +118,18 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    const systemBotFull = authUser.isAdmin ? await getSystemTelegramBotConfig() : null;
+
     return NextResponse.json({
       success: true,
+      systemBot: systemBotPublic,
+      systemBotConfig: systemBotFull,
       config: config
         ? {
             id: config.id,
             username: config.username,
-            botToken: config.botToken,
+            isCustomBot: !!config.botToken,
+            botToken: config.botToken || null,
             chatId: config.chatId,
             threadId: config.threadId,
             isEnabled: config.isEnabled,
@@ -164,20 +181,58 @@ export async function POST(req: NextRequest) {
       maLop: studentInfo?.maLop || authUser.lop || 'Chưa cập nhật',
     };
 
+    // 0. ACTION: SAVE SYSTEM BOT TOKEN (Admin only -> TelegramGlobalConfig)
+    if (action === 'SAVE_SYSTEM_BOT') {
+      if (!authUser.isAdmin) {
+        return NextResponse.json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền cấu hình Bot Hệ Thống' }, { status: 403 });
+      }
+
+      const systemToken = body.botToken?.trim();
+      const description = body.description?.trim();
+      if (!systemToken) {
+        return NextResponse.json({ error: 'Vui lòng nhập Telegram Bot Token cho Hệ Thống' }, { status: 400 });
+      }
+
+      const saveRes = await saveSystemTelegramBot(systemToken, description);
+
+      await logActivity({
+        req,
+        action: 'SAVE_SYSTEM_TELEGRAM_BOT',
+        targetType: 'TELEGRAM_GLOBAL_CONFIG',
+        targetId: 'SYSTEM_BOT',
+        description: `Admin cấu hình Bot Telegram Hệ Thống: @${saveRes.botInfo.username || saveRes.botInfo.firstName}`,
+        metadata: {
+          botUsername: saveRes.botInfo.username,
+          botFirstName: saveRes.botInfo.firstName,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Đã lưu Bot Hệ Thống (@${saveRes.botInfo.username || saveRes.botInfo.firstName}) vào bảng TelegramGlobalConfig thành công!`,
+        botInfo: saveRes.botInfo,
+      });
+    }
+
     // 1. ACTION: TEST NOTIFICATION (Gửi tin nhắn thử nghiệm)
     if (action === 'TEST') {
-      const botToken = body.botToken?.trim();
+      const customToken = body.botToken?.trim() || null;
       const chatId = body.chatId?.trim();
       const threadId = body.threadId ? String(body.threadId).trim() : null;
 
-      if (!botToken) {
-        return NextResponse.json({ error: 'Vui lòng nhập Telegram Bot Token' }, { status: 400 });
-      }
       if (!chatId) {
         return NextResponse.json({ error: 'Vui lòng nhập Chat ID người nhận' }, { status: 400 });
       }
 
-      const testResult = await sendTestNotification(botToken, chatId, threadId, userDisplayInfo);
+      let effectiveToken: string;
+      try {
+        const resolved = await resolveEffectiveBotToken(customToken);
+        effectiveToken = resolved.token;
+      } catch (tokenErr: any) {
+        return NextResponse.json({ error: tokenErr.message }, { status: 400 });
+      }
+
+      const testResult = await sendTestNotification(effectiveToken, chatId, threadId, userDisplayInfo);
 
       // Update test result in DB if config already exists
       const existingConfig = await prisma.telegramConfig.findUnique({
@@ -202,10 +257,11 @@ export async function POST(req: NextRequest) {
         action: 'TEST_TELEGRAM_CONFIG',
         targetType: 'TELEGRAM_CONFIG',
         targetId: username,
-        description: `Thử nghiệm gửi tin nhắn Telegram cho tài khoản ${username} (${testResult.success ? 'Thành công' : 'Thất bại'})`,
+        description: `Thử nghiệm gửi tin nhắn Telegram cho ${username} (${testResult.success ? 'Thành công' : 'Thất bại'})`,
         metadata: {
           chatId,
           threadId,
+          isCustomBot: !!customToken,
           success: testResult.success,
           error: testResult.error || null,
           botUsername: testResult.botInfo?.username,
@@ -231,9 +287,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. ACTION: SAVE CONFIGURATION (Lưu cấu hình)
+    // 2. ACTION: SAVE CONFIGURATION (Lưu cấu hình cho từng account)
     if (action === 'SAVE') {
-      const botToken = body.botToken?.trim();
+      const customToken = body.botToken?.trim() || null;
       const chatId = body.chatId?.trim();
       const threadId = body.threadId ? String(body.threadId).trim() : null;
       const isEnabled = body.isEnabled !== undefined ? Boolean(body.isEnabled) : true;
@@ -241,27 +297,38 @@ export async function POST(req: NextRequest) {
       const notifyCourseRegistration = body.notifyCourseRegistration !== undefined ? Boolean(body.notifyCourseRegistration) : true;
       const notifyClassActivity = body.notifyClassActivity !== undefined ? Boolean(body.notifyClassActivity) : true;
 
-      if (!botToken) {
-        return NextResponse.json({ error: 'Vui lòng nhập Telegram Bot Token' }, { status: 400 });
-      }
       if (!chatId) {
         return NextResponse.json({ error: 'Vui lòng nhập Chat ID nhận thông báo' }, { status: 400 });
       }
 
-      // Verify bot token to fetch bot metadata
       let botUsername: string | null = null;
       let botFirstName: string | null = null;
-      const verifyRes = await verifyTelegramBot(botToken);
-      if (verifyRes.success && verifyRes.botInfo) {
+
+      if (customToken) {
+        const verifyRes = await verifyTelegramBot(customToken);
+        if (!verifyRes.success || !verifyRes.botInfo) {
+          return NextResponse.json({ error: verifyRes.error || 'Token Bot riêng không hợp lệ' }, { status: 400 });
+        }
         botUsername = verifyRes.botInfo.username || null;
         botFirstName = verifyRes.botInfo.firstName || null;
+      } else {
+        // Global System Bot
+        const sysPublic = await getSystemTelegramBotPublicInfo();
+        if (!sysPublic.isConfigured) {
+          return NextResponse.json(
+            { error: 'Bot Hệ Thống chưa được Admin thiết lập trong bảng TelegramGlobalConfig. Vui lòng liên hệ Admin hoặc nhập Bot Token riêng.' },
+            { status: 400 }
+          );
+        }
+        botUsername = sysPublic.botUsername || null;
+        botFirstName = sysPublic.botFirstName || 'PTIT EduSync Official Bot';
       }
 
       const savedConfig = await prisma.telegramConfig.upsert({
         where: { username },
         create: {
           username,
-          botToken,
+          botToken: customToken,
           chatId,
           threadId,
           isEnabled,
@@ -272,7 +339,7 @@ export async function POST(req: NextRequest) {
           botFirstName,
         },
         update: {
-          botToken,
+          botToken: customToken,
           chatId,
           threadId,
           isEnabled,
@@ -294,6 +361,7 @@ export async function POST(req: NextRequest) {
           chatId,
           threadId,
           isEnabled,
+          isCustomBot: !!customToken,
           botUsername,
         },
       });
@@ -302,23 +370,27 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'Đã lưu cấu hình thông báo Telegram thành công!',
         config: savedConfig,
-        botInfo: verifyRes.botInfo,
       });
     }
 
     // 3. ACTION: PULL FORUM TOPICS (Lấy danh sách topic từ nhóm)
     if (action === 'PULL_TOPICS') {
-      const botToken = body.botToken?.trim();
+      const customToken = body.botToken?.trim() || null;
       const chatId = body.chatId?.trim();
 
-      if (!botToken) {
-        return NextResponse.json({ error: 'Vui lòng nhập Telegram Bot Token để quét Topic' }, { status: 400 });
-      }
       if (!chatId) {
         return NextResponse.json({ error: 'Vui lòng nhập Chat ID nhóm để quét Topic' }, { status: 400 });
       }
 
-      const pullResult = await pullForumTopics(botToken, chatId);
+      let effectiveToken: string;
+      try {
+        const resolved = await resolveEffectiveBotToken(customToken);
+        effectiveToken = resolved.token;
+      } catch (tokenErr: any) {
+        return NextResponse.json({ error: tokenErr.message }, { status: 400 });
+      }
+
+      const pullResult = await pullForumTopics(effectiveToken, chatId);
 
       if (!pullResult.success) {
         return NextResponse.json(
@@ -341,14 +413,11 @@ export async function POST(req: NextRequest) {
 
     // 4. ACTION: CREATE FORUM TOPIC (Tạo topic mới trong nhóm)
     if (action === 'CREATE_TOPIC') {
-      const botToken = body.botToken?.trim();
+      const customToken = body.botToken?.trim() || null;
       const chatId = body.chatId?.trim();
       const topicName = body.topicName?.trim();
       const iconColor = body.iconColor;
 
-      if (!botToken) {
-        return NextResponse.json({ error: 'Vui lòng nhập Telegram Bot Token' }, { status: 400 });
-      }
       if (!chatId) {
         return NextResponse.json({ error: 'Vui lòng nhập Chat ID nhóm' }, { status: 400 });
       }
@@ -356,7 +425,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Vui lòng nhập tên Topic cần tạo' }, { status: 400 });
       }
 
-      const createRes = await createTelegramForumTopic(botToken, chatId, topicName, iconColor);
+      let effectiveToken: string;
+      try {
+        const resolved = await resolveEffectiveBotToken(customToken);
+        effectiveToken = resolved.token;
+      } catch (tokenErr: any) {
+        return NextResponse.json({ error: tokenErr.message }, { status: 400 });
+      }
+
+      const createRes = await createTelegramForumTopic(effectiveToken, chatId, topicName, iconColor);
       if (!createRes.success) {
         return NextResponse.json(
           {

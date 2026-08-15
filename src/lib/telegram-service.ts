@@ -1,7 +1,4 @@
-/**
- * Telegram Service Helper for PTIT Web Tool
- * Handles Telegram Bot API calls, message formatting, and bot verification.
- */
+import { prisma } from './prisma';
 
 export interface TelegramBotInfo {
   id: number;
@@ -518,5 +515,173 @@ export async function createTelegramForumTopic(
       error: `Lỗi kết nối khi tạo Topic: ${err.message || 'Lỗi mạng'}`,
     };
   }
+}
+
+export interface SystemBotConfigData {
+  id?: number;
+  botToken: string;
+  botUsername?: string | null;
+  botFirstName?: string | null;
+  botId?: string | null;
+  isActive: boolean;
+  description?: string | null;
+  lastTestedAt?: string | null;
+  lastTestStatus?: string | null;
+  lastTestError?: string | null;
+  updatedAt: string;
+}
+
+/**
+ * Get System Telegram Bot Token & info from TelegramGlobalConfig table or Environment
+ */
+export async function getSystemTelegramBotConfig(): Promise<SystemBotConfigData | null> {
+  try {
+    const globalConfig = await prisma.telegramGlobalConfig.findFirst({
+      where: { isActive: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (globalConfig && globalConfig.botToken) {
+      return {
+        id: globalConfig.id,
+        botToken: globalConfig.botToken,
+        botUsername: globalConfig.botUsername,
+        botFirstName: globalConfig.botFirstName || 'PTIT EduSync Official Bot',
+        botId: globalConfig.botId,
+        isActive: globalConfig.isActive,
+        description: globalConfig.description,
+        lastTestedAt: globalConfig.lastTestedAt ? globalConfig.lastTestedAt.toISOString() : null,
+        lastTestStatus: globalConfig.lastTestStatus,
+        lastTestError: globalConfig.lastTestError,
+        updatedAt: globalConfig.updatedAt.toISOString(),
+      };
+    }
+
+    // Fallback to process.env
+    const envToken = process.env.TELEGRAM_BOT_TOKEN || process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN;
+    if (envToken && envToken.trim()) {
+      return {
+        botToken: envToken.trim(),
+        botUsername: process.env.TELEGRAM_BOT_USERNAME || null,
+        botFirstName: 'PTIT System Bot',
+        isActive: true,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    return null;
+  } catch (err) {
+    console.error('Error loading system telegram bot config from TelegramGlobalConfig:', err);
+    return null;
+  }
+}
+
+/**
+ * Public Info of System Bot safe to return to all users
+ */
+export async function getSystemTelegramBotPublicInfo() {
+  const sysConfig = await getSystemTelegramBotConfig();
+  if (!sysConfig || !sysConfig.botToken) {
+    return {
+      isConfigured: false,
+      botUsername: null,
+      botFirstName: null,
+      botUrl: null,
+      addToGroupUrl: null,
+      addToChannelUrl: null,
+      description: null,
+      updatedAt: null,
+    };
+  }
+
+  const username = sysConfig.botUsername || '';
+  return {
+    isConfigured: true,
+    botUsername: sysConfig.botUsername || null,
+    botFirstName: sysConfig.botFirstName || 'PTIT EduSync Official Bot',
+    botUrl: username ? `https://t.me/${username}` : null,
+    addToGroupUrl: username ? `https://t.me/${username}?startgroup=true` : null,
+    addToChannelUrl: username ? `https://t.me/${username}?startchannel=true` : null,
+    description: sysConfig.description || null,
+    updatedAt: sysConfig.updatedAt,
+  };
+}
+
+/**
+ * Save System Bot Token (Admin only) to TelegramGlobalConfig table
+ */
+export async function saveSystemTelegramBot(botToken: string, description?: string) {
+  const token = botToken?.trim();
+  if (!token) {
+    throw new Error('Vui lòng nhập System Telegram Bot Token');
+  }
+
+  const verifyRes = await verifyTelegramBot(token);
+  if (!verifyRes.success || !verifyRes.botInfo) {
+    throw new Error(verifyRes.error || 'Token Bot hệ thống không hợp lệ');
+  }
+
+  const existing = await prisma.telegramGlobalConfig.findFirst({
+    orderBy: { id: 'asc' },
+  });
+
+  let savedRecord;
+  if (existing) {
+    savedRecord = await prisma.telegramGlobalConfig.update({
+      where: { id: existing.id },
+      data: {
+        botToken: token,
+        botUsername: verifyRes.botInfo.username || null,
+        botFirstName: verifyRes.botInfo.firstName || 'PTIT EduSync Official Bot',
+        botId: verifyRes.botInfo.id ? String(verifyRes.botInfo.id) : null,
+        isActive: true,
+        description: description || existing.description || 'Bot Telegram thông báo chính thức của hệ thống PTIT EduSync',
+        lastTestedAt: new Date(),
+        lastTestStatus: 'SUCCESS',
+        lastTestError: null,
+      },
+    });
+  } else {
+    savedRecord = await prisma.telegramGlobalConfig.create({
+      data: {
+        botToken: token,
+        botUsername: verifyRes.botInfo.username || null,
+        botFirstName: verifyRes.botInfo.firstName || 'PTIT EduSync Official Bot',
+        botId: verifyRes.botInfo.id ? String(verifyRes.botInfo.id) : null,
+        isActive: true,
+        description: description || 'Bot Telegram thông báo chính thức của hệ thống PTIT EduSync',
+        lastTestedAt: new Date(),
+        lastTestStatus: 'SUCCESS',
+        lastTestError: null,
+      },
+    });
+  }
+
+  return {
+    success: true,
+    botInfo: verifyRes.botInfo,
+    config: savedRecord,
+  };
+}
+
+/**
+ * Resolve effective bot token: uses customToken if provided, otherwise falls back to TelegramGlobalConfig
+ */
+export async function resolveEffectiveBotToken(
+  customToken?: string | null
+): Promise<{ token: string; isCustom: boolean }> {
+  if (customToken && customToken.trim()) {
+    return { token: customToken.trim(), isCustom: true };
+  }
+
+  // Fallback to GLOBAL SYSTEM BOT from TelegramGlobalConfig
+  const sysConfig = await getSystemTelegramBotConfig();
+  if (!sysConfig || !sysConfig.botToken) {
+    throw new Error(
+      'Bot Hệ Thống chưa được Admin thiết lập trong bảng TelegramGlobalConfig. Vui lòng liên hệ Quản trị viên hoặc nhập Bot Token riêng.'
+    );
+  }
+
+  return { token: sysConfig.botToken, isCustom: false };
 }
 
