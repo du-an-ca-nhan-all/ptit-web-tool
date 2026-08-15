@@ -22,8 +22,10 @@ import {
   HelpCircle,
   Check,
   Layers,
-  Sparkles
+  Sparkles,
+  KeyRound,
 } from 'lucide-react';
+import AdminResetPasswordModal from './AdminResetPasswordModal';
 
 interface ClassMembersProps {
   records: ExamRecord[];
@@ -176,6 +178,10 @@ export default function ClassMembers({
         (s.phone && s.phone.includes(q))
     );
   }, [activeStudents, candidateSearchQuery]);
+
+  // Admin Reset Password Modal state
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [resetPasswordStudent, setResetPasswordStudent] = useState({ username: '', fullName: '', lop: '' });
 
   const openAssignMonitorModal = (preselectedMaSV?: string | null) => {
     setSelectedCandidateMaSV(preselectedMaSV || '');
@@ -890,22 +896,40 @@ export default function ClassMembers({
                               )}
 
                               {isAdmin && (
-                                student.MaSV === classMonitor?.username ? (
-                                  <span
-                                    className="p-1.5 text-amber-600 bg-amber-50 rounded-lg cursor-default"
-                                    title="Đang là Lớp Trưởng"
-                                  >
-                                    <Crown className="w-4 h-4 fill-amber-400 text-amber-600" />
-                                  </span>
-                                ) : (
+                                <>
                                   <button
-                                    onClick={() => openAssignMonitorModal(student.MaSV)}
-                                    className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                                    title={`Chỉ định ${student.HoLotSV} ${student.TenSV} làm Lớp Trưởng`}
+                                    type="button"
+                                    onClick={() => {
+                                      setResetPasswordStudent({
+                                        username: student.MaSV,
+                                        fullName: `${student.HoLotSV || ''} ${student.TenSV || ''}`.trim(),
+                                        lop: selectedClass,
+                                      });
+                                      setIsResetPasswordModalOpen(true);
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                    title={`Đặt lại mật khẩu cho sinh viên ${student.MaSV}`}
                                   >
-                                    <Crown className="w-4 h-4" />
+                                    <KeyRound className="w-4 h-4" />
                                   </button>
-                                )
+
+                                  {student.MaSV === classMonitor?.username ? (
+                                    <span
+                                      className="p-1.5 text-amber-600 bg-amber-50 rounded-lg cursor-default"
+                                      title="Đang là Lớp Trưởng"
+                                    >
+                                      <Crown className="w-4 h-4 fill-amber-400 text-amber-600" />
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => openAssignMonitorModal(student.MaSV)}
+                                      className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                      title={`Chỉ định ${student.HoLotSV} ${student.TenSV} làm Lớp Trưởng`}
+                                    >
+                                      <Crown className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </>
                               )}
 
                               {canManageClass && (
@@ -1808,6 +1832,18 @@ export default function ClassMembers({
           </div>
         </div>
       )}
+
+      {/* Admin Reset Password Modal */}
+      <AdminResetPasswordModal
+        isOpen={isResetPasswordModalOpen}
+        onClose={() => setIsResetPasswordModalOpen(false)}
+        initialUsername={resetPasswordStudent.username}
+        initialFullName={resetPasswordStudent.fullName}
+        initialClass={resetPasswordStudent.lop}
+        onSuccess={() => {
+          showToast(`Đã cập nhật mật khẩu cho ${resetPasswordStudent.username}!`);
+        }}
+      />
     </div>
   );
 }

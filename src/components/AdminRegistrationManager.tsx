@@ -18,8 +18,10 @@ import {
   ShieldCheck,
   Sparkles,
   ShieldAlert,
+  KeyRound,
 } from 'lucide-react';
 import { LoginUser } from '../types';
+import AdminResetPasswordModal from './AdminResetPasswordModal';
 
 interface RegistrationItem {
   id: number;
@@ -62,6 +64,10 @@ export default function AdminRegistrationManager({ currentUser }: AdminRegistrat
   // Reject modal state
   const [rejectingItem, setRejectingItem] = useState<RegistrationItem | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  // Reset Password Modal state
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetModalUser, setResetModalUser] = useState({ username: '', fullName: '', lop: '' });
 
   const isAdmin = Boolean(
     currentUser?.isAdmin ||
@@ -288,7 +294,20 @@ export default function AdminRegistrationManager({ currentUser }: AdminRegistrat
           </div>
         </div>
 
-        <div className="flex items-center gap-3 relative z-10 shrink-0">
+        <div className="flex items-center gap-3 relative z-10 shrink-0 flex-wrap sm:flex-nowrap">
+          <button
+            type="button"
+            onClick={() => {
+              setResetModalUser({ username: '', fullName: '', lop: '' });
+              setIsResetModalOpen(true);
+            }}
+            className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-2xl transition-all shadow-md shadow-emerald-600/30 flex items-center gap-2 cursor-pointer"
+            title="Chủ động đặt lại mật khẩu cho bất kỳ người dùng nào"
+          >
+            <KeyRound className="w-4 h-4" />
+            <span>Reset Mật Khẩu User</span>
+          </button>
+
           <button
             onClick={() => fetchRequests()}
             className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2 cursor-pointer"
@@ -612,6 +631,22 @@ export default function AdminRegistrationManager({ currentUser }: AdminRegistrat
                           )}
 
                           <button
+                            type="button"
+                            onClick={() => {
+                              setResetModalUser({
+                                username: item.username,
+                                fullName: item.fullName || item.username,
+                                lop: item.lop || '',
+                              });
+                              setIsResetModalOpen(true);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
+                            title={`Đặt lại mật khẩu cho ${item.username}`}
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </button>
+
+                          <button
                             onClick={() => handleDeleteRequest(item.id)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                             title="Xoá bản ghi này"
@@ -686,6 +721,18 @@ export default function AdminRegistrationManager({ currentUser }: AdminRegistrat
           </div>
         </div>
       )}
+
+      {/* Admin Reset Password Modal */}
+      <AdminResetPasswordModal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+        initialUsername={resetModalUser.username}
+        initialFullName={resetModalUser.fullName}
+        initialClass={resetModalUser.lop}
+        onSuccess={() => {
+          fetchRequests();
+        }}
+      />
     </div>
   );
 }
