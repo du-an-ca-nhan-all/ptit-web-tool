@@ -244,12 +244,11 @@ export default function CourseCompare({
                   So Sánh Đăng Ký Môn Học
                 </h1>
                 <span className="bg-blue-600 text-white text-xs font-black px-2.5 py-0.5 rounded-full shadow-xs">
-                  Đối Chiếu
+                  Mặc Định Đối Chiếu Với Lớp Trưởng
                 </span>
               </div>
               <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-                Đối chiếu môn học & nhóm tổ của sinh viên <strong className="text-indigo-600 font-mono">({currentStudentName})</strong> với Lớp trưởng{' '}
-                <strong className="text-emerald-700 font-mono">({data?.main?.username || 'Lớp trưởng'})</strong>
+                Đối chiếu danh sách môn học & nhóm tổ của <strong className="text-indigo-600 font-mono">({currentStudentName})</strong> với mốc chuẩn <strong className="text-emerald-700 font-mono">Lớp trưởng ({data?.main?.username || 'Lớp trưởng'})</strong>
               </p>
             </div>
           </div>
@@ -302,9 +301,9 @@ export default function CourseCompare({
             <Users className="w-5 h-5 text-indigo-600" />
             <div>
               <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
-                Đối tượng so sánh:
+                Sinh viên cần đối chiếu với Lớp trưởng:
               </span>
-              <span className="text-[11px] text-slate-400">Chọn sinh viên trong lớp để xem kết quả đối chiếu</span>
+              <span className="text-[11px] text-slate-400">Mặc định so sánh với mốc đăng ký của Lớp trưởng ({data?.main?.username || 'Lớp trưởng'})</span>
             </div>
           </div>
           <select
@@ -338,7 +337,7 @@ export default function CourseCompare({
             <span className="font-black text-xs uppercase tracking-wider">Khác nhóm tổ</span>
           </div>
           <span className="text-3xl font-black text-amber-700 mt-1">{comparison.diffGroup.length}</span>
-          <span className="text-xs text-slate-400 mt-1">Cùng môn, khác nhóm học</span>
+          <span className="text-xs text-slate-400 mt-1">Cùng môn, khác nhóm học với LT</span>
         </div>
 
         <div className="bg-white border border-rose-200 rounded-3xl p-5 shadow-sm flex flex-col">
