@@ -74,6 +74,8 @@ export default function TelegramConfigSection({
   const [classReminderBefore, setClassReminderBefore] = useState<number>(30);
   const [isCheckingClassSchedule, setIsCheckingClassSchedule] = useState(false);
   const [classScheduleCheckMsg, setClassScheduleCheckMsg] = useState('');
+  const [isCheckingNearestClassSchedule, setIsCheckingNearestClassSchedule] = useState(false);
+  const [nearestClassScheduleMsg, setNearestClassScheduleMsg] = useState('');
 
   // Admin System Bot Config states
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
@@ -308,6 +310,49 @@ export default function TelegramConfigSection({
       setErrorMsg('Không thể kết nối máy chủ để kiểm tra lịch học.');
     } finally {
       setIsCheckingClassSchedule(false);
+    }
+  };
+
+  // Check nearest class schedule in next 10 days
+  const handleCheckNearestClassSchedule = async () => {
+    setIsCheckingNearestClassSchedule(true);
+    setNearestClassScheduleMsg('');
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/telegram-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'CHECK_NEAREST_CLASS_SCHEDULE',
+          maxDays: 10,
+          targetUsername: targetUsername || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (data.totalSent > 0 && data.results && data.results[0]?.found) {
+          const r = data.results[0];
+          const offsetText =
+            r.dayOffset === 0
+              ? 'Hôm nay'
+              : r.dayOffset === 1
+              ? 'Ngày mai'
+              : `sau ${r.dayOffset} ngày nữa`;
+          setNearestClassScheduleMsg(
+            `Đã tìm thấy lịch học gần nhất vào ${r.dowName}, ngày ${r.dateStr} (${offsetText}) gồm ${r.sessionsCount} ca học và đã gửi chi tiết lên Telegram!`
+          );
+        } else {
+          setNearestClassScheduleMsg(
+            `Đã quét thời khóa biểu: Trong 10 ngày tới bạn không có ca học nào trên hệ thống.`
+          );
+        }
+      } else {
+        setErrorMsg(data.error || 'Lỗi khi quét lịch học 10 ngày tới.');
+      }
+    } catch {
+      setErrorMsg('Không thể kết nối máy chủ để quét lịch học.');
+    } finally {
+      setIsCheckingNearestClassSchedule(false);
     }
   };
 
@@ -1076,12 +1121,23 @@ export default function TelegramConfigSection({
                   <button
                     type="button"
                     onClick={handleCheckClassScheduleNow}
-                    disabled={isCheckingClassSchedule}
+                    disabled={isCheckingClassSchedule || isCheckingNearestClassSchedule}
                     className="ml-1 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
                     title="Kiểm tra lịch học hôm nay và gửi tin nhắn thử nghiệm ngay"
                   >
                     {isCheckingClassSchedule ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                     <span>Kiểm Tra Hôm Nay</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCheckNearestClassSchedule}
+                    disabled={isCheckingNearestClassSchedule || isCheckingClassSchedule}
+                    className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs rounded-lg transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    title="Quét lịch học gần nhất trong 10 ngày tới và gửi thông báo Telegram nếu có"
+                  >
+                    {isCheckingNearestClassSchedule ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CalendarDays className="w-3 h-3" />}
+                    <span>Quét Lịch 10 Ngày Tới</span>
                   </button>
                 </div>
               </div>
@@ -1091,6 +1147,13 @@ export default function TelegramConfigSection({
               <div className="p-3 bg-amber-50/80 border border-amber-300 text-amber-900 text-xs font-medium rounded-xl flex items-center gap-2 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>{classScheduleCheckMsg}</span>
+              </div>
+            )}
+
+            {nearestClassScheduleMsg && (
+              <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 text-amber-950 text-xs font-medium rounded-xl flex items-center gap-2 animate-in fade-in shadow-xs">
+                <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>{nearestClassScheduleMsg}</span>
               </div>
             )}
 

@@ -1132,4 +1132,193 @@ export async function runClassScheduleReminders(options: {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. SCAN NEAREST UPCOMING CLASS IN 10 DAYS (QUÉT LỊCH HỌC GẦN NHẤT TRONG 10 NGÀY TỚI)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface NearestClassScheduleResult {
+  found: boolean;
+  maxDays: number;
+  date?: Date;
+  dateStr?: string;
+  dowName?: string;
+  dayOffset?: number;
+  sessions?: ParsedClassSession[];
+}
+
+/**
+ * Quét tìm ngày học gần nhất có trong maxDays ngày tới (mặc định 10 ngày)
+ */
+export async function findNearestStudentClassSchedule(
+  username: string,
+  maxDays: number = 10,
+  options: {
+    includeTodayIfEnded?: boolean;
+  } = {}
+): Promise<NearestClassScheduleResult> {
+  const nowVN = getVietnamTime();
+  const nowMinutesToday = nowVN.getHours() * 60 + nowVN.getMinutes();
+  const dowMap = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+
+  for (let offset = 0; offset <= maxDays; offset++) {
+    const checkDate = new Date(nowVN.getFullYear(), nowVN.getMonth(), nowVN.getDate() + offset);
+    const sessions = await getStudentClassSessionsForDate(username, checkDate);
+
+    if (sessions && sessions.length > 0) {
+      if (offset === 0 && !options.includeTodayIfEnded) {
+        // Kiểm tra xem hôm nay còn ca học nào chưa kết thúc không
+        const hasUpcomingSession = sessions.some((s) => {
+          const sessionEndMinutes = s.startMinutes + ((s.endPeriod - s.startPeriod + 1) * 45 || 135);
+          return sessionEndMinutes >= nowMinutesToday;
+        });
+
+        // Nếu hôm nay tất cả các ca học đều đã qua thì tiếp tục tìm các ngày kế tiếp trong 10 ngày tới
+        if (!hasUpcomingSession) {
+          continue;
+        }
+      }
+
+      const dateStr = formatDateVN(checkDate);
+      const dowName = dowMap[checkDate.getDay()];
+      return {
+        found: true,
+        maxDays,
+        date: checkDate,
+        dateStr,
+        dowName,
+        dayOffset: offset,
+        sessions,
+      };
+    }
+  }
+
+  return {
+    found: false,
+    maxDays,
+  };
+}
+
+/**
+ * Quét lịch học gần nhất trong 10 ngày tới. Nếu có thì lấy lịch gần nhất rồi gửi Telegram
+ */
+export async function dispatchNearestClassScheduleNotification(options: {
+  username?: string;
+  maxDays?: number;
+  forceSend?: boolean;
+} = {}) {
+  try {
+    const maxDays = options.maxDays || 10;
+    const nowVN = getVietnamTime();
+
+    const whereCond: any = {
+      isEnabled: true,
+      notifyClassSchedule: true,
+    };
+    if (options.username) {
+      whereCond.username = options.username;
+    }
+
+    const subscribers = await prisma.telegramConfig.findMany({
+      where: whereCond,
+      include: {
+        user: {
+          include: {
+            student: true,
+          },
+        },
+      },
+    });
+
+    if (subscribers.length === 0) {
+      return {
+        success: true,
+        totalSubscribers: 0,
+        totalSent: 0,
+        message: 'Không tìm thấy tài khoản nào bật nhận thông báo lịch học Telegram.',
+      };
+    }
+
+    let sentCount = 0;
+    let notFoundCount = 0;
+    const results: any[] = [];
+    const errors: string[] = [];
+
+    for (const sub of subscribers) {
+      const studentName = sub.user?.student?.hoTen || sub.username;
+      const classCode = sub.user?.student?.maLop || 'Chưa cập nhật';
+
+      const nearest = await findNearestStudentClassSchedule(sub.username, maxDays);
+
+      if (!nearest.found || !nearest.sessions || nearest.sessions.length === 0) {
+        notFoundCount++;
+        results.push({
+          username: sub.username,
+          found: false,
+          message: `Không có ca học nào trong ${maxDays} ngày tới`,
+        });
+        continue;
+      }
+
+      let effectiveToken: string;
+      try {
+        const resolved = await resolveEffectiveBotToken(sub.botToken);
+        effectiveToken = resolved.token;
+      } catch (e: any) {
+        errors.push(`${sub.username}: ${e.message}`);
+        continue;
+      }
+
+      const offsetText =
+        nearest.dayOffset === 0
+          ? 'HÔM NAY'
+          : nearest.dayOffset === 1
+          ? 'NGÀY MAI'
+          : `sau ${nearest.dayOffset} ngày nữa`;
+
+      let sessionListHtml = '';
+      nearest.sessions.forEach((ses, idx) => {
+        sessionListHtml += `\n<b>${idx + 1}️⃣ ${ses.subjectName}</b> (<code>${ses.subjectCode}</code>)\n   ⏰ Thời gian: <b>${ses.startTime} - ${ses.endTime}</b> (<i>${ses.periodStr}</i>)\n   🚪 Phòng học: <b>${ses.room || 'Phòng học môn'}</b> ${ses.group ? `(Tổ: ${ses.group})` : ''}\n`;
+      });
+
+      const messageHtml = `📚 <b>[LỊCH HỌC GẦN NHẤT] THỜI KHÓA BIỂU PTIT</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n🏫 Lớp: <b>${classCode}</b>\n🗓️ Ngày học gần nhất: <b>${nearest.dowName}, ngày ${nearest.dateStr}</b> (<i>${offsetText}</i>)\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 <b>DANH SÁCH CA HỌC (${nearest.sessions.length} ca):</b>${sessionListHtml}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🔔 <i>Hệ thống tự động quét lịch học trong ${maxDays} ngày tới. Chúc bạn học tập tốt!</i>\n⏰ <i>Quét lúc: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>`;
+
+      const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
+        threadId: sub.threadId ? Number(sub.threadId) : undefined,
+      });
+
+      if (sendRes.success) {
+        sentCount++;
+        results.push({
+          username: sub.username,
+          found: true,
+          dateStr: nearest.dateStr,
+          dowName: nearest.dowName,
+          dayOffset: nearest.dayOffset,
+          sessionsCount: nearest.sessions.length,
+          sessions: nearest.sessions,
+        });
+      } else {
+        errors.push(`${sub.username}: ${sendRes.error}`);
+      }
+    }
+
+    return {
+      success: true,
+      maxDays,
+      totalSubscribers: subscribers.length,
+      totalSent: sentCount,
+      notFoundCount,
+      results,
+      errors: errors.slice(0, 10),
+    };
+  } catch (err: any) {
+    console.error('dispatchNearestClassScheduleNotification error:', err);
+    return {
+      success: false,
+      error: err.message || 'Lỗi khi quét lịch học gần nhất',
+    };
+  }
+}
+
+
 

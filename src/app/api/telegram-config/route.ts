@@ -14,7 +14,12 @@ import {
   resolveEffectiveBotToken,
 } from '@/src/lib/telegram-service';
 import { logActivity } from '@/src/lib/activityLog';
-import { checkAndDispatchQldtAnnouncements, runClassScheduleReminders } from '@/src/lib/telegram-dispatcher';
+import {
+  checkAndDispatchQldtAnnouncements,
+  runClassScheduleReminders,
+  findNearestStudentClassSchedule,
+  dispatchNearestClassScheduleNotification,
+} from '@/src/lib/telegram-dispatcher';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -528,6 +533,27 @@ export async function POST(req: NextRequest) {
         forceMorningSummary: true,
         forcePreClassAlert: true,
       });
+      return NextResponse.json(result);
+    }
+
+    // 2.7 ACTION: CHECK NEAREST CLASS SCHEDULE (Quét lịch học gần nhất trong 10 ngày tới & gửi Telegram)
+    if (action === 'CHECK_NEAREST_CLASS_SCHEDULE') {
+      const maxDays = Number(body.maxDays) || 10;
+      const result = await dispatchNearestClassScheduleNotification({
+        username,
+        maxDays,
+        forceSend: true,
+      });
+
+      await logActivity({
+        req,
+        action: 'CHECK_NEAREST_CLASS_SCHEDULE',
+        targetType: 'TELEGRAM_CONFIG',
+        targetId: username,
+        description: `Quét lịch học gần nhất trong ${maxDays} ngày tới cho tài khoản ${username}`,
+        metadata: result,
+      });
+
       return NextResponse.json(result);
     }
 
