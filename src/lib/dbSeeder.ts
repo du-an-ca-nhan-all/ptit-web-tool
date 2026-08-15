@@ -72,12 +72,26 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
 
           if (fs.existsSync(mainFile)) {
             const mainContent = fs.readFileSync(mainFile, 'utf8');
-            await prisma.courseRegistration.deleteMany({
-              where: { classCode: folder, type: 'main' },
-            });
-            await prisma.courseRegistration.create({
-              data: {
+            let mainUsername = 'LOP_TRUONG';
+            try {
+              const parsed = JSON.parse(mainContent);
+              if (parsed.username) mainUsername = parsed.username.toUpperCase();
+            } catch (e) {}
+
+            await prisma.courseRegistration.upsert({
+              where: {
+                classCode_username: {
+                  classCode: folder,
+                  username: mainUsername,
+                },
+              },
+              create: {
                 classCode: folder,
+                type: 'main',
+                username: mainUsername,
+                data: mainContent,
+              },
+              update: {
                 type: 'main',
                 data: mainContent,
               },
@@ -88,16 +102,25 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
             const subContent = fs.readFileSync(subFile, 'utf8');
             try {
               const subList = JSON.parse(subContent);
-              await prisma.courseRegistration.deleteMany({
-                where: { classCode: folder, type: 'sub' },
-              });
               if (Array.isArray(subList)) {
                 for (const subItem of subList) {
-                  await prisma.courseRegistration.create({
-                    data: {
+                  const subUser = (subItem.username || '').toUpperCase();
+                  if (!subUser) continue;
+                  await prisma.courseRegistration.upsert({
+                    where: {
+                      classCode_username: {
+                        classCode: folder,
+                        username: subUser,
+                      },
+                    },
+                    create: {
                       classCode: folder,
                       type: 'sub',
-                      username: subItem.username || null,
+                      username: subUser,
+                      data: JSON.stringify(subItem),
+                    },
+                    update: {
+                      type: 'sub',
                       data: JSON.stringify(subItem),
                     },
                   });

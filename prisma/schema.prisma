@@ -111,18 +111,24 @@ model ExamRecord {
   @@index([mapThi])
 }
 
-// 5. Bảng CourseRegistration: Lưu dữ liệu so sánh đăng ký môn học
+// 5. Bảng CourseRegistration: Lưu dữ liệu môn học đã đăng ký & so sánh ĐKMH
 model CourseRegistration {
-  id        Int      @id @default(autoincrement())
-  classCode String
-  type      String   // 'main' (lớp trưởng) hoặc 'sub' (sinh viên)
-  username  String?
-  data      String   // Dữ liệu JSON chi tiết môn học đã đăng ký
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int       @id @default(autoincrement())
+  classCode    String    // Mã lớp (Ví dụ: D25TXCN11-K)
+  type         String    @default("sub") // 'main' (lớp trưởng) hoặc 'sub' (sinh viên)
+  username     String    // Mã sinh viên (MaSV)
+  data         String    // Dữ liệu JSON chi tiết kết quả ĐKMH từ cổng trường (ds_kqdkmh)
+  totalCourses Int?      @default(0) // Tổng số môn đã đăng ký
+  totalCredits Int?      @default(0) // Tổng số tín chỉ
+  tuitionFee   Int?      @default(0) // Tổng học phí tạm tính (VNĐ)
+  lastPulledAt DateTime? @default(now()) // Thời điểm kéo dữ liệu từ QLDTTX
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
+  @@unique([classCode, username])
   @@index([classCode])
   @@index([username])
+  @@index([type])
 }
 
 // 6. Bảng SystemMeta: Lưu trạng thái và cấu hình hệ thống

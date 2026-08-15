@@ -1,38 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 
 export async function GET(req: NextRequest) {
   try {
-    await ensureDatabaseSeeded(false);
-
     const { searchParams } = new URL(req.url);
     const classCode = searchParams.get('classCode');
-    const username = searchParams.get('username')?.toLowerCase();
+    const username = searchParams.get('username')?.toUpperCase();
 
     if (!classCode) {
       return NextResponse.json({ error: 'Mã lớp (classCode) là bắt buộc' }, { status: 400 });
     }
 
-    const mainReg = await prisma.courseRegistration.findFirst({
+    // 1. Get monitor (main) registration
+    let mainReg = await prisma.courseRegistration.findFirst({
       where: { classCode, type: 'main' },
     });
 
-    const subRegs = await prisma.courseRegistration.findMany({
-      where: { classCode, type: 'sub' },
+    // Fallback: If no 'main' marked, find class monitor user
+    if (!mainReg) {
+      const monitorUser = await prisma.user.findFirst({
+        where: {
+          role: { contains: 'lop_truong' },
+          student: { maLop: classCode },
+        },
+      });
+      if (monitorUser) {
+        mainReg = await prisma.courseRegistration.findFirst({
+          where: { username: monitorUser.username.toUpperCase() },
+        });
+      }
+    }
+
+    // 2. Get all sub registrations in this class
+    const allRegs = await prisma.courseRegistration.findMany({
+      where: { classCode },
+      orderBy: { username: 'asc' },
     });
 
     let mainData = null;
     if (mainReg) {
       try {
-        mainData = JSON.parse(mainReg.data);
+        const parsed = JSON.parse(mainReg.data);
+        mainData = {
+          username: mainReg.username,
+          data: parsed.data ? parsed : { data: parsed },
+          totalCourses: mainReg.totalCourses,
+          totalCredits: mainReg.totalCredits,
+          tuitionFee: mainReg.tuitionFee,
+          lastPulledAt: mainReg.lastPulledAt?.toISOString() || null,
+        };
       } catch (e) {}
     }
 
     const allSubAccounts: any[] = [];
-    subRegs.forEach((sub) => {
+    allRegs.forEach((reg) => {
       try {
-        allSubAccounts.push(JSON.parse(sub.data));
+        const parsed = JSON.parse(reg.data);
+        allSubAccounts.push({
+          username: reg.username,
+          type: reg.type,
+          data: parsed.data ? parsed : { data: parsed },
+          totalCourses: reg.totalCourses,
+          totalCredits: reg.totalCredits,
+          tuitionFee: reg.tuitionFee,
+          lastPulledAt: reg.lastPulledAt?.toISOString() || null,
+        });
       } catch (e) {}
     });
 
@@ -40,15 +72,15 @@ export async function GET(req: NextRequest) {
     if (username) {
       userSubAccount =
         allSubAccounts.find(
-          (acc: any) => (acc.username || '').toLowerCase() === username
-        ) || null;
+          (acc: any) => (acc.username || '').toUpperCase() === username
+        ) || (mainData?.username?.toUpperCase() === username ? mainData : null);
     }
 
     return NextResponse.json({
       main: mainData,
       subAccount: userSubAccount,
       allSubAccounts,
-      hasData: !!(mainData && allSubAccounts.length > 0),
+      hasData: !!(mainData || allSubAccounts.length > 0),
     });
   } catch (error: any) {
     console.error('Course compare API error:', error);

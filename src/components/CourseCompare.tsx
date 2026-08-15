@@ -1,6 +1,22 @@
-import React, { useMemo } from 'react';
-import { BookOpen, CheckCircle2, AlertTriangle, XCircle, Info, X, Users, BarChart3 } from 'lucide-react';
-import { useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import {
+  BookOpen,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Info,
+  X,
+  Users,
+  BarChart3,
+  RefreshCw,
+  Zap,
+  ArrowRight,
+  Clock,
+  Sparkles,
+  Search,
+  Check,
+} from 'lucide-react';
+import { LoginUser } from '../types';
 
 interface CourseCompareProps {
   data: {
@@ -8,31 +24,154 @@ interface CourseCompareProps {
     subAccount: any;
     allSubAccounts?: any[];
   } | null;
+  currentUser?: LoginUser | null;
+  onNavigateTab?: (tab: string) => void;
+  onReload?: () => void;
 }
 
-export default function CourseCompare({ data }: CourseCompareProps) {
-  const [selectedCourse, setSelectedCourse] = useState<{type: 'missing' | 'diffGroup', courseCode: string, courseName: string, monitorGroup: string, myGroup?: string} | null>(null);
+// Helper safely extracting courses from any nesting structure
+const extractCoursesFromAccount = (acc: any): any[] => {
+  if (!acc) return [];
+  const rawList =
+    acc.data?.data?.ds_kqdkmh ||
+    acc.data?.ds_kqdkmh ||
+    acc.ds_kqdkmh ||
+    (Array.isArray(acc.data) ? acc.data : []) ||
+    [];
+
+  return rawList
+    .map((item: any) => item.to_hoc || item)
+    .filter((c: any) => c && (c.ma_mon || c.MaMH));
+};
+
+export default function CourseCompare({
+  data: initialData,
+  currentUser,
+  onNavigateTab,
+  onReload,
+}: CourseCompareProps) {
+  const [data, setData] = useState(initialData);
+
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+    }
+  }, [initialData]);
+
+  const loadCompareData = async () => {
+    const classCode = currentUser?.lop || 'D25TXCN11-K';
+    const username = currentUser?.username || '';
+    try {
+      const res = await fetch(
+        `/api/course-compare?classCode=${encodeURIComponent(classCode)}${username ? `&username=${encodeURIComponent(username)}` : ''}`
+      );
+      const json = await res.json();
+      if (json && json.hasData) {
+        setData(json);
+      }
+    } catch (e) {
+      console.error('Failed to load course compare data:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadCompareData();
+  }, [currentUser]);
+
+  const [selectedStudentUsername, setSelectedStudentUsername] = useState<string>(
+    currentUser?.username?.toUpperCase() || initialData?.subAccount?.username?.toUpperCase() || ''
+  );
+
+  useEffect(() => {
+    if (currentUser?.username) {
+      setSelectedStudentUsername(currentUser.username.toUpperCase());
+    } else if (data?.subAccount?.username) {
+      setSelectedStudentUsername(data.subAccount.username.toUpperCase());
+    }
+  }, [currentUser?.username, data?.subAccount?.username]);
+
+  const [selectedCourse, setSelectedCourse] = useState<{
+    type: 'missing' | 'diffGroup';
+    courseCode: string;
+    courseName: string;
+    monitorGroup: string;
+    myGroup?: string;
+  } | null>(null);
+
+  const [isPulling, setIsPulling] = useState(false);
+  const [pullMsg, setPullMsg] = useState('');
+
+  // Handle direct pull from QLDTTX for current student
+  const handlePullMyCourses = async () => {
+    if (!currentUser) return;
+    setIsPulling(true);
+    setPullMsg('');
+    try {
+      const res = await fetch('/api/course-registrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'PULL',
+          targetUsername: currentUser.username,
+          classCode: currentUser.lop,
+        }),
+      });
+      const resData = await res.json();
+      if (res.ok && resData.success) {
+        setPullMsg('Đã đồng bộ môn học mới nhất thành công!');
+        await loadCompareData();
+        if (onReload) onReload();
+        setTimeout(() => setPullMsg(''), 4000);
+      } else {
+        alert(resData.error || 'Đồng bộ thất bại. Vui lòng kiểm tra lại tài khoản liên kết QLDTTX.');
+      }
+    } catch (e) {
+      alert('Lỗi kết nối máy chủ');
+    } finally {
+      setIsPulling(false);
+    }
+  };
+
+  const activeSubAccount = useMemo(() => {
+    if (!data?.allSubAccounts || data.allSubAccounts.length === 0) return data?.subAccount || null;
+    if (!selectedStudentUsername) return data?.subAccount || data.allSubAccounts[0] || null;
+    return (
+      data.allSubAccounts.find(
+        (acc: any) => (acc.username || '').toUpperCase() === selectedStudentUsername.toUpperCase()
+      ) ||
+      data.subAccount ||
+      null
+    );
+  }, [data, selectedStudentUsername]);
+
+  const monitorCourses = useMemo(() => {
+    return extractCoursesFromAccount(data?.main);
+  }, [data]);
+
+  const myCourses = useMemo(() => {
+    return extractCoursesFromAccount(activeSubAccount);
+  }, [activeSubAccount]);
 
   const popupStats = useMemo(() => {
     if (!selectedCourse || !data?.allSubAccounts) return null;
-    const { courseCode, monitorGroup, myGroup } = selectedCourse;
-    
+    const { courseCode } = selectedCourse;
+
     let totalAnalyzed = 0;
     const missingUsers: any[] = [];
     const groupMap = new Map<string, any[]>();
 
-    data.allSubAccounts.forEach(acc => {
+    data.allSubAccounts.forEach((acc) => {
       // Bỏ qua lớp trưởng
-      if (acc.username.toLowerCase() === data.main.username.toLowerCase()) return;
+      if (data.main && acc.username?.toLowerCase() === data.main.username?.toLowerCase()) return;
 
-      const courses = acc.data?.data?.ds_kqdkmh?.map((item: any) => item.to_hoc) || [];
-      const course = courses.find((c: any) => c.ma_mon === courseCode);
-      
+      const courses = extractCoursesFromAccount(acc);
+      const course = courses.find((c: any) => (c.ma_mon || c.MaMH) === courseCode);
+
       totalAnalyzed++;
       if (!course) {
         missingUsers.push(acc.username);
       } else {
-        const grp = course.nhom_to;
+        const grp = course.nhom_to || course.NhomTo || '01';
         if (!groupMap.has(grp)) groupMap.set(grp, []);
         groupMap.get(grp)!.push(acc.username);
       }
@@ -41,32 +180,29 @@ export default function CourseCompare({ data }: CourseCompareProps) {
     return {
       totalAnalyzed,
       missingUsers,
-      groupMap
+      groupMap,
     };
   }, [selectedCourse, data]);
 
-  const monitorCourses = useMemo(() => {
-    return data?.main?.data?.data?.ds_kqdkmh?.map((item: any) => item.to_hoc) || [];
-  }, [data]);
-
-  const myCourses = useMemo(() => {
-    return data?.subAccount?.data?.data?.ds_kqdkmh?.map((item: any) => item.to_hoc) || [];
-  }, [data]);
-
   const comparison = useMemo(() => {
-    const monitorMap = new Map<string, any>(monitorCourses.map((c: any) => [c.ma_mon, c]));
-    const myMap = new Map<string, any>(myCourses.map((c: any) => [c.ma_mon, c]));
+    const monitorMap = new Map<string, any>(
+      monitorCourses.map((c: any) => [c.ma_mon || c.MaMH, c])
+    );
+    const myMap = new Map<string, any>(
+      myCourses.map((c: any) => [c.ma_mon || c.MaMH, c])
+    );
 
     const exactMatch: any[] = [];
-    const diffGroup: { monitor: any, mine: any }[] = [];
+    const diffGroup: { monitor: any; mine: any }[] = [];
     const missing: any[] = [];
     const extra: any[] = [];
 
     monitorCourses.forEach((mc: any) => {
-      const myC = myMap.get(mc.ma_mon);
+      const code = mc.ma_mon || mc.MaMH;
+      const myC = myMap.get(code);
       if (!myC) {
         missing.push(mc);
-      } else if (myC.nhom_to !== mc.nhom_to) {
+      } else if ((myC.nhom_to || myC.NhomTo) !== (mc.nhom_to || mc.NhomTo)) {
         diffGroup.push({ monitor: mc, mine: myC });
       } else {
         exactMatch.push(mc);
@@ -74,7 +210,8 @@ export default function CourseCompare({ data }: CourseCompareProps) {
     });
 
     myCourses.forEach((myC: any) => {
-      if (!monitorMap.has(myC.ma_mon)) {
+      const code = myC.ma_mon || myC.MaMH;
+      if (!monitorMap.has(code)) {
         extra.push(myC);
       }
     });
@@ -82,271 +219,445 @@ export default function CourseCompare({ data }: CourseCompareProps) {
     return { exactMatch, diffGroup, missing, extra };
   }, [monitorCourses, myCourses]);
 
-  if (!data) return null;
+  const currentStudentName = activeSubAccount?.username?.toUpperCase() || currentUser?.username?.toUpperCase() || 'Bạn';
 
   return (
-    <div className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-auto h-full bg-slate-50">
-      <div className="shrink-0">
-        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <BookOpen className="w-6 h-6 text-blue-600" />
-          So sánh Đăng ký môn học
-        </h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Đối chiếu danh sách môn học bạn đã đăng ký với Lớp trưởng ({data.main?.username}).
-        </p>
+    <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+      {/* Toast */}
+      {pullMsg && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{pullMsg}</span>
+        </div>
+      )}
+
+      {/* Screen Header */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
+                  So Sánh Đăng Ký Môn Học
+                </h1>
+                <span className="bg-blue-600 text-white text-xs font-black px-2.5 py-0.5 rounded-full shadow-xs">
+                  Đối Chiếu
+                </span>
+              </div>
+              <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+                Đối chiếu môn học & nhóm tổ của sinh viên <strong className="text-indigo-600 font-mono">({currentStudentName})</strong> với Lớp trưởng{' '}
+                <strong className="text-emerald-700 font-mono">({data?.main?.username || 'Lớp trưởng'})</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto">
+          <button
+            onClick={() => {
+              loadCompareData();
+              if (onReload) onReload();
+            }}
+            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Tải Lại</span>
+          </button>
+
+          {currentUser && (
+            <button
+              onClick={handlePullMyCourses}
+              disabled={isPulling}
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {isPulling ? (
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
+              )}
+              <span>Đồng Bộ Từ QLDTTX</span>
+            </button>
+          )}
+
+          {onNavigateTab && (
+            <button
+              onClick={() => onNavigateTab('registered_courses')}
+              className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-2xl transition-colors border border-emerald-200 flex items-center gap-1.5 cursor-pointer"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Xem Danh Sách Môn ĐK</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
-        <div className="bg-white border border-emerald-200 rounded-2xl p-4 shadow-sm flex flex-col">
-          <div className="flex items-center gap-2 text-emerald-600 mb-2">
+      {/* Student Selector Dropdown (When class has multiple students) */}
+      {data?.allSubAccounts && data.allSubAccounts.length > 0 && (
+        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <Users className="w-5 h-5 text-indigo-600" />
+            <div>
+              <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                Đối tượng so sánh:
+              </span>
+              <span className="text-[11px] text-slate-400">Chọn sinh viên trong lớp để xem kết quả đối chiếu</span>
+            </div>
+          </div>
+          <select
+            value={selectedStudentUsername}
+            onChange={(e) => setSelectedStudentUsername(e.target.value)}
+            className="bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer min-w-[260px]"
+          >
+            {data.allSubAccounts.map((acc: any) => (
+              <option key={acc.username} value={acc.username?.toUpperCase()}>
+                {acc.username?.toUpperCase()} {acc.username?.toUpperCase() === currentUser?.username?.toUpperCase() ? '(Bạn)' : ''} {acc.type === 'main' ? '★ Lớp trưởng' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Comparison Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white border border-emerald-200 rounded-3xl p-5 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 text-emerald-600 mb-1">
             <CheckCircle2 className="w-5 h-5" />
-            <span className="font-bold">Trùng khớp</span>
+            <span className="font-black text-xs uppercase tracking-wider">Trùng khớp</span>
           </div>
-          <span className="text-3xl font-bold text-emerald-700">{comparison.exactMatch.length}</span>
-          <span className="text-xs text-slate-500 mt-1">Môn học giống LT</span>
+          <span className="text-3xl font-black text-emerald-700 mt-1">{comparison.exactMatch.length}</span>
+          <span className="text-xs text-slate-400 mt-1">Môn học cùng nhóm tổ với LT</span>
         </div>
 
-        <div className="bg-white border border-amber-200 rounded-2xl p-4 shadow-sm flex flex-col">
-          <div className="flex items-center gap-2 text-amber-600 mb-2">
+        <div className="bg-white border border-amber-200 rounded-3xl p-5 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 text-amber-600 mb-1">
             <AlertTriangle className="w-5 h-5" />
-            <span className="font-bold">Khác nhóm tổ</span>
+            <span className="font-black text-xs uppercase tracking-wider">Khác nhóm tổ</span>
           </div>
-          <span className="text-3xl font-bold text-amber-700">{comparison.diffGroup.length}</span>
-          <span className="text-xs text-slate-500 mt-1">Cùng môn, khác nhóm</span>
+          <span className="text-3xl font-black text-amber-700 mt-1">{comparison.diffGroup.length}</span>
+          <span className="text-xs text-slate-400 mt-1">Cùng môn, khác nhóm học</span>
         </div>
 
-        <div className="bg-white border border-rose-200 rounded-2xl p-4 shadow-sm flex flex-col">
-          <div className="flex items-center gap-2 text-rose-600 mb-2">
+        <div className="bg-white border border-rose-200 rounded-3xl p-5 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 text-rose-600 mb-1">
             <XCircle className="w-5 h-5" />
-            <span className="font-bold">Thiếu môn</span>
+            <span className="font-black text-xs uppercase tracking-wider">Thiếu môn</span>
           </div>
-          <span className="text-3xl font-bold text-rose-700">{comparison.missing.length}</span>
-          <span className="text-xs text-slate-500 mt-1">LT đăng ký nhưng bạn chưa ĐK</span>
+          <span className="text-3xl font-black text-rose-700 mt-1">{comparison.missing.length}</span>
+          <span className="text-xs text-slate-400 mt-1">LT đăng ký nhưng SV chưa ĐK</span>
         </div>
 
-        <div className="bg-white border border-purple-200 rounded-2xl p-4 shadow-sm flex flex-col">
-          <div className="flex items-center gap-2 text-purple-600 mb-2">
+        <div className="bg-white border border-purple-200 rounded-3xl p-5 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 text-purple-600 mb-1">
             <Info className="w-5 h-5" />
-            <span className="font-bold">Đăng ký thêm</span>
+            <span className="font-black text-xs uppercase tracking-wider">Đăng ký thêm</span>
           </div>
-          <span className="text-3xl font-bold text-purple-700">{comparison.extra.length}</span>
-          <span className="text-xs text-slate-500 mt-1">Bạn ĐK nhưng LT không ĐK</span>
+          <span className="text-3xl font-black text-purple-700 mt-1">{comparison.extra.length}</span>
+          <span className="text-xs text-slate-400 mt-1">SV ĐK nhưng LT không ĐK</span>
         </div>
       </div>
 
-      <div className="flex flex-col gap-6 pb-8">
+      {/* Comparison Sections */}
+      <div className="flex flex-col gap-6">
         {/* Thiếu môn */}
         {comparison.missing.length > 0 && (
-          <div className="bg-white rounded-2xl border border-rose-200 shadow-sm overflow-hidden shrink-0">
-            <div className="bg-rose-50 px-4 py-3 border-b border-rose-100 flex items-center gap-2">
-              <XCircle className="w-5 h-5 text-rose-600" />
-              <h3 className="font-bold text-rose-800 flex items-center gap-2">Môn học bị thiếu (Cần bổ sung) <span className="text-xs font-normal text-rose-600 bg-rose-100 px-2 py-0.5 rounded-full">Ấn vào để xem chi tiết</span></h3>
+          <div className="bg-white rounded-3xl border border-rose-200 shadow-sm overflow-hidden">
+            <div className="p-4 bg-rose-50/80 border-b border-rose-100 flex items-center justify-between">
+              <h3 className="font-black text-rose-900 text-sm flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-rose-600" />
+                Môn Sinh Viên Chưa Đăng Ký ({comparison.missing.length})
+              </h3>
+              <span className="text-xs text-rose-700 font-medium">Cần kiểm tra để tránh thiếu tín chỉ</span>
             </div>
             <div className="divide-y divide-slate-100">
-              {comparison.missing.map((c: any) => (
-                <div key={c.ma_mon} onClick={() => setSelectedCourse({type: 'missing', courseCode: c.ma_mon, courseName: c.ten_mon, monitorGroup: c.nhom_to})} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50 cursor-pointer transition-colors">
-                  <div>
-                    <div className="font-bold text-slate-800">{c.ten_mon}</div>
-                    <div className="text-sm text-slate-500">{c.ma_mon} • {c.so_tc} tín chỉ</div>
+              {comparison.missing.map((c: any) => {
+                const code = c.ma_mon || c.MaMH;
+                const name = c.ten_mon || c.TenMH;
+                const tc = c.so_tc || c.SoTC;
+                const grp = c.nhom_to || c.NhomTo;
+                const lop = c.lop || c.Lop;
+
+                return (
+                  <div
+                    key={code}
+                    className="p-4 flex items-center justify-between hover:bg-rose-50/20 transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
+                          {code}
+                        </span>
+                        <span className="font-bold text-slate-800 text-sm">{name}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
+                        <span>Số TC: {tc}</span>
+                        <span>•</span>
+                        <span>Nhóm tổ của LT: <strong className="text-indigo-600">{grp}</strong></span>
+                        {lop && <span>• Lớp HP: {lop}</span>}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        setSelectedCourse({
+                          type: 'missing',
+                          courseCode: code,
+                          courseName: name,
+                          monitorGroup: grp,
+                        })
+                      }
+                      className="px-3.5 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      <span>Xem thống kê lớp</span>
+                    </button>
                   </div>
-                  <div className="bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap self-start md:self-auto w-fit">
-                    Nhóm tổ: {c.nhom_to}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* Khác nhóm tổ */}
         {comparison.diffGroup.length > 0 && (
-          <div className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden shrink-0">
-            <div className="bg-amber-50 px-4 py-3 border-b border-amber-100 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
-              <h3 className="font-bold text-amber-800 flex items-center gap-2">Khác nhóm tổ với Lớp trưởng <span className="text-xs font-normal text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Ấn vào để xem chi tiết</span></h3>
+          <div className="bg-white rounded-3xl border border-amber-200 shadow-sm overflow-hidden">
+            <div className="p-4 bg-amber-50/80 border-b border-amber-100 flex items-center justify-between">
+              <h3 className="font-black text-amber-900 text-sm flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                Môn Khác Nhóm Tổ ({comparison.diffGroup.length})
+              </h3>
+              <span className="text-xs text-amber-700 font-medium">Sinh viên và Lớp trưởng học khác ca/nhóm</span>
             </div>
             <div className="divide-y divide-slate-100">
-              {comparison.diffGroup.map(({ monitor, mine }: any) => (
-                <div key={monitor.ma_mon} onClick={() => setSelectedCourse({type: 'diffGroup', courseCode: monitor.ma_mon, courseName: monitor.ten_mon, monitorGroup: monitor.nhom_to, myGroup: mine.nhom_to})} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50 cursor-pointer transition-colors">
-                  <div>
-                    <div className="font-bold text-slate-800">{monitor.ten_mon}</div>
-                    <div className="text-sm text-slate-500">{monitor.ma_mon} • {monitor.so_tc} tín chỉ</div>
-                  </div>
-                  <div className="flex items-center gap-3 self-start md:self-auto">
-                    <div className="flex flex-col items-start md:items-end">
-                      <span className="text-xs text-slate-500">Nhóm của bạn</span>
-                      <span className="font-bold text-amber-600">Nhóm {mine.nhom_to}</span>
-                    </div>
-                    <div className="w-px h-8 bg-slate-200 hidden md:block"></div>
-                    <div className="flex flex-col items-start">
-                      <span className="text-xs text-slate-500">Nhóm LT</span>
-                      <span className="font-bold text-slate-700">Nhóm {monitor.nhom_to}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+              {comparison.diffGroup.map(({ monitor: mc, mine: myC }) => {
+                const code = mc.ma_mon || mc.MaMH;
+                const name = mc.ten_mon || mc.TenMH;
+                const monitorGrp = mc.nhom_to || mc.NhomTo;
+                const myGrp = myC.nhom_to || myC.NhomTo;
 
-        {/* Đăng ký thêm */}
-        {comparison.extra.length > 0 && (
-          <div className="bg-white rounded-2xl border border-purple-200 shadow-sm overflow-hidden shrink-0">
-            <div className="bg-purple-50 px-4 py-3 border-b border-purple-100 flex items-center gap-2">
-              <Info className="w-5 h-5 text-purple-600" />
-              <h3 className="font-bold text-purple-800">Môn học bạn đăng ký thêm (LT không đăng ký)</h3>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {comparison.extra.map((c: any) => (
-                <div key={c.ma_mon} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50">
-                  <div>
-                    <div className="font-bold text-slate-800">{c.ten_mon}</div>
-                    <div className="text-sm text-slate-500">{c.ma_mon} • {c.so_tc} tín chỉ</div>
+                return (
+                  <div
+                    key={code}
+                    className="p-4 flex items-center justify-between hover:bg-amber-50/20 transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
+                          {code}
+                        </span>
+                        <span className="font-bold text-slate-800 text-sm">{name}</span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1 flex items-center gap-3">
+                        <span>
+                          Nhóm của SV: <strong className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{myGrp}</strong>
+                        </span>
+                        <span>
+                          Nhóm của LT: <strong className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">{monitorGrp}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        setSelectedCourse({
+                          type: 'diffGroup',
+                          courseCode: code,
+                          courseName: name,
+                          monitorGroup: monitorGrp,
+                          myGroup: myGrp,
+                        })
+                      }
+                      className="px-3.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      <span>Xem thống kê lớp</span>
+                    </button>
                   </div>
-                  <div className="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap self-start md:self-auto w-fit">
-                    Nhóm tổ: {c.nhom_to}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* Trùng khớp */}
         {comparison.exactMatch.length > 0 && (
-          <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden shrink-0">
-            <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-100 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              <h3 className="font-bold text-emerald-800">Môn học trùng khớp hoàn toàn</h3>
+          <div className="bg-white rounded-3xl border border-emerald-200 shadow-sm overflow-hidden">
+            <div className="p-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
+              <h3 className="font-black text-emerald-900 text-sm flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Môn Trùng Khớp Hoàn Toàn ({comparison.exactMatch.length})
+              </h3>
+              <span className="text-xs text-emerald-700 font-medium">Học chung nhóm tổ với Lớp trưởng</span>
             </div>
             <div className="divide-y divide-slate-100">
-              {comparison.exactMatch.map((c: any) => (
-                <div key={c.ma_mon} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50">
-                  <div>
-                    <div className="font-bold text-slate-800">{c.ten_mon}</div>
-                    <div className="text-sm text-slate-500">{c.ma_mon} • {c.so_tc} tín chỉ</div>
+              {comparison.exactMatch.map((c: any) => {
+                const code = c.ma_mon || c.MaMH;
+                const name = c.ten_mon || c.TenMH;
+                const tc = c.so_tc || c.SoTC;
+                const grp = c.nhom_to || c.NhomTo;
+                const lop = c.lop || c.Lop;
+
+                return (
+                  <div key={code} className="p-4 flex items-center justify-between hover:bg-emerald-50/20 transition-colors">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
+                          {code}
+                        </span>
+                        <span className="font-bold text-slate-800 text-sm">{name}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
+                        <span>Số TC: {tc}</span>
+                        <span>•</span>
+                        <span>Nhóm tổ: <strong className="text-emerald-700">{grp}</strong></span>
+                        {lop && <span>• Lớp HP: {lop}</span>}
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                      ✓ Cùng nhóm {grp}
+                    </span>
                   </div>
-                  <div className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap self-start md:self-auto w-fit">
-                    Nhóm tổ: {c.nhom_to}
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Đăng ký thêm */}
+        {comparison.extra.length > 0 && (
+          <div className="bg-white rounded-3xl border border-purple-200 shadow-sm overflow-hidden">
+            <div className="p-4 bg-purple-50/80 border-b border-purple-100 flex items-center justify-between">
+              <h3 className="font-black text-purple-900 text-sm flex items-center gap-2">
+                <Info className="w-4 h-4 text-purple-600" />
+                Môn Đăng Ký Thêm ({comparison.extra.length})
+              </h3>
+              <span className="text-xs text-purple-700 font-medium">Môn học cải thiện hoặc ngoài chương trình LT</span>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {comparison.extra.map((c: any) => {
+                const code = c.ma_mon || c.MaMH;
+                const name = c.ten_mon || c.TenMH;
+                const tc = c.so_tc || c.SoTC;
+                const grp = c.nhom_to || c.NhomTo;
+
+                return (
+                  <div key={code} className="p-4 flex items-center justify-between hover:bg-purple-50/20 transition-colors">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
+                          {code}
+                        </span>
+                        <span className="font-bold text-slate-800 text-sm">{name}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
+                        <span>Số TC: {tc}</span>
+                        <span>•</span>
+                        <span>Nhóm tổ: {grp}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
       </div>
 
+      {/* Modal Popup Stats */}
       {selectedCourse && popupStats && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedCourse(null);
+          }}
+        >
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
+                <div className="p-2 bg-white/20 rounded-xl">
+                  <BarChart3 className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800 text-lg leading-none">{selectedCourse.courseName}</h3>
-                  <p className="text-sm text-slate-500 mt-1">{selectedCourse.courseCode} • Phân tích sinh viên trong lớp</p>
+                  <h3 className="text-lg font-black">{selectedCourse.courseName}</h3>
+                  <p className="text-xs text-slate-300 font-mono">{selectedCourse.courseCode}</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedCourse(null)}
-                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-full cursor-pointer"
               >
-                <X className="w-5 h-5 text-slate-400" />
+                <X className="w-5 h-5" />
               </button>
             </div>
-            
-            <div className="p-6 overflow-auto">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                  <div className="text-2xl font-bold text-slate-800">{popupStats.totalAnalyzed}</div>
-                  <div className="text-xs font-medium text-slate-500 mt-1">SV (Trừ LT)</div>
-                </div>
-                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
-                  <div className="text-2xl font-bold text-emerald-700">{popupStats.groupMap.get(selectedCourse.monitorGroup)?.length || 0}</div>
-                  <div className="text-xs font-medium text-emerald-600 mt-1">Nhóm {selectedCourse.monitorGroup} (Giống LT)</div>
-                </div>
-                {selectedCourse.type === 'diffGroup' && selectedCourse.myGroup && (
-                  <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 text-center">
-                    <div className="text-2xl font-bold text-amber-700">{popupStats.groupMap.get(selectedCourse.myGroup)?.length || 0}</div>
-                    <div className="text-xs font-medium text-amber-600 mt-1">Nhóm {selectedCourse.myGroup} (Giống bạn)</div>
-                  </div>
-                )}
-                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 text-center">
-                  <div className="text-2xl font-bold text-rose-700">{popupStats.missingUsers.length}</div>
-                  <div className="text-xs font-medium text-rose-600 mt-1">Chưa ĐK</div>
+
+            <div className="p-6 flex flex-col gap-4 text-xs">
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                <span className="text-slate-500 font-bold block mb-1">
+                  Thống kê trên {popupStats.totalAnalyzed} sinh viên trong lớp có dữ liệu:
+                </span>
+              </div>
+
+              {/* Group Distribution */}
+              <div className="flex flex-col gap-2">
+                <h4 className="font-black text-slate-800 uppercase tracking-wider text-[11px]">
+                  Phân bố theo nhóm tổ:
+                </h4>
+                <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+                  {Array.from(popupStats.groupMap.entries()).map(([grp, users]) => (
+                    <div
+                      key={grp}
+                      className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                          Nhóm {grp}
+                        </span>
+                        {grp === selectedCourse.monitorGroup && (
+                          <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold">
+                            Nhóm của LT
+                          </span>
+                        )}
+                        {grp === selectedCourse.myGroup && (
+                          <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">
+                            Nhóm của bạn
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-bold text-slate-700">{users.length} SV</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="space-y-6">
-                {/* Giống LT */}
-                {(popupStats.groupMap.get(selectedCourse.monitorGroup)?.length || 0) > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-emerald-800 flex items-center gap-2 mb-3">
-                      <CheckCircle2 className="w-4 h-4" /> 
-                      SV học Nhóm {selectedCourse.monitorGroup} (Cùng Lớp trưởng)
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {popupStats.groupMap.get(selectedCourse.monitorGroup)?.map(user => (
-                        <span key={user} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-sm font-medium rounded-lg border border-emerald-100">
-                          {user.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
+              {/* Missing list */}
+              {popupStats.missingUsers.length > 0 && (
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                  <h4 className="font-black text-rose-700 uppercase tracking-wider text-[11px]">
+                    Chưa đăng ký ({popupStats.missingUsers.length} SV):
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                    {popupStats.missingUsers.map((u: string) => (
+                      <span
+                        key={u}
+                        className="px-2 py-1 bg-rose-50 text-rose-800 font-mono font-bold rounded-lg border border-rose-200 text-[11px]"
+                      >
+                        {u}
+                      </span>
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Giống bạn (nếu có) */}
-                {selectedCourse.type === 'diffGroup' && selectedCourse.myGroup && (popupStats.groupMap.get(selectedCourse.myGroup)?.length || 0) > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-amber-800 flex items-center gap-2 mb-3">
-                      <AlertTriangle className="w-4 h-4" /> 
-                      SV học Nhóm {selectedCourse.myGroup} (Cùng với bạn)
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {popupStats.groupMap.get(selectedCourse.myGroup)?.map(user => (
-                        <span key={user} className="px-2.5 py-1 bg-amber-50 text-amber-700 text-sm font-medium rounded-lg border border-amber-100">
-                          {user.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Các nhóm khác */}
-                {Array.from(popupStats.groupMap.entries()).filter(([grp]) => grp !== selectedCourse.monitorGroup && grp !== selectedCourse.myGroup).map(([grp, users]) => (
-                  <div key={grp}>
-                    <h4 className="font-semibold text-purple-800 flex items-center gap-2 mb-3">
-                      <Users className="w-4 h-4" /> 
-                      SV học Nhóm {grp}
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {users.map(user => (
-                        <span key={user} className="px-2.5 py-1 bg-purple-50 text-purple-700 text-sm font-medium rounded-lg border border-purple-100">
-                          {user.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Chưa ĐK */}
-                {popupStats.missingUsers.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-rose-800 flex items-center gap-2 mb-3">
-                      <XCircle className="w-4 h-4" /> 
-                      SV chưa đăng ký môn này
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {popupStats.missingUsers.map(user => (
-                        <span key={user} className="px-2.5 py-1 bg-rose-50 text-rose-700 text-sm font-medium rounded-lg border border-rose-100">
-                          {user.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => setSelectedCourse(null)}
+                  className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
               </div>
             </div>
           </div>

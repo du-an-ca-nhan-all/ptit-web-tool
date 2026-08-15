@@ -137,3 +137,94 @@ export async function getValidTokenOrRefresh(account: {
 
   return { token: freshToken, isNew: true };
 }
+
+/**
+ * Lấy danh sách kết quả đăng ký môn học (ĐKMH) từ cổng QLDTTX cho sinh viên
+ */
+export async function fetchStudentCoursesFromQLDTTX(account: {
+  username: string;
+  password?: string;
+  token?: string | null;
+}): Promise<{
+  data: any;
+  totalCourses: number;
+  totalCredits: number;
+  tuitionFee: number;
+}> {
+  let validToken = account.token;
+  if (!validToken && account.password) {
+    const res = await getValidTokenOrRefresh({
+      username: account.username,
+      password: account.password,
+      existingToken: account.token,
+    });
+    validToken = res.token;
+  }
+
+  if (!validToken) {
+    throw new Error('Chưa có token hoặc mật khẩu để kết nối cổng QLDTTX');
+  }
+
+  const rawToken = validToken.replace(/^Bearer\s+/i, '').trim();
+
+  let response = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      ...STATIC_HEADERS,
+      Authorization: `Bearer ${rawToken}`,
+      Cookie: `access_token=${rawToken}`,
+    },
+    body: JSON.stringify(REQUEST_BODY),
+  });
+
+  // If token expired (401/403) and password available, auto refresh token & retry
+  if ((response.status === 401 || response.status === 403) && account.password) {
+    const fresh = await loginAndGetToken({
+      username: account.username,
+      password: account.password,
+    });
+    const freshRaw = fresh.replace(/^Bearer\s+/i, '').trim();
+    response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        ...STATIC_HEADERS,
+        Authorization: `Bearer ${freshRaw}`,
+        Cookie: `access_token=${freshRaw}`,
+      },
+      body: JSON.stringify(REQUEST_BODY),
+    });
+  }
+
+  const text = await response.text();
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = text;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Cổng QLDTTX phản hồi lỗi (${response.status}): ${typeof parsed === 'string' ? parsed : JSON.stringify(parsed)}`);
+  }
+
+  const courseList = parsed?.data?.ds_kqdkmh || [];
+  let totalCredits = 0;
+  let tuitionFee = 0;
+
+  courseList.forEach((item: any) => {
+    const toHoc = item.to_hoc;
+    if (toHoc) {
+      const tc = Number(toHoc.so_tc) || Number(toHoc.so_tc_hp) || 0;
+      totalCredits += tc;
+      const fee = Number(toHoc.phai_dong) || Number(item.hoc_phi_tam_tinh) || 0;
+      tuitionFee += fee;
+    }
+  });
+
+  return {
+    data: parsed,
+    totalCourses: courseList.length,
+    totalCredits,
+    tuitionFee,
+  };
+}

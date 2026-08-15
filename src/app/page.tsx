@@ -35,6 +35,7 @@ import MonitorsList from '../components/MonitorsList';
 import CourseCompare from '../components/CourseCompare';
 import SettlementManager from '../components/SettlementManager';
 import UserProfileScreen from '../components/UserProfileScreen';
+import StudentCourseRegistration from '../components/StudentCourseRegistration';
 import ExamBatchManagement from '../components/ExamBatchManagement';
 import AdminExternalAccounts from '../components/AdminExternalAccounts';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
@@ -61,6 +62,7 @@ const getInitialState = () => {
         | 'schedule'
         | 'personal_schedule'
         | 'profile'
+        | 'registered_courses'
         | 'monitor'
         | 'members'
         | 'envelope'
@@ -93,6 +95,7 @@ export default function Home() {
     | 'schedule'
     | 'personal_schedule'
     | 'profile'
+    | 'registered_courses'
     | 'monitor'
     | 'members'
     | 'envelope'
@@ -247,18 +250,10 @@ export default function Home() {
   }, [activeTab]);
 
   // Load Course Compare Data from DB API
-  useEffect(() => {
-    let classCode = currentUser?.lop;
+  const fetchCourseCompareData = useCallback(() => {
+    const classCode = currentUser?.lop || monitorClass || 'D25TXCN11-K';
 
-    if (!classCode && currentUser && records.length > 0) {
-      const currentUsername = currentUser.username.toLowerCase();
-      const studentRecord = records.find((r) => r.MaSV?.toLowerCase() === currentUsername);
-      if (studentRecord && studentRecord.MaLop) {
-        classCode = studentRecord.MaLop;
-      }
-    }
-
-    if (classCode && currentUser) {
+    if (currentUser) {
       fetch(`/api/course-compare?classCode=${encodeURIComponent(classCode)}&username=${encodeURIComponent(currentUser.username)}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
@@ -278,11 +273,12 @@ export default function Home() {
           setShowCourseCompare(false);
           setCourseCompareData(null);
         });
-    } else {
-      setShowCourseCompare(false);
-      setCourseCompareData(null);
     }
-  }, [currentUser, records]);
+  }, [currentUser, monitorClass]);
+
+  useEffect(() => {
+    fetchCourseCompareData();
+  }, [fetchCourseCompareData, activeTab]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -532,13 +528,27 @@ export default function Home() {
             </button>
           )}
 
-          {/* 4. So sánh ĐKMH */}
-          {currentUser && showCourseCompare && (
+          {/* 4. Môn học đã đăng ký */}
+          {currentUser && (
+            <button
+              onClick={() => handleTabChange('registered_courses')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                activeTab === 'registered_courses'
+                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+              }`}
+            >
+              <BookOpen className="w-4 h-4 text-emerald-400" /> Môn Học Đã Đăng Ký
+            </button>
+          )}
+
+          {/* 5. So sánh ĐKMH */}
+          {currentUser && (
             <button
               onClick={() => handleTabChange('course_compare')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 activeTab === 'course_compare'
-                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
+                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
               }`}
             >
@@ -833,6 +843,11 @@ export default function Home() {
                 localStorage.setItem('currentUser', JSON.stringify(updatedUser));
               }}
             />
+          ) : activeTab === 'registered_courses' && currentUser ? (
+            <StudentCourseRegistration
+              currentUser={currentUser}
+              onNavigateTab={(tab) => handleTabChange(tab)}
+            />
           ) : activeTab === 'external_accounts_admin' && isAdmin ? (
             <AdminExternalAccounts currentUser={currentUser!} />
           ) : activeTab === 'batches' ? (
@@ -855,7 +870,12 @@ export default function Home() {
               }}
             />
           ) : activeTab === 'course_compare' ? (
-            <CourseCompare data={courseCompareData} />
+            <CourseCompare
+              data={courseCompareData}
+              currentUser={currentUser}
+              onNavigateTab={(tab) => handleTabChange(tab)}
+              onReload={fetchCourseCompareData}
+            />
           ) : activeTab === 'members' ? (
             <ClassMembers
               records={records}
