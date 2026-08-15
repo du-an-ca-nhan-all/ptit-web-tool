@@ -127,6 +127,9 @@ export interface TelegramConfigItem {
   notifyExamSchedule: boolean;
   notifyCourseRegistration: boolean;
   notifyClassActivity: boolean;
+  notifyQldtAnnouncements?: boolean;
+  qldtCheckInterval?: number;
+  lastQldtCheckedAt?: string | null;
   lastTestedAt?: string | null;
   lastTestStatus?: 'SUCCESS' | 'FAILED' | null;
   lastTestError?: string | null;

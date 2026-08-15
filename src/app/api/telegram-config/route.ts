@@ -14,6 +14,7 @@ import {
   resolveEffectiveBotToken,
 } from '@/src/lib/telegram-service';
 import { logActivity } from '@/src/lib/activityLog';
+import { checkAndDispatchQldtAnnouncements } from '@/src/lib/telegram-dispatcher';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -81,6 +82,9 @@ export async function GET(req: NextRequest) {
           notifyExamSchedule: cfg.notifyExamSchedule,
           notifyCourseRegistration: cfg.notifyCourseRegistration,
           notifyClassActivity: cfg.notifyClassActivity,
+          notifyQldtAnnouncements: cfg.notifyQldtAnnouncements,
+          qldtCheckInterval: cfg.qldtCheckInterval,
+          lastQldtCheckedAt: cfg.lastQldtCheckedAt ? cfg.lastQldtCheckedAt.toISOString() : null,
           lastTestedAt: cfg.lastTestedAt ? cfg.lastTestedAt.toISOString() : null,
           lastTestStatus: cfg.lastTestStatus,
           lastTestError: cfg.lastTestError,
@@ -138,6 +142,9 @@ export async function GET(req: NextRequest) {
             notifyExamSchedule: config.notifyExamSchedule,
             notifyCourseRegistration: config.notifyCourseRegistration,
             notifyClassActivity: config.notifyClassActivity,
+            notifyQldtAnnouncements: config.notifyQldtAnnouncements,
+            qldtCheckInterval: config.qldtCheckInterval,
+            lastQldtCheckedAt: config.lastQldtCheckedAt ? config.lastQldtCheckedAt.toISOString() : null,
             lastTestedAt: config.lastTestedAt ? config.lastTestedAt.toISOString() : null,
             lastTestStatus: config.lastTestStatus,
             lastTestError: config.lastTestError,
@@ -403,6 +410,8 @@ export async function POST(req: NextRequest) {
       const notifyExamSchedule = body.notifyExamSchedule !== undefined ? Boolean(body.notifyExamSchedule) : true;
       const notifyCourseRegistration = body.notifyCourseRegistration !== undefined ? Boolean(body.notifyCourseRegistration) : true;
       const notifyClassActivity = body.notifyClassActivity !== undefined ? Boolean(body.notifyClassActivity) : true;
+      const notifyQldtAnnouncements = body.notifyQldtAnnouncements !== undefined ? Boolean(body.notifyQldtAnnouncements) : true;
+      const qldtCheckInterval = [1, 2, 5].includes(Number(body.qldtCheckInterval)) ? Number(body.qldtCheckInterval) : 2;
 
       if (!chatId) {
         return NextResponse.json({ error: 'Vui lòng nhập Chat ID nhận thông báo' }, { status: 400 });
@@ -442,6 +451,8 @@ export async function POST(req: NextRequest) {
           notifyExamSchedule,
           notifyCourseRegistration,
           notifyClassActivity,
+          notifyQldtAnnouncements,
+          qldtCheckInterval,
           botUsername,
           botFirstName,
         },
@@ -453,6 +464,8 @@ export async function POST(req: NextRequest) {
           notifyExamSchedule,
           notifyCourseRegistration,
           notifyClassActivity,
+          notifyQldtAnnouncements,
+          qldtCheckInterval,
           botUsername: botUsername ?? undefined,
           botFirstName: botFirstName ?? undefined,
         },
@@ -478,6 +491,15 @@ export async function POST(req: NextRequest) {
         message: 'Đã lưu cấu hình thông báo Telegram thành công!',
         config: savedConfig,
       });
+    }
+
+    // 2.5 ACTION: CHECK QLDTTX ANNOUNCEMENTS NOW (Kiểm tra thông báo QLDTTX tức thì)
+    if (action === 'CHECK_QLDT_ANNOUNCEMENTS') {
+      const result = await checkAndDispatchQldtAnnouncements({
+        username,
+        forceCheck: true,
+      });
+      return NextResponse.json(result);
     }
 
     // 3. ACTION: PULL FORUM TOPICS (Lấy danh sách topic từ nhóm)

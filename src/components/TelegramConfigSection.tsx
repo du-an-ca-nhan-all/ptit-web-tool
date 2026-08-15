@@ -65,6 +65,10 @@ export default function TelegramConfigSection({
   const [notifyExamSchedule, setNotifyExamSchedule] = useState(true);
   const [notifyCourseRegistration, setNotifyCourseRegistration] = useState(true);
   const [notifyClassActivity, setNotifyClassActivity] = useState(true);
+  const [notifyQldtAnnouncements, setNotifyQldtAnnouncements] = useState(true);
+  const [qldtCheckInterval, setQldtCheckInterval] = useState<number>(2);
+  const [isCheckingQldt, setIsCheckingQldt] = useState(false);
+  const [qldtCheckMsg, setQldtCheckMsg] = useState('');
 
   // Admin System Bot Config states
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
@@ -118,6 +122,8 @@ export default function TelegramConfigSection({
           setNotifyExamSchedule(data.config.notifyExamSchedule ?? true);
           setNotifyCourseRegistration(data.config.notifyCourseRegistration ?? true);
           setNotifyClassActivity(data.config.notifyClassActivity ?? true);
+          setNotifyQldtAnnouncements(data.config.notifyQldtAnnouncements ?? true);
+          setQldtCheckInterval(data.config.qldtCheckInterval ?? 2);
           if (data.config.lastTestStatus) {
             setTestResult({
               success: data.config.lastTestStatus === 'SUCCESS',
@@ -209,6 +215,8 @@ export default function TelegramConfigSection({
           notifyExamSchedule,
           notifyCourseRegistration,
           notifyClassActivity,
+          notifyQldtAnnouncements,
+          qldtCheckInterval,
         }),
       });
 
@@ -225,6 +233,37 @@ export default function TelegramConfigSection({
       setErrorMsg('Lỗi kết nối máy chủ khi lưu cấu hình.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Check QLDTTX announcements now
+  const handleCheckQldtNow = async () => {
+    setIsCheckingQldt(true);
+    setQldtCheckMsg('');
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/telegram-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'CHECK_QLDT_ANNOUNCEMENTS',
+          targetUsername: targetUsername || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setQldtCheckMsg(
+          data.totalAnnouncementsDispatched > 0
+            ? `Đã quét cổng QLDTTX: Phát hiện và đã gửi ${data.totalAnnouncementsDispatched} thông báo mới về Telegram của bạn!`
+            : 'Đã quét cổng QLDTTX: Không có thông báo mới nào hoặc đã được gửi trước đó.'
+        );
+      } else {
+        setErrorMsg(data.error || 'Lỗi khi kiểm tra thông báo cổng QLDTTX.');
+      }
+    } catch {
+      setErrorMsg('Không thể kết nối máy chủ để kiểm tra thông báo QLDTTX.');
+    } finally {
+      setIsCheckingQldt(false);
     }
   };
 
@@ -874,48 +913,124 @@ export default function TelegramConfigSection({
 
           {/* Notification Types Filter Checkboxes */}
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-              <Bell className="w-3.5 h-3.5 text-sky-600" />
-              <span>Tùy Chọn Nhận Các Loại Thông Báo</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                <Bell className="w-3.5 h-3.5 text-sky-600" />
+                <span>Tùy Chọn Nhận Các Loại Thông Báo</span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-              <label className="flex items-center gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+              {/* Option 1: Exam Schedule */}
+              <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
                 <input
                   type="checkbox"
                   checked={notifyExamSchedule}
                   onChange={(e) => setNotifyExamSchedule(e.target.checked)}
-                  className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500 cursor-pointer"
+                  className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0"
                 />
-                <div className="text-xs font-bold text-slate-700">
-                  <span>Lịch Thi & Ca Thi</span>
+                <div className="text-xs">
+                  <div className="font-bold text-slate-800">Lịch Thi & Ca Thi</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Nhắc trước 1 ngày & 7h sáng hôm thi</div>
                 </div>
               </label>
 
-              <label className="flex items-center gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
+              {/* Option 2: Course Registration */}
+              <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
                 <input
                   type="checkbox"
                   checked={notifyCourseRegistration}
                   onChange={(e) => setNotifyCourseRegistration(e.target.checked)}
-                  className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500 cursor-pointer"
+                  className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0"
                 />
-                <div className="text-xs font-bold text-slate-700">
-                  <span>ĐKMH & Học Phí</span>
+                <div className="text-xs">
+                  <div className="font-bold text-slate-800">ĐKMH & Học Phí</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Tổng kết tín chỉ và học phí tạm tính</div>
                 </div>
               </label>
 
-              <label className="flex items-center gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
+              {/* Option 3: Class Activity */}
+              <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
                 <input
                   type="checkbox"
                   checked={notifyClassActivity}
                   onChange={(e) => setNotifyClassActivity(e.target.checked)}
-                  className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500 cursor-pointer"
+                  className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0"
                 />
-                <div className="text-xs font-bold text-slate-700">
-                  <span>Biến Động Lớp Học</span>
+                <div className="text-xs">
+                  <div className="font-bold text-slate-800">Biến Động Lớp Học</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Phân công phong bì & bù trừ lớp</div>
+                </div>
+              </label>
+
+              {/* Option 4: QLDTTX Portal Announcements */}
+              <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-sky-300 bg-sky-50/40 hover:border-sky-400 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={notifyQldtAnnouncements}
+                  onChange={(e) => setNotifyQldtAnnouncements(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0"
+                />
+                <div className="text-xs">
+                  <div className="font-bold text-sky-900">Thông Báo Cổng QLDTTX</div>
+                  <div className="text-[10px] text-sky-700 mt-0.5">/#/xemthongbao (Học viện)</div>
                 </div>
               </label>
             </div>
+
+            {/* QLDTTX Check Interval Selector */}
+            {notifyQldtAnnouncements && (
+              <div className="mt-2 p-3 bg-sky-50 border border-sky-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex flex-col gap-0.5">
+                  <div className="font-bold text-sky-900 flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-sky-600" />
+                    <span>Tần suất kiểm tra thông báo mới từ QLDTTX:</span>
+                  </div>
+                  <div className="text-[11px] text-sky-700">
+                    Hệ thống sẽ quét định kỳ trang <a href="https://qldttx.pttc1.edu.vn/#/xemthongbao" target="_blank" rel="noopener noreferrer" className="underline font-bold text-sky-800 hover:text-sky-950">/#/xemthongbao</a> và bắn tin nhắn khi có thông báo mới.
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {[
+                    { value: 1, label: '1 tiếng' },
+                    { value: 2, label: '2 tiếng (Khuyên dùng)' },
+                    { value: 5, label: '5 tiếng' },
+                  ].map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setQldtCheckInterval(item.value)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        qldtCheckInterval === item.value
+                          ? 'bg-sky-600 text-white shadow-xs'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={handleCheckQldtNow}
+                    disabled={isCheckingQldt}
+                    className="ml-1 px-3 py-1.5 bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-xs rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    title="Kiểm tra thông báo QLDTTX ngay bây giờ"
+                  >
+                    {isCheckingQldt ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                    <span>Quét Ngay</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {qldtCheckMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-xl flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{qldtCheckMsg}</span>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}

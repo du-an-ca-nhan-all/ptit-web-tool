@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { sendTelegramMessage, resolveEffectiveBotToken } from './telegram-service';
+import { fetchStudentAnnouncementsFromQLDTTX } from './qldttx-service';
 
 /**
  * Normalizes date string into DD/MM/YYYY format
@@ -495,3 +496,153 @@ export async function runExamScheduleReminders(options: {
     };
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. QLDTTX ANNOUNCEMENTS: KIỂM TRA THÔNG BÁO MỚI TỪ CỔNG QLDTTX (/#/xemthongbao)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function checkAndDispatchQldtAnnouncements(options: {
+  username?: string;
+  forceCheck?: boolean;
+} = {}) {
+  try {
+    const whereCond: any = {
+      isEnabled: true,
+      notifyQldtAnnouncements: true,
+    };
+    if (options.username) {
+      whereCond.username = options.username;
+    }
+
+    const subscribers = await prisma.telegramConfig.findMany({
+      where: whereCond,
+      include: {
+        user: {
+          include: {
+            student: true,
+          },
+        },
+      },
+    });
+
+    let totalChecked = 0;
+    let totalAnnouncementsDispatched = 0;
+    const errors: string[] = [];
+
+    for (const sub of subscribers) {
+      const intervalHours = sub.qldtCheckInterval || 2;
+
+      // Check if enough time has elapsed
+      if (!options.forceCheck && sub.lastQldtCheckedAt) {
+        const elapsedHours = (Date.now() - new Date(sub.lastQldtCheckedAt).getTime()) / (1000 * 60 * 60);
+        if (elapsedHours < intervalHours) {
+          continue;
+        }
+      }
+
+      // Find external account
+      const extAccount = await prisma.externalAccount.findFirst({
+        where: { username: sub.username },
+      });
+
+      if (!extAccount || (!extAccount.extPassword && !extAccount.token)) {
+        continue;
+      }
+
+      totalChecked++;
+
+      try {
+        const { announcements } = await fetchStudentAnnouncementsFromQLDTTX({
+          username: extAccount.extUsername,
+          password: extAccount.extPassword,
+          token: extAccount.token,
+        });
+
+        if (!announcements || announcements.length === 0) {
+          // Update last check time
+          await prisma.telegramConfig.update({
+            where: { id: sub.id },
+            data: { lastQldtCheckedAt: new Date() },
+          });
+          continue;
+        }
+
+        let effectiveToken: string;
+        try {
+          const resolved = await resolveEffectiveBotToken(sub.botToken);
+          effectiveToken = resolved.token;
+        } catch {
+          continue;
+        }
+
+        for (const ann of announcements) {
+          // Check if already dispatched
+          const alreadyLogged = await prisma.qldtAnnouncementLog.findUnique({
+            where: {
+              username_announcementId: {
+                username: sub.username,
+                announcementId: ann.id,
+              },
+            },
+          });
+
+          if (alreadyLogged && !options.forceCheck) {
+            continue;
+          }
+
+          const studentName = sub.user?.student?.hoTen || sub.username;
+          const cleanSummary = ann.summary ? ann.summary.slice(0, 350) : '';
+
+          const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ CỔNG QLDTTX (PTTC1)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n📌 <b>${ann.title}</b>\n\n${cleanSummary ? `📝 <i>${cleanSummary}...</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${ann.sender || 'Phòng Đào Tạo'}</b>\n🗓️ Ngày đăng: <b>${ann.publishDate || 'Gần đây'}</b>\n🔗 <a href="https://qldttx.pttc1.edu.vn/#/xemthongbao">Xem chi tiết trên QLDTTX (/#/xemthongbao)</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
+
+          const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
+            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          });
+
+          if (sendRes.success) {
+            totalAnnouncementsDispatched++;
+            await prisma.qldtAnnouncementLog.upsert({
+              where: {
+                username_announcementId: {
+                  username: sub.username,
+                  announcementId: ann.id,
+                },
+              },
+              create: {
+                username: sub.username,
+                announcementId: ann.id,
+                title: ann.title,
+                publishDate: ann.publishDate,
+              },
+              update: {
+                sentAt: new Date(),
+              },
+            });
+          }
+        }
+
+        // Update last checked at
+        await prisma.telegramConfig.update({
+          where: { id: sub.id },
+          data: { lastQldtCheckedAt: new Date() },
+        });
+      } catch (err: any) {
+        errors.push(`${sub.username}: ${err.message}`);
+      }
+    }
+
+    return {
+      success: true,
+      totalSubscribers: subscribers.length,
+      totalChecked,
+      totalAnnouncementsDispatched,
+      errors: errors.slice(0, 5),
+    };
+  } catch (err: any) {
+    console.error('checkAndDispatchQldtAnnouncements error:', err);
+    return {
+      success: false,
+      error: err.message || 'Lỗi khi kiểm tra thông báo QLDTTX',
+    };
+  }
+}
+

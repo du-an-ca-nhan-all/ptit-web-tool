@@ -228,3 +228,152 @@ export async function fetchStudentCoursesFromQLDTTX(account: {
     tuitionFee,
   };
 }
+
+/**
+ * Lấy danh sách thông báo từ cổng QLDTTX (https://qldttx.pttc1.edu.vn/#/xemthongbao)
+ */
+export async function fetchStudentAnnouncementsFromQLDTTX(account: {
+  username: string;
+  password?: string;
+  token?: string | null;
+}): Promise<{
+  announcements: Array<{
+    id: string;
+    title: string;
+    summary?: string;
+    content?: string;
+    publishDate?: string;
+    sender?: string;
+    link?: string;
+  }>;
+}> {
+  let validToken = account.token;
+  if (!validToken && account.password) {
+    const res = await getValidTokenOrRefresh({
+      username: account.username,
+      password: account.password,
+      existingToken: account.token,
+    });
+    validToken = res.token;
+  }
+
+  if (!validToken) {
+    throw new Error('Chưa có token hoặc mật khẩu để kết nối cổng QLDTTX');
+  }
+
+  const rawToken = validToken.replace(/^Bearer\s+/i, '').trim();
+
+  // Candidate endpoints for /#/xemthongbao
+  const candidateEndpoints = [
+    'https://qldttx.pttc1.edu.vn/api/dkmh/w-locdsthongbaosinhvien',
+    'https://qldttx.pttc1.edu.vn/api/dkmh/w-locdsthongbaocanhan',
+    'https://qldttx.pttc1.edu.vn/api/dkmh/w-locdsthongbao',
+    'https://qldttx.pttc1.edu.vn/api/qldt/w-locdsthongbaosinhvien',
+  ];
+
+  let rawList: any[] = [];
+
+  for (const endpoint of candidateEndpoints) {
+    try {
+      let response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          ...STATIC_HEADERS,
+          Authorization: `Bearer ${rawToken}`,
+          Cookie: `access_token=${rawToken}`,
+        },
+        body: JSON.stringify({ is_CVHT: false, is_Clear: false, limit: 20 }),
+      });
+
+      if ((response.status === 401 || response.status === 403) && account.password) {
+        const fresh = await loginAndGetToken({
+          username: account.username,
+          password: account.password,
+        });
+        const freshRaw = fresh.replace(/^Bearer\s+/i, '').trim();
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            ...STATIC_HEADERS,
+            Authorization: `Bearer ${freshRaw}`,
+            Cookie: `access_token=${freshRaw}`,
+          },
+          body: JSON.stringify({ is_CVHT: false, is_Clear: false, limit: 20 }),
+        });
+      }
+
+      if (response.ok) {
+        const json = await response.json();
+        const items =
+          json?.data?.ds_thong_bao ||
+          json?.data?.ds_thongbao ||
+          json?.data?.items ||
+          (Array.isArray(json?.data) ? json.data : []) ||
+          (Array.isArray(json) ? json : []);
+
+        if (Array.isArray(items) && items.length > 0) {
+          rawList = items;
+          break;
+        }
+      }
+    } catch {
+      // Continue to next endpoint fallback
+    }
+  }
+
+  const announcements = rawList.map((item: any, idx: number) => {
+    const id = String(
+      item.id ||
+      item.id_thong_bao ||
+      item.ma_thong_bao ||
+      item.id_tb ||
+      item.guid ||
+      `${item.tieu_de || item.title || 'tb'}-${item.ngay_tao || item.ngay_dang || idx}`
+    );
+
+    const title =
+      item.tieu_de ||
+      item.title ||
+      item.ten_thong_bao ||
+      item.subject ||
+      'Thông báo mới từ Học viện PTIT';
+
+    const content =
+      item.noi_dung ||
+      item.content ||
+      item.noi_dung_chi_tiet ||
+      item.description ||
+      '';
+
+    const summary =
+      item.noi_dung_tom_tat ||
+      item.tom_tat ||
+      item.summary ||
+      (content ? content.replace(/<[^>]+>/g, '').slice(0, 250) : '');
+
+    const publishDate =
+      item.ngay_dang ||
+      item.ngay_tao ||
+      item.created_at ||
+      item.ngay_gui ||
+      new Date().toLocaleDateString('vi-VN');
+
+    const sender =
+      item.nguoi_gui ||
+      item.tac_gia ||
+      item.don_vi_gui ||
+      'Phòng Đào tạo / Học viện PTIT';
+
+    return {
+      id,
+      title,
+      summary,
+      content,
+      publishDate,
+      sender,
+      link: 'https://qldttx.pttc1.edu.vn/#/xemthongbao',
+    };
+  });
+
+  return { announcements };
+}

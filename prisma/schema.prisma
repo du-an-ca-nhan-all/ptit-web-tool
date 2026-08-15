@@ -208,6 +208,9 @@ model TelegramConfig {
   notifyExamSchedule      Boolean   @default(true) // Nhận thông báo khi có lịch thi / đổi lịch thi
   notifyCourseRegistration Boolean   @default(true) // Nhận thông báo ĐKMH / học phí
   notifyClassActivity     Boolean   @default(true) // Nhận thông báo biến động lớp / quyết toán
+  notifyQldtAnnouncements Boolean   @default(true) // Nhận thông báo mới từ cổng QLDTTX (/#/xemthongbao)
+  qldtCheckInterval       Int       @default(2)    // Tần suất kiểm tra (1, 2, hoặc 5 tiếng)
+  lastQldtCheckedAt       DateTime? // Thời điểm kiểm tra thông báo QLDTTX gần nhất
   
   lastTestedAt            DateTime? // Lần cuối gửi tin nhắn test
   lastTestStatus          String?   // 'SUCCESS' | 'FAILED'
@@ -253,4 +256,18 @@ model ExamReminderLog {
   @@index([username])
   @@index([targetDate])
   @@index([reminderType])
+}
+
+// 12. Bảng QldtAnnouncementLog: Nhật ký lưu các thông báo từ QLDTTX đã gửi để tránh gửi lặp
+model QldtAnnouncementLog {
+  id             Int      @id @default(autoincrement())
+  username       String   // Mã SV
+  announcementId String   // ID / Mã thông báo QLDTTX
+  title          String?  // Tiêu đề thông báo
+  publishDate    String?  // Ngày đăng thông báo
+  sentAt         DateTime @default(now())
+
+  @@unique([username, announcementId])
+  @@index([username])
+  @@index([announcementId])
 }
