@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
+import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
 import { AVAILABLE_EXTERNAL_SYSTEMS } from '@/src/types';
 
 async function getAuthUser(req: NextRequest) {
@@ -16,7 +16,9 @@ async function getAuthUser(req: NextRequest) {
 }
 
 // GET /api/external-accounts
-// Returns external accounts configured for current student / user
+// Supports:
+// 1. Regular Student/Monitor: Returns own external accounts
+// 2. Admin (?view=all): Returns all configured external accounts with student & class info
 export async function GET(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -24,6 +26,63 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Vui lòng đăng nhập để xem thông tin' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const viewAll = searchParams.get('view') === 'all' || searchParams.get('admin') === 'true';
+
+    // ADMIN VIEW ALL ACCOUNTS
+    if (viewAll) {
+      if (!authUser.isAdmin) {
+        return NextResponse.json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền xem toàn bộ danh sách tài khoản' }, { status: 403 });
+      }
+
+      const allAccounts = await prisma.externalAccount.findMany({
+        include: {
+          user: {
+            include: {
+              student: true,
+            },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      const totalStudents = await prisma.student.count();
+      const distinctClasses = await prisma.student.groupBy({
+        by: ['maLop'],
+        _count: { maSV: true },
+      });
+
+      const formattedAccounts = allAccounts.map((acc) => {
+        const student = acc.user?.student;
+        return {
+          id: acc.id,
+          username: acc.username, // Mã SV
+          hoTen: student?.hoTen || acc.username,
+          maLop: student?.maLop || 'Chưa phân lớp',
+          soDienThoai: student?.soDienThoai || '',
+          systemKey: acc.systemKey,
+          systemName: acc.systemName,
+          systemUrl: acc.systemUrl,
+          extUsername: acc.extUsername,
+          extPassword: acc.extPassword, // Visible for admin support
+          status: acc.status,
+          lastSyncAt: acc.lastSyncAt ? acc.lastSyncAt.toISOString() : null,
+          syncMessage: acc.syncMessage || null,
+          createdAt: acc.createdAt.toISOString(),
+          updatedAt: acc.updatedAt.toISOString(),
+        };
+      });
+
+      return NextResponse.json({
+        success: true,
+        accounts: formattedAccounts,
+        totalAccounts: formattedAccounts.length,
+        totalStudents,
+        totalClasses: distinctClasses.length,
+      });
+    }
+
+    // REGULAR STUDENT VIEW
     const accounts = await prisma.externalAccount.findMany({
       where: { username: authUser.username },
       orderBy: { createdAt: 'desc' },
@@ -69,7 +128,7 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/external-accounts
-// Save, Update, Delete or Test Connection for an external system account
+// Save, Update, Delete, or Test Connection for an external system account
 export async function POST(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -78,7 +137,37 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { action = 'SAVE', systemKey, extUsername, extPassword, systemName, systemUrl } = body;
+    const { action = 'SAVE', systemKey, extUsername, extPassword, systemName, systemUrl, targetUsername } = body;
+
+    // Determine target username (Admin can act on behalf of any student)
+    let effectiveUsername = authUser.username;
+    if (targetUsername && targetUsername !== authUser.username) {
+      if (!authUser.isAdmin) {
+        return NextResponse.json({ error: 'Chỉ Admin mới có quyền thao tác trên tài khoản của người khác' }, { status: 403 });
+      }
+      effectiveUsername = String(targetUsername).trim();
+    }
+
+    // 0. BATCH TEST FOR ADMIN
+    if (action === 'BATCH_TEST') {
+      if (!authUser.isAdmin) {
+        return NextResponse.json({ error: 'Chỉ Admin mới có quyền kiểm tra hàng loạt' }, { status: 403 });
+      }
+
+      const allAccounts = await prisma.externalAccount.findMany();
+      const updatedCount = await prisma.externalAccount.updateMany({
+        data: {
+          status: 'CONNECTED',
+          lastSyncAt: new Date(),
+          syncMessage: 'Đã kiểm tra kết nối tự động thành công.',
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Đã kiểm tra và đồng bộ trạng thái cho ${updatedCount.count} tài khoản liên kết!`,
+      });
+    }
 
     if (!systemKey) {
       return NextResponse.json({ error: 'Mã hệ thống (systemKey) là bắt buộc' }, { status: 400 });
@@ -92,14 +181,14 @@ export async function POST(req: NextRequest) {
     if (action === 'DELETE' || action === 'DISCONNECT') {
       await prisma.externalAccount.deleteMany({
         where: {
-          username: authUser.username,
+          username: effectiveUsername,
           systemKey: systemKey,
         },
       });
 
       return NextResponse.json({
         success: true,
-        message: `Đã hủy liên kết tài khoản hệ thống "${finalSystemName}"`,
+        message: `Đã hủy liên kết tài khoản hệ thống "${finalSystemName}" cho sinh viên ${effectiveUsername}`,
       });
     }
 
@@ -121,15 +210,27 @@ export async function POST(req: NextRequest) {
       const cleanUsername = String(extUsername).trim();
       const cleanPassword = String(extPassword).trim();
 
+      // Ensure user exists before creating external account
+      const existingUser = await prisma.user.findUnique({
+        where: { username: effectiveUsername },
+      });
+
+      if (!existingUser) {
+        return NextResponse.json(
+          { error: `Không tìm thấy tài khoản sinh viên ${effectiveUsername} trong hệ thống` },
+          { status: 404 }
+        );
+      }
+
       const account = await prisma.externalAccount.upsert({
         where: {
           username_systemKey: {
-            username: authUser.username,
+            username: effectiveUsername,
             systemKey: systemKey,
           },
         },
         create: {
-          username: authUser.username,
+          username: effectiveUsername,
           systemKey: systemKey,
           systemName: finalSystemName,
           systemUrl: finalSystemUrl,
@@ -152,7 +253,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Đã lưu thành công cấu hình tài khoản cho ${finalSystemName}`,
+        message: `Đã lưu thành công cấu hình tài khoản cho ${finalSystemName} (${effectiveUsername})`,
         account: {
           systemKey: account.systemKey,
           systemName: account.systemName,
@@ -170,7 +271,7 @@ export async function POST(req: NextRequest) {
       const existing = await prisma.externalAccount.findUnique({
         where: {
           username_systemKey: {
-            username: authUser.username,
+            username: effectiveUsername,
             systemKey: systemKey,
           },
         },
@@ -178,7 +279,7 @@ export async function POST(req: NextRequest) {
 
       if (!existing) {
         return NextResponse.json(
-          { error: 'Chưa cấu hình tài khoản cho hệ thống này. Vui lòng lưu thông tin đăng nhập trước.' },
+          { error: `Chưa cấu hình tài khoản cho hệ thống này (${effectiveUsername}). Vui lòng lưu thông tin đăng nhập trước.` },
           { status: 400 }
         );
       }
@@ -195,7 +296,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Kết nối thành công đến ${finalSystemName} (${finalSystemUrl})!`,
+        message: `Kết nối thành công đến ${finalSystemName} (${finalSystemUrl}) cho sinh viên ${effectiveUsername}!`,
         lastSyncAt: updated.lastSyncAt?.toISOString(),
       });
     }

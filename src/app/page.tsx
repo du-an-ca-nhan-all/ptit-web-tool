@@ -36,6 +36,7 @@ import CourseCompare from '../components/CourseCompare';
 import SettlementManager from '../components/SettlementManager';
 import UserProfileModal from '../components/UserProfileModal';
 import ExamBatchManagement from '../components/ExamBatchManagement';
+import AdminExternalAccounts from '../components/AdminExternalAccounts';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
 import { buildSessions } from '../utils/dataModel';
 
@@ -67,6 +68,7 @@ const getInitialState = () => {
         | 'settings'
         | 'monitors_list'
         | 'batches'
+        | 'external_accounts_admin'
         | 'course_compare') || 'personal_schedule',
     search: params.get('search') || '',
     classCode: params.get('classCode') || '',
@@ -97,6 +99,7 @@ export default function Home() {
     | 'settings'
     | 'monitors_list'
     | 'batches'
+    | 'external_accounts_admin'
     | 'course_compare'
   >(initialState.tab as any);
 
@@ -527,21 +530,7 @@ export default function Home() {
             </button>
           )}
 
-          {/* 5. Liên kết hệ thống ngoài (QLDTTX) */}
-          {currentUser && (
-            <button
-              onClick={() => {
-                setProfileInitialTab('EXTERNAL_ACCOUNTS');
-                setIsProfileOpen(true);
-              }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent cursor-pointer"
-            >
-              <Globe className="w-4 h-4 text-emerald-400" />
-              <span>Liên Kết QLĐT Từ Xa</span>
-            </button>
-          )}
-
-          {/* 6. Danh sách lớp trưởng */}
+          {/* 5. Danh sách lớp trưởng */}
           <button
             onClick={() => handleTabChange('monitors_list')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors mt-2 ${
@@ -621,16 +610,29 @@ export default function Home() {
                   )}
 
                   {isAdmin && (
-                    <button
-                      onClick={() => handleTabChange('batches')}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
-                        activeTab === 'batches'
-                          ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                      }`}
-                    >
-                      <Layers className="w-4 h-4 text-indigo-400" /> Quản Lý Đợt Thi
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleTabChange('batches')}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                          activeTab === 'batches'
+                            ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+                        }`}
+                      >
+                        <Layers className="w-4 h-4 text-indigo-400" /> Quản Lý Đợt Thi
+                      </button>
+
+                      <button
+                        onClick={() => handleTabChange('external_accounts_admin')}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                          activeTab === 'external_accounts_admin'
+                            ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+                        }`}
+                      >
+                        <Globe className="w-4 h-4 text-indigo-400" /> Tài Khoản QLĐT Từ Xa
+                      </button>
+                    </>
                   )}
                 </div>
               )}
@@ -801,6 +803,8 @@ export default function Home() {
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               <p className="text-sm text-slate-500 font-medium">Đang tải dữ liệu từ máy chủ...</p>
             </div>
+          ) : activeTab === 'external_accounts_admin' && isAdmin ? (
+            <AdminExternalAccounts currentUser={currentUser!} />
           ) : activeTab === 'batches' ? (
             <ExamBatchManagement
               currentUser={currentUser!}
