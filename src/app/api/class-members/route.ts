@@ -102,6 +102,7 @@ export async function GET(req: NextRequest) {
           SoPhutThi: r.soPhutThi || '',
           MaDotThi: r.maDotThi || '',
           TenDotThi: r.tenDotThi || '',
+          isPostponed: Boolean(r.isPostponed),
         })),
       };
     });

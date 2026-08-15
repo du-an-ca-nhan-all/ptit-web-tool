@@ -34,6 +34,7 @@ interface ClassMembersProps {
   onSelectStudentSchedule?: (studentId: string) => void;
   hasExamSchedule?: boolean;
   onImpersonate?: (username: string) => void;
+  onTogglePostpone?: (record: ExamRecord, newStatus: boolean) => Promise<void> | void;
 }
 
 interface StudentExtraInfo {
@@ -50,6 +51,7 @@ export default function ClassMembers({
   onSelectStudentSchedule,
   hasExamSchedule = false,
   onImpersonate,
+  onTogglePostpone,
 }: ClassMembersProps) {
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<'ALL' | 'NAM' | 'NU'>('ALL');
@@ -1298,19 +1300,63 @@ export default function ClassMembers({
                             <th className="px-3 py-2.5">Tên môn học</th>
                             <th className="px-3 py-2.5 text-center">Phòng</th>
                             <th className="px-3 py-2.5 text-center">Tổ/Nhóm</th>
+                            <th className="px-3 py-2.5 text-center">Trạng thái thi</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {selectedStudentDetail.exams.map((ex: ExamRecord, idx: number) => (
-                            <tr key={idx} className="hover:bg-blue-50/50">
+                            <tr key={idx} className={`hover:bg-blue-50/50 ${ex.isPostponed ? 'bg-amber-50/30' : ''}`}>
                               <td className="px-3 py-2.5 font-bold text-slate-700">{ex.NgayThi}</td>
                               <td className="px-3 py-2.5 text-blue-600 font-medium">{ex.GioThi}</td>
                               <td className="px-3 py-2.5 font-bold text-slate-800">
-                                {ex.TenMH} <span className="text-[10px] text-slate-400 font-mono">({ex.MaMH})</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={ex.isPostponed ? 'line-through text-slate-400' : ''}>{ex.TenMH}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">({ex.MaMH})</span>
+                                </div>
                               </td>
                               <td className="px-3 py-2.5 text-center font-bold text-emerald-700">{ex.MAPTHI || '—'}</td>
                               <td className="px-3 py-2.5 text-center text-slate-500">
                                 {ex['To thi'] || ex.NhomThi || '—'}
+                              </td>
+                              <td className="px-3 py-2.5 text-center">
+                                {onTogglePostpone ? (
+                                  <button
+                                    onClick={async () => {
+                                      const nextStatus = !ex.isPostponed;
+                                      await onTogglePostpone(ex, nextStatus);
+                                      setSelectedStudentDetail((prev: any) => {
+                                        if (!prev) return prev;
+                                        return {
+                                          ...prev,
+                                          exams: prev.exams.map((e: ExamRecord) =>
+                                            (ex.id && e.id === ex.id) ||
+                                            (e.MaMH === ex.MaMH && e.MAPTHI === ex.MAPTHI && e.NgayThi === ex.NgayThi && e.GioThi === ex.GioThi)
+                                              ? { ...e, isPostponed: nextStatus }
+                                              : e
+                                          ),
+                                        };
+                                      });
+                                    }}
+                                    title={ex.isPostponed ? 'Bấm để chuyển về Dự thi' : 'Bấm để đánh dấu Hoãn thi (không chia tiền)'}
+                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                                      ex.isPostponed
+                                        ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 shadow-xs'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300'
+                                    }`}
+                                  >
+                                    {ex.isPostponed ? '✕ Hoãn thi' : '✓ Dự thi'}
+                                  </button>
+                                ) : (
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                      ex.isPostponed
+                                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    }`}
+                                  >
+                                    {ex.isPostponed ? 'Hoãn thi' : 'Dự thi'}
+                                  </span>
+                                )}
                               </td>
                             </tr>
                           ))}

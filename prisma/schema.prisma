@@ -105,6 +105,7 @@ model ExamRecord {
   soPhutThi  String?    // Thời lượng thi (phút)
   maDotThi   String?    // Mã đợt thi
   tenDotThi  String?    // Tên đợt thi
+  isPostponed Boolean   @default(false) // Đánh dấu không thi môn này hoặc hoãn thi (không tính chia tiền)
   createdAt  DateTime   @default(now())
 
   @@index([maSV])
@@ -112,6 +113,7 @@ model ExamRecord {
   @@index([maMH])
   @@index([ngayThi])
   @@index([mapThi])
+  @@index([isPostponed])
 }
 
 // 5. Bảng CourseRegistration: Lưu dữ liệu môn học đã đăng ký & so sánh ĐKMH

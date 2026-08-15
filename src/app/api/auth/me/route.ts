@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
                 GioThi: r.gioThi || '',
                 MaHTThi: r.maHTThi || '',
                 SoPhutThi: r.soPhutThi || '',
+                isPostponed: Boolean(r.isPostponed),
               })),
             }
           : null,

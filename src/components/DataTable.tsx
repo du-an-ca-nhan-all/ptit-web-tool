@@ -12,9 +12,20 @@ interface DataTableProps {
   onStudentClick: (maSV: string) => void;
   onClassClick: (maLop: string) => void;
   onRowClick?: (record: ExamRecord) => void;
+  onTogglePostpone?: (record: ExamRecord, newStatus: boolean) => Promise<void> | void;
+  canEditPostpone?: boolean;
 }
 
-export default function DataTable({ records, sortConfig, onSortChange, onStudentClick, onClassClick, onRowClick }: DataTableProps) {
+export default function DataTable({ 
+  records, 
+  sortConfig, 
+  onSortChange, 
+  onStudentClick, 
+  onClassClick, 
+  onRowClick,
+  onTogglePostpone,
+  canEditPostpone = false,
+}: DataTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -161,13 +172,14 @@ export default function DataTable({ records, sortConfig, onSortChange, onStudent
               </th>
               <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">Giờ</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 text-center">HT</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 text-center">Trạng thái thi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {currentRecords.map((record, index) => (
               <tr 
                 key={index} 
-                className={`transition-colors ${index % 2 === 1 ? 'bg-slate-50/30' : ''} ${onRowClick ? 'cursor-pointer hover:bg-slate-100' : 'hover:bg-slate-50'}`}
+                className={`transition-colors ${record.isPostponed ? 'bg-amber-50/40 text-slate-600' : index % 2 === 1 ? 'bg-slate-50/30' : ''} ${onRowClick ? 'cursor-pointer hover:bg-slate-100' : 'hover:bg-slate-50'}`}
                 onClick={() => onRowClick && onRowClick(record)}
               >
                 <td className="px-6 py-4 text-sm text-slate-500">{startIndex + index + 1}</td>
@@ -178,7 +190,16 @@ export default function DataTable({ records, sortConfig, onSortChange, onStudent
                   {record.MaSV}
                 </td>
                 <td className="px-6 py-4 text-sm font-semibold text-slate-800">
-                  {record.HoLotSV} {record.TenSV}
+                  <div className="flex items-center gap-2">
+                    <span className={record.isPostponed ? 'line-through text-slate-500' : ''}>
+                      {record.HoLotSV} {record.TenSV}
+                    </span>
+                    {record.isPostponed && (
+                      <span className="text-[9px] bg-amber-100 text-amber-800 border border-amber-300 font-bold px-1.5 py-0.5 rounded uppercase">
+                        Hoãn thi
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td 
                   className="px-6 py-4 text-sm text-slate-600 cursor-pointer hover:underline text-blue-600 font-medium" 
@@ -194,6 +215,34 @@ export default function DataTable({ records, sortConfig, onSortChange, onStudent
                   <span className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${getHTColor(record.MaHTThi)}`}>
                     {record.MaHTThi || 'Thi'}
                   </span>
+                </td>
+                <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                  {onTogglePostpone && canEditPostpone ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTogglePostpone(record, !record.isPostponed);
+                      }}
+                      title={record.isPostponed ? 'Bấm để chuyển về Dự thi (sẽ tính tiền)' : 'Bấm để đánh dấu Hoãn thi / Không thi (không tính chia tiền)'}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                        record.isPostponed
+                          ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 shadow-xs'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300'
+                      }`}
+                    >
+                      {record.isPostponed ? '✕ Hoãn thi' : '✓ Dự thi'}
+                    </button>
+                  ) : (
+                    <span
+                      className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold border ${
+                        record.isPostponed
+                          ? 'bg-amber-100 text-amber-800 border-amber-300'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}
+                    >
+                      {record.isPostponed ? 'Hoãn thi' : 'Dự thi'}
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}

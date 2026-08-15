@@ -73,8 +73,10 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
           });
         }
         const session = sessionMap.get(key)!;
-        const className = r.MaLop || 'Khác';
-        session.counts.set(className, (session.counts.get(className) || 0) + 1);
+        if (!r.isPostponed) {
+          const className = r.MaLop || 'Khác';
+          session.counts.set(className, (session.counts.get(className) || 0) + 1);
+        }
       }
     });
 

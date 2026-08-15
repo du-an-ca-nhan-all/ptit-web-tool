@@ -91,6 +91,14 @@ export async function POST(req: NextRequest) {
         soPhutThi: row.SoPhutThi ? String(row.SoPhutThi).trim() : null,
         maDotThi: row.MaDotThi ? String(row.MaDotThi).trim() : null,
         tenDotThi: row.TenDotThi ? String(row.TenDotThi).trim() : null,
+        isPostponed:
+          row.isPostponed === true ||
+          row.isPostponed === 'true' ||
+          row.isPostponed === '1' ||
+          row.HoanThi === 'true' ||
+          row.KhongThi === 'true' ||
+          row['Hoãn thi'] === 'true' ||
+          false,
       });
     });
 

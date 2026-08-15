@@ -1,4 +1,5 @@
 export interface ExamRecord {
+  id?: number;
   MaSV: string;
   HoLotSV: string;
   TenSV: string;
@@ -11,6 +12,7 @@ export interface ExamRecord {
   MaHTThi: string;
   NhomHoc: string;
   'To thi': string;
+  ToThi?: string;
   MaLop: string;
   NgayThi: string;
   GioThi: string;
@@ -18,6 +20,7 @@ export interface ExamRecord {
   MaDotThi: string;
   TenDotThi: string;
   batchCode?: string;
+  isPostponed?: boolean; // true nếu không thi môn này hoặc hoãn thi (không chia tiền đầu người)
   [key: string]: any;
 }
 

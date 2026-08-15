@@ -1048,22 +1048,38 @@ export default function UserProfileScreen({
                     <th className="px-4 py-3 text-center">Phòng Thi</th>
                     <th className="px-4 py-3 text-center">Hình Thức</th>
                     <th className="px-4 py-3 text-center">Tổ/Nhóm</th>
+                    <th className="px-4 py-3 text-center">Trạng Thái</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {exams.map((ex: ExamRecord, idx: number) => (
-                    <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
+                    <tr key={idx} className={`transition-colors ${ex.isPostponed ? 'bg-amber-50/40' : 'hover:bg-blue-50/40'}`}>
                       <td className="px-4 py-3 text-center text-slate-400 font-mono">{idx + 1}</td>
                       <td className="px-4 py-3 font-bold text-slate-800">{ex.NgayThi}</td>
                       <td className="px-4 py-3 font-semibold text-blue-600">{ex.GioThi}</td>
                       <td className="px-4 py-3 font-mono font-bold text-indigo-700">{ex.MaMH}</td>
-                      <td className="px-4 py-3 font-bold text-slate-800">{ex.TenMH}</td>
+                      <td className="px-4 py-3 font-bold text-slate-800">
+                        <div className="flex items-center gap-1.5">
+                          <span className={ex.isPostponed ? 'line-through text-slate-400' : ''}>{ex.TenMH}</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-center font-black text-emerald-700 bg-emerald-50/50">
                         {ex.MAPTHI || '—'}
                       </td>
                       <td className="px-4 py-3 text-center font-bold text-slate-600">{ex.MaHTThi || '—'}</td>
                       <td className="px-4 py-3 text-center font-mono text-slate-500">
                         {ex['To thi'] || ex.NhomThi || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            ex.isPostponed
+                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}
+                        >
+                          {ex.isPostponed ? 'Hoãn thi' : 'Dự thi'}
+                        </span>
                       </td>
                     </tr>
                   ))}

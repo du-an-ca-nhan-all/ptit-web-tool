@@ -240,6 +240,14 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
           soPhutThi: row.SoPhutThi ? String(row.SoPhutThi).trim() : null,
           maDotThi: batchCode,
           tenDotThi: batchName,
+          isPostponed:
+            row.isPostponed === true ||
+            row.isPostponed === 'true' ||
+            row.isPostponed === '1' ||
+            row.HoanThi === 'true' ||
+            row.KhongThi === 'true' ||
+            row['Hoãn thi'] === 'true' ||
+            false,
         });
       });
 

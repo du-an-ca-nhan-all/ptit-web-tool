@@ -113,6 +113,14 @@ export async function POST(req: NextRequest) {
         soPhutThi: row.SoPhutThi ? String(row.SoPhutThi).trim() : null,
         maDotThi: cleanBatchCode,
         tenDotThi: batch.name,
+        isPostponed:
+          row.isPostponed === true ||
+          row.isPostponed === 'true' ||
+          row.isPostponed === '1' ||
+          row.HoanThi === 'true' ||
+          row.KhongThi === 'true' ||
+          row['Hoãn thi'] === 'true' ||
+          false,
       });
     });
 

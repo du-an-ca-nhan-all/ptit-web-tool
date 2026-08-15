@@ -389,6 +389,54 @@ export default function Home() {
     }
   }, []);
 
+  const handleToggleExamPostpone = useCallback(
+    async (record: ExamRecord, newStatus: boolean) => {
+      // 1. Optimistic state update in memory
+      setRecords((prev) => {
+        const next = prev.map((r) => {
+          const isMatch =
+            (record.id && r.id === record.id) ||
+            (r.MaSV === record.MaSV &&
+              r.MaMH === record.MaMH &&
+              r.MAPTHI === record.MAPTHI &&
+              r.NgayThi === record.NgayThi &&
+              r.GioThi === record.GioThi);
+          if (isMatch) {
+            return { ...r, isPostponed: newStatus };
+          }
+          return r;
+        });
+        setSessions(buildSessions(next));
+        return next;
+      });
+
+      // 2. Persist to API
+      try {
+        const res = await fetch('/api/exam-records', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: record.id,
+            maSV: record.MaSV,
+            maMH: record.MaMH,
+            mapThi: record.MAPTHI,
+            ngayThi: record.NgayThi,
+            gioThi: record.GioThi,
+            isPostponed: newStatus,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.warn('API sync warning:', err);
+        }
+      } catch (e: any) {
+        console.error('Failed to sync exam postpone to server:', e);
+      }
+    },
+    []
+  );
+
   const hasActiveBatch = useMemo(() => examBatches.some((b) => b.isActive), [examBatches]);
   const hasExamSchedule = hasActiveBatch && records.length > 0;
 
@@ -1224,6 +1272,7 @@ export default function Home() {
               loginUsers={loginUsers}
               hasExamSchedule={hasExamSchedule}
               onImpersonate={isAdmin ? handleImpersonate : undefined}
+              onTogglePostpone={handleToggleExamPostpone}
               onSelectStudentSchedule={(studentId) => {
                 setSearchInput(studentId);
                 setFilters((prev) => ({ ...prev, search: studentId }));
@@ -1248,7 +1297,12 @@ export default function Home() {
           ) : activeTab === 'envelope_all' ? (
             <AllMonitorsEnvelopes records={records} sessions={sessions} loginUsers={loginUsers} />
           ) : activeTab === 'settlement' ? (
-            <SettlementManager records={records} sessions={sessions} loginUsers={loginUsers} />
+            <SettlementManager 
+              records={records} 
+              sessions={sessions} 
+              loginUsers={loginUsers} 
+              onTogglePostpone={handleToggleExamPostpone}
+            />
           ) : !hasActiveBatch && (activeTab === 'schedule' || activeTab === 'personal_schedule') ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto my-auto animate-in fade-in duration-300">
               <div className="w-16 h-16 bg-amber-50 border border-amber-200 rounded-3xl flex items-center justify-center text-amber-600 mb-4 shadow-sm">
@@ -1283,6 +1337,8 @@ export default function Home() {
                 onBack={() => setSelectedExamRoom(null)}
                 onStudentClick={setConfirmStudentId}
                 onClassClick={setConfirmClassCode}
+                onTogglePostpone={handleToggleExamPostpone}
+                canEditPostpone={canAccessMonitorTools}
               />
             ) : (
               <>
@@ -1303,6 +1359,8 @@ export default function Home() {
                   onStudentClick={setConfirmStudentId}
                   onClassClick={setConfirmClassCode}
                   onRowClick={setSelectedExamRoom}
+                  onTogglePostpone={handleToggleExamPostpone}
+                  canEditPostpone={canAccessMonitorTools}
                 />
               </>
             )
@@ -1315,6 +1373,7 @@ export default function Home() {
               loginUsers={loginUsers}
               hasExamSchedule={hasExamSchedule}
               onImpersonate={isAdmin ? handleImpersonate : undefined}
+              onTogglePostpone={handleToggleExamPostpone}
               onSelectStudentSchedule={(studentId) => {
                 setSearchInput(studentId);
                 setFilters((prev) => ({ ...prev, search: studentId }));

@@ -7,6 +7,7 @@ interface SettlementManagerProps {
   records: ExamRecord[];
   sessions: ExamSession[];
   loginUsers?: LoginUser[];
+  onTogglePostpone?: (record: ExamRecord, newStatus: boolean) => Promise<void> | void;
 }
 
 interface DebtDetail {
@@ -29,7 +30,7 @@ interface PartnerBalance {
 
 const getExclusionKey = (sessionId: string, maSV: string) => `${sessionId}||${maSV}`;
 
-export default function SettlementManager({ records, sessions = [], loginUsers = [] }: SettlementManagerProps) {
+export default function SettlementManager({ records, sessions = [], loginUsers = [], onTogglePostpone }: SettlementManagerProps) {
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [expandedPairs, setExpandedPairs] = useState<Set<string>>(new Set());
   const [selectedDetail, setSelectedDetail] = useState<DebtDetail | null>(null);
@@ -60,15 +61,17 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
 
   const currentRoomRecords = useMemo(() => {
     if (!selectedDetail) return [];
-    if (selectedDetail.session?.records && selectedDetail.session.records.length > 0) {
-      return selectedDetail.session.records;
-    }
+    const sess = selectedDetail.session;
+    const room = sess.room || sess.MAPTHI;
+    const date = sess.date || sess.NgayThi;
+    const time = sess.time || sess.GioThi;
+    const subject = sess.subject || sess.TenMH;
     return records.filter(
       r =>
-        r.MAPTHI === selectedDetail.session.room &&
-        r.NgayThi === selectedDetail.session.date &&
-        r.GioThi === selectedDetail.session.time &&
-        r.TenMH === selectedDetail.session.subject
+        r.MAPTHI === room &&
+        r.NgayThi === date &&
+        r.GioThi === time &&
+        r.TenMH === subject
     );
   }, [selectedDetail, records]);
 
@@ -98,27 +101,44 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
   const monitorClassList: string[] = (Array.from(monitorClasses) as string[]).sort();
 
   // Helpers for exclusion
-  const isStudentExcluded = (sessionId: string, maSV: string) =>
-    excludedStudents.has(getExclusionKey(sessionId, maSV));
-
-  const toggleStudentExclusion = (sessionId: string, maSV: string) => {
-    const key = getExclusionKey(sessionId, maSV);
-    setExcludedStudents(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  const isStudentExcluded = (sessionId: string, r: ExamRecord) => {
+    const key = getExclusionKey(sessionId, r.MaSV || '');
+    if (excludedStudents.has(key)) return true;
+    return Boolean(r.isPostponed);
   };
 
-  const clearSessionExclusions = (sessionId: string) => {
+  const toggleStudentExclusion = async (session: any, r: ExamRecord) => {
+    const isExcluded = isStudentExcluded(session.id, r);
+    const newExcluded = !isExcluded;
+    const key = getExclusionKey(session.id, r.MaSV || '');
+
+    setExcludedStudents(prev => {
+      const next = new Set(prev);
+      if (newExcluded) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+
+    if (onTogglePostpone) {
+      await onTogglePostpone(r, newExcluded);
+    }
+  };
+
+  const clearSessionExclusions = (session: any) => {
     setExcludedStudents(prev => {
       const next = new Set(prev);
       for (const key of Array.from(next)) {
-        if (key.startsWith(`${sessionId}||`)) next.delete(key);
+        if (key.startsWith(`${session.id}||`)) next.delete(key);
       }
       return next;
     });
+    if (onTogglePostpone && session.records) {
+      session.records.forEach((r: ExamRecord) => {
+        if (r.isPostponed) {
+          onTogglePostpone(r, false);
+        }
+      });
+    }
   };
 
   useEffect(() => {
@@ -148,7 +168,8 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
       // Recalculate effective class counts (excluding students marked as hoãn thi / excluded)
       const effectiveCounts = new Map<string, number>();
       session.records.forEach(r => {
-        if (!excludedStudents.has(getExclusionKey(session.id, r.MaSV || ''))) {
+        const isExcluded = r.isPostponed || excludedStudents.has(getExclusionKey(session.id, r.MaSV || ''));
+        if (!isExcluded) {
           const cls = r.MaLop || 'Khác';
           effectiveCounts.set(cls, (effectiveCounts.get(cls) || 0) + 1);
         }
@@ -236,22 +257,49 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
   const effectiveClassCountsForModal = useMemo(() => {
     if (!selectedDetail) return new Map<string, number>();
     const map = new Map<string, number>();
-    (selectedDetail.session.records as ExamRecord[]).forEach((r: ExamRecord) => {
-      if (!excludedStudents.has(getExclusionKey(selectedDetail.session.id, r.MaSV || ''))) {
+    currentRoomRecords.forEach((r: ExamRecord) => {
+      const isExcluded = isStudentExcluded(selectedDetail.session.id, r);
+      if (!isExcluded) {
         const cls = r.MaLop || 'Khác';
         map.set(cls, (map.get(cls) || 0) + 1);
       }
     });
     return map;
-  }, [selectedDetail, excludedStudents]);
+  }, [selectedDetail, currentRoomRecords, excludedStudents]);
 
   // Count excluded students for the current session in modal
   const excludedCountForModal = useMemo(() => {
     if (!selectedDetail) return 0;
-    return (selectedDetail.session.records as ExamRecord[]).filter((r: ExamRecord) =>
-      excludedStudents.has(getExclusionKey(selectedDetail.session.id, r.MaSV || ''))
+    return currentRoomRecords.filter((r: ExamRecord) =>
+      isStudentExcluded(selectedDetail.session.id, r)
     ).length;
-  }, [selectedDetail, excludedStudents]);
+  }, [selectedDetail, currentRoomRecords, excludedStudents]);
+
+  // Dynamic live calculation for the modal when students are toggled
+  const activeDetailCalc = useMemo(() => {
+    if (!selectedDetail) return null;
+    const sess = selectedDetail.session;
+    const monitoredCounts = Array.from(effectiveClassCountsForModal.entries())
+      .filter(([cls]) => monitorClasses.has(cls))
+      .map(([className, count]) => ({ className, count }))
+      .sort((a, b) => (b.count !== a.count ? b.count - a.count : a.className.localeCompare(b.className)));
+
+    const responsibleClass = monitoredCounts[0]?.className || selectedDetail.toClass;
+    const totalMonitoredStudents = monitoredCounts.reduce((acc, c) => acc + c.count, 0);
+    const roomPrice = calculateRoomPrice(sess.subject, sess.subjectCode, sess.room, sess.examFormat);
+    const pricePerStudent = totalMonitoredStudents > 0 ? roomPrice / totalMonitoredStudents : 0;
+    const fromClassCount = effectiveClassCountsForModal.get(selectedDetail.fromClass) || 0;
+    const amount = fromClassCount * pricePerStudent;
+
+    return {
+      responsibleClass,
+      totalMonitoredStudents,
+      pricePerStudent,
+      totalRoomPrice: roomPrice,
+      fromClassCount,
+      amount,
+    };
+  }, [selectedDetail, effectiveClassCountsForModal, monitorClasses]);
 
 
 
@@ -568,11 +616,11 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                 <div className="space-y-3 text-sm text-slate-700">
                   <div className="flex justify-between items-center">
                     <span>Tổng định mức phong bì phòng thi:</span>
-                    <span className="font-bold text-base">{formatCurrency(selectedDetail.totalRoomPrice)}</span>
+                    <span className="font-bold text-base">{formatCurrency(activeDetailCalc?.totalRoomPrice ?? selectedDetail.totalRoomPrice)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Số SV tham gia chia tiền (thuộc các lớp có LT):</span>
-                    <span className="font-bold text-base">{selectedDetail.totalRoomPrice / selectedDetail.pricePerStudent} SV</span>
+                    <span className="font-bold text-base">{activeDetailCalc?.totalMonitoredStudents ?? (selectedDetail.totalRoomPrice / (selectedDetail.pricePerStudent || 1))} SV</span>
                   </div>
                   {excludedCountForModal > 0 && (
                     <div className="flex justify-between items-center text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
@@ -582,7 +630,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                   )}
                   <div className="flex justify-between items-center pt-2 border-t border-blue-100">
                     <span className="font-semibold">Đơn giá trên mỗi Sinh Viên:</span>
-                    <span className="font-bold text-rose-600 text-base">{formatCurrency(selectedDetail.pricePerStudent)}/SV</span>
+                    <span className="font-bold text-rose-600 text-base">{formatCurrency(activeDetailCalc?.pricePerStudent ?? selectedDetail.pricePerStudent)}/SV</span>
                   </div>
                 </div>
               </div>
@@ -677,8 +725,8 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                             {excludedCountForModal} bị loại khỏi chia tiền
                           </span>
                           <button
-                            onClick={() => clearSessionExclusions(selectedDetail.session.id)}
-                            className="text-[10px] font-bold text-rose-600 hover:text-rose-800 underline underline-offset-2"
+                            onClick={() => clearSessionExclusions(selectedDetail.session)}
+                            className="text-[10px] font-bold text-rose-600 hover:text-rose-800 underline underline-offset-2 cursor-pointer"
                           >
                             Đặt lại tất cả
                           </button>
@@ -746,7 +794,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                           <th className="px-3 py-2 font-semibold">Phái</th>
                           <th className="px-3 py-2 font-semibold">Lớp</th>
                           <th className="px-3 py-2 font-semibold">Tổ/Nhóm thi</th>
-                          <th className="px-3 py-2 font-semibold text-center">Phân bổ</th>
+                          <th className="px-3 py-2 font-semibold text-center">Phân bổ chia tiền</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -758,7 +806,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                           </tr>
                         ) : (
                           filteredStudentRecords.map((r, idx) => {
-                            const excluded = isStudentExcluded(selectedDetail.session.id, r.MaSV || '');
+                            const excluded = isStudentExcluded(selectedDetail.session.id, r);
                             return (
                               <tr
                                 key={idx}
@@ -767,7 +815,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                                 <td className="px-3 py-2 text-slate-400 font-medium">{idx + 1}</td>
                                 <td className="px-3 py-2 font-mono font-bold text-slate-700">
                                   {r.MaSV}
-                                  {excluded && <span className="ml-1 text-[9px] bg-amber-200 text-amber-800 px-1 py-0.5 rounded font-bold uppercase">Bỏ ra</span>}
+                                  {excluded && <span className="ml-1 text-[9px] bg-amber-200 text-amber-800 px-1 py-0.5 rounded font-bold uppercase">Hoãn thi</span>}
                                 </td>
                                 <td className={`px-3 py-2 font-semibold ${excluded ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
                                   {r.HoLotSV} {r.TenSV}
@@ -777,15 +825,15 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                                 <td className="px-3 py-2 text-slate-500">{r['To thi'] || r.NhomThi || '—'}</td>
                                 <td className="px-3 py-2 text-center">
                                   <button
-                                    onClick={() => toggleStudentExclusion(selectedDetail.session.id, r.MaSV || '')}
-                                    title={excluded ? 'Thêm lại vào chia tiền' : 'Loại khỏi chia tiền (hoãn thi, vắng...)'}
-                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all ${
+                                    onClick={() => toggleStudentExclusion(selectedDetail.session, r)}
+                                    title={excluded ? 'Thêm lại vào chia tiền (Dự thi)' : 'Loại khỏi chia tiền (hoãn thi, không thi...)'}
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all cursor-pointer ${
                                       excluded
-                                        ? 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200'
+                                        ? 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200 shadow-xs'
                                         : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300'
                                     }`}
                                   >
-                                    {excluded ? '↩ Thêm lại' : '✕ Bỏ ra'}
+                                    {excluded ? '↩ Thêm lại' : '✕ Hoãn / Bỏ ra'}
                                   </button>
                                 </td>
                               </tr>
@@ -801,9 +849,11 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
               {/* Final Note */}
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
                 <span className="font-bold">Kết luận cho cặp lớp này: </span>
-                Lớp <span className="font-bold">{selectedDetail.fromClass}</span> có {selectedDetail.studentsCount} SV. 
-                Cần gửi cho lớp đại diện <span className="font-bold">{selectedDetail.toClass}</span> số tiền là: 
-                <span className="font-bold text-rose-600 ml-1">{selectedDetail.studentsCount} x {formatCurrency(selectedDetail.pricePerStudent)} = {formatCurrency(selectedDetail.amount)}</span>.
+                Lớp <span className="font-bold">{selectedDetail.fromClass}</span> có {activeDetailCalc?.fromClassCount ?? selectedDetail.studentsCount} SV dự thi. 
+                Cần gửi cho lớp đại diện <span className="font-bold">{activeDetailCalc?.responsibleClass ?? selectedDetail.toClass}</span> số tiền là: 
+                <span className="font-bold text-rose-600 ml-1">
+                  {activeDetailCalc?.fromClassCount ?? selectedDetail.studentsCount} x {formatCurrency(activeDetailCalc?.pricePerStudent ?? selectedDetail.pricePerStudent)} = {formatCurrency(activeDetailCalc?.amount ?? selectedDetail.amount)}
+                </span>.
               </div>
             </div>
 
