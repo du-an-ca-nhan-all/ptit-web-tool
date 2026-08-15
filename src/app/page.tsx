@@ -34,7 +34,7 @@ import ExamRoomMembers from '../components/ExamRoomMembers';
 import MonitorsList from '../components/MonitorsList';
 import CourseCompare from '../components/CourseCompare';
 import SettlementManager from '../components/SettlementManager';
-import UserProfileModal from '../components/UserProfileModal';
+import UserProfileScreen from '../components/UserProfileScreen';
 import ExamBatchManagement from '../components/ExamBatchManagement';
 import AdminExternalAccounts from '../components/AdminExternalAccounts';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
@@ -60,6 +60,7 @@ const getInitialState = () => {
       (params.get('tab') as
         | 'schedule'
         | 'personal_schedule'
+        | 'profile'
         | 'monitor'
         | 'members'
         | 'envelope'
@@ -91,6 +92,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<
     | 'schedule'
     | 'personal_schedule'
+    | 'profile'
     | 'monitor'
     | 'members'
     | 'envelope'
@@ -471,6 +473,20 @@ export default function Home() {
           </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1 scrollbar-hide">
+          {/* 0. Hồ sơ cá nhân */}
+          {currentUser && (
+            <button
+              onClick={() => handleTabChange('profile')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                activeTab === 'profile'
+                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+              }`}
+            >
+              <User className="w-4 h-4" /> Hồ Sơ Cá Nhân
+            </button>
+          )}
+
           {/* 1. Lịch thi tổng hợp (Chỉ hiển thị khi có lịch thi) */}
           {hasExamSchedule && (
             <button
@@ -642,12 +658,13 @@ export default function Home() {
 
         {currentUser && (
           <div
-            className="p-3 mx-3 mb-2 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl flex items-center justify-between cursor-pointer transition-colors"
-            onClick={() => {
-              setProfileInitialTab('PROFILE');
-              setIsProfileOpen(true);
-            }}
-            title="Xem hồ sơ & liên kết hệ thống"
+            className={`p-3 mx-3 mb-2 rounded-xl flex items-center justify-between cursor-pointer transition-colors ${
+              activeTab === 'profile'
+                ? 'bg-blue-600/20 border border-blue-500/40 text-white'
+                : 'bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60'
+            }`}
+            onClick={() => handleTabChange('profile')}
+            title="Xem hồ sơ cá nhân"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden ring-1 ring-white/20 shrink-0">
@@ -773,8 +790,10 @@ export default function Home() {
             </button>
 
             <button
-              onClick={() => setIsProfileOpen(true)}
-              className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-slate-500 font-bold overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 hover:scale-105 transition-all"
+              onClick={() => handleTabChange('profile')}
+              className={`w-10 h-10 rounded-full border-2 shadow-sm flex items-center justify-center text-slate-500 font-bold overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 hover:scale-105 transition-all ${
+                activeTab === 'profile' ? 'ring-2 ring-blue-500 border-blue-500' : 'bg-slate-200 border-white'
+              }`}
               title={`Hồ sơ: ${currentUser?.fullName || currentUser?.username} (Bấm để xem)`}
             >
               <img
@@ -803,6 +822,17 @@ export default function Home() {
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               <p className="text-sm text-slate-500 font-medium">Đang tải dữ liệu từ máy chủ...</p>
             </div>
+          ) : activeTab === 'profile' && currentUser ? (
+            <UserProfileScreen
+              currentUser={currentUser}
+              onLogout={handleLogout}
+              hasExamSchedule={hasExamSchedule}
+              onNavigateTab={(tab) => handleTabChange(tab)}
+              onProfileUpdated={(updatedUser) => {
+                setCurrentUser(updatedUser);
+                localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+              }}
+            />
           ) : activeTab === 'external_accounts_admin' && isAdmin ? (
             <AdminExternalAccounts currentUser={currentUser!} />
           ) : activeTab === 'batches' ? (
@@ -993,20 +1023,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* User Profile Modal */}
-      {isProfileOpen && currentUser && (
-        <UserProfileModal
-          currentUser={currentUser}
-          onClose={() => setIsProfileOpen(false)}
-          onLogout={handleLogout}
-          hasExamSchedule={hasExamSchedule}
-          initialTab={profileInitialTab}
-          onProfileUpdated={(updatedUser) => {
-            setCurrentUser(updatedUser);
-            localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-          }}
-        />
-      )}
+      {/* End of modals */}
     </div>
   );
 }

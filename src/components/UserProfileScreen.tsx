@@ -1,0 +1,1070 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { LoginUser, ExamRecord } from '../types';
+import {
+  User as UserIcon,
+  Phone,
+  Calendar,
+  GraduationCap,
+  Crown,
+  Edit3,
+  Check,
+  LogOut,
+  Sparkles,
+  BookOpen,
+  FileText,
+  Copy,
+  CheckCheck,
+  Globe,
+  Link2,
+  ExternalLink,
+  Lock,
+  Key,
+  Eye,
+  EyeOff,
+  Trash2,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  ShieldCheck,
+  Server,
+  Zap,
+  FileKey,
+  Layers,
+  Award,
+  Clock,
+  MapPin,
+  ChevronRight,
+  Shield,
+  X,
+} from 'lucide-react';
+
+interface UserProfileScreenProps {
+  currentUser: LoginUser & { student?: any };
+  onLogout: () => void;
+  onProfileUpdated?: (updatedUser: any) => void;
+  hasExamSchedule?: boolean;
+  onNavigateTab?: (tab: string) => void;
+}
+
+export default function UserProfileScreen({
+  currentUser,
+  onLogout,
+  onProfileUpdated,
+  hasExamSchedule = false,
+  onNavigateTab,
+}: UserProfileScreenProps) {
+  const student = currentUser?.student || {};
+  const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'EXTERNAL_ACCOUNTS' | 'EXAMS' | 'SECURITY'>('OVERVIEW');
+
+  // Edit personal profile state
+  const [isEditing, setIsEditing] = useState(false);
+  const [phone, setPhone] = useState(student?.soDienThoai || currentUser?.phoneNumber || '');
+  const [note, setNote] = useState(student?.ghiChu || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [copiedMssv, setCopiedMssv] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
+
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [isChangingPass, setIsChangingPass] = useState(false);
+
+  // External Accounts state
+  const [externalAccounts, setExternalAccounts] = useState<any[]>([]);
+  const [isLoadingExternal, setIsLoadingExternal] = useState(false);
+  const [extForm, setExtForm] = useState<{
+    [key: string]: {
+      username: string;
+      password: string;
+      showPass: boolean;
+      isSaving: boolean;
+      isTesting: boolean;
+    };
+  }>({});
+
+  const isAdmin = currentUser?.isAdmin || (currentUser?.role ? currentUser.role.includes('admin') : false);
+  const isMonitor = currentUser?.isMonitor || (currentUser?.role ? currentUser.role.includes('lop_truong') : false);
+  const fullName = student?.hoTen || currentUser.fullName || currentUser.username;
+  const maSV = currentUser.username;
+  const maLop = student?.maLop || currentUser.lop || 'Chưa cập nhật';
+  const gioiTinh = student?.gioiTinh || 'Nam';
+  const ngaySinh = student?.ngaySinh || 'Chưa cập nhật';
+  const trangThai = student?.trangThai || 'DANG_HOC';
+  const exams: ExamRecord[] = student?.exams || [];
+
+  const handleCopyMssv = () => {
+    navigator.clipboard.writeText(maSV);
+    setCopiedMssv(true);
+    setTimeout(() => setCopiedMssv(false), 2000);
+  };
+
+  // Fetch External Accounts
+  const fetchExternalAccounts = async () => {
+    setIsLoadingExternal(true);
+    try {
+      const res = await fetch('/api/external-accounts');
+      const data = await res.json();
+      if (res.ok && data.accounts) {
+        setExternalAccounts(data.accounts);
+        const formState: any = {};
+        data.accounts.forEach((acc: any) => {
+          formState[acc.systemKey] = {
+            username: acc.extUsername || currentUser.username,
+            password: '',
+            showPass: false,
+            isSaving: false,
+            isTesting: false,
+          };
+        });
+        setExtForm(formState);
+      }
+    } catch (err) {
+      console.error('Fetch external accounts error:', err);
+    } finally {
+      setIsLoadingExternal(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchExternalAccounts();
+  }, []);
+
+  // Save profile info (phone & note)
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          soDienThoai: phone.trim(),
+          ghiChu: note.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg('Đã lưu thông tin cá nhân thành công!');
+        setIsEditing(false);
+        if (onProfileUpdated) {
+          onProfileUpdated({
+            ...currentUser,
+            phoneNumber: phone.trim(),
+            student: {
+              ...student,
+              soDienThoai: phone.trim(),
+              ghiChu: note.trim(),
+            },
+          });
+        }
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        setErrorMsg(data.error || 'Có lỗi xảy ra khi lưu.');
+      }
+    } catch (err: any) {
+      setErrorMsg('Không thể kết nối đến máy chủ.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Save / Connect External Account
+  const handleSaveExternalAccount = async (sys: any) => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    const form = extForm[sys.systemKey] || { username: '', password: '' };
+
+    if (!form.username || !form.username.trim()) {
+      setErrorMsg('Vui lòng nhập tên đăng nhập hệ thống');
+      return;
+    }
+    if (!form.password || !form.password.trim()) {
+      setErrorMsg('Vui lòng nhập mật khẩu tài khoản hệ thống ngoài');
+      return;
+    }
+
+    setExtForm((prev) => ({
+      ...prev,
+      [sys.systemKey]: { ...prev[sys.systemKey], isSaving: true },
+    }));
+
+    try {
+      const res = await fetch('/api/external-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SAVE',
+          systemKey: sys.systemKey,
+          systemName: sys.systemName,
+          systemUrl: sys.systemUrl,
+          extUsername: form.username.trim(),
+          extPassword: form.password.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg(data.message);
+        fetchExternalAccounts();
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        setErrorMsg(data.error || 'Có lỗi xảy ra khi lưu tài khoản');
+      }
+    } catch (err) {
+      setErrorMsg('Lỗi kết nối máy chủ');
+    } finally {
+      setExtForm((prev) => ({
+        ...prev,
+        [sys.systemKey]: { ...prev[sys.systemKey], isSaving: false },
+      }));
+    }
+  };
+
+  // Delete External Account
+  const handleDeleteExternalAccount = async (sys: any) => {
+    if (!confirm(`Bạn có chắc chắn muốn hủy liên kết tài khoản ${sys.systemName}?`)) return;
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch('/api/external-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'DELETE',
+          systemKey: sys.systemKey,
+          systemName: sys.systemName,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg(data.message);
+        fetchExternalAccounts();
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        setErrorMsg(data.error || 'Có lỗi xảy ra');
+      }
+    } catch (err) {
+      setErrorMsg('Lỗi kết nối máy chủ');
+    }
+  };
+
+  // Get/Refresh Token
+  const handleGetToken = async (sys: any) => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setExtForm((prev) => ({
+      ...prev,
+      [sys.systemKey]: { ...prev[sys.systemKey], isTesting: true },
+    }));
+
+    try {
+      const res = await fetch('/api/external-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'GET_TOKEN',
+          systemKey: sys.systemKey,
+          systemName: sys.systemName,
+          systemUrl: sys.systemUrl,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg(data.message);
+        fetchExternalAccounts();
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        setErrorMsg(data.error || 'Lấy token thất bại');
+      }
+    } catch (err) {
+      setErrorMsg('Lỗi kết nối máy chủ');
+    } finally {
+      setExtForm((prev) => ({
+        ...prev,
+        [sys.systemKey]: { ...prev[sys.systemKey], isTesting: false },
+      }));
+    }
+  };
+
+  const configuredCount = externalAccounts.filter((a) => a.isConfigured).length;
+  const tokenCount = externalAccounts.filter((a) => a.hasToken).length;
+
+  return (
+    <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+      {/* Toast notifications */}
+      {successMsg && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-3xl text-emerald-800 text-sm font-bold flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg('')} className="p-1 text-emerald-600 hover:text-emerald-800 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-3xl text-rose-700 text-sm font-bold flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg('')} className="p-1 text-rose-600 hover:text-rose-800 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Main Profile Hero Banner */}
+      <div className="relative rounded-3xl overflow-hidden shadow-lg border border-slate-200/80 bg-gradient-to-r from-blue-700 via-indigo-700 to-indigo-900 text-white p-6 sm:p-8">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-5 flex-wrap sm:flex-nowrap">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-white p-1.5 shadow-2xl shrink-0 overflow-hidden ring-4 ring-white/20">
+              <img
+                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${maSV}`}
+                alt={fullName}
+                className="w-full h-full object-cover rounded-2xl"
+              />
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{fullName}</h1>
+                {isAdmin && (
+                  <span className="bg-rose-500 text-white text-xs font-black px-3 py-1 rounded-full inline-flex items-center gap-1 shadow-sm">
+                    <Crown className="w-3.5 h-3.5 text-amber-300" /> Quản Trị Viên (Admin)
+                  </span>
+                )}
+                {isMonitor && (
+                  <span className="bg-amber-400 text-slate-900 text-xs font-black px-3 py-1 rounded-full inline-flex items-center gap-1 shadow-sm">
+                    <Crown className="w-3.5 h-3.5" /> Lớp Trưởng
+                  </span>
+                )}
+                {!isAdmin && !isMonitor && (
+                  <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1">
+                    <GraduationCap className="w-3.5 h-3.5" /> Sinh Viên
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 mt-2 text-blue-100 text-xs sm:text-sm font-mono flex-wrap">
+                <button
+                  onClick={handleCopyMssv}
+                  className="bg-black/25 hover:bg-black/40 px-3 py-1 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Sao chép MSSV"
+                >
+                  <span className="font-bold text-white">{maSV}</span>
+                  {copiedMssv ? <CheckCheck className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+                <span>•</span>
+                <span className="font-bold text-white">Lớp {maLop}</span>
+                <span>•</span>
+                <span className="text-emerald-300 font-sans font-semibold">
+                  {trangThai === 'DANG_HOC'
+                    ? '● Đang theo học'
+                    : trangThai === 'BAO_LUU'
+                    ? '● Đang bảo lưu'
+                    : '● Đã chuyển lớp'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Metrics on Banner */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 text-center">
+              <div className="text-[11px] text-blue-200 uppercase font-bold tracking-wider">Lịch Thi</div>
+              <div className="text-lg font-black text-white mt-0.5">
+                {hasExamSchedule ? `${exams.length} môn` : 'Đang đóng'}
+              </div>
+            </div>
+
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 text-center">
+              <div className="text-[11px] text-blue-200 uppercase font-bold tracking-wider">Cổng QLĐT</div>
+              <div className="text-lg font-black text-emerald-300 mt-0.5">
+                {tokenCount > 0 ? 'Có Token' : configuredCount > 0 ? 'Đã liên kết' : 'Chưa liên kết'}
+              </div>
+            </div>
+
+            <div className="col-span-2 sm:col-span-1 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 text-center">
+              <div className="text-[11px] text-blue-200 uppercase font-bold tracking-wider">Số Điện Thoại</div>
+              <div className="text-xs font-mono font-bold text-white mt-1 truncate">
+                {phone || 'Chưa cập nhật'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Screen Sub-Tabs Navigation */}
+      <div className="bg-white rounded-3xl p-1.5 border border-slate-200 shadow-sm flex items-center gap-1.5 overflow-x-auto">
+        <button
+          onClick={() => setActiveSubTab('OVERVIEW')}
+          className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeSubTab === 'OVERVIEW'
+              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <UserIcon className="w-4 h-4" />
+          <span>Thông Tin Học Vụ</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
+          className={`flex-1 min-w-[180px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer relative ${
+            activeSubTab === 'EXTERNAL_ACCOUNTS'
+              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Liên Kết QLĐT Từ Xa</span>
+          {tokenCount > 0 ? (
+            <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white"></span>
+          ) : configuredCount > 0 ? (
+            <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white"></span>
+          ) : null}
+        </button>
+
+        {hasExamSchedule && (
+          <button
+            onClick={() => setActiveSubTab('EXAMS')}
+            className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activeSubTab === 'EXAMS'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Lịch Thi Cá Nhân ({exams.length})</span>
+          </button>
+        )}
+
+        <button
+          onClick={() => setActiveSubTab('SECURITY')}
+          className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeSubTab === 'SECURITY'
+              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          <span>Bảo Mật & Mật Khẩu</span>
+        </button>
+      </div>
+
+      {/* SUB-TAB 1: OVERVIEW & PERSONAL INFO */}
+      {activeSubTab === 'OVERVIEW' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Info Card */}
+          <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-2xl">
+                  <UserIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800">Hồ Sơ & Lý Lịch Học Tập</h3>
+                  <p className="text-xs text-slate-500">Thông tin cá nhân được trích xuất từ cơ sở dữ liệu sinh viên</p>
+                </div>
+              </div>
+
+              {!isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Chỉnh Sửa SĐT / Ghi Chú</span>
+                </button>
+              )}
+            </div>
+
+            {isEditing ? (
+              <form onSubmit={handleSaveProfile} className="flex flex-col gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <span className="text-slate-400 text-xs font-bold uppercase block mb-1">Mã sinh viên:</span>
+                    <span className="font-mono font-black text-slate-800 text-base">{maSV}</span>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <span className="text-slate-400 text-xs font-bold uppercase block mb-1">Lớp học chính:</span>
+                    <span className="font-bold text-blue-600 text-base">{maLop}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Số điện thoại liên hệ</label>
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Nhập số điện thoại (ví dụ: 0912345678)"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 text-sm font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Ghi chú cá nhân / Ghi chú ban cán sự</label>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Thêm ghi chú cá nhân, phân công, trực nhật..."
+                    rows={3}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-4 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setPhone(student?.soDienThoai || currentUser?.phoneNumber || '');
+                      setNote(student?.ghiChu || '');
+                    }}
+                    className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-2xl transition-colors cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5" />
+                    )}
+                    <span>Lưu Thay Đổi</span>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Mã sinh viên</span>
+                  <span className="font-mono font-black text-slate-800 text-base">{maSV}</span>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Họ và Tên</span>
+                  <span className="font-black text-slate-800 text-base">{fullName}</span>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Giới tính</span>
+                  <span className="font-bold text-slate-800 text-sm">{gioiTinh}</span>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Ngày sinh</span>
+                  <span className="font-bold text-slate-800 text-sm">{ngaySinh}</span>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Lớp biên chế</span>
+                  <span className="font-bold text-blue-600 text-sm">{maLop}</span>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Số điện thoại</span>
+                  <span className="font-mono font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                    {phone || <span className="text-slate-400 font-normal italic">Chưa cập nhật</span>}
+                  </span>
+                </div>
+
+                {note && (
+                  <div className="sm:col-span-2 p-4 bg-amber-50/50 rounded-2xl border border-amber-200/60">
+                    <span className="text-amber-800 text-xs font-bold uppercase tracking-wider block mb-1">Ghi chú cá nhân</span>
+                    <p className="text-slate-700 text-xs italic">"{note}"</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Side Info Cards */}
+          <div className="flex flex-col gap-6">
+            {/* Institution Card */}
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-black text-slate-800 text-sm">Học Viện Công Nghệ Bưu Chính Viễn Thông</h4>
+                  <p className="text-[11px] text-slate-500">Hệ Đào Tạo Từ Xa (PTTC1)</p>
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                Cổng tra cứu lịch thi & quản lý sinh viên trực tuyến S-Exam Portal. Dữ liệu được đồng bộ trực tiếp từ cổng trường.
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
+                <span>Cổng QLĐT:</span>
+                <a
+                  href="https://qldttx.pttc1.edu.vn/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline font-mono flex items-center gap-1"
+                >
+                  qldttx.pttc1.edu.vn <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+
+            {/* Quick Actions Card */}
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col gap-3">
+              <h4 className="font-black text-slate-800 text-sm mb-1">Truy Cập Nhanh</h4>
+
+              <button
+                onClick={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
+                className="w-full p-3 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-2xl text-left flex items-center justify-between transition-colors cursor-pointer group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Globe className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">Cấu Hình Tài Khoản QLDTTX</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
+              </button>
+
+              {hasExamSchedule && onNavigateTab && (
+                <button
+                  onClick={() => onNavigateTab('personal_schedule')}
+                  className="w-full p-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-2xl text-left flex items-center justify-between transition-colors cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs font-bold text-slate-700 group-hover:text-blue-700">Xem Toàn Bộ Lịch Thi</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                </button>
+              )}
+
+              <button
+                onClick={onLogout}
+                className="w-full p-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-2xl text-left flex items-center justify-between transition-colors cursor-pointer text-rose-700"
+              >
+                <div className="flex items-center gap-2.5">
+                  <LogOut className="w-4 h-4" />
+                  <span className="text-xs font-bold">Đăng Xuất Khỏi Hệ Thống</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-TAB 2: EXTERNAL ACCOUNTS & TOKEN */}
+      {activeSubTab === 'EXTERNAL_ACCOUNTS' && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl">
+                <Globe className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Liên Kết Hệ Thống Quản Lý Đào Tạo Từ Xa</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Cổng kết nối: <strong className="text-indigo-600 font-mono">https://qldttx.pttc1.edu.vn/</strong>
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={fetchExternalAccounts}
+              disabled={isLoadingExternal}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingExternal ? 'animate-spin' : ''}`} />
+              <span>Làm Mới</span>
+            </button>
+          </div>
+
+          <div className="bg-blue-50/60 border border-blue-200/80 rounded-2xl p-4 text-xs text-slate-700 leading-relaxed flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-blue-900 mb-1">Cơ chế bảo mật và cấp quyền Token</p>
+              <p className="text-slate-600">
+                Hệ thống sử dụng tài khoản đăng nhập để tự động xác thực và nhận Bearer Token từ cổng QLDTTX của trường.
+                Token này được dùng để đồng bộ thời khóa biểu, lịch thi, điểm số và đăng ký môn học một cách an toàn.
+              </p>
+            </div>
+          </div>
+
+          {isLoadingExternal ? (
+            <div className="py-16 flex flex-col items-center justify-center gap-3">
+              <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-slate-500 font-bold">Đang tải cấu hình kết nối...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {externalAccounts.map((sys) => {
+                const form = extForm[sys.systemKey] || {
+                  username: sys.extUsername || currentUser.username,
+                  password: '',
+                  showPass: false,
+                  isSaving: false,
+                  isTesting: false,
+                };
+
+                return (
+                  <div
+                    key={sys.systemKey}
+                    className={`rounded-3xl border transition-all p-6 flex flex-col gap-5 ${
+                      sys.hasToken
+                        ? 'bg-white border-emerald-300 ring-2 ring-emerald-500/10 shadow-sm'
+                        : sys.isConfigured
+                        ? 'bg-white border-indigo-300 shadow-sm'
+                        : 'bg-white border-slate-200 shadow-sm'
+                    }`}
+                  >
+                    {/* Header: System Info & Status */}
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <h4 className="font-black text-slate-800 text-base flex items-center gap-2">
+                            <Globe className="w-5 h-5 text-indigo-600" />
+                            {sys.systemName}
+                          </h4>
+                          {sys.isConfigured ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1">
+                                <Check className="w-3 h-3" /> Đã Liên Kết
+                              </span>
+                              {sys.hasToken ? (
+                                <span className="bg-teal-100 text-teal-800 text-xs font-black px-2.5 py-0.5 rounded-full border border-teal-300 inline-flex items-center gap-1">
+                                  <FileKey className="w-3 h-3" /> Đã Cấp Token
+                                </span>
+                              ) : (
+                                <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
+                                  Chưa Có Token
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="bg-slate-100 text-slate-500 text-xs font-bold px-2.5 py-0.5 rounded-full border border-slate-200">
+                              Chưa Cấu Hình
+                            </span>
+                          )}
+                        </div>
+
+                        <a
+                          href={sys.systemUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-indigo-600 hover:text-indigo-800 font-mono font-bold flex items-center gap-1 hover:underline"
+                        >
+                          <span>{sys.systemUrl}</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+
+                    {sys.description && (
+                      <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        {sys.description}
+                      </p>
+                    )}
+
+                    {/* Input Credentials Form */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
+                          <UserIcon className="w-3.5 h-3.5 text-slate-400" /> Tên đăng nhập (Mã SV trên QLDTTX)
+                        </label>
+                        <input
+                          type="text"
+                          value={form.username}
+                          onChange={(e) =>
+                            setExtForm((prev) => ({
+                              ...prev,
+                              [sys.systemKey]: { ...prev[sys.systemKey], username: e.target.value },
+                            }))
+                          }
+                          placeholder={sys.placeholderUser || 'Nhập mã sinh viên'}
+                          className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 text-xs font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
+                          <Key className="w-3.5 h-3.5 text-slate-400" /> Mật khẩu {sys.hasPassword && '(Đã lưu)'}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={form.showPass ? 'text' : 'password'}
+                            value={form.password}
+                            onChange={(e) =>
+                              setExtForm((prev) => ({
+                                ...prev,
+                                [sys.systemKey]: { ...prev[sys.systemKey], password: e.target.value },
+                              }))
+                            }
+                            placeholder={sys.hasPassword ? '•••••••• (Nhập lại để cập nhật)' : 'Nhập mật khẩu QLDTTX'}
+                            className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-10 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExtForm((prev) => ({
+                                ...prev,
+                                [sys.systemKey]: { ...prev[sys.systemKey], showPass: !prev[sys.systemKey]?.showPass },
+                              }))
+                            }
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                            title={form.showPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                          >
+                            {form.showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Token Value Display if Available */}
+                    {sys.token && (
+                      <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                            <FileKey className="w-4 h-4 text-emerald-600" />
+                            Access Token hiện tại:
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(sys.token);
+                              setCopiedToken(true);
+                              setTimeout(() => setCopiedToken(false), 2000);
+                            }}
+                            className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            {copiedToken ? <CheckCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedToken ? 'Đã sao chép' : 'Sao chép Token'}</span>
+                          </button>
+                        </div>
+                        <div className="font-mono text-xs text-slate-700 break-all bg-white p-2.5 rounded-xl border border-emerald-200/60 select-all">
+                          {sys.token}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status Message */}
+                    {sys.syncMessage && (
+                      <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>{sys.syncMessage}</span>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-100 flex-wrap gap-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveExternalAccount(sys)}
+                          disabled={form.isSaving}
+                          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {form.isSaving ? (
+                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
+                          <span>{sys.isConfigured ? 'Cập Nhật & Lấy Token' : 'Lưu & Kết Nối'}</span>
+                        </button>
+
+                        {sys.isConfigured && (
+                          <button
+                            type="button"
+                            onClick={() => handleGetToken(sys)}
+                            disabled={form.isTesting}
+                            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-amber-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            title="Lấy và làm mới Bearer Token từ cổng trường"
+                          >
+                            {form.isTesting ? (
+                              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                              <Zap className="w-3.5 h-3.5" />
+                            )}
+                            <span>Lấy / Làm Mới Token</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {sys.isConfigured && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteExternalAccount(sys)}
+                          className="px-4 py-2.5 text-rose-600 hover:bg-rose-50 text-xs font-bold rounded-2xl transition-colors border border-rose-200 flex items-center gap-1.5 cursor-pointer"
+                          title="Hủy liên kết tài khoản"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hủy Liên Kết</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUB-TAB 3: EXAM SCHEDULE FOR THIS STUDENT */}
+      {activeSubTab === 'EXAMS' && hasExamSchedule && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Lịch Thi Đã Đăng Ký Của Bạn</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Tổng cộng: <strong className="text-blue-600">{exams.length} môn thi</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {exams.length === 0 ? (
+            <div className="py-16 text-center text-slate-400 italic text-sm">
+              Không tìm thấy lịch thi nào cho sinh viên {maSV}.
+            </div>
+          ) : (
+            <div className="border border-slate-200 rounded-2xl overflow-hidden">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 text-center">STT</th>
+                    <th className="px-4 py-3">Ngày Thi</th>
+                    <th className="px-4 py-3">Giờ Thi</th>
+                    <th className="px-4 py-3">Mã Môn</th>
+                    <th className="px-4 py-3">Tên Môn Học</th>
+                    <th className="px-4 py-3 text-center">Phòng Thi</th>
+                    <th className="px-4 py-3 text-center">Hình Thức</th>
+                    <th className="px-4 py-3 text-center">Tổ/Nhóm</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {exams.map((ex: ExamRecord, idx: number) => (
+                    <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
+                      <td className="px-4 py-3 text-center text-slate-400 font-mono">{idx + 1}</td>
+                      <td className="px-4 py-3 font-bold text-slate-800">{ex.NgayThi}</td>
+                      <td className="px-4 py-3 font-semibold text-blue-600">{ex.GioThi}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-indigo-700">{ex.MaMH}</td>
+                      <td className="px-4 py-3 font-bold text-slate-800">{ex.TenMH}</td>
+                      <td className="px-4 py-3 text-center font-black text-emerald-700 bg-emerald-50/50">
+                        {ex.MAPTHI || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-slate-600">{ex.MaHTThi || '—'}</td>
+                      <td className="px-4 py-3 text-center font-mono text-slate-500">
+                        {ex['To thi'] || ex.NhomThi || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUB-TAB 4: SECURITY & SETTINGS */}
+      {activeSubTab === 'SECURITY' && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6 max-w-2xl">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+            <div className="p-2.5 bg-rose-50 text-rose-600 rounded-2xl">
+              <Lock className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-800">Bảo Mật Tài Khoản S-Exam</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Đổi mật khẩu đăng nhập portal</p>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">
+            Mật khẩu mặc định của sinh viên là Mã sinh viên (viết in hoa). Bạn có thể đổi mật khẩu riêng để bảo vệ tài khoản.
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              alert('Tính năng đổi mật khẩu portal đang hoàn thiện!');
+            }}
+            className="flex flex-col gap-4"
+          >
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Mật khẩu hiện tại</label>
+              <div className="relative">
+                <input
+                  type={showCurrentPass ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Nhập mật khẩu hiện tại"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-10 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPass(!showCurrentPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  {showCurrentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Mật khẩu mới</label>
+              <div className="relative">
+                <input
+                  type={showNewPass ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Nhập mật khẩu mới"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-10 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPass(!showNewPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 cursor-pointer"
+              >
+                Cập Nhật Mật Khẩu
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
