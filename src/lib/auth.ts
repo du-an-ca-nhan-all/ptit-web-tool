@@ -134,3 +134,7 @@ export async function getCurrentUserFromCookie(): Promise<AuthUser | null> {
     return null;
   }
 }
+
+export async function getAuthUser(req?: any): Promise<AuthUser | null> {
+  return getCurrentUserFromCookie();
+}
