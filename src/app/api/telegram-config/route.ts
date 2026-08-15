@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import {
+  sendTelegramMessage,
   sendTestNotification,
   verifyTelegramBot,
   pullForumTopics,
@@ -282,12 +283,20 @@ export async function POST(req: NextRequest) {
       let failCount = 0;
 
       for (const sub of subscribers) {
-        const tokenToUse = sub.botToken?.trim() || sysConfig.botToken;
-        const sendRes = await sendTestNotification(tokenToUse, sub.chatId, sub.threadId, {
-          username: sub.username,
-          fullName: sub.user?.student?.hoTen || sub.username,
-          maLop: sub.user?.student?.maLop || 'PTIT',
+        let tokenToUse = sub.botToken?.trim();
+        if (!tokenToUse) {
+          try {
+            const resolved = await resolveEffectiveBotToken(null);
+            tokenToUse = resolved.token;
+          } catch {
+            tokenToUse = sysConfig.botToken;
+          }
+        }
+
+        const sendRes = await sendTelegramMessage(tokenToUse, sub.chatId, formattedBroadcast, {
+          threadId: sub.threadId ? Number(sub.threadId) : undefined,
         });
+
         if (sendRes.success) {
           sentCount++;
         } else {
