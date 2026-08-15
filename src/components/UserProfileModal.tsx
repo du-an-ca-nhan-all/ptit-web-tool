@@ -28,6 +28,8 @@ import {
   AlertCircle,
   ShieldCheck,
   Server,
+  Zap,
+  FileKey,
 } from 'lucide-react';
 
 interface UserProfileModalProps {
@@ -593,9 +595,20 @@ export default function UserProfileModal({
                                 {sys.systemName}
                               </h4>
                               {sys.isConfigured ? (
-                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1">
-                                  <Check className="w-3 h-3" /> Đã Liên Kết
-                                </span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1">
+                                    <Check className="w-3 h-3" /> Đã Liên Kết
+                                  </span>
+                                  {sys.hasToken ? (
+                                    <span className="bg-teal-100 text-teal-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-teal-300 inline-flex items-center gap-1">
+                                      <FileKey className="w-3 h-3" /> Đã Cấp Token
+                                    </span>
+                                  ) : (
+                                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300 inline-flex items-center gap-1">
+                                      Chưa Có Token
+                                    </span>
+                                  )}
+                                </div>
                               ) : (
                                 <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200">
                                   Chưa Cấu Hình

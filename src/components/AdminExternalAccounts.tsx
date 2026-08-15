@@ -23,6 +23,9 @@ import {
   Sparkles,
   Users,
   Zap,
+  Copy,
+  CheckCheck,
+  FileKey,
 } from 'lucide-react';
 import { LoginUser } from '../types';
 
@@ -37,6 +40,8 @@ interface ExternalAccountAdminItem {
   systemUrl: string;
   extUsername: string;
   extPassword?: string;
+  token?: string | null;
+  hasToken?: boolean;
   status: string;
   lastSyncAt: string | null;
   syncMessage: string | null;
@@ -55,7 +60,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClass, setSelectedClass] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'CONNECTED' | 'ERROR'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'CONNECTED' | 'ERROR' | 'HAS_TOKEN'>('ALL');
   const [visiblePasswords, setVisiblePasswords] = useState<{ [id: number]: boolean }>({});
 
   // Feedback states
@@ -63,6 +68,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
   const [errorMsg, setErrorMsg] = useState('');
   const [isBatchTesting, setIsBatchTesting] = useState(false);
   const [testingId, setTestingId] = useState<number | null>(null);
+  const [copiedTokenId, setCopiedTokenId] = useState<number | null>(null);
+  const [viewingTokenAccount, setViewingTokenAccount] = useState<ExternalAccountAdminItem | null>(null);
 
   // Edit / Add Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -130,7 +137,10 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       const matchClass = selectedClass === 'ALL' || a.maLop === selectedClass;
 
       // Status
-      const matchStatus = statusFilter === 'ALL' || a.status === statusFilter;
+      let matchStatus = true;
+      if (statusFilter === 'CONNECTED') matchStatus = a.status === 'CONNECTED';
+      else if (statusFilter === 'ERROR') matchStatus = a.status === 'ERROR';
+      else if (statusFilter === 'HAS_TOKEN') matchStatus = !!a.token;
 
       return matchSearch && matchClass && matchStatus;
     });
@@ -141,8 +151,15 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
     setVisiblePasswords((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Test single connection
-  const handleTestSingle = async (acc: ExternalAccountAdminItem) => {
+  // Copy token
+  const handleCopyToken = (token: string, id: number) => {
+    navigator.clipboard.writeText(token);
+    setCopiedTokenId(id);
+    setTimeout(() => setCopiedTokenId(null), 2000);
+  };
+
+  // Get/Refresh Single Token
+  const handleGetTokenSingle = async (acc: ExternalAccountAdminItem) => {
     setTestingId(acc.id);
     setErrorMsg('');
     setSuccessMsg('');
@@ -151,7 +168,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'TEST',
+          action: 'GET_TOKEN',
           systemKey: acc.systemKey,
           targetUsername: acc.username,
         }),
@@ -162,7 +179,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
         fetchAccounts();
         setTimeout(() => setSuccessMsg(''), 4000);
       } else {
-        setErrorMsg(data.error || 'Kiểm tra kết nối thất bại');
+        setErrorMsg(data.error || 'Lấy token thất bại');
       }
     } catch (err) {
       setErrorMsg('Lỗi kết nối máy chủ');
@@ -171,9 +188,9 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
     }
   };
 
-  // Batch Test all accounts
-  const handleBatchTest = async () => {
-    if (!confirm('Bạn có chắc muốn kiểm tra kết nối cho toàn bộ các tài khoản đã liên kết?')) return;
+  // Batch Get Tokens / Test all accounts
+  const handleBatchGetTokens = async () => {
+    if (!confirm('Bạn có chắc muốn lấy và xác thực Token cho toàn bộ các tài khoản đã liên kết?')) return;
     setIsBatchTesting(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -181,7 +198,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       const res = await fetch('/api/external-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'BATCH_TEST' }),
+        body: JSON.stringify({ action: 'BATCH_GET_TOKENS' }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -189,7 +206,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
         fetchAccounts();
         setTimeout(() => setSuccessMsg(''), 4000);
       } else {
-        setErrorMsg(data.error || 'Kiểm tra hàng loạt thất bại');
+        setErrorMsg(data.error || 'Lấy token hàng loạt thất bại');
       }
     } catch (err) {
       setErrorMsg('Lỗi kết nối máy chủ');
@@ -286,7 +303,20 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       return;
     }
 
-    const headers = ['STT', 'Mã Sinh Viên', 'Họ và Tên', 'Lớp', 'SĐT', 'Hệ Thống', 'URL', 'Tên Đăng Nhập QLDTTX', 'Mật Khẩu', 'Trạng Thái', 'Cập Nhật Lần Cuối'];
+    const headers = [
+      'STT',
+      'Mã Sinh Viên',
+      'Họ và Tên',
+      'Lớp',
+      'SĐT',
+      'Hệ Thống',
+      'URL',
+      'Tên Đăng Nhập QLDTTX',
+      'Mật Khẩu',
+      'Token',
+      'Trạng Thái',
+      'Cập Nhật Lần Cuối',
+    ];
     const rows = accounts.map((a, idx) => [
       idx + 1,
       a.username,
@@ -297,11 +327,13 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       a.systemUrl,
       a.extUsername,
       `"${a.extPassword || ''}"`,
+      `"${a.token || ''}"`,
       a.status,
       a.updatedAt ? new Date(a.updatedAt).toLocaleString('vi-VN') : '',
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -312,6 +344,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
   };
 
   const connectedCount = accounts.filter((a) => a.status === 'CONNECTED').length;
+  const hasTokenCount = accounts.filter((a) => !!a.token).length;
   const coveragePercent = totalStudents > 0 ? ((accounts.length / totalStudents) * 100).toFixed(1) : '0';
 
   return (
@@ -351,7 +384,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
-                  Quản Lý Tài Khoản QLĐT Từ Xa
+                  Quản Lý Tài Khoản & Token QLĐT Từ Xa
                 </h1>
                 <span className="bg-rose-500 text-white text-xs font-black px-2.5 py-0.5 rounded-full shadow-xs">
                   Admin
@@ -377,17 +410,17 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
           </button>
 
           <button
-            onClick={handleBatchTest}
+            onClick={handleBatchGetTokens}
             disabled={isBatchTesting || accounts.length === 0}
             className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-amber-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Kiểm tra kết nối toàn bộ tài khoản"
+            title="Lấy và xác thực Token cho toàn bộ tài khoản"
           >
             {isBatchTesting ? (
               <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <Zap className="w-3.5 h-3.5" />
             )}
-            <span>Kiểm Tra Hàng Loạt</span>
+            <span>Lấy Token Hàng Loạt</span>
           </button>
 
           <button
@@ -438,12 +471,15 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
 
         <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-6 h-6" />
+            <FileKey className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Kết Nối Thành Công</div>
-            <div className="text-2xl font-black text-emerald-600 mt-0.5">{connectedCount}</div>
-            <div className="text-[11px] text-slate-400 font-medium mt-0.5">Sẵn sàng đồng bộ</div>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Đã Cấp Token</div>
+            <div className="text-2xl font-black text-emerald-600 mt-0.5">
+              {hasTokenCount}{' '}
+              <span className="text-xs font-normal text-slate-400">/ {accounts.length}</span>
+            </div>
+            <div className="text-[11px] text-emerald-700 font-bold mt-0.5">Sẵn sàng crawl/đồng bộ</div>
           </div>
         </div>
 
@@ -531,9 +567,21 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 Tất cả ({accounts.length})
               </button>
               <button
+                onClick={() => setStatusFilter('HAS_TOKEN')}
+                className={`px-3 py-1.5 rounded-xl transition-colors cursor-pointer ${
+                  statusFilter === 'HAS_TOKEN'
+                    ? 'bg-white text-emerald-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Có Token ({hasTokenCount})
+              </button>
+              <button
                 onClick={() => setStatusFilter('CONNECTED')}
                 className={`px-3 py-1.5 rounded-xl transition-colors cursor-pointer ${
-                  statusFilter === 'CONNECTED' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  statusFilter === 'CONNECTED'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Đã liên kết ({connectedCount})
@@ -568,9 +616,9 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                   <th className="px-4 py-3.5 text-center w-12">STT</th>
                   <th className="px-4 py-3.5">Sinh Viên</th>
                   <th className="px-4 py-3.5">Lớp</th>
-                  <th className="px-4 py-3.5">Hệ Thống Liên Kết</th>
-                  <th className="px-4 py-3.5">Tên Đăng Nhập QLDTTX</th>
+                  <th className="px-4 py-3.5">Tên Đăng Nhập</th>
                   <th className="px-4 py-3.5">Mật Khẩu</th>
+                  <th className="px-4 py-3.5">Access Token</th>
                   <th className="px-4 py-3.5 text-center">Trạng Thái</th>
                   <th className="px-4 py-3.5 text-center">Cập Nhật</th>
                   <th className="px-4 py-3.5 text-right">Thao Tác</th>
@@ -580,6 +628,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 {filteredAccounts.map((acc, index) => {
                   const isPassVisible = !!visiblePasswords[acc.id];
                   const isCurrentTesting = testingId === acc.id;
+                  const isCopied = copiedTokenId === acc.id;
 
                   return (
                     <tr key={acc.id} className="hover:bg-indigo-50/30 transition-colors">
@@ -605,22 +654,6 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                         </span>
                       </td>
                       <td className="px-4 py-3.5">
-                        <div>
-                          <div className="font-bold text-slate-800 flex items-center gap-1">
-                            <span>{acc.systemName}</span>
-                          </div>
-                          <a
-                            href={acc.systemUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] text-indigo-600 hover:underline font-mono flex items-center gap-1 mt-0.5"
-                          >
-                            <span>{acc.systemUrl}</span>
-                            <ExternalLink className="w-2.5 h-2.5" />
-                          </a>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5">
                         <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
                           {acc.extUsername}
                         </span>
@@ -640,6 +673,33 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                           </button>
                         </div>
                       </td>
+                      <td className="px-4 py-3.5">
+                        {acc.token ? (
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              onClick={() => setViewingTokenAccount(acc)}
+                              className="font-mono text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-1 rounded-lg truncate max-w-[140px] cursor-pointer hover:bg-emerald-100 transition-colors"
+                              title="Bấm để xem toàn bộ Token"
+                            >
+                              {acc.token.replace(/^Bearer\s+/i, '').substring(0, 16)}...
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyToken(acc.token!, acc.id)}
+                              className="p-1 text-slate-400 hover:text-emerald-700 rounded-md transition-colors cursor-pointer"
+                              title="Sao chép Token"
+                            >
+                              {isCopied ? (
+                                <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">Chưa cấp</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3.5 text-center">
                         {acc.status === 'CONNECTED' ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
@@ -656,17 +716,17 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Test connection button */}
+                          {/* Get / Refresh Token button */}
                           <button
-                            onClick={() => handleTestSingle(acc)}
+                            onClick={() => handleGetTokenSingle(acc)}
                             disabled={isCurrentTesting}
                             className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                            title="Kiểm tra kết nối tới QLDTTX"
+                            title="Lấy / Làm mới Token từ QLDTTX"
                           >
                             {isCurrentTesting ? (
                               <div className="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
                             ) : (
-                              <RefreshCw className="w-3.5 h-3.5" />
+                              <Zap className="w-3.5 h-3.5" />
                             )}
                           </button>
 
@@ -708,6 +768,93 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
           )}
         </div>
       </div>
+
+      {/* Modal View Full Token */}
+      {viewingTokenAccount && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setViewingTokenAccount(null);
+          }}
+        >
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                  <FileKey className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black tracking-tight">Chi Tiết Access Token</h3>
+                  <p className="text-xs text-emerald-100 mt-0.5">
+                    {viewingTokenAccount.hoTen} ({viewingTokenAccount.username})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingTokenAccount(null)}
+                className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-full cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Giá trị Bearer Token (Dùng cho API Crawl & Đồng bộ):
+                </label>
+                <textarea
+                  readOnly
+                  value={viewingTokenAccount.token || 'Chưa có token'}
+                  rows={4}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-mono text-slate-800 break-all outline-none select-all"
+                />
+              </div>
+
+              {viewingTokenAccount.syncMessage && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
+                  <span className="font-bold text-slate-700 block mb-0.5">Nhật ký trạng thái:</span>
+                  <span>{viewingTokenAccount.syncMessage}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => handleGetTokenSingle(viewingTokenAccount)}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-amber-200"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Làm Mới Token Ngay</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (viewingTokenAccount.token) {
+                        navigator.clipboard.writeText(viewingTokenAccount.token);
+                        alert('Đã sao chép Token vào clipboard!');
+                      }
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-indigo-200"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Sao Chép</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewingTokenAccount(null)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Add / Edit Account */}
       {isModalOpen && (
@@ -787,6 +934,9 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                     {showModalPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                <p className="text-[11px] text-slate-400 mt-1 italic">
+                  * Hệ thống sẽ tự động đăng nhập tới cổng trường để lấy Access Token ngay sau khi lưu.
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
@@ -807,7 +957,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                   ) : (
                     <Check className="w-3.5 h-3.5" />
                   )}
-                  <span>{modalMode === 'ADD' ? 'Thêm Tài Khoản' : 'Lưu Thay Đổi'}</span>
+                  <span>{modalMode === 'ADD' ? 'Thêm & Lấy Token' : 'Lưu & Cập Nhật Token'}</span>
                 </button>
               </div>
             </form>
@@ -817,7 +967,11 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
 
       {/* Delete Confirmation Modal */}
       {deletingAccount && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDeletingAccount(null);
+          }}
+        >
           <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-full border border-slate-200">
             <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
               <Trash2 className="w-5 h-5 text-rose-600" />
@@ -825,7 +979,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed mb-5">
               Bạn có chắc chắn muốn hủy liên kết tài khoản QLDTTX của sinh viên{' '}
-              <strong>{deletingAccount.hoTen}</strong> (Mã SV: <span className="font-mono font-bold text-indigo-600">{deletingAccount.username}</span>)?
+              <strong>{deletingAccount.hoTen}</strong> (Mã SV:{' '}
+              <span className="font-mono font-bold text-indigo-600">{deletingAccount.username}</span>)?
             </p>
             <div className="flex items-center justify-end gap-2.5">
               <button

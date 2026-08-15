@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
+import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { AVAILABLE_EXTERNAL_SYSTEMS } from '@/src/types';
+import { loginAndGetToken, validateToken, getValidTokenOrRefresh } from '@/src/lib/qldttx-service';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -18,7 +19,7 @@ async function getAuthUser(req: NextRequest) {
 // GET /api/external-accounts
 // Supports:
 // 1. Regular Student/Monitor: Returns own external accounts
-// 2. Admin (?view=all): Returns all configured external accounts with student & class info
+// 2. Admin (?view=all): Returns all configured external accounts with student & class info & token
 export async function GET(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -32,7 +33,10 @@ export async function GET(req: NextRequest) {
     // ADMIN VIEW ALL ACCOUNTS
     if (viewAll) {
       if (!authUser.isAdmin) {
-        return NextResponse.json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền xem toàn bộ danh sách tài khoản' }, { status: 403 });
+        return NextResponse.json(
+          { error: 'Chỉ Quản trị viên (Admin) mới có quyền xem toàn bộ danh sách tài khoản' },
+          { status: 403 }
+        );
       }
 
       const allAccounts = await prisma.externalAccount.findMany({
@@ -65,6 +69,8 @@ export async function GET(req: NextRequest) {
           systemUrl: acc.systemUrl,
           extUsername: acc.extUsername,
           extPassword: acc.extPassword, // Visible for admin support
+          token: acc.token || null, // Token column
+          hasToken: !!acc.token,
           status: acc.status,
           lastSyncAt: acc.lastSyncAt ? acc.lastSyncAt.toISOString() : null,
           syncMessage: acc.syncMessage || null,
@@ -101,6 +107,8 @@ export async function GET(req: NextRequest) {
         isConfigured: !!existing,
         extUsername: existing?.extUsername || authUser.username,
         hasPassword: !!existing?.extPassword,
+        token: existing?.token || null,
+        hasToken: !!existing?.token,
         status: existing?.status || 'DISCONNECTED',
         lastSyncAt: existing?.lastSyncAt ? existing.lastSyncAt.toISOString() : null,
         syncMessage: existing?.syncMessage || null,
@@ -116,6 +124,7 @@ export async function GET(req: NextRequest) {
         systemName: a.systemName,
         systemUrl: a.systemUrl,
         extUsername: a.extUsername,
+        token: a.token,
         status: a.status,
         lastSyncAt: a.lastSyncAt?.toISOString() || null,
         syncMessage: a.syncMessage,
@@ -128,7 +137,7 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/external-accounts
-// Save, Update, Delete, or Test Connection for an external system account
+// Save, Update, Delete, Get Token or Test Connection for an external system account
 export async function POST(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -143,29 +152,59 @@ export async function POST(req: NextRequest) {
     let effectiveUsername = authUser.username;
     if (targetUsername && targetUsername !== authUser.username) {
       if (!authUser.isAdmin) {
-        return NextResponse.json({ error: 'Chỉ Admin mới có quyền thao tác trên tài khoản của người khác' }, { status: 403 });
+        return NextResponse.json(
+          { error: 'Chỉ Admin mới có quyền thao tác trên tài khoản của người khác' },
+          { status: 403 }
+        );
       }
       effectiveUsername = String(targetUsername).trim();
     }
 
-    // 0. BATCH TEST FOR ADMIN
-    if (action === 'BATCH_TEST') {
+    // 0. BATCH GET TOKENS & TEST FOR ADMIN
+    if (action === 'BATCH_TEST' || action === 'BATCH_GET_TOKENS') {
       if (!authUser.isAdmin) {
-        return NextResponse.json({ error: 'Chỉ Admin mới có quyền kiểm tra hàng loạt' }, { status: 403 });
+        return NextResponse.json({ error: 'Chỉ Admin mới có quyền lấy token hàng loạt' }, { status: 403 });
       }
 
       const allAccounts = await prisma.externalAccount.findMany();
-      const updatedCount = await prisma.externalAccount.updateMany({
-        data: {
-          status: 'CONNECTED',
-          lastSyncAt: new Date(),
-          syncMessage: 'Đã kiểm tra kết nối tự động thành công.',
-        },
-      });
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const acc of allAccounts) {
+        try {
+          const { token: freshToken } = await getValidTokenOrRefresh({
+            username: acc.extUsername,
+            password: acc.extPassword,
+            existingToken: acc.token,
+          });
+
+          await prisma.externalAccount.update({
+            where: { id: acc.id },
+            data: {
+              token: freshToken,
+              status: 'CONNECTED',
+              lastSyncAt: new Date(),
+              syncMessage: 'Đã lấy và xác thực Token QLDTTX thành công.',
+            },
+          });
+          successCount++;
+        } catch (err: any) {
+          await prisma.externalAccount.update({
+            where: { id: acc.id },
+            data: {
+              status: 'ERROR',
+              syncMessage: `Lỗi kết nối / lấy token: ${err.message}`,
+            },
+          });
+          failCount++;
+        }
+      }
 
       return NextResponse.json({
         success: true,
-        message: `Đã kiểm tra và đồng bộ trạng thái cho ${updatedCount.count} tài khoản liên kết!`,
+        message: `Đã làm mới token cho ${allAccounts.length} tài khoản (${successCount} thành công, ${failCount} thất bại).`,
+        successCount,
+        failCount,
       });
     }
 
@@ -192,7 +231,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. ACTION: SAVE / CONNECT
+    // 2. ACTION: SAVE / CONNECT (Automatically fetch token upon saving!)
     if (action === 'SAVE' || action === 'CONNECT') {
       if (!extUsername || !extUsername.trim()) {
         return NextResponse.json(
@@ -222,6 +261,22 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Try logging in to QLDTTX to get the access token
+      let fetchedToken: string | null = null;
+      let status = 'CONNECTED';
+      let syncMessage = 'Đã lưu cấu hình tài khoản và cấp Token kết nối thành công!';
+
+      try {
+        fetchedToken = await loginAndGetToken({
+          username: cleanUsername,
+          password: cleanPassword,
+        });
+      } catch (tokenErr: any) {
+        console.warn(`Could not get token for ${cleanUsername} during SAVE:`, tokenErr.message);
+        status = 'ERROR';
+        syncMessage = `Lưu thông tin thành công, nhưng không thể lấy token từ cổng trường: ${tokenErr.message}`;
+      }
+
       const account = await prisma.externalAccount.upsert({
         where: {
           username_systemKey: {
@@ -236,29 +291,35 @@ export async function POST(req: NextRequest) {
           systemUrl: finalSystemUrl,
           extUsername: cleanUsername,
           extPassword: cleanPassword,
-          status: 'CONNECTED',
+          token: fetchedToken,
+          status,
           lastSyncAt: new Date(),
-          syncMessage: 'Đã lưu cấu hình tài khoản thành công và sẵn sàng đồng bộ dữ liệu.',
+          syncMessage,
         },
         update: {
           systemName: finalSystemName,
           systemUrl: finalSystemUrl,
           extUsername: cleanUsername,
           extPassword: cleanPassword,
-          status: 'CONNECTED',
+          token: fetchedToken,
+          status,
           lastSyncAt: new Date(),
-          syncMessage: 'Đã cập nhật cấu hình tài khoản.',
+          syncMessage,
         },
       });
 
       return NextResponse.json({
         success: true,
-        message: `Đã lưu thành công cấu hình tài khoản cho ${finalSystemName} (${effectiveUsername})`,
+        message: fetchedToken
+          ? `Đã lưu tài khoản & lấy Token thành công cho ${finalSystemName} (${effectiveUsername})`
+          : `Đã lưu tài khoản nhưng chưa lấy được Token: ${syncMessage}`,
+        hasToken: !!account.token,
         account: {
           systemKey: account.systemKey,
           systemName: account.systemName,
           systemUrl: account.systemUrl,
           extUsername: account.extUsername,
+          token: account.token,
           status: account.status,
           lastSyncAt: account.lastSyncAt?.toISOString() || null,
           syncMessage: account.syncMessage,
@@ -266,8 +327,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3. ACTION: TEST_SYNC
-    if (action === 'TEST' || action === 'SYNC') {
+    // 3. ACTION: GET_TOKEN / TEST / SYNC
+    if (action === 'GET_TOKEN' || action === 'TEST' || action === 'SYNC') {
       const existing = await prisma.externalAccount.findUnique({
         where: {
           username_systemKey: {
@@ -279,26 +340,57 @@ export async function POST(req: NextRequest) {
 
       if (!existing) {
         return NextResponse.json(
-          { error: `Chưa cấu hình tài khoản cho hệ thống này (${effectiveUsername}). Vui lòng lưu thông tin đăng nhập trước.` },
+          {
+            error: `Chưa cấu hình tài khoản cho hệ thống này (${effectiveUsername}). Vui lòng lưu thông tin đăng nhập trước.`,
+          },
           { status: 400 }
         );
       }
 
-      // Simulate connection verification & ping check
-      const updated = await prisma.externalAccount.update({
-        where: { id: existing.id },
-        data: {
-          status: 'CONNECTED',
-          lastSyncAt: new Date(),
-          syncMessage: `Kết nối đến ${finalSystemUrl} thành công cho tài khoản ${existing.extUsername}.`,
-        },
-      });
+      try {
+        const { token: validToken, isNew } = await getValidTokenOrRefresh({
+          username: existing.extUsername,
+          password: existing.extPassword,
+          existingToken: existing.token,
+        });
 
-      return NextResponse.json({
-        success: true,
-        message: `Kết nối thành công đến ${finalSystemName} (${finalSystemUrl}) cho sinh viên ${effectiveUsername}!`,
-        lastSyncAt: updated.lastSyncAt?.toISOString(),
-      });
+        const updated = await prisma.externalAccount.update({
+          where: { id: existing.id },
+          data: {
+            token: validToken,
+            status: 'CONNECTED',
+            lastSyncAt: new Date(),
+            syncMessage: isNew
+              ? `Đã đăng nhập và cấp Token mới lúc ${new Date().toLocaleTimeString('vi-VN')}`
+              : `Token hiện tại còn sống và hợp lệ lúc ${new Date().toLocaleTimeString('vi-VN')}`,
+          },
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: isNew
+            ? `Đã lấy Token mới thành công cho ${existing.extUsername}!`
+            : `Token hiện tại còn sống và hợp lệ!`,
+          token: updated.token,
+          isNew,
+          lastSyncAt: updated.lastSyncAt?.toISOString(),
+        });
+      } catch (loginErr: any) {
+        await prisma.externalAccount.update({
+          where: { id: existing.id },
+          data: {
+            status: 'ERROR',
+            syncMessage: `Lỗi lấy Token: ${loginErr.message}`,
+          },
+        });
+
+        return NextResponse.json(
+          {
+            error: `Không thể lấy token: ${loginErr.message}`,
+          },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({ error: 'Action không hợp lệ' }, { status: 400 });

@@ -91,6 +91,7 @@ export interface ExternalAccountItem {
   systemUrl: string;
   extUsername: string;
   extPassword?: string;
+  token?: string | null;
   status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
   lastSyncAt?: string | null;
   syncMessage?: string | null;

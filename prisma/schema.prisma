@@ -145,6 +145,7 @@ model ExternalAccount {
   
   extUsername String    // Tên đăng nhập hệ thống ngoài (Mã SV)
   extPassword String    // Mật khẩu hệ thống ngoài
+  token       String?   // Access token được cấp từ cổng QLDTTX (Bearer access_token)
   
   status      String    @default("CONNECTED") // 'CONNECTED' | 'DISCONNECTED' | 'ERROR'
   lastSyncAt  DateTime?
