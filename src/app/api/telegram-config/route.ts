@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
-import { sendTestNotification, verifyTelegramBot } from '@/src/lib/telegram-service';
+import {
+  sendTestNotification,
+  verifyTelegramBot,
+  pullForumTopics,
+  createTelegramForumTopic,
+} from '@/src/lib/telegram-service';
 import { logActivity } from '@/src/lib/activityLog';
 
 async function getAuthUser(req: NextRequest) {
@@ -301,7 +306,83 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3. ACTION: TOGGLE ENABLE/DISABLE
+    // 3. ACTION: PULL FORUM TOPICS (Lấy danh sách topic từ nhóm)
+    if (action === 'PULL_TOPICS') {
+      const botToken = body.botToken?.trim();
+      const chatId = body.chatId?.trim();
+
+      if (!botToken) {
+        return NextResponse.json({ error: 'Vui lòng nhập Telegram Bot Token để quét Topic' }, { status: 400 });
+      }
+      if (!chatId) {
+        return NextResponse.json({ error: 'Vui lòng nhập Chat ID nhóm để quét Topic' }, { status: 400 });
+      }
+
+      const pullResult = await pullForumTopics(botToken, chatId);
+
+      if (!pullResult.success) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: pullResult.error || 'Không thể lấy danh sách Topic từ Telegram',
+          },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        chat: pullResult.chat,
+        topics: pullResult.topics,
+        isForumGroup: pullResult.isForumGroup,
+        message: `Đã tìm thấy ${pullResult.topics.length} topic trong nhóm "${pullResult.chat?.title || chatId}"`,
+      });
+    }
+
+    // 4. ACTION: CREATE FORUM TOPIC (Tạo topic mới trong nhóm)
+    if (action === 'CREATE_TOPIC') {
+      const botToken = body.botToken?.trim();
+      const chatId = body.chatId?.trim();
+      const topicName = body.topicName?.trim();
+      const iconColor = body.iconColor;
+
+      if (!botToken) {
+        return NextResponse.json({ error: 'Vui lòng nhập Telegram Bot Token' }, { status: 400 });
+      }
+      if (!chatId) {
+        return NextResponse.json({ error: 'Vui lòng nhập Chat ID nhóm' }, { status: 400 });
+      }
+      if (!topicName) {
+        return NextResponse.json({ error: 'Vui lòng nhập tên Topic cần tạo' }, { status: 400 });
+      }
+
+      const createRes = await createTelegramForumTopic(botToken, chatId, topicName, iconColor);
+      if (!createRes.success) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: createRes.error || 'Không thể tạo Topic trên Telegram',
+          },
+          { status: 400 }
+        );
+      }
+
+      await logActivity({
+        req,
+        action: 'CREATE_TELEGRAM_TOPIC',
+        targetType: 'TELEGRAM_CONFIG',
+        targetId: username,
+        description: `Tạo topic Telegram "${topicName}" (#${createRes.topic?.threadId}) trong nhóm ${chatId}`,
+      });
+
+      return NextResponse.json({
+        success: true,
+        topic: createRes.topic,
+        message: `Đã tạo Topic "${topicName}" (Thread ID: ${createRes.topic?.threadId}) thành công!`,
+      });
+    }
+
+    // 5. ACTION: TOGGLE ENABLE/DISABLE
     if (action === 'TOGGLE') {
       const existingConfig = await prisma.telegramConfig.findUnique({
         where: { username },
@@ -332,7 +413,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. ACTION: DELETE CONFIGURATION (Hủy liên kết)
+    // 6. ACTION: DELETE CONFIGURATION (Hủy liên kết)
     if (action === 'DELETE') {
       await prisma.telegramConfig.deleteMany({
         where: { username },

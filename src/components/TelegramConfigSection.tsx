@@ -19,11 +19,13 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  Clock,
   Layers,
   Check,
   Zap,
+  ListFilter,
+  X as CloseIcon,
 } from 'lucide-react';
+import TelegramTopicSelectorModal from './TelegramTopicSelectorModal';
 
 interface TelegramConfigSectionProps {
   currentUser?: LoginUser | null;
@@ -46,6 +48,8 @@ export default function TelegramConfigSection({
   const [botToken, setBotToken] = useState('');
   const [chatId, setChatId] = useState('');
   const [threadId, setThreadId] = useState('');
+  const [selectedTopicName, setSelectedTopicName] = useState<string | null>(null);
+  const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
   const [isEnabled, setIsEnabled] = useState(true);
   const [notifyExamSchedule, setNotifyExamSchedule] = useState(true);
   const [notifyCourseRegistration, setNotifyCourseRegistration] = useState(true);
@@ -534,17 +538,80 @@ export default function TelegramConfigSection({
                   <span>Thread ID / Topic ID</span>
                   <span className="text-slate-400 font-normal">(Tùy chọn)</span>
                 </label>
-                <span className="text-[11px] text-slate-400">Supergroup Topics</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMsg('');
+                    if (!botToken.trim()) {
+                      setErrorMsg('Vui lòng nhập Telegram Bot Token trước khi quét Topic.');
+                      return;
+                    }
+                    if (!chatId.trim()) {
+                      setErrorMsg('Vui lòng nhập Chat ID nhóm trước khi quét Topic.');
+                      return;
+                    }
+                    setIsTopicModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-2.5 py-0.5 rounded-lg border border-sky-200 transition-colors cursor-pointer"
+                >
+                  <ListFilter className="w-3 h-3" />
+                  <span>Quét / Chọn Topic</span>
+                </button>
               </div>
-              <input
-                type="text"
-                value={threadId}
-                onChange={(e) => setThreadId(e.target.value)}
-                placeholder="Ví dụ: 24 (để trống nếu không dùng Topic)"
-                className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
-              />
+
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={threadId}
+                  onChange={(e) => {
+                    setThreadId(e.target.value);
+                    setSelectedTopicName(null);
+                  }}
+                  placeholder="Ví dụ: 24 (để trống nếu không dùng Topic)"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-28 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMsg('');
+                    if (!botToken.trim()) {
+                      setErrorMsg('Vui lòng nhập Telegram Bot Token trước khi quét Topic.');
+                      return;
+                    }
+                    if (!chatId.trim()) {
+                      setErrorMsg('Vui lòng nhập Chat ID nhóm trước khi quét Topic.');
+                      return;
+                    }
+                    setIsTopicModalOpen(true);
+                  }}
+                  className="absolute right-2 px-3 py-1.5 bg-white hover:bg-sky-50 text-sky-600 text-[11px] font-bold border border-slate-200 rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1"
+                >
+                  <ListFilter className="w-3 h-3 text-sky-500" />
+                  <span>Chọn Topic</span>
+                </button>
+              </div>
+
+              {selectedTopicName && threadId && (
+                <div className="mt-1.5 flex items-center justify-between bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-xl text-[11px] text-sky-800 font-medium animate-in fade-in">
+                  <span className="truncate">
+                    Topic đã chọn: <strong>{selectedTopicName}</strong> <span className="font-mono text-sky-600">(#{threadId})</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setThreadId('');
+                      setSelectedTopicName(null);
+                    }}
+                    className="p-0.5 text-sky-500 hover:text-sky-700 ml-1 cursor-pointer"
+                    title="Bỏ chọn topic"
+                  >
+                    <CloseIcon className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+
               <p className="text-[11px] text-slate-500 mt-1">
-                Chỉ nhập nếu bạn muốn gửi vào một Topic trong Group Telegram.
+                Bấm <strong>"Chọn Topic"</strong> để quét danh sách các chủ đề diễn đàn trong nhóm Telegram.
               </p>
             </div>
           </div>
@@ -692,6 +759,21 @@ export default function TelegramConfigSection({
           </div>
         </div>
       </div>
+
+      {/* Topic Selector Popup Modal */}
+      <TelegramTopicSelectorModal
+        isOpen={isTopicModalOpen}
+        onClose={() => setIsTopicModalOpen(false)}
+        botToken={botToken}
+        chatId={chatId}
+        currentSelectedThreadId={threadId}
+        onSelectTopic={(topic) => {
+          setThreadId(topic.threadId);
+          setSelectedTopicName(topic.name);
+          setSuccessMsg(`Đã chọn Topic: "${topic.name}" (ID: ${topic.threadId})`);
+          setTimeout(() => setSuccessMsg(''), 3000);
+        }}
+      />
     </div>
   );
 }

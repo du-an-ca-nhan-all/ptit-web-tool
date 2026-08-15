@@ -244,3 +244,279 @@ export async function sendTestNotification(
 
   return sendResult;
 }
+
+export interface TelegramChatInfo {
+  id: number | string;
+  type: 'private' | 'group' | 'supergroup' | 'channel';
+  title?: string;
+  username?: string;
+  isForum?: boolean;
+  description?: string;
+}
+
+export interface TelegramForumTopic {
+  threadId: string;
+  name: string;
+  iconColor?: number;
+  iconCustomEmojiId?: string;
+  isGeneral?: boolean;
+  lastMessageSnippet?: string;
+  lastMessageDate?: string;
+}
+
+/**
+ * Fetch Chat Details to check if it's a supergroup and has forum topics enabled
+ */
+export async function getChatInfo(
+  botToken: string,
+  chatId: string
+): Promise<{
+  success: boolean;
+  chat?: TelegramChatInfo;
+  error?: string;
+}> {
+  const token = botToken?.trim();
+  const chat = chatId?.trim();
+
+  if (!token || !chat) {
+    return { success: false, error: 'Thiếu Bot Token hoặc Chat ID' };
+  }
+
+  try {
+    const url = `https://api.telegram.org/bot${token}/getChat?chat_id=${encodeURIComponent(chat)}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const data = await res.json();
+    if (res.ok && data.ok && data.result) {
+      const r = data.result;
+      return {
+        success: true,
+        chat: {
+          id: r.id,
+          type: r.type,
+          title: r.title || r.first_name || 'Cuộc trò chuyện',
+          username: r.username,
+          isForum: !!r.is_forum,
+          description: r.description,
+        },
+      };
+    }
+
+    return {
+      success: false,
+      error: formatTelegramError(data.description || 'Không thể lấy thông tin nhóm chat', data.error_code),
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: `Lỗi kết nối khi lấy thông tin nhóm: ${err.message || 'Lỗi mạng'}`,
+    };
+  }
+}
+
+/**
+ * Pull and scan forum topics from recent updates / messages in the group
+ */
+export async function pullForumTopics(
+  botToken: string,
+  chatId: string
+): Promise<{
+  success: boolean;
+  chat?: TelegramChatInfo;
+  topics: TelegramForumTopic[];
+  isForumGroup: boolean;
+  error?: string;
+}> {
+  const token = botToken?.trim();
+  const chat = chatId?.trim();
+
+  if (!token || !chat) {
+    return {
+      success: false,
+      topics: [],
+      isForumGroup: false,
+      error: 'Thiếu Bot Token hoặc Chat ID',
+    };
+  }
+
+  // 1. Fetch Chat Info
+  const chatRes = await getChatInfo(token, chat);
+  if (!chatRes.success) {
+    return {
+      success: false,
+      topics: [],
+      isForumGroup: false,
+      error: chatRes.error || 'Không thể kiểm tra thông tin nhóm chat',
+    };
+  }
+
+  const chatInfo = chatRes.chat!;
+  const isForumGroup = !!chatInfo.isForum || chatInfo.type === 'supergroup';
+
+  // Map to store discovered topics keyed by threadId
+  const topicMap = new Map<string, TelegramForumTopic>();
+
+  // Always register "General" topic (ID 1) if it's a forum supergroup
+  if (chatInfo.isForum) {
+    topicMap.set('1', {
+      threadId: '1',
+      name: 'General (Chung)',
+      isGeneral: true,
+      lastMessageSnippet: 'Chủ đề mặc định của nhóm',
+    });
+  }
+
+  // 2. Fetch recent updates to discover topic creation events and thread IDs
+  try {
+    const updatesUrl = `https://api.telegram.org/bot${token}/getUpdates?limit=100&allowed_updates=${encodeURIComponent(
+      JSON.stringify(['message', 'edited_message', 'channel_post'])
+    )}`;
+    const updatesRes = await fetch(updatesUrl, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const updatesData = await updatesRes.json();
+    if (updatesRes.ok && updatesData.ok && Array.isArray(updatesData.result)) {
+      const normalizedTargetChatId = String(chatInfo.id);
+
+      for (const update of updatesData.result) {
+        const msg = update.message || update.edited_message || update.channel_post;
+        if (!msg || !msg.chat) continue;
+
+        const msgChatId = String(msg.chat.id);
+        if (msgChatId !== normalizedTargetChatId && msgChatId !== chat) continue;
+
+        // Check forum_topic_created action
+        if (msg.forum_topic_created) {
+          const threadId = String(msg.message_thread_id || msg.message_id);
+          const existing = topicMap.get(threadId);
+          topicMap.set(threadId, {
+            threadId,
+            name: msg.forum_topic_created.name || `Topic #${threadId}`,
+            iconColor: msg.forum_topic_created.icon_color,
+            iconCustomEmojiId: msg.forum_topic_created.icon_custom_emoji_id,
+            isGeneral: threadId === '1',
+            lastMessageDate: msg.date ? new Date(msg.date * 1000).toISOString() : existing?.lastMessageDate,
+          });
+        }
+
+        // Check forum_topic_edited action
+        if (msg.forum_topic_edited) {
+          const threadId = String(msg.message_thread_id || msg.message_id);
+          const existing = topicMap.get(threadId);
+          if (existing) {
+            if (msg.forum_topic_edited.name) existing.name = msg.forum_topic_edited.name;
+            if (msg.forum_topic_edited.icon_custom_emoji_id) existing.iconCustomEmojiId = msg.forum_topic_edited.icon_custom_emoji_id;
+          }
+        }
+
+        // Check regular messages that have message_thread_id
+        if (msg.message_thread_id) {
+          const threadId = String(msg.message_thread_id);
+          const textSnippet = (msg.text || msg.caption || '').substring(0, 60);
+          const msgDate = msg.date ? new Date(msg.date * 1000).toISOString() : undefined;
+
+          if (!topicMap.has(threadId)) {
+            topicMap.set(threadId, {
+              threadId,
+              name: threadId === '1' ? 'General (Chung)' : `Topic #${threadId}`,
+              isGeneral: threadId === '1',
+              lastMessageSnippet: textSnippet || undefined,
+              lastMessageDate: msgDate,
+            });
+          } else {
+            const existing = topicMap.get(threadId)!;
+            if (textSnippet && !existing.lastMessageSnippet) {
+              existing.lastMessageSnippet = textSnippet;
+            }
+            if (msgDate && (!existing.lastMessageDate || new Date(msgDate) > new Date(existing.lastMessageDate))) {
+              existing.lastMessageDate = msgDate;
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching Telegram updates for topics:', err);
+  }
+
+  const topicList = Array.from(topicMap.values()).sort((a, b) => {
+    if (a.isGeneral) return -1;
+    if (b.isGeneral) return 1;
+    return Number(a.threadId) - Number(b.threadId);
+  });
+
+  return {
+    success: true,
+    chat: chatInfo,
+    topics: topicList,
+    isForumGroup,
+  };
+}
+
+/**
+ * Create a new Forum Topic in a supergroup (requires bot to have admin rights)
+ */
+export async function createTelegramForumTopic(
+  botToken: string,
+  chatId: string,
+  name: string,
+  iconColor?: number,
+  iconCustomEmojiId?: string
+): Promise<{
+  success: boolean;
+  topic?: TelegramForumTopic;
+  error?: string;
+}> {
+  const token = botToken?.trim();
+  const chat = chatId?.trim();
+  const topicName = name?.trim();
+
+  if (!token) return { success: false, error: 'Thiếu Bot Token' };
+  if (!chat) return { success: false, error: 'Thiếu Chat ID nhóm' };
+  if (!topicName) return { success: false, error: 'Tên Topic không được để trống' };
+
+  try {
+    const payload: any = {
+      chat_id: chat,
+      name: topicName,
+    };
+    if (iconColor !== undefined) payload.icon_color = iconColor;
+    if (iconCustomEmojiId) payload.icon_custom_emoji_id = iconCustomEmojiId;
+
+    const url = `https://api.telegram.org/bot${token}/createForumTopic`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.ok && data.result) {
+      return {
+        success: true,
+        topic: {
+          threadId: String(data.result.message_thread_id),
+          name: data.result.name,
+          iconColor: data.result.icon_color,
+          iconCustomEmojiId: data.result.icon_custom_emoji_id,
+        },
+      };
+    }
+
+    return {
+      success: false,
+      error: formatTelegramError(data.description || 'Không thể tạo Topic mới', data.error_code),
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: `Lỗi kết nối khi tạo Topic: ${err.message || 'Lỗi mạng'}`,
+    };
+  }
+}
+
