@@ -14,7 +14,7 @@ import {
   resolveEffectiveBotToken,
 } from '@/src/lib/telegram-service';
 import { logActivity } from '@/src/lib/activityLog';
-import { checkAndDispatchQldtAnnouncements } from '@/src/lib/telegram-dispatcher';
+import { checkAndDispatchQldtAnnouncements, runClassScheduleReminders } from '@/src/lib/telegram-dispatcher';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -28,28 +28,24 @@ async function getAuthUser(req: NextRequest) {
   return authUser;
 }
 
-// GET /api/telegram-config
+// GET /api/telegram-config?view=all OR /api/telegram-config?targetUsername=K25...
 export async function GET(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
     if (!authUser) {
-      return NextResponse.json({ error: 'Vui lòng đăng nhập để xem thông tin' }, { status: 401 });
+      return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
-    const viewAll = searchParams.get('view') === 'all' || searchParams.get('admin') === 'true';
-    const targetUsername = searchParams.get('username');
+    const view = searchParams.get('view');
+    const targetUsername = searchParams.get('targetUsername')?.trim();
 
-    // Fetch system bot public info (safe for all users)
     const systemBotPublic = await getSystemTelegramBotPublicInfo();
 
-    // ADMIN: View all users' Telegram configs
-    if (viewAll) {
+    // If Admin requests full list of subscribers
+    if (view === 'all') {
       if (!authUser.isAdmin) {
-        return NextResponse.json(
-          { error: 'Chỉ Quản trị viên (Admin) mới có quyền xem toàn bộ danh sách cấu hình Telegram' },
-          { status: 403 }
-        );
+        return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền xem danh sách tất cả tài khoản' }, { status: 403 });
       }
 
       const allConfigs = await prisma.telegramConfig.findMany({
@@ -85,6 +81,8 @@ export async function GET(req: NextRequest) {
           notifyQldtAnnouncements: cfg.notifyQldtAnnouncements,
           qldtCheckInterval: cfg.qldtCheckInterval,
           lastQldtCheckedAt: cfg.lastQldtCheckedAt ? cfg.lastQldtCheckedAt.toISOString() : null,
+          notifyClassSchedule: cfg.notifyClassSchedule,
+          classReminderBefore: cfg.classReminderBefore,
           lastTestedAt: cfg.lastTestedAt ? cfg.lastTestedAt.toISOString() : null,
           lastTestStatus: cfg.lastTestStatus,
           lastTestError: cfg.lastTestError,
@@ -145,6 +143,8 @@ export async function GET(req: NextRequest) {
             notifyQldtAnnouncements: config.notifyQldtAnnouncements,
             qldtCheckInterval: config.qldtCheckInterval,
             lastQldtCheckedAt: config.lastQldtCheckedAt ? config.lastQldtCheckedAt.toISOString() : null,
+            notifyClassSchedule: config.notifyClassSchedule,
+            classReminderBefore: config.classReminderBefore,
             lastTestedAt: config.lastTestedAt ? config.lastTestedAt.toISOString() : null,
             lastTestStatus: config.lastTestStatus,
             lastTestError: config.lastTestError,
@@ -170,87 +170,99 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { action = 'SAVE', targetUsername } = body;
+    const { action, targetUsername } = body;
 
+    // Target username check: Normal users can only configure their own account, admin can configure anyone
     let username = authUser.username;
     if (targetUsername && targetUsername !== authUser.username) {
       if (!authUser.isAdmin) {
-        return NextResponse.json({ error: 'Không có quyền thao tác cấu hình của tài khoản khác' }, { status: 403 });
+        return NextResponse.json({ error: 'Bạn không có quyền thao tác cấu hình của tài khoản khác' }, { status: 403 });
       }
       username = targetUsername;
     }
 
-    // Get student info for message templates
-    const studentInfo = await prisma.student.findUnique({
-      where: { maSV: username },
-    });
-    const userDisplayInfo = {
-      username: username,
-      fullName: studentInfo?.hoTen || authUser.fullName || username,
-      maLop: studentInfo?.maLop || authUser.lop || 'Chưa cập nhật',
-    };
+    // ─────────────────────────────────────────────────────────────
+    // GLOBAL SYSTEM BOT ACTIONS (ADMIN ONLY)
+    // ─────────────────────────────────────────────────────────────
+    if (action === 'GET_SYSTEM_BOT') {
+      const systemBotInfo = await getSystemTelegramBotPublicInfo();
+      const systemBotConfig = authUser.isAdmin ? await getSystemTelegramBotConfig() : null;
+      return NextResponse.json({
+        success: true,
+        systemBot: systemBotInfo,
+        systemBotConfig,
+      });
+    }
 
-    // 0. ACTION: SAVE SYSTEM BOT TOKEN (Admin only -> TelegramGlobalConfig)
     if (action === 'SAVE_SYSTEM_BOT') {
       if (!authUser.isAdmin) {
-        return NextResponse.json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền cấu hình Bot Hệ Thống' }, { status: 403 });
+        return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền cấu hình Bot hệ thống toàn cục' }, { status: 403 });
       }
 
-      const systemToken = body.botToken?.trim();
+      const botToken = body.botToken?.trim();
       const description = body.description?.trim();
-      if (!systemToken) {
-        return NextResponse.json({ error: 'Vui lòng nhập Telegram Bot Token cho Hệ Thống' }, { status: 400 });
+
+      if (!botToken) {
+        return NextResponse.json({ error: 'Vui lòng nhập Telegram Bot Token' }, { status: 400 });
       }
 
-      const saveRes = await saveSystemTelegramBot(systemToken, description);
+      try {
+        const saveRes = await saveSystemTelegramBot(botToken, description);
 
-      await logActivity({
-        req,
-        action: 'SAVE_SYSTEM_TELEGRAM_BOT',
-        targetType: 'TELEGRAM_GLOBAL_CONFIG',
-        targetId: 'SYSTEM_BOT',
-        description: `Admin cấu hình Bot Telegram Hệ Thống: @${saveRes.botInfo.username || saveRes.botInfo.firstName}`,
-        metadata: {
-          botUsername: saveRes.botInfo.username,
-          botFirstName: saveRes.botInfo.firstName,
-        },
-      });
+        await logActivity({
+          req,
+          action: 'SAVE_SYSTEM_TELEGRAM_BOT',
+          targetType: 'TELEGRAM_GLOBAL_CONFIG',
+          targetId: 'SYSTEM_BOT',
+          description: `Admin ${authUser.username} cập nhật cấu hình Bot Telegram toàn cục (@${saveRes.config?.botUsername})`,
+          metadata: {
+            botUsername: saveRes.config?.botUsername,
+            botFirstName: saveRes.config?.botFirstName,
+          },
+        });
 
-      return NextResponse.json({
-        success: true,
-        message: `Đã lưu Bot Hệ Thống (@${saveRes.botInfo.username || saveRes.botInfo.firstName}) vào bảng TelegramGlobalConfig thành công!`,
-        botInfo: saveRes.botInfo,
-      });
+        return NextResponse.json({
+          success: true,
+          message: `Đã cấu hình thành công Bot hệ thống: @${saveRes.config?.botUsername} (${saveRes.config?.botFirstName})`,
+          config: saveRes.config,
+          systemBot: await getSystemTelegramBotPublicInfo(),
+        });
+      } catch (err: any) {
+        return NextResponse.json({ error: err.message || 'Lỗi khi lưu cấu hình Bot hệ thống' }, { status: 400 });
+      }
     }
 
-    // 0.1 ACTION: TOGGLE SYSTEM BOT (Admin only)
     if (action === 'TOGGLE_SYSTEM_BOT') {
       if (!authUser.isAdmin) {
-        return NextResponse.json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền bật/tắt Bot Hệ Thống' }, { status: 403 });
+        return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền bật/tắt Bot hệ thống' }, { status: 403 });
       }
 
-      const isActive = body.isActive !== undefined ? Boolean(body.isActive) : true;
-      const updated = await toggleSystemTelegramBot(isActive);
+      const isActive = Boolean(body.isActive);
+      try {
+        const updatedConfig = await toggleSystemTelegramBot(isActive);
 
-      await logActivity({
-        req,
-        action: 'TOGGLE_SYSTEM_TELEGRAM_BOT',
-        targetType: 'TELEGRAM_GLOBAL_CONFIG',
-        targetId: 'SYSTEM_BOT',
-        description: `Admin ${isActive ? 'bật' : 'tắt'} Bot Telegram Hệ Thống`,
-      });
+        await logActivity({
+          req,
+          action: 'TOGGLE_SYSTEM_TELEGRAM_BOT',
+          targetType: 'TELEGRAM_GLOBAL_CONFIG',
+          targetId: 'SYSTEM_BOT',
+          description: `Admin ${authUser.username} ${isActive ? 'bật' : 'tắt'} Bot Telegram toàn cục`,
+        });
 
-      return NextResponse.json({
-        success: true,
-        message: `Đã ${isActive ? 'kích hoạt' : 'tạm dừng'} Bot Hệ Thống thành công.`,
-        config: updated,
-      });
+        return NextResponse.json({
+          success: true,
+          message: `Đã ${isActive ? 'kích hoạt' : 'tạm dừng'} Bot hệ thống thành công!`,
+          config: updatedConfig,
+          systemBot: await getSystemTelegramBotPublicInfo(),
+        });
+      } catch (err: any) {
+        return NextResponse.json({ error: err.message || 'Lỗi khi cập nhật trạng thái Bot hệ thống' }, { status: 400 });
+      }
     }
 
-    // 0.2 ACTION: BROADCAST ANNOUNCEMENT (Admin only)
     if (action === 'BROADCAST') {
       if (!authUser.isAdmin) {
-        return NextResponse.json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền phát thông báo toàn trường' }, { status: 403 });
+        return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền phát thông báo toàn trường' }, { status: 403 });
       }
 
       const title = body.title?.trim();
@@ -328,14 +340,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 1. ACTION: TEST NOTIFICATION (Gửi tin nhắn thử nghiệm)
+    // ─────────────────────────────────────────────────────────────
+    // INDIVIDUAL USER TELEGRAM ACTIONS
+    // ─────────────────────────────────────────────────────────────
+
+    // 1. ACTION: SEND TEST NOTIFICATION
     if (action === 'TEST') {
       const customToken = body.botToken?.trim() || null;
       const chatId = body.chatId?.trim();
       const threadId = body.threadId ? String(body.threadId).trim() : null;
 
       if (!chatId) {
-        return NextResponse.json({ error: 'Vui lòng nhập Chat ID người nhận' }, { status: 400 });
+        return NextResponse.json({ error: 'Vui lòng nhập Chat ID nhận thông báo' }, { status: 400 });
       }
 
       let effectiveToken: string;
@@ -346,39 +362,36 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: tokenErr.message }, { status: 400 });
       }
 
-      const testResult = await sendTestNotification(effectiveToken, chatId, threadId, userDisplayInfo);
-
-      // Update test result in DB if config already exists
-      const existingConfig = await prisma.telegramConfig.findUnique({
-        where: { username },
+      const student = await prisma.student.findUnique({
+        where: { maSV: username },
       });
 
-      if (existingConfig) {
-        await prisma.telegramConfig.update({
-          where: { username },
-          data: {
-            lastTestedAt: new Date(),
-            lastTestStatus: testResult.success ? 'SUCCESS' : 'FAILED',
-            lastTestError: testResult.success ? null : testResult.error,
-            botUsername: testResult.botInfo?.username || existingConfig.botUsername,
-            botFirstName: testResult.botInfo?.firstName || existingConfig.botFirstName,
-          },
-        });
-      }
+      const testResult = await sendTestNotification(effectiveToken, chatId, threadId, {
+        username,
+        fullName: student?.hoTen || username,
+        maLop: student?.maLop,
+      });
 
-      await logActivity({
-        req,
-        action: 'TEST_TELEGRAM_CONFIG',
-        targetType: 'TELEGRAM_CONFIG',
-        targetId: username,
-        description: `Thử nghiệm gửi tin nhắn Telegram cho ${username} (${testResult.success ? 'Thành công' : 'Thất bại'})`,
-        metadata: {
+      // Update test status in user's TelegramConfig
+      await prisma.telegramConfig.upsert({
+        where: { username },
+        create: {
+          username,
+          botToken: customToken,
           chatId,
           threadId,
-          isCustomBot: !!customToken,
-          success: testResult.success,
-          error: testResult.error || null,
-          botUsername: testResult.botInfo?.username,
+          lastTestedAt: new Date(),
+          lastTestStatus: testResult.success ? 'SUCCESS' : 'FAILED',
+          lastTestError: testResult.error || null,
+          botUsername: testResult.botInfo?.username || null,
+          botFirstName: testResult.botInfo?.firstName || null,
+        },
+        update: {
+          lastTestedAt: new Date(),
+          lastTestStatus: testResult.success ? 'SUCCESS' : 'FAILED',
+          lastTestError: testResult.error || null,
+          botUsername: testResult.botInfo?.username ?? undefined,
+          botFirstName: testResult.botInfo?.firstName ?? undefined,
         },
       });
 
@@ -386,8 +399,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            error: testResult.error || 'Gửi tin nhắn thử nghiệm thất bại',
-            details: testResult,
+            error: testResult.error || 'Gửi tin nhắn thử nghiệm thất bại. Vui lòng kiểm tra lại Chat ID hoặc quyền của Bot.',
           },
           { status: 400 }
         );
@@ -412,6 +424,8 @@ export async function POST(req: NextRequest) {
       const notifyClassActivity = body.notifyClassActivity !== undefined ? Boolean(body.notifyClassActivity) : true;
       const notifyQldtAnnouncements = body.notifyQldtAnnouncements !== undefined ? Boolean(body.notifyQldtAnnouncements) : true;
       const qldtCheckInterval = [1, 2, 5].includes(Number(body.qldtCheckInterval)) ? Number(body.qldtCheckInterval) : 2;
+      const notifyClassSchedule = body.notifyClassSchedule !== undefined ? Boolean(body.notifyClassSchedule) : true;
+      const classReminderBefore = [0, 30, 60].includes(Number(body.classReminderBefore)) ? Number(body.classReminderBefore) : 30;
 
       if (!chatId) {
         return NextResponse.json({ error: 'Vui lòng nhập Chat ID nhận thông báo' }, { status: 400 });
@@ -453,6 +467,8 @@ export async function POST(req: NextRequest) {
           notifyClassActivity,
           notifyQldtAnnouncements,
           qldtCheckInterval,
+          notifyClassSchedule,
+          classReminderBefore,
           botUsername,
           botFirstName,
         },
@@ -466,6 +482,8 @@ export async function POST(req: NextRequest) {
           notifyClassActivity,
           notifyQldtAnnouncements,
           qldtCheckInterval,
+          notifyClassSchedule,
+          classReminderBefore,
           botUsername: botUsername ?? undefined,
           botFirstName: botFirstName ?? undefined,
         },
@@ -498,6 +516,17 @@ export async function POST(req: NextRequest) {
       const result = await checkAndDispatchQldtAnnouncements({
         username,
         forceCheck: true,
+      });
+      return NextResponse.json(result);
+    }
+
+    // 2.6 ACTION: CHECK CLASS SCHEDULE NOW (Kiểm tra lịch học hôm nay & gửi tin nhắn ngay)
+    if (action === 'CHECK_CLASS_SCHEDULE_NOW') {
+      const result = await runClassScheduleReminders({
+        username,
+        forceCheck: true,
+        forceMorningSummary: true,
+        forcePreClassAlert: true,
       });
       return NextResponse.json(result);
     }

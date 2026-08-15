@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { prisma } from './prisma';
 import { sendTelegramMessage, resolveEffectiveBotToken } from './telegram-service';
 import { fetchStudentAnnouncementsFromQLDTTX } from './qldttx-service';
@@ -645,4 +647,489 @@ export async function checkAndDispatchQldtAnnouncements(options: {
     };
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. CLASS SCHEDULE & TIMETABLE (THỜI KHÓA BIỂU & NHẮC LỊCH HỌC)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ParsedClassSession {
+  subjectName: string;
+  subjectCode: string;
+  group?: string;
+  classCode?: string;
+  dayOfWeekStr: string;
+  dayOfWeekNum: number; // 2..7 = Thứ 2..Thứ 7, 8 = Chủ nhật
+  periodStr: string;
+  startPeriod: number;
+  endPeriod: number;
+  startTime: string;
+  endTime: string;
+  startMinutes: number; // Phút tính từ 00:00 của ngày
+  room: string;
+  startDate: Date;
+  endDate: Date;
+}
+
+function parseTkbDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const parts = dateStr.trim().split(/[-/]/);
+  if (parts.length !== 3) return null;
+  let [d, m, y] = parts.map(Number);
+  if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+  if (y < 100) y += 2000;
+  return new Date(y, m - 1, d);
+}
+
+export function parseTkbString(tkbStr: string): Array<{
+  raw: string;
+  dayOfWeekStr: string;
+  dayOfWeekNum: number;
+  periodStr: string;
+  startPeriod: number;
+  endPeriod: number;
+  startTime: string;
+  endTime: string;
+  startMinutes: number;
+  room: string;
+  startDate: Date;
+  endDate: Date;
+}> {
+  if (!tkbStr) return [];
+  const rawSegments = tkbStr.split(/<hr\s*\/?>|\n|;/i).map((s) => s.trim()).filter(Boolean);
+  const results: any[] = [];
+
+  for (const seg of rawSegments) {
+    const parts = seg.split(',').map((p) => p.trim());
+    if (parts.length < 4) continue;
+
+    const dayOfWeekStr = parts[0];
+    const periodStr = parts[1];
+    const roomStr = parts[2];
+    const dateRangeStr = parts.slice(3).join(',');
+
+    let dayOfWeekNum = -1;
+    const matchDow = dayOfWeekStr.match(/Thứ\s*(\d)|CN|Chủ\s*nhật/i);
+    if (matchDow) {
+      if (matchDow[1]) {
+        dayOfWeekNum = parseInt(matchDow[1], 10);
+      } else {
+        dayOfWeekNum = 8;
+      }
+    }
+
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+    if (dateRangeStr.includes('đến')) {
+      const [startStr, endStr] = dateRangeStr.split('đến').map((s) => s.trim());
+      startDate = parseTkbDate(startStr);
+      endDate = parseTkbDate(endStr);
+    } else {
+      startDate = parseTkbDate(dateRangeStr);
+      endDate = startDate;
+    }
+
+    if (!startDate || !endDate) continue;
+
+    let startPeriod = 13;
+    let endPeriod = 15;
+    const matchPeriod = periodStr.match(/(\d+)(?:\s*->\s*|\s*-\s*)(\d+)?/);
+    if (matchPeriod) {
+      startPeriod = parseInt(matchPeriod[1], 10);
+      endPeriod = matchPeriod[2] ? parseInt(matchPeriod[2], 10) : startPeriod;
+    }
+
+    // Map PTIT periods to standard timestamps
+    const periodTimes: Record<number, { start: string; end: string; startMin: number }> = {
+      1: { start: '07:00', end: '07:45', startMin: 7 * 60 },
+      2: { start: '07:50', end: '08:35', startMin: 7 * 60 + 50 },
+      3: { start: '08:40', end: '09:25', startMin: 8 * 60 + 40 },
+      4: { start: '09:30', end: '10:15', startMin: 9 * 60 + 30 },
+      5: { start: '10:20', end: '11:05', startMin: 10 * 60 + 20 },
+      6: { start: '11:10', end: '11:55', startMin: 11 * 60 + 10 },
+      7: { start: '12:30', end: '13:15', startMin: 12 * 60 + 30 },
+      8: { start: '13:20', end: '14:05', startMin: 13 * 60 + 20 },
+      9: { start: '14:10', end: '14:55', startMin: 14 * 60 + 10 },
+      10: { start: '15:00', end: '15:45', startMin: 15 * 60 },
+      11: { start: '15:50', end: '16:35', startMin: 15 * 60 + 50 },
+      12: { start: '16:40', end: '17:25', startMin: 16 * 60 + 40 },
+      13: { start: '18:00', end: '18:45', startMin: 18 * 60 },
+      14: { start: '18:50', end: '19:35', startMin: 18 * 60 + 50 },
+      15: { start: '19:40', end: '20:25', startMin: 19 * 60 + 40 },
+      16: { start: '20:30', end: '21:15', startMin: 20 * 60 + 30 },
+    };
+
+    const startTime = periodTimes[startPeriod]?.start || '18:00';
+    const endTime = periodTimes[endPeriod]?.end || '20:30';
+    const startMinutes = periodTimes[startPeriod]?.startMin || 18 * 60;
+
+    results.push({
+      raw: seg,
+      dayOfWeekStr,
+      dayOfWeekNum,
+      periodStr,
+      startPeriod,
+      endPeriod,
+      startTime,
+      endTime,
+      startMinutes,
+      room: roomStr.replace(/^Ph\s*/i, '').trim(),
+      startDate,
+      endDate,
+    });
+  }
+
+  return results;
+}
+
+function isSessionOnDate(
+  session: { dayOfWeekNum: number; startDate: Date; endDate: Date },
+  dateObj: Date
+): boolean {
+  const jsDay = dateObj.getDay();
+  const dow = jsDay === 0 ? 8 : jsDay + 1;
+  if (session.dayOfWeekNum !== dow) return false;
+
+  const y = dateObj.getFullYear();
+  const m = dateObj.getMonth();
+  const d = dateObj.getDate();
+  const targetTime = new Date(y, m, d).getTime();
+
+  const start = new Date(session.startDate.getFullYear(), session.startDate.getMonth(), session.startDate.getDate()).getTime();
+  const end = new Date(session.endDate.getFullYear(), session.endDate.getMonth(), session.endDate.getDate()).getTime();
+
+  return targetTime >= start && targetTime <= end;
+}
+
+/**
+ * Lấy tất cả ca học của sinh viên vào ngày cụ thể
+ */
+export async function getStudentClassSessionsForDate(
+  username: string,
+  targetDateVN: Date
+): Promise<ParsedClassSession[]> {
+  let courseList: any[] = [];
+
+  // 1. Thử lấy từ cơ sở dữ liệu CourseRegistration
+  const dbCourseReg = await prisma.courseRegistration.findFirst({
+    where: { username },
+  });
+
+  if (dbCourseReg && dbCourseReg.data) {
+    try {
+      const parsed = JSON.parse(dbCourseReg.data);
+      courseList = parsed?.data?.ds_kqdkmh || parsed?.ds_kqdkmh || [];
+    } catch {}
+  }
+
+  // 2. Nếu DB chưa có, tìm từ file public/dangky_mon_hoc/
+  if (courseList.length === 0) {
+    try {
+      const baseDir = path.join(process.cwd(), 'public', 'dangky_mon_hoc');
+      if (fs.existsSync(baseDir)) {
+        const classDirs = fs.readdirSync(baseDir, { withFileTypes: true }).filter((d) => d.isDirectory());
+        for (const cDir of classDirs) {
+          const mainPath = path.join(baseDir, cDir.name, 'main.json');
+          if (fs.existsSync(mainPath)) {
+            const raw = JSON.parse(fs.readFileSync(mainPath, 'utf8'));
+            if (raw.username === username) {
+              courseList = raw.data?.data?.ds_kqdkmh || raw.ds_kqdkmh || [];
+              break;
+            }
+          }
+
+          const subPath = path.join(baseDir, cDir.name, 'sub-accounts.json');
+          if (fs.existsSync(subPath)) {
+            const raw = JSON.parse(fs.readFileSync(subPath, 'utf8'));
+            if (raw[username]) {
+              courseList = raw[username].data?.data?.ds_kqdkmh || raw[username].ds_kqdkmh || [];
+              break;
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  const sessionsToday: ParsedClassSession[] = [];
+
+  for (const item of courseList) {
+    const toHoc = item.to_hoc;
+    if (!toHoc || !toHoc.tkb) continue;
+
+    const parsedTkb = parseTkbString(toHoc.tkb);
+    for (const seg of parsedTkb) {
+      if (isSessionOnDate(seg, targetDateVN)) {
+        sessionsToday.push({
+          subjectName: toHoc.ten_mon || 'Môn học',
+          subjectCode: toHoc.ma_mon || '',
+          group: toHoc.nhom_to || '',
+          classCode: toHoc.lop || '',
+          dayOfWeekStr: seg.dayOfWeekStr,
+          dayOfWeekNum: seg.dayOfWeekNum,
+          periodStr: seg.periodStr,
+          startPeriod: seg.startPeriod,
+          endPeriod: seg.endPeriod,
+          startTime: seg.startTime,
+          endTime: seg.endTime,
+          startMinutes: seg.startMinutes,
+          room: seg.room,
+          startDate: seg.startDate,
+          endDate: seg.endDate,
+        });
+      }
+    }
+  }
+
+  // Sắp xếp ca học theo thời gian bắt đầu
+  sessionsToday.sort((a, b) => a.startMinutes - b.startMinutes);
+  return sessionsToday;
+}
+
+/**
+ * Quét và gửi thông báo lịch học (Sáng 7h-10h gửi tổng hợp & trước giờ học 30p/1h gửi nhắc nhở)
+ */
+export async function runClassScheduleReminders(options: {
+  forceCheck?: boolean;
+  username?: string;
+  forceMorningSummary?: boolean;
+  forcePreClassAlert?: boolean;
+} = {}) {
+  try {
+    const nowVN = getVietnamTime();
+    const todayStr = normalizeDateVN(
+      `${String(nowVN.getDate()).padStart(2, '0')}/${String(nowVN.getMonth() + 1).padStart(2, '0')}/${nowVN.getFullYear()}`
+    );
+    const nowHourVN = nowVN.getHours();
+    const nowMinutesToday = nowHourVN * 60 + nowVN.getMinutes();
+
+    const dowMap = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const todayDowName = dowMap[nowVN.getDay()];
+
+    const whereCond: any = {
+      isEnabled: true,
+      notifyClassSchedule: true,
+    };
+    if (options.username) {
+      whereCond.username = options.username;
+    }
+
+    const subscribers = await prisma.telegramConfig.findMany({
+      where: whereCond,
+      include: {
+        user: {
+          include: {
+            student: true,
+          },
+        },
+      },
+    });
+
+    let morningSummariesSent = 0;
+    let preClassAlertsSent = 0;
+    const errors: string[] = [];
+
+    // Is current time within the morning review window (7h00 -> 10h00 VN Time)?
+    const isMorningWindow = (nowHourVN >= 7 && nowHourVN < 10) || options.forceMorningSummary;
+
+    for (const sub of subscribers) {
+      const studentName = sub.user?.student?.hoTen || sub.username;
+      const sessionsToday = await getStudentClassSessionsForDate(sub.username, nowVN);
+
+      if (sessionsToday.length === 0) {
+        continue;
+      }
+
+      let effectiveToken: string;
+      try {
+        const resolved = await resolveEffectiveBotToken(sub.botToken);
+        effectiveToken = resolved.token;
+      } catch {
+        continue;
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // 1. GỬI TỔNG HỢP LỊCH HỌC ĐẦU NGÀY (7h00 - 10h00 SÁNG)
+      // ─────────────────────────────────────────────────────────────
+      if (isMorningWindow) {
+        const morningLog = await prisma.classScheduleReminderLog.findUnique({
+          where: {
+            username_courseCode_reminderType_targetDate: {
+              username: sub.username,
+              courseCode: 'DAILY_SUMMARY',
+              reminderType: 'MORNING_DAILY_SUMMARY',
+              targetDate: todayStr,
+            },
+          },
+        });
+
+        if (!morningLog || options.forceMorningSummary) {
+          let scheduleItemsText = '';
+          sessionsToday.forEach((ses, idx) => {
+            scheduleItemsText += `\n<b>${idx + 1}️⃣ ${ses.subjectName}</b> (<code>${ses.subjectCode}</code>)\n   ⏰ Thời gian: <b>${ses.startTime} - ${ses.endTime}</b> (<i>${ses.periodStr}</i>)\n   🚪 Phòng học: <b>${ses.room || 'Phòng học môn'}</b> ${ses.group ? `(Tổ: ${ses.group})` : ''}\n`;
+          });
+
+          const morningMessage = `📚 <b>THỜI KHÓA BIỂU HÔM NAY - PTIT</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n📅 <b>${todayDowName}, ngày ${todayStr}</b>\n\n📌 Hôm nay bạn có <b>${sessionsToday.length}</b> ca học:${scheduleItemsText}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🔔 <i>Hệ thống sẽ tự động gửi thông báo nhắc nhở trước giờ vào lớp ${sub.classReminderBefore || 30} phút. Chúc bạn học tập tốt!</i>`;
+
+          const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, morningMessage, {
+            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          });
+
+          if (sendRes.success) {
+            morningSummariesSent++;
+            await prisma.classScheduleReminderLog.upsert({
+              where: {
+                username_courseCode_reminderType_targetDate: {
+                  username: sub.username,
+                  courseCode: 'DAILY_SUMMARY',
+                  reminderType: 'MORNING_DAILY_SUMMARY',
+                  targetDate: todayStr,
+                },
+              },
+              create: {
+                username: sub.username,
+                courseCode: 'DAILY_SUMMARY',
+                reminderType: 'MORNING_DAILY_SUMMARY',
+                targetDate: todayStr,
+                sessionInfo: `${sessionsToday.length} ca học`,
+              },
+              update: {
+                sentAt: new Date(),
+              },
+            });
+          } else if (sendRes.error) {
+            errors.push(`${sub.username}: ${sendRes.error}`);
+          }
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // 2. NHẮC NHỞ TRƯỚC GIỜ VÀO HỌC (30 PHÚT HOẶC 1 TIẾNG)
+      // ─────────────────────────────────────────────────────────────
+      const reminderConfig = sub.classReminderBefore ?? 30; // 30, 60 hoặc 0 (cả hai)
+
+      for (const ses of sessionsToday) {
+        const minutesUntilStart = ses.startMinutes - nowMinutesToday;
+        const sessionKey = `${ses.subjectCode}_${ses.startPeriod}`;
+
+        // Kiểm tra điều kiện nhắc 60 phút
+        const shouldCheck60M =
+          (reminderConfig === 60 || reminderConfig === 0) &&
+          ((minutesUntilStart > 30 && minutesUntilStart <= 65) || options.forcePreClassAlert);
+
+        if (shouldCheck60M) {
+          const log60 = await prisma.classScheduleReminderLog.findUnique({
+            where: {
+              username_courseCode_reminderType_targetDate: {
+                username: sub.username,
+                courseCode: sessionKey,
+                reminderType: 'BEFORE_CLASS_60M',
+                targetDate: todayStr,
+              },
+            },
+          });
+
+          if (!log60 || options.forcePreClassAlert) {
+            const preMessage60 = `⏰ <b>NHẮC NHỞ: SẮP ĐẾN GIỜ VÀO LỚP HỌC (CÒN 1 TIẾNG)!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n📖 Môn học: <b>${ses.subjectName}</b> (<code>${ses.subjectCode}</code>)\n\n⏰ Bắt đầu lúc: <b>${ses.startTime}</b> (<i>${ses.periodStr}</i>)\n⏳ Thời gian: <b>${ses.startTime} - ${ses.endTime}</b>\n🚪 Phòng học: <b>${ses.room || 'Phòng học môn'}</b> ${ses.group ? `(Tổ: ${ses.group})` : ''}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👉 <i>Vui lòng chuẩn bị tài liệu và kiểm tra đường truyền/phòng học trước giờ bắt đầu!</i>`;
+
+            const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, preMessage60, {
+              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            });
+
+            if (sendRes.success) {
+              preClassAlertsSent++;
+              await prisma.classScheduleReminderLog.upsert({
+                where: {
+                  username_courseCode_reminderType_targetDate: {
+                    username: sub.username,
+                    courseCode: sessionKey,
+                    reminderType: 'BEFORE_CLASS_60M',
+                    targetDate: todayStr,
+                  },
+                },
+                create: {
+                  username: sub.username,
+                  courseCode: sessionKey,
+                  reminderType: 'BEFORE_CLASS_60M',
+                  targetDate: todayStr,
+                  sessionInfo: `${ses.startTime} - ${ses.room}`,
+                },
+                update: {
+                  sentAt: new Date(),
+                },
+              });
+            }
+          }
+        }
+
+        // Kiểm tra điều kiện nhắc 30 phút
+        const shouldCheck30M =
+          (reminderConfig === 30 || reminderConfig === 0) &&
+          ((minutesUntilStart > 0 && minutesUntilStart <= 35) || options.forcePreClassAlert);
+
+        if (shouldCheck30M) {
+          const log30 = await prisma.classScheduleReminderLog.findUnique({
+            where: {
+              username_courseCode_reminderType_targetDate: {
+                username: sub.username,
+                courseCode: sessionKey,
+                reminderType: 'BEFORE_CLASS_30M',
+                targetDate: todayStr,
+              },
+            },
+          });
+
+          if (!log30 || options.forcePreClassAlert) {
+            const preMessage30 = `⏰ <b>NHẮC NHỞ: SẮP ĐẾN GIỜ VÀO LỚP HỌC (CÒN 30 PHÚT)!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n📖 Môn học: <b>${ses.subjectName}</b> (<code>${ses.subjectCode}</code>)\n\n⏰ Bắt đầu lúc: <b>${ses.startTime}</b> (<i>${ses.periodStr}</i>)\n⏳ Thời gian: <b>${ses.startTime} - ${ses.endTime}</b>\n🚪 Phòng học: <b>${ses.room || 'Phòng học môn'}</b> ${ses.group ? `(Tổ: ${ses.group})` : ''}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👉 <i>Hãy vào phòng học / Zoom / Teams đúng giờ nhé!</i>`;
+
+            const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, preMessage30, {
+              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            });
+
+            if (sendRes.success) {
+              preClassAlertsSent++;
+              await prisma.classScheduleReminderLog.upsert({
+                where: {
+                  username_courseCode_reminderType_targetDate: {
+                    username: sub.username,
+                    courseCode: sessionKey,
+                    reminderType: 'BEFORE_CLASS_30M',
+                    targetDate: todayStr,
+                  },
+                },
+                create: {
+                  username: sub.username,
+                  courseCode: sessionKey,
+                  reminderType: 'BEFORE_CLASS_30M',
+                  targetDate: todayStr,
+                  sessionInfo: `${ses.startTime} - ${ses.room}`,
+                },
+                update: {
+                  sentAt: new Date(),
+                },
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      success: true,
+      timestampVN: nowVN.toLocaleString('vi-VN'),
+      todayStr,
+      todayDowName,
+      morningSummariesSent,
+      preClassAlertsSent,
+      totalSubscribers: subscribers.length,
+      errors: errors.slice(0, 10),
+    };
+  } catch (err: any) {
+    console.error('runClassScheduleReminders error:', err);
+    return {
+      success: false,
+      error: err.message || 'Lỗi khi quét nhắc lịch học',
+    };
+  }
+}
+
 

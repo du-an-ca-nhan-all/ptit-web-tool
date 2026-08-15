@@ -29,6 +29,7 @@ import {
   Settings,
   ShieldCheck,
   Globe,
+  CalendarDays,
 } from 'lucide-react';
 import TelegramTopicSelectorModal from './TelegramTopicSelectorModal';
 
@@ -69,6 +70,10 @@ export default function TelegramConfigSection({
   const [qldtCheckInterval, setQldtCheckInterval] = useState<number>(2);
   const [isCheckingQldt, setIsCheckingQldt] = useState(false);
   const [qldtCheckMsg, setQldtCheckMsg] = useState('');
+  const [notifyClassSchedule, setNotifyClassSchedule] = useState(true);
+  const [classReminderBefore, setClassReminderBefore] = useState<number>(30);
+  const [isCheckingClassSchedule, setIsCheckingClassSchedule] = useState(false);
+  const [classScheduleCheckMsg, setClassScheduleCheckMsg] = useState('');
 
   // Admin System Bot Config states
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
@@ -124,6 +129,8 @@ export default function TelegramConfigSection({
           setNotifyClassActivity(data.config.notifyClassActivity ?? true);
           setNotifyQldtAnnouncements(data.config.notifyQldtAnnouncements ?? true);
           setQldtCheckInterval(data.config.qldtCheckInterval ?? 2);
+          setNotifyClassSchedule(data.config.notifyClassSchedule ?? true);
+          setClassReminderBefore(data.config.classReminderBefore ?? 30);
           if (data.config.lastTestStatus) {
             setTestResult({
               success: data.config.lastTestStatus === 'SUCCESS',
@@ -217,6 +224,8 @@ export default function TelegramConfigSection({
           notifyClassActivity,
           notifyQldtAnnouncements,
           qldtCheckInterval,
+          notifyClassSchedule,
+          classReminderBefore,
         }),
       });
 
@@ -264,6 +273,41 @@ export default function TelegramConfigSection({
       setErrorMsg('Không thể kết nối máy chủ để kiểm tra thông báo QLDTTX.');
     } finally {
       setIsCheckingQldt(false);
+    }
+  };
+
+  // Check Class schedule now
+  const handleCheckClassScheduleNow = async () => {
+    setIsCheckingClassSchedule(true);
+    setClassScheduleCheckMsg('');
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/telegram-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'CHECK_CLASS_SCHEDULE_NOW',
+          targetUsername: targetUsername || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (data.morningSummariesSent > 0 || data.preClassAlertsSent > 0) {
+          setClassScheduleCheckMsg(
+            `Đã kiểm tra lịch học: Đã gửi ${data.morningSummariesSent > 0 ? `tổng hợp lịch học hôm nay (${data.todayDowName} - ${data.todayStr})` : ''} ${data.preClassAlertsSent > 0 ? `và ${data.preClassAlertsSent} thông báo nhắc giờ vào lớp` : ''} lên Telegram!`
+          );
+        } else {
+          setClassScheduleCheckMsg(
+            `Đã kiểm tra lịch học (${data.todayDowName} - ${data.todayStr}): Hôm nay bạn không có ca học nào trên thời khóa biểu.`
+          );
+        }
+      } else {
+        setErrorMsg(data.error || 'Lỗi khi kiểm tra lịch học.');
+      }
+    } catch {
+      setErrorMsg('Không thể kết nối máy chủ để kiểm tra lịch học.');
+    } finally {
+      setIsCheckingClassSchedule(false);
     }
   };
 
@@ -920,7 +964,7 @@ export default function TelegramConfigSection({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
               {/* Option 1: Exam Schedule */}
               <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
                 <input
@@ -930,12 +974,30 @@ export default function TelegramConfigSection({
                   className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0"
                 />
                 <div className="text-xs">
-                  <div className="font-bold text-slate-800">Lịch Thi & Ca Thi</div>
+                  <div className="font-bold text-slate-800 flex items-center gap-1">
+                    <span>Lịch Thi & Ca Thi</span>
+                  </div>
                   <div className="text-[10px] text-slate-400 mt-0.5">Nhắc trước 1 ngày & 7h sáng hôm thi</div>
                 </div>
               </label>
 
-              {/* Option 2: Course Registration */}
+              {/* Option 2: Class Schedule & Timetable */}
+              <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-amber-300 bg-amber-50/40 hover:border-amber-400 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={notifyClassSchedule}
+                  onChange={(e) => setNotifyClassSchedule(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 text-amber-600 rounded focus:ring-amber-500 cursor-pointer shrink-0"
+                />
+                <div className="text-xs">
+                  <div className="font-bold text-amber-900 flex items-center gap-1">
+                    <span>Lịch Học & Thời Khóa Biểu</span>
+                  </div>
+                  <div className="text-[10px] text-amber-700 mt-0.5">Tổng hợp sáng 7h-10h & nhắc trước giờ học</div>
+                </div>
+              </label>
+
+              {/* Option 3: Course Registration */}
               <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
                 <input
                   type="checkbox"
@@ -949,7 +1011,7 @@ export default function TelegramConfigSection({
                 </div>
               </label>
 
-              {/* Option 3: Class Activity */}
+              {/* Option 4: Class Activity */}
               <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
                 <input
                   type="checkbox"
@@ -963,8 +1025,8 @@ export default function TelegramConfigSection({
                 </div>
               </label>
 
-              {/* Option 4: QLDTTX Portal Announcements */}
-              <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-sky-300 bg-sky-50/40 hover:border-sky-400 transition-colors">
+              {/* Option 5: QLDTTX Portal Announcements */}
+              <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-sky-300 bg-sky-50/40 hover:border-sky-400 transition-colors sm:col-span-2 lg:col-span-2">
                 <input
                   type="checkbox"
                   checked={notifyQldtAnnouncements}
@@ -973,14 +1035,68 @@ export default function TelegramConfigSection({
                 />
                 <div className="text-xs">
                   <div className="font-bold text-sky-900">Thông Báo Cổng QLDTTX</div>
-                  <div className="text-[10px] text-sky-700 mt-0.5">/#/xemthongbao (Học viện)</div>
+                  <div className="text-[10px] text-sky-700 mt-0.5">/#/xemthongbao (Thông báo mới từ Học viện)</div>
                 </div>
               </label>
             </div>
 
+            {/* Class Schedule Setting Panel */}
+            {notifyClassSchedule && (
+              <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex flex-col gap-0.5">
+                  <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <CalendarDays className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Tự động nhắc lịch học & thời khóa biểu:</span>
+                  </div>
+                  <div className="text-[11px] text-amber-700">
+                    Sáng từ <strong>7h00 - 10h00</strong> tự động gửi tổng hợp các ca học hôm nay. Chọn thời gian nhắc nhở trước giờ vào lớp:
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {[
+                    { value: 30, label: '30 phút trước' },
+                    { value: 60, label: '1 tiếng trước' },
+                    { value: 0, label: 'Cả 30p & 1 tiếng' },
+                  ].map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setClassReminderBefore(item.value)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        classReminderBefore === item.value
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={handleCheckClassScheduleNow}
+                    disabled={isCheckingClassSchedule}
+                    className="ml-1 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    title="Kiểm tra lịch học hôm nay và gửi tin nhắn thử nghiệm ngay"
+                  >
+                    {isCheckingClassSchedule ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                    <span>Kiểm Tra Hôm Nay</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {classScheduleCheckMsg && (
+              <div className="p-3 bg-amber-50/80 border border-amber-300 text-amber-900 text-xs font-medium rounded-xl flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>{classScheduleCheckMsg}</span>
+              </div>
+            )}
+
             {/* QLDTTX Check Interval Selector */}
             {notifyQldtAnnouncements && (
-              <div className="mt-2 p-3 bg-sky-50 border border-sky-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="mt-1 p-3 bg-sky-50 border border-sky-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                 <div className="flex flex-col gap-0.5">
                   <div className="font-bold text-sky-900 flex items-center gap-1.5">
                     <Globe className="w-3.5 h-3.5 text-sky-600" />

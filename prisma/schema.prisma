@@ -211,6 +211,8 @@ model TelegramConfig {
   notifyQldtAnnouncements Boolean   @default(true) // Nhận thông báo mới từ cổng QLDTTX (/#/xemthongbao)
   qldtCheckInterval       Int       @default(2)    // Tần suất kiểm tra (1, 2, hoặc 5 tiếng)
   lastQldtCheckedAt       DateTime? // Thời điểm kiểm tra thông báo QLDTTX gần nhất
+  notifyClassSchedule     Boolean   @default(true) // Nhận thông báo lịch học (Sáng 7h-10h & trước giờ học)
+  classReminderBefore     Int       @default(30)   // Nhắc trước giờ học (30 phút, 60 phút, hoặc 0 = cả hai)
   
   lastTestedAt            DateTime? // Lần cuối gửi tin nhắn test
   lastTestStatus          String?   // 'SUCCESS' | 'FAILED'
@@ -270,4 +272,20 @@ model QldtAnnouncementLog {
   @@unique([username, announcementId])
   @@index([username])
   @@index([announcementId])
+}
+
+// 13. Bảng ClassScheduleReminderLog: Nhật ký nhắc lịch học tự động để tránh gửi trùng
+model ClassScheduleReminderLog {
+  id           Int      @id @default(autoincrement())
+  username     String   // Mã SV
+  courseCode   String   // Mã môn học hoặc ID tổ học
+  reminderType String   // 'MORNING_DAILY_SUMMARY' | 'BEFORE_CLASS_30M' | 'BEFORE_CLASS_60M'
+  targetDate   String   // Ngày học (DD/MM/YYYY)
+  sessionInfo  String?  // Ca học (tiết học, phòng học)
+  sentAt       DateTime @default(now())
+
+  @@unique([username, courseCode, reminderType, targetDate])
+  @@index([username])
+  @@index([targetDate])
+  @@index([reminderType])
 }

@@ -130,6 +130,8 @@ export interface TelegramConfigItem {
   notifyQldtAnnouncements?: boolean;
   qldtCheckInterval?: number;
   lastQldtCheckedAt?: string | null;
+  notifyClassSchedule?: boolean;
+  classReminderBefore?: number;
   lastTestedAt?: string | null;
   lastTestStatus?: 'SUCCESS' | 'FAILED' | null;
   lastTestError?: string | null;

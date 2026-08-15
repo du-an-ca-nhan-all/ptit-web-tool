@@ -55,6 +55,8 @@ interface SubscriberItem {
   notifyQldtAnnouncements?: boolean;
   qldtCheckInterval?: number;
   lastQldtCheckedAt?: string | null;
+  notifyClassSchedule?: boolean;
+  classReminderBefore?: number;
   lastTestedAt: string | null;
   lastTestStatus: string | null;
   lastTestError: string | null;
@@ -904,6 +906,11 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
                           {sub.notifyClassActivity && (
                             <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-[10px] font-bold">
                               Lớp Học
+                            </span>
+                          )}
+                          {sub.notifyClassSchedule && (
+                            <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded text-[10px] font-bold">
+                              Lịch Học ({sub.classReminderBefore === 0 ? '30p & 1h' : `${sub.classReminderBefore || 30}p`})
                             </span>
                           )}
                           {sub.notifyQldtAnnouncements && (
