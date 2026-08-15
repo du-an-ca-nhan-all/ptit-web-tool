@@ -614,7 +614,7 @@ export default function UserProfileScreen({
               </div>
 
               <div className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                Cổng tra cứu lịch thi & quản lý sinh viên trực tuyến S-Exam Portal. Dữ liệu được đồng bộ trực tiếp từ cổng trường.
+                Cổng tiện ích học tập, đối chiếu môn học & tra cứu lịch thi trực tuyến PTIT EduSync. Dữ liệu được đồng bộ trực tiếp từ cổng trường.
               </div>
 
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
@@ -955,7 +955,7 @@ export default function UserProfileScreen({
               <Lock className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-800">Bảo Mật Tài Khoản S-Exam</h3>
+              <h3 className="text-lg font-black text-slate-800">Bảo Mật Tài Khoản PTIT EduSync</h3>
               <p className="text-xs text-slate-500 mt-0.5">Đổi mật khẩu đăng nhập portal</p>
             </div>
           </div>

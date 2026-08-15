@@ -415,7 +415,7 @@ export default function Home() {
       <div className="flex h-screen w-full bg-[#0F172A] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-mono text-slate-400">Đang khởi động S-Exam Portal...</p>
+          <p className="text-xs font-mono text-slate-400">Đang khởi động PTIT EduSync...</p>
         </div>
       </div>
     );
@@ -450,11 +450,11 @@ export default function Home() {
       >
         <div className="p-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
-              S
+            <div className="w-8 h-8 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-lg flex items-center justify-center text-white font-black text-lg shadow-sm shadow-blue-500/30">
+              P
             </div>
             <div>
-              <h1 className="text-white font-semibold text-lg tracking-tight">S-Exam Portal</h1>
+              <h1 className="text-white font-bold text-base tracking-tight">PTIT EduSync</h1>
               <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono">
                 <Database className="w-2.5 h-2.5" /> SQLite Server-Side
               </div>

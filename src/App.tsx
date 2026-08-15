@@ -362,8 +362,8 @@ export default function App() {
       <aside className={`fixed md:relative inset-y-0 left-0 z-50 w-64 bg-[#0F172A] flex flex-col shrink-0 transition-transform duration-300 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">S</div>
-            <h1 className="text-white font-semibold text-lg tracking-tight">S-Exam Portal</h1>
+            <div className="w-8 h-8 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-lg flex items-center justify-center text-white font-black text-lg">P</div>
+            <h1 className="text-white font-bold text-base tracking-tight">PTIT EduSync</h1>
           </div>
 
           <button 
