@@ -48,6 +48,7 @@ export interface LoginUser {
   fullName?: string; // Lấy từ Student.hoTen
   phoneNumber?: string; // Lấy từ Student.soDienThoai
   lop?: string;      // Lấy từ Student.maLop
+  impersonatedBy?: string | null; // Admin gốc đang giả lập tài khoản này
   student?: any;
 }
 

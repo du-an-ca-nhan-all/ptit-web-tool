@@ -17,6 +17,7 @@ export interface AuthUser {
   fullName?: string | null;
   phoneNumber?: string | null;
   lop?: string | null;
+  impersonatedBy?: string | null;
 }
 
 export function checkIsAdmin(role?: string | null): boolean {
@@ -74,6 +75,7 @@ export async function createAuthToken(user: AuthUser): Promise<string> {
     fullName: user.fullName,
     phoneNumber: user.phoneNumber,
     lop: user.lop,
+    impersonatedBy: user.impersonatedBy || null,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -94,6 +96,7 @@ export async function verifyAuthToken(token: string): Promise<AuthUser | null> {
       fullName: p.fullName,
       phoneNumber: p.phoneNumber,
       lop: p.lop,
+      impersonatedBy: p.impersonatedBy || null,
     };
   } catch (err) {
     return null;
@@ -129,6 +132,7 @@ export async function getCurrentUserFromCookie(): Promise<AuthUser | null> {
       fullName: user.student?.hoTen || user.student?.ten || user.username,
       phoneNumber: user.student?.soDienThoai || null,
       lop: user.student?.maLop || null,
+      impersonatedBy: payload.impersonatedBy || null,
     };
   } catch (err) {
     return null;

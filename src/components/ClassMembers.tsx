@@ -33,6 +33,7 @@ interface ClassMembersProps {
   loginUsers?: LoginUser[];
   onSelectStudentSchedule?: (studentId: string) => void;
   hasExamSchedule?: boolean;
+  onImpersonate?: (username: string) => void;
 }
 
 interface StudentExtraInfo {
@@ -48,6 +49,7 @@ export default function ClassMembers({
   loginUsers = [],
   onSelectStudentSchedule,
   hasExamSchedule = false,
+  onImpersonate,
 }: ClassMembersProps) {
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<'ALL' | 'NAM' | 'NU'>('ALL');
@@ -765,6 +767,16 @@ export default function ClassMembers({
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
+
+                              {onImpersonate && (
+                                <button
+                                  onClick={() => onImpersonate(student.MaSV)}
+                                  className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                                  title={`Đăng nhập với tư cách ${student.MaSV} (${student.TenSV})`}
+                                >
+                                  <UserCheck className="w-4 h-4" />
+                                </button>
+                              )}
 
                               {canManageClass && (
                                 <>
