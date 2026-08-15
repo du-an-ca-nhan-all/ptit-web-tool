@@ -216,6 +216,7 @@ export default function Home() {
   }, []);
 
   const hasActiveBatch = useMemo(() => examBatches.some((b) => b.isActive), [examBatches]);
+  const hasExamSchedule = hasActiveBatch && records.length > 0;
 
   useEffect(() => {
     loadDataFromApi();
@@ -224,15 +225,15 @@ export default function Home() {
   useEffect(() => {
     if (!isMounted || !currentUser) return;
     if (!isAdmin && activeTab === 'batches') {
-      setActiveTab(hasActiveBatch ? 'personal_schedule' : 'members');
-    }
-    if (!canAccessMonitorTools && ['monitor', 'envelope', 'envelope_all', 'settlement', 'settings'].includes(activeTab)) {
-      setActiveTab(hasActiveBatch ? 'personal_schedule' : 'members');
-    }
-    if (!hasActiveBatch && !isAdmin && (activeTab === 'schedule' || activeTab === 'personal_schedule')) {
       setActiveTab('members');
     }
-  }, [isMounted, currentUser, isAdmin, canAccessMonitorTools, hasActiveBatch, activeTab]);
+    if (!canAccessMonitorTools && ['monitor', 'envelope', 'envelope_all', 'settlement', 'settings'].includes(activeTab)) {
+      setActiveTab('members');
+    }
+    if (!hasExamSchedule && ['schedule', 'personal_schedule', 'envelope', 'envelope_all', 'settlement'].includes(activeTab)) {
+      setActiveTab(isAdmin ? 'batches' : 'members');
+    }
+  }, [isMounted, currentUser, isAdmin, canAccessMonitorTools, hasExamSchedule, activeTab]);
 
   useEffect(() => {
     setSelectedExamRoom(null);
@@ -465,40 +466,35 @@ export default function Home() {
           </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1 scrollbar-hide">
-          {(hasActiveBatch || isAdmin) && (
+          {/* 1. Lịch thi tổng hợp (Chỉ hiển thị khi có lịch thi) */}
+          {hasExamSchedule && (
             <button
               onClick={() => handleTabChange('schedule')}
-              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 activeTab === 'schedule'
                   ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <CalendarDays className="w-4 h-4" /> Lịch Thi Tổng Hợp
-              </div>
-              {!hasActiveBatch && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-mono">Tắt</span>
-              )}
+              <CalendarDays className="w-4 h-4" /> Lịch Thi Tổng Hợp
             </button>
           )}
-          {currentUser && (hasActiveBatch || isAdmin) && (
+
+          {/* 2. Lịch thi cá nhân (Chỉ hiển thị khi có lịch thi) */}
+          {currentUser && hasExamSchedule && (
             <button
               onClick={() => handleTabChange('personal_schedule')}
-              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 activeTab === 'personal_schedule'
                   ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <User className="w-4 h-4" /> Lịch Thi Cá Nhân
-              </div>
-              {!hasActiveBatch && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-mono">Tắt</span>
-              )}
+              <User className="w-4 h-4" /> Lịch Thi Cá Nhân
             </button>
           )}
+
+          {/* 3. Thành viên lớp mình */}
           {currentUser && !isMonitor && (
             <button
               onClick={() => {
@@ -514,6 +510,8 @@ export default function Home() {
               <Users className="w-4 h-4" /> Thành Viên Lớp Mình
             </button>
           )}
+
+          {/* 4. So sánh ĐKMH */}
           {currentUser && showCourseCompare && (
             <button
               onClick={() => handleTabChange('course_compare')}
@@ -527,6 +525,7 @@ export default function Home() {
             </button>
           )}
 
+          {/* 5. Danh sách lớp trưởng */}
           <button
             onClick={() => handleTabChange('monitors_list')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors mt-2 ${
@@ -538,6 +537,7 @@ export default function Home() {
             <Crown className="w-4 h-4" /> Danh Sách Lớp Trưởng
           </button>
 
+          {/* 6. Công cụ Admin & Lớp Trưởng */}
           {canAccessMonitorTools && (
             <div className="mt-4 flex flex-col gap-1">
               <div
@@ -561,36 +561,48 @@ export default function Home() {
                   >
                     <Users className="w-4 h-4" /> Danh Sách Lớp
                   </button>
-                  <button
-                    onClick={() => handleTabChange('envelope')}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                      activeTab === 'envelope'
-                        ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                    }`}
-                  >
-                    <Mail className="w-4 h-4" /> PB Lớp Mình
-                  </button>
-                  <button
-                    onClick={() => handleTabChange('envelope_all')}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                      activeTab === 'envelope_all'
-                        ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                    }`}
-                  >
-                    <BookOpen className="w-4 h-4" /> PB Lớp Khác
-                  </button>
-                  <button
-                    onClick={() => handleTabChange('settlement')}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                      activeTab === 'settlement'
-                        ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-                    }`}
-                  >
-                    <DollarSign className="w-4 h-4" /> Bù Trừ Thanh Toán
-                  </button>
+
+                  {/* PB Lớp Mình (Chỉ hiển thị khi có lịch thi) */}
+                  {hasExamSchedule && (
+                    <button
+                      onClick={() => handleTabChange('envelope')}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                        activeTab === 'envelope'
+                          ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+                      }`}
+                    >
+                      <Mail className="w-4 h-4" /> PB Lớp Mình
+                    </button>
+                  )}
+
+                  {/* PB Lớp Khác (Chỉ hiển thị khi có lịch thi) */}
+                  {hasExamSchedule && (
+                    <button
+                      onClick={() => handleTabChange('envelope_all')}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                        activeTab === 'envelope_all'
+                          ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+                      }`}
+                    >
+                      <BookOpen className="w-4 h-4" /> PB Lớp Khác
+                    </button>
+                  )}
+
+                  {/* Bù Trừ Thanh Toán (Chỉ hiển thị khi có lịch thi) */}
+                  {hasExamSchedule && (
+                    <button
+                      onClick={() => handleTabChange('settlement')}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                        activeTab === 'settlement'
+                          ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+                      }`}
+                    >
+                      <DollarSign className="w-4 h-4" /> Bù Trừ Thanh Toán
+                    </button>
+                  )}
 
                   {isAdmin && (
                     <button
