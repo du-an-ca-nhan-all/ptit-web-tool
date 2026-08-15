@@ -15,6 +15,7 @@ import {
   Sparkles,
   Search,
   Check,
+  ShieldAlert,
 } from 'lucide-react';
 import { LoginUser } from '../types';
 
@@ -152,6 +153,10 @@ export default function CourseCompare({
     return extractCoursesFromAccount(activeSubAccount);
   }, [activeSubAccount]);
 
+  const hasMonitorData = monitorCourses.length > 0 && !!data?.main;
+  const isCurrentUserMonitor =
+    currentUser?.isMonitor || (currentUser?.role && currentUser.role.includes('lop_truong')) || false;
+
   const popupStats = useMemo(() => {
     if (!selectedCourse || !data?.allSubAccounts) return null;
     const { courseCode } = selectedCourse;
@@ -248,7 +253,15 @@ export default function CourseCompare({
                 </span>
               </div>
               <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-                Đối chiếu danh sách môn học & nhóm tổ của <strong className="text-indigo-600 font-mono">({currentStudentName})</strong> với mốc chuẩn <strong className="text-emerald-700 font-mono">Lớp trưởng ({data?.main?.username || 'Lớp trưởng'})</strong>
+                {hasMonitorData ? (
+                  <>
+                    Đối chiếu danh sách môn học & nhóm tổ của <strong className="text-indigo-600 font-mono">({currentStudentName})</strong> với mốc chuẩn <strong className="text-emerald-700 font-mono">Lớp trưởng ({data?.main?.username || 'Lớp trưởng'})</strong>
+                  </>
+                ) : (
+                  <span className="text-amber-700 font-medium">
+                    Chưa có mốc chuẩn đối chiếu từ Lớp trưởng của lớp
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -294,6 +307,65 @@ export default function CourseCompare({
         </div>
       </div>
 
+      {/* Prominent Warning when Monitor has not pulled course data */}
+      {!hasMonitorData && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 animate-in fade-in duration-200">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-300">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-black text-amber-950 uppercase tracking-tight">
+                  Lớp Trưởng Chưa Đồng Bộ Dữ Liệu Đăng Ký Môn Học
+                </h3>
+                <span className="bg-amber-200 text-amber-900 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-amber-300">
+                  Chưa Có Mốc Chuẩn
+                </span>
+              </div>
+              <p className="text-xs text-amber-800 mt-1.5 leading-relaxed max-w-2xl">
+                {isCurrentUserMonitor ? (
+                  <>
+                    Bạn là <strong>Lớp trưởng</strong> nhưng chưa kéo kết quả đăng ký môn học của mình từ cổng trường (<strong>https://qldttx.pttc1.edu.vn/</strong>).
+                    Vui lòng bấm nút <strong>"Đồng Bộ Môn Học Lớp Trưởng Ngay"</strong> bên dưới để tạo mốc đối chiếu cho toàn bộ sinh viên trong lớp.
+                  </>
+                ) : (
+                  <>
+                    <strong>Lớp trưởng</strong> của lớp <strong className="text-indigo-700 font-mono">({currentUser?.lop || 'Lớp bạn'})</strong> chưa đồng bộ dữ liệu môn học đã đăng ký kỳ này từ cổng QLDTTX.
+                    Vì vậy hệ thống chưa thể tạo mốc chuẩn để đối chiếu môn học và nhóm tổ. Bạn vẫn có thể xem và đồng bộ danh sách môn học của riêng mình.
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
+            {isCurrentUserMonitor ? (
+              <button
+                onClick={handlePullMyCourses}
+                disabled={isPulling}
+                className="w-full sm:w-auto px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-amber-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isPulling ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Zap className="w-4 h-4 fill-current text-yellow-300" />
+                )}
+                <span>Đồng Bộ Môn Học Lớp Trưởng Ngay</span>
+              </button>
+            ) : onNavigateTab ? (
+              <button
+                onClick={() => onNavigateTab('registered_courses')}
+                className="w-full sm:w-auto px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-2xl transition-colors shrink-0 cursor-pointer shadow-sm flex items-center justify-center gap-2"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Xem Môn Của Bạn</span>
+              </button>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       {/* Student Selector Dropdown (When class has multiple students) */}
       {data?.allSubAccounts && data.allSubAccounts.length > 0 && (
         <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -303,7 +375,9 @@ export default function CourseCompare({
               <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
                 Sinh viên cần đối chiếu với Lớp trưởng:
               </span>
-              <span className="text-[11px] text-slate-400">Mặc định so sánh với mốc đăng ký của Lớp trưởng ({data?.main?.username || 'Lớp trưởng'})</span>
+              <span className="text-[11px] text-slate-400">
+                Mặc định so sánh với mốc đăng ký của Lớp trưởng ({data?.main?.username || 'Lớp trưởng'})
+              </span>
             </div>
           </div>
           <select
@@ -327,7 +401,9 @@ export default function CourseCompare({
             <CheckCircle2 className="w-5 h-5" />
             <span className="font-black text-xs uppercase tracking-wider">Trùng khớp</span>
           </div>
-          <span className="text-3xl font-black text-emerald-700 mt-1">{comparison.exactMatch.length}</span>
+          <span className="text-3xl font-black text-emerald-700 mt-1">
+            {hasMonitorData ? comparison.exactMatch.length : '—'}
+          </span>
           <span className="text-xs text-slate-400 mt-1">Môn học cùng nhóm tổ với LT</span>
         </div>
 
@@ -336,7 +412,9 @@ export default function CourseCompare({
             <AlertTriangle className="w-5 h-5" />
             <span className="font-black text-xs uppercase tracking-wider">Khác nhóm tổ</span>
           </div>
-          <span className="text-3xl font-black text-amber-700 mt-1">{comparison.diffGroup.length}</span>
+          <span className="text-3xl font-black text-amber-700 mt-1">
+            {hasMonitorData ? comparison.diffGroup.length : '—'}
+          </span>
           <span className="text-xs text-slate-400 mt-1">Cùng môn, khác nhóm học với LT</span>
         </div>
 
@@ -345,7 +423,9 @@ export default function CourseCompare({
             <XCircle className="w-5 h-5" />
             <span className="font-black text-xs uppercase tracking-wider">Thiếu môn</span>
           </div>
-          <span className="text-3xl font-black text-rose-700 mt-1">{comparison.missing.length}</span>
+          <span className="text-3xl font-black text-rose-700 mt-1">
+            {hasMonitorData ? comparison.missing.length : '—'}
+          </span>
           <span className="text-xs text-slate-400 mt-1">LT đăng ký nhưng SV chưa ĐK</span>
         </div>
 
@@ -354,110 +434,137 @@ export default function CourseCompare({
             <Info className="w-5 h-5" />
             <span className="font-black text-xs uppercase tracking-wider">Đăng ký thêm</span>
           </div>
-          <span className="text-3xl font-black text-purple-700 mt-1">{comparison.extra.length}</span>
+          <span className="text-3xl font-black text-purple-700 mt-1">
+            {hasMonitorData ? comparison.extra.length : '—'}
+          </span>
           <span className="text-xs text-slate-400 mt-1">SV ĐK nhưng LT không ĐK</span>
         </div>
       </div>
 
-      {/* Comparison Sections */}
-      <div className="flex flex-col gap-6">
-        {/* Thiếu môn */}
-        {comparison.missing.length > 0 && (
-          <div className="bg-white rounded-3xl border border-rose-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-rose-50/80 border-b border-rose-100 flex items-center justify-between">
-              <h3 className="font-black text-rose-900 text-sm flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-rose-600" />
-                Môn Sinh Viên Chưa Đăng Ký ({comparison.missing.length})
-              </h3>
-              <span className="text-xs text-rose-700 font-medium">Cần kiểm tra để tránh thiếu tín chỉ</span>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {comparison.missing.map((c: any) => {
-                const code = c.ma_mon || c.MaMH;
-                const name = c.ten_mon || c.TenMH;
-                const tc = c.so_tc || c.SoTC;
-                const grp = c.nhom_to || c.NhomTo;
-                const lop = c.lop || c.Lop;
-
-                return (
-                  <div
-                    key={code}
-                    className="p-4 flex items-center justify-between hover:bg-rose-50/20 transition-colors"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
-                          {code}
-                        </span>
-                        <span className="font-bold text-slate-800 text-sm">{name}</span>
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
-                        <span>Số TC: {tc}</span>
-                        <span>•</span>
-                        <span>Nhóm tổ của LT: <strong className="text-indigo-600">{grp}</strong></span>
-                        {lop && <span>• Lớp HP: {lop}</span>}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() =>
-                        setSelectedCourse({
-                          type: 'missing',
-                          courseCode: code,
-                          courseName: name,
-                          monitorGroup: grp,
-                        })
-                      }
-                      className="px-3.5 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <BarChart3 className="w-3.5 h-3.5" />
-                      <span>Xem thống kê lớp</span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+      {/* When Monitor Has No Data */}
+      {!hasMonitorData && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center flex flex-col items-center justify-center gap-3 shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+            <ShieldAlert className="w-8 h-8" />
           </div>
-        )}
+          <h3 className="text-base font-bold text-slate-800 mt-2">
+            Chưa thể đối chiếu vì Lớp trưởng chưa có dữ liệu môn học
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md">
+            Khi Lớp trưởng thực hiện đồng bộ kết quả đăng ký môn học từ cổng trường QLDTTX, toàn bộ kết quả đối chiếu 4 trạng thái (Trùng khớp, Khác nhóm, Thiếu môn, ĐK thêm) sẽ tự động hiển thị tại đây.
+          </p>
+          {onNavigateTab && (
+            <button
+              onClick={() => onNavigateTab('registered_courses')}
+              className="mt-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-2xl transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>Xem Môn Học Đã Đăng Ký Của Bạn</span>
+            </button>
+          )}
+        </div>
+      )}
 
-        {/* Khác nhóm tổ */}
-        {comparison.diffGroup.length > 0 && (
-          <div className="bg-white rounded-3xl border border-amber-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-amber-50/80 border-b border-amber-100 flex items-center justify-between">
-              <h3 className="font-black text-amber-900 text-sm flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                Môn Khác Nhóm Tổ ({comparison.diffGroup.length})
-              </h3>
-              <span className="text-xs text-amber-700 font-medium">Sinh viên và Lớp trưởng học khác ca/nhóm</span>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {comparison.diffGroup.map(({ monitor: mc, mine: myC }) => {
-                const code = mc.ma_mon || mc.MaMH;
-                const name = mc.ten_mon || mc.TenMH;
-                const monitorGrp = mc.nhom_to || mc.NhomTo;
-                const myGrp = myC.nhom_to || myC.NhomTo;
+      {/* Comparison Sections (When Monitor has data) */}
+      {hasMonitorData && (
+        <div className="flex flex-col gap-6">
+          {/* Thiếu môn */}
+          {comparison.missing.length > 0 && (
+            <div className="bg-white rounded-3xl border border-rose-200 shadow-sm overflow-hidden">
+              <div className="p-4 bg-rose-50/80 border-b border-rose-100 flex items-center justify-between">
+                <h3 className="font-black text-rose-900 text-sm flex items-center gap-2">
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                  Môn Sinh Viên Chưa Đăng Ký ({comparison.missing.length})
+                </h3>
+                <span className="text-xs text-rose-700 font-medium">Cần kiểm tra để tránh thiếu tín chỉ</span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {comparison.missing.map((c: any) => {
+                  const code = c.ma_mon || c.MaMH;
+                  const name = c.ten_mon || c.TenMH;
+                  const tc = c.so_tc || c.SoTC;
+                  const grp = c.nhom_to || c.NhomTo;
+                  const lop = c.lop || c.Lop;
 
-                return (
-                  <div
-                    key={code}
-                    className="p-4 flex items-center justify-between hover:bg-amber-50/20 transition-colors"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
-                          {code}
-                        </span>
-                        <span className="font-bold text-slate-800 text-sm">{name}</span>
+                  return (
+                    <div
+                      key={code}
+                      className="p-4 flex items-center justify-between hover:bg-rose-50/20 transition-colors"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
+                            {code}
+                          </span>
+                          <span className="font-bold text-slate-800 text-sm">{name}</span>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
+                          <span>Số TC: {tc}</span>
+                          <span>•</span>
+                          <span>Nhóm tổ của LT: <strong className="text-indigo-600">{grp}</strong></span>
+                          {lop && <span>• Lớp HP: {lop}</span>}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-600 mt-1 flex items-center gap-3">
-                        <span>
-                          Nhóm của SV: <strong className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{myGrp}</strong>
-                        </span>
-                        <span>
-                          Nhóm của LT: <strong className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">{monitorGrp}</strong>
-                        </span>
-                      </div>
+
+                      <button
+                        onClick={() =>
+                          setSelectedCourse({
+                            type: 'missing',
+                            courseCode: code,
+                            courseName: name,
+                            monitorGroup: grp,
+                          })
+                        }
+                        className="px-3.5 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <BarChart3 className="w-3.5 h-3.5" />
+                        <span>Xem thống kê lớp</span>
+                      </button>
                     </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Khác nhóm tổ */}
+          {comparison.diffGroup.length > 0 && (
+            <div className="bg-white rounded-3xl border border-amber-200 shadow-sm overflow-hidden">
+              <div className="p-4 bg-amber-50/80 border-b border-amber-100 flex items-center justify-between">
+                <h3 className="font-black text-amber-900 text-sm flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  Môn Khác Nhóm Tổ ({comparison.diffGroup.length})
+                </h3>
+                <span className="text-xs text-amber-700 font-medium">Sinh viên và Lớp trưởng học khác ca/nhóm</span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {comparison.diffGroup.map(({ monitor: mc, mine: myC }) => {
+                  const code = mc.ma_mon || mc.MaMH;
+                  const name = mc.ten_mon || mc.TenMH;
+                  const monitorGrp = mc.nhom_to || mc.NhomTo;
+                  const myGrp = myC.nhom_to || myC.NhomTo;
+
+                  return (
+                    <div
+                      key={code}
+                      className="p-4 flex items-center justify-between hover:bg-amber-50/20 transition-colors"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
+                            {code}
+                          </span>
+                          <span className="font-bold text-slate-800 text-sm">{name}</span>
+                        </div>
+                        <div className="text-xs text-slate-600 mt-1 flex items-center gap-3">
+                          <span>
+                            Nhóm của SV: <strong className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{myGrp}</strong>
+                          </span>
+                          <span>
+                            Nhóm của LT: <strong className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">{monitorGrp}</strong>
+                          </span>
+                        </div>
+                      </div>
 
                     <button
                       onClick={() =>
@@ -481,89 +588,90 @@ export default function CourseCompare({
           </div>
         )}
 
-        {/* Trùng khớp */}
-        {comparison.exactMatch.length > 0 && (
-          <div className="bg-white rounded-3xl border border-emerald-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
-              <h3 className="font-black text-emerald-900 text-sm flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Môn Trùng Khớp Hoàn Toàn ({comparison.exactMatch.length})
-              </h3>
-              <span className="text-xs text-emerald-700 font-medium">Học chung nhóm tổ với Lớp trưởng</span>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {comparison.exactMatch.map((c: any) => {
-                const code = c.ma_mon || c.MaMH;
-                const name = c.ten_mon || c.TenMH;
-                const tc = c.so_tc || c.SoTC;
-                const grp = c.nhom_to || c.NhomTo;
-                const lop = c.lop || c.Lop;
+          {/* Trùng khớp */}
+          {comparison.exactMatch.length > 0 && (
+            <div className="bg-white rounded-3xl border border-emerald-200 shadow-sm overflow-hidden">
+              <div className="p-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
+                <h3 className="font-black text-emerald-900 text-sm flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Môn Trùng Khớp Hoàn Toàn ({comparison.exactMatch.length})
+                </h3>
+                <span className="text-xs text-emerald-700 font-medium">Học chung nhóm tổ với Lớp trưởng</span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {comparison.exactMatch.map((c: any) => {
+                  const code = c.ma_mon || c.MaMH;
+                  const name = c.ten_mon || c.TenMH;
+                  const tc = c.so_tc || c.SoTC;
+                  const grp = c.nhom_to || c.NhomTo;
+                  const lop = c.lop || c.Lop;
 
-                return (
-                  <div key={code} className="p-4 flex items-center justify-between hover:bg-emerald-50/20 transition-colors">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
-                          {code}
-                        </span>
-                        <span className="font-bold text-slate-800 text-sm">{name}</span>
+                  return (
+                    <div key={code} className="p-4 flex items-center justify-between hover:bg-emerald-50/20 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
+                            {code}
+                          </span>
+                          <span className="font-bold text-slate-800 text-sm">{name}</span>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
+                          <span>Số TC: {tc}</span>
+                          <span>•</span>
+                          <span>Nhóm tổ: <strong className="text-emerald-700">{grp}</strong></span>
+                          {lop && <span>• Lớp HP: {lop}</span>}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
-                        <span>Số TC: {tc}</span>
-                        <span>•</span>
-                        <span>Nhóm tổ: <strong className="text-emerald-700">{grp}</strong></span>
-                        {lop && <span>• Lớp HP: {lop}</span>}
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                        ✓ Cùng nhóm {grp}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Đăng ký thêm */}
+          {comparison.extra.length > 0 && (
+            <div className="bg-white rounded-3xl border border-purple-200 shadow-sm overflow-hidden">
+              <div className="p-4 bg-purple-50/80 border-b border-purple-100 flex items-center justify-between">
+                <h3 className="font-black text-purple-900 text-sm flex items-center gap-2">
+                  <Info className="w-4 h-4 text-purple-600" />
+                  Môn Đăng Ký Thêm ({comparison.extra.length})
+                </h3>
+                <span className="text-xs text-purple-700 font-medium">Môn học cải thiện hoặc ngoài chương trình LT</span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {comparison.extra.map((c: any) => {
+                  const code = c.ma_mon || c.MaMH;
+                  const name = c.ten_mon || c.TenMH;
+                  const tc = c.so_tc || c.SoTC;
+                  const grp = c.nhom_to || c.NhomTo;
+
+                  return (
+                    <div key={code} className="p-4 flex items-center justify-between hover:bg-purple-50/20 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
+                            {code}
+                          </span>
+                          <span className="font-bold text-slate-800 text-sm">{name}</span>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
+                          <span>Số TC: {tc}</span>
+                          <span>•</span>
+                          <span>Nhóm tổ: {grp}</span>
+                        </div>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                      ✓ Cùng nhóm {grp}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
-
-        {/* Đăng ký thêm */}
-        {comparison.extra.length > 0 && (
-          <div className="bg-white rounded-3xl border border-purple-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-purple-50/80 border-b border-purple-100 flex items-center justify-between">
-              <h3 className="font-black text-purple-900 text-sm flex items-center gap-2">
-                <Info className="w-4 h-4 text-purple-600" />
-                Môn Đăng Ký Thêm ({comparison.extra.length})
-              </h3>
-              <span className="text-xs text-purple-700 font-medium">Môn học cải thiện hoặc ngoài chương trình LT</span>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {comparison.extra.map((c: any) => {
-                const code = c.ma_mon || c.MaMH;
-                const name = c.ten_mon || c.TenMH;
-                const tc = c.so_tc || c.SoTC;
-                const grp = c.nhom_to || c.NhomTo;
-
-                return (
-                  <div key={code} className="p-4 flex items-center justify-between hover:bg-purple-50/20 transition-colors">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-2 py-0.5 rounded">
-                          {code}
-                        </span>
-                        <span className="font-bold text-slate-800 text-sm">{name}</span>
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-3">
-                        <span>Số TC: {tc}</span>
-                        <span>•</span>
-                        <span>Nhóm tổ: {grp}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Modal Popup Stats */}
       {selectedCourse && popupStats && (
