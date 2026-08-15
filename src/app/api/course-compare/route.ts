@@ -11,27 +11,32 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Mã lớp (classCode) là bắt buộc' }, { status: 400 });
     }
 
-    // 1. Get monitor (main) registration
-    let mainReg = await prisma.courseRegistration.findFirst({
-      where: { classCode, type: 'main' },
+    // 1. Find class monitor user dynamically from User/Student role
+    let monitorUser = await prisma.user.findFirst({
+      where: {
+        role: { contains: 'lop_truong' },
+        student: { maLop: classCode },
+      },
     });
 
-    // Fallback: If no 'main' marked, find class monitor user
-    if (!mainReg) {
-      const monitorUser = await prisma.user.findFirst({
-        where: {
-          role: { contains: 'lop_truong' },
-          student: { maLop: classCode },
-        },
+    // Fallback if class not linked in student profile
+    if (!monitorUser) {
+      monitorUser = await prisma.user.findFirst({
+        where: { role: { contains: 'lop_truong' } },
       });
-      if (monitorUser) {
-        mainReg = await prisma.courseRegistration.findFirst({
-          where: { username: monitorUser.username.toUpperCase() },
-        });
-      }
     }
 
-    // 2. Get all sub registrations in this class
+    // Get monitor registration
+    let mainReg = null;
+    if (monitorUser) {
+      mainReg = await prisma.courseRegistration.findFirst({
+        where: {
+          username: monitorUser.username.toUpperCase(),
+        },
+      });
+    }
+
+    // 2. Get all registrations in this class
     const allRegs = await prisma.courseRegistration.findMany({
       where: { classCode },
       orderBy: { username: 'asc' },
@@ -56,9 +61,10 @@ export async function GET(req: NextRequest) {
     allRegs.forEach((reg) => {
       try {
         const parsed = JSON.parse(reg.data);
+        const isMonitor = monitorUser?.username?.toUpperCase() === reg.username?.toUpperCase();
         allSubAccounts.push({
           username: reg.username,
-          type: reg.type,
+          isMonitor,
           data: parsed.data ? parsed : { data: parsed },
           totalCourses: reg.totalCourses,
           totalCredits: reg.totalCredits,

@@ -65,7 +65,6 @@ export async function GET(req: NextRequest) {
       success: true,
       username: targetUsername,
       classCode: registration?.classCode || classCode,
-      type: registration?.type || (authUser.isMonitor ? 'main' : 'sub'),
       hasRegistration: !!registration,
       totalCourses: registration?.totalCourses || coursesList.length,
       totalCredits: registration?.totalCredits || 0,
@@ -159,7 +158,6 @@ export async function POST(req: NextRequest) {
             create: {
               classCode: targetClass,
               username: st.maSV.toUpperCase(),
-              type: regType,
               data: JSON.stringify(fetched.data),
               totalCourses: fetched.totalCourses,
               totalCredits: fetched.totalCredits,
@@ -167,7 +165,6 @@ export async function POST(req: NextRequest) {
               lastPulledAt: new Date(),
             },
             update: {
-              type: regType,
               data: JSON.stringify(fetched.data),
               totalCourses: fetched.totalCourses,
               totalCredits: fetched.totalCredits,
@@ -224,14 +221,6 @@ export async function POST(req: NextRequest) {
       token: extAccount.token,
     });
 
-    // Determine type (main for monitor, sub for student)
-    const isTargetMonitor =
-      authUser.username.toUpperCase() === effectiveUsername
-        ? authUser.isMonitor
-        : (await prisma.user.findUnique({ where: { username: effectiveUsername } }))?.role?.includes('lop_truong') || false;
-
-    const regType = isTargetMonitor ? 'main' : 'sub';
-
     // Upsert into CourseRegistration
     const saved = await prisma.courseRegistration.upsert({
       where: {
@@ -243,7 +232,6 @@ export async function POST(req: NextRequest) {
       create: {
         classCode: finalClassCode,
         username: effectiveUsername,
-        type: regType,
         data: JSON.stringify(fetchedResult.data),
         totalCourses: fetchedResult.totalCourses,
         totalCredits: fetchedResult.totalCredits,
@@ -251,7 +239,6 @@ export async function POST(req: NextRequest) {
         lastPulledAt: new Date(),
       },
       update: {
-        type: regType,
         data: JSON.stringify(fetchedResult.data),
         totalCourses: fetchedResult.totalCourses,
         totalCredits: fetchedResult.totalCredits,
@@ -267,7 +254,6 @@ export async function POST(req: NextRequest) {
       message: `Đã đồng bộ thành công ${fetchedResult.totalCourses} môn học (${fetchedResult.totalCredits} tín chỉ) từ cổng QLDTTX!`,
       username: effectiveUsername,
       classCode: finalClassCode,
-      type: regType,
       totalCourses: saved.totalCourses,
       totalCredits: saved.totalCredits,
       tuitionFee: saved.tuitionFee,

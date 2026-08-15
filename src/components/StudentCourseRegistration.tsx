@@ -41,7 +41,6 @@ export default function StudentCourseRegistration({
     lastPulledAt: string | null;
     hasRegistration: boolean;
     classCode: string;
-    type: string;
     externalAccount: {
       isConfigured: boolean;
       status: string;
@@ -55,7 +54,6 @@ export default function StudentCourseRegistration({
     lastPulledAt: null,
     hasRegistration: false,
     classCode: currentUser.lop || '',
-    type: currentUser.isMonitor ? 'main' : 'sub',
     externalAccount: {
       isConfigured: false,
       status: 'DISCONNECTED',
@@ -92,7 +90,6 @@ export default function StudentCourseRegistration({
           lastPulledAt: data.lastPulledAt,
           hasRegistration: data.hasRegistration,
           classCode: data.classCode,
-          type: data.type,
           externalAccount: data.externalAccount || {
             isConfigured: false,
             status: 'DISCONNECTED',

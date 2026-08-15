@@ -387,7 +387,7 @@ export default function CourseCompare({
           >
             {data.allSubAccounts.map((acc: any) => (
               <option key={acc.username} value={acc.username?.toUpperCase()}>
-                {acc.username?.toUpperCase()} {acc.username?.toUpperCase() === currentUser?.username?.toUpperCase() ? '(Bạn)' : ''} {acc.type === 'main' ? '★ Lớp trưởng' : ''}
+                {acc.username?.toUpperCase()} {acc.username?.toUpperCase() === currentUser?.username?.toUpperCase() ? '(Bạn)' : ''} {acc.isMonitor || acc.username?.toUpperCase() === data?.main?.username?.toUpperCase() ? '★ Lớp trưởng' : ''}
               </option>
             ))}
           </select>

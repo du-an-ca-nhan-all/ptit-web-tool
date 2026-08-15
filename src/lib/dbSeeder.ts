@@ -87,12 +87,10 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
               },
               create: {
                 classCode: folder,
-                type: 'main',
                 username: mainUsername,
                 data: mainContent,
               },
               update: {
-                type: 'main',
                 data: mainContent,
               },
             });
@@ -115,12 +113,10 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
                     },
                     create: {
                       classCode: folder,
-                      type: 'sub',
                       username: subUser,
                       data: JSON.stringify(subItem),
                     },
                     update: {
-                      type: 'sub',
                       data: JSON.stringify(subItem),
                     },
                   });
