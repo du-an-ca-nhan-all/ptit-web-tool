@@ -14,18 +14,19 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
       const studentCount = await prisma.student.count();
       const userCount = await prisma.user.count();
       const examCount = await prisma.examRecord.count();
+      const batchCount = await prisma.examBatch.count();
       return {
         success: true,
         message: 'Database already seeded',
-        counts: { students: studentCount, users: userCount, examRecords: examCount },
+        counts: { students: studentCount, users: userCount, examRecords: examCount, examBatches: batchCount },
       };
     }
 
-    console.log('[DB Seeder] Starting streamlined database seeding...');
+    console.log('[DB Seeder] Starting database seeding with ExamBatch support...');
     const publicDir = path.join(process.cwd(), 'public');
 
-    // 1. Read ClassConfig from class_config.yaml
-    const classConfigPath = path.join(process.cwd(), 'public', 'class_config.yaml');
+    // 1. Read class_config.yaml (if present)
+    const classConfigPath = path.join(publicDir, 'class_config.yaml');
     const includedMap = new Map<string, string>();
     const excludedSet = new Set<string>();
 
@@ -41,21 +42,6 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
           if (Array.isArray(cls.excludedStudents)) {
             cls.excludedStudents.forEach((id: string) => excludedSet.add(id));
           }
-
-          await prisma.classConfig.upsert({
-            where: { classCode: cls.classCode },
-            update: {
-              monitorPhone: cls.monitorPhone || null,
-              includedStudents: JSON.stringify(cls.includedStudents || []),
-              excludedStudents: JSON.stringify(cls.excludedStudents || []),
-            },
-            create: {
-              classCode: cls.classCode,
-              monitorPhone: cls.monitorPhone || null,
-              includedStudents: JSON.stringify(cls.includedStudents || []),
-              excludedStudents: JSON.stringify(cls.excludedStudents || []),
-            },
-          });
         }
       }
     }
@@ -125,7 +111,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
       }
     }
 
-    // 4. Parse data.csv and extract distinct Students & ExamRecords
+    // 4. Parse data.csv and extract distinct Batches, Students & ExamRecords
     const csvPath = path.join(publicDir, 'data.csv');
     let examCount = 0;
     let studentCount = 0;
@@ -151,12 +137,27 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         }
       });
 
+      const batchesMap = new Map<string, any>();
       const studentsMap = new Map<string, any>();
       const examRecordsList: any[] = [];
 
       validData.forEach((row) => {
         const maSV = String(row.MaSV || '').trim().toUpperCase();
-        if (!maSV || excludedSet.has(maSV)) return;
+        if (!maSV) return;
+
+        const batchCode = row.MaDotThi ? String(row.MaDotThi).trim() : '20252_TX';
+        const batchName = row.TenDotThi ? String(row.TenDotThi).trim() : 'ĐHTX HK2 2025-2026';
+
+        if (!batchesMap.has(batchCode)) {
+          batchesMap.set(batchCode, {
+            code: batchCode,
+            name: batchName,
+            semester: 'HK2',
+            academicYear: '2025-2026',
+            isActive: true,
+            description: `Đợt thi chính thức ${batchName}`,
+          });
+        }
 
         let maLop = row.MaLop;
         if (includedMap.has(maSV)) {
@@ -170,6 +171,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
           const hoLot = row.HoLotSV ? String(row.HoLotSV).trim() : '';
           const ten = row.TenSV ? String(row.TenSV).trim() : '';
           const hoTen = `${hoLot} ${ten}`.trim();
+          const isExcluded = excludedSet.has(maSV);
 
           studentsMap.set(maSV, {
             maSV,
@@ -179,13 +181,15 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
             gioiTinh: row.PHAI ? String(row.PHAI).trim() : 'Nam',
             ngaySinh: row.NgaySinhC ? String(row.NgaySinhC).trim() : null,
             maLop: loginUser?.lop || maLop || null,
+            trangThai: isExcluded ? 'BAO_LUU' : 'DANG_HOC',
             soDienThoai: loginUser?.phoneNumber || null,
-            ghiChu: null,
+            ghiChu: isExcluded ? '[Bảo lưu/Nghỉ học]' : null,
           });
         }
 
         examRecordsList.push({
           maSV,
+          batchCode,
           nhomThi: row.NhomThi ? String(row.NhomThi).trim() : null,
           mapThi: row.MAPTHI ? String(row.MAPTHI).trim() : null,
           maMH: row.MaMH ? String(row.MaMH).trim() : null,
@@ -197,12 +201,24 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
           ngayThi: row.NgayThi ? String(row.NgayThi).trim() : null,
           gioThi: row.GioThi ? String(row.GioThi).trim() : null,
           soPhutThi: row.SoPhutThi ? String(row.SoPhutThi).trim() : null,
-          maDotThi: row.MaDotThi ? String(row.MaDotThi).trim() : null,
-          tenDotThi: row.TenDotThi ? String(row.TenDotThi).trim() : null,
+          maDotThi: batchCode,
+          tenDotThi: batchName,
         });
       });
 
-      // Add monitors from login.yaml not in CSV
+      // Add default batch if empty
+      if (batchesMap.size === 0) {
+        batchesMap.set('20252_TX', {
+          code: '20252_TX',
+          name: 'ĐHTX HK2 2025-2026',
+          semester: 'HK2',
+          academicYear: '2025-2026',
+          isActive: true,
+          description: 'Đợt thi chính thức ĐHTX HK2 2025-2026',
+        });
+      }
+
+      // Add monitors/admins from login.yaml not in CSV
       loginUsersMap.forEach((u, username) => {
         if (!studentsMap.has(username)) {
           studentsMap.set(username, {
@@ -213,6 +229,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
             gioiTinh: 'Nam',
             ngaySinh: null,
             maLop: u.lop || null,
+            trangThai: 'DANG_HOC',
             soDienThoai: u.phoneNumber || null,
             ghiChu: null,
           });
@@ -222,11 +239,21 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
       // Clear existing records if force
       if (force) {
         await prisma.examRecord.deleteMany();
+        await prisma.examBatch.deleteMany();
         await prisma.user.deleteMany();
         await prisma.student.deleteMany();
       }
 
-      // 4a. Batch insert Students
+      // 4a. Batch insert ExamBatches
+      for (const batch of Array.from(batchesMap.values())) {
+        await prisma.examBatch.upsert({
+          where: { code: batch.code },
+          update: { name: batch.name, isActive: batch.isActive },
+          create: batch,
+        });
+      }
+
+      // 4b. Batch insert Students
       const studentArray = Array.from(studentsMap.values());
       const studentChunkSize = 500;
       for (let i = 0; i < studentArray.length; i += studentChunkSize) {
@@ -237,7 +264,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         studentCount += chunk.length;
       }
 
-      // 4b. Batch insert Users (username = maSV, support multiple roles like 'admin,lop_truong')
+      // 4c. Batch insert Users
       const userList = studentArray.map((s) => {
         const loginUser = loginUsersMap.get(s.maSV);
         const role = Array.isArray(loginUser?.role)
@@ -260,7 +287,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         userCount += chunk.length;
       }
 
-      // 4c. Batch insert ExamRecords
+      // 4d. Batch insert ExamRecords
       const examChunkSize = 500;
       for (let i = 0; i < examRecordsList.length; i += examChunkSize) {
         const chunk = examRecordsList.slice(i, i + examChunkSize);

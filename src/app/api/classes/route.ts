@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
+import { checkIsMonitor } from '@/src/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,20 +16,15 @@ export async function GET(req: NextRequest) {
 
     const classNames = new Set(classRecords.map((r) => r.maLop!).filter(Boolean));
 
-    // 2. Add classes from ClassConfig
-    const configs = await prisma.classConfig.findMany();
-    configs.forEach((c) => classNames.add(c.classCode));
-
-    // 3. Find monitors
-    const monitors = await prisma.user.findMany({
-      where: { role: 'lop_truong' },
+    // 2. Find monitors
+    const users = await prisma.user.findMany({
       include: { student: true },
     });
 
     const monitorMap = new Map<string, any>();
-    monitors.forEach((m) => {
-      if (m.student?.maLop) {
-        monitorMap.set(m.student.maLop, m);
+    users.forEach((u) => {
+      if (checkIsMonitor(u.role) && u.student?.maLop) {
+        monitorMap.set(u.student.maLop, u);
       }
     });
 
@@ -36,12 +32,11 @@ export async function GET(req: NextRequest) {
 
     const classesWithInfo = sortedClasses.map((cls) => {
       const monitor = monitorMap.get(cls) || null;
-      const config = configs.find((c) => c.classCode === cls) || null;
 
       return {
         classCode: cls,
         monitorName: monitor?.student?.hoTen || monitor?.student?.ten || monitor?.username || null,
-        monitorPhone: monitor?.student?.soDienThoai || config?.monitorPhone || null,
+        monitorPhone: monitor?.student?.soDienThoai || null,
       };
     });
 

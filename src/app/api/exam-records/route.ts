@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const all = searchParams.get('all') === 'true';
+    const batchCode = searchParams.get('batchCode') || undefined;
     const classCode = searchParams.get('classCode') || undefined;
     const subjectCode = searchParams.get('subjectCode') || undefined;
     const date = searchParams.get('date') || undefined;
@@ -24,8 +25,10 @@ export async function GET(req: NextRequest) {
       });
       const classes = classesRaw.map((r) => r.maLop!).sort();
 
+      const batchFilter = batchCode ? { batchCode } : {};
+
       const subjectsRaw = await prisma.examRecord.findMany({
-        where: { maMH: { not: null }, tenMH: { not: null } },
+        where: { ...batchFilter, maMH: { not: null }, tenMH: { not: null } },
         distinct: ['maMH'],
         select: { maMH: true, tenMH: true },
       });
@@ -34,7 +37,7 @@ export async function GET(req: NextRequest) {
         .sort((a, b) => a.code.localeCompare(b.code));
 
       const datesRaw = await prisma.examRecord.findMany({
-        where: { ngayThi: { not: null } },
+        where: { ...batchFilter, ngayThi: { not: null } },
         distinct: ['ngayThi'],
         select: { ngayThi: true },
       });
@@ -50,9 +53,8 @@ export async function GET(req: NextRequest) {
     }
 
     const where: any = {};
-    if (classCode) {
-      where.student = { maLop: classCode };
-    }
+    if (batchCode) where.batchCode = batchCode;
+    if (classCode) where.student = { maLop: classCode };
     if (subjectCode) where.maMH = subjectCode;
     if (date) where.ngayThi = date;
     if (maSV) where.maSV = maSV.toUpperCase();
@@ -89,46 +91,51 @@ export async function GET(req: NextRequest) {
       NgayThi: r.ngayThi || '',
       GioThi: r.gioThi || '',
       SoPhutThi: r.soPhutThi || '',
-      MaDotThi: r.maDotThi || '',
+      MaDotThi: r.maDotThi || r.batchCode || '',
       TenDotThi: r.tenDotThi || '',
+      batchCode: r.batchCode || '',
     });
 
     if (all) {
-      const recordsRaw = await prisma.examRecord.findMany({
+      const records = await prisma.examRecord.findMany({
         where,
-        include: { student: true },
-        orderBy: [{ ngayThi: 'asc' }, { gioThi: 'asc' }, { mapThi: 'asc' }],
+        include: {
+          student: true,
+        },
+        orderBy: [{ ngayThi: 'asc' }, { gioThi: 'asc' }],
       });
-      const records = recordsRaw.map(formatRecord);
-      return NextResponse.json({ records, total: records.length });
+
+      return NextResponse.json({
+        records: records.map(formatRecord),
+        total: records.length,
+      });
     }
 
     const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '100', 10);
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
     const skip = (page - 1) * limit;
 
-    const [recordsRaw, total] = await Promise.all([
+    const [records, total] = await Promise.all([
       prisma.examRecord.findMany({
         where,
-        include: { student: true },
+        include: {
+          student: true,
+        },
         skip,
         take: limit,
-        orderBy: [{ ngayThi: 'asc' }, { gioThi: 'asc' }, { mapThi: 'asc' }],
+        orderBy: [{ ngayThi: 'asc' }, { gioThi: 'asc' }],
       }),
       prisma.examRecord.count({ where }),
     ]);
 
-    const records = recordsRaw.map(formatRecord);
-
     return NextResponse.json({
-      records,
+      records: records.map(formatRecord),
       total,
       page,
-      limit,
       totalPages: Math.ceil(total / limit),
     });
   } catch (error: any) {
-    console.error('ExamRecords GET error:', error);
+    console.error('Exam records API error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

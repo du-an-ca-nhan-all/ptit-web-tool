@@ -17,18 +17,25 @@ export interface ExamRecord {
   SoPhutThi: string;
   MaDotThi: string;
   TenDotThi: string;
+  batchCode?: string;
   [key: string]: any;
 }
 
-export interface ClassConfigItem {
-  classCode: string;
-  monitorPhone?: string;
-  includedStudents?: string[];
-  excludedStudents?: string[];
-}
-
-export interface ClassConfig {
-  classes: ClassConfigItem[];
+export interface ExamBatchItem {
+  id: number;
+  code: string;
+  name: string;
+  semester?: string | null;
+  academicYear?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  isActive: boolean;
+  description?: string | null;
+  totalRecords?: number;
+  totalStudents?: number;
+  totalRooms?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LoginUser {
@@ -53,6 +60,7 @@ export interface StudentProfile {
   gioiTinh?: string;
   ngaySinh?: string;
   maLop?: string;
+  trangThai?: string; // 'DANG_HOC' | 'BAO_LUU' | 'NGHI_HOC' | 'CHUYEN_LOP'
   soDienThoai?: string;
   ghiChu?: string;
 }

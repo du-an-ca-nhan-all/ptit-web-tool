@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
-import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
+import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
 
-// Helper to get authenticated user
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
   if (!authUser) {
@@ -16,31 +15,8 @@ async function getAuthUser(req: NextRequest) {
   return authUser;
 }
 
-// Helper to get or create class config
-async function getClassConfig(classCode: string) {
-  let config = await prisma.classConfig.findUnique({
-    where: { classCode },
-  });
-
-  if (!config) {
-    config = await prisma.classConfig.create({
-      data: {
-        classCode,
-        includedStudents: JSON.stringify([]),
-        excludedStudents: JSON.stringify([]),
-      },
-    });
-  }
-
-  return {
-    config,
-    included: JSON.parse(config.includedStudents || '[]') as string[],
-    excluded: JSON.parse(config.excludedStudents || '[]') as string[],
-  };
-}
-
 // GET /api/class-members/transfer?classCode=...
-// Fetch excluded/transferred students of a class
+// Fetch excluded/transferred students of a class directly from Student table
 export async function GET(req: NextRequest) {
   try {
     await ensureDatabaseSeeded(false);
@@ -52,21 +28,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'classCode is required' }, { status: 400 });
     }
 
-    const { excluded } = await getClassConfig(classCode);
-
-    if (excluded.length === 0) {
-      return NextResponse.json({ excludedStudents: [], total: 0 });
-    }
-
     const students = await prisma.student.findMany({
       where: {
-        maSV: { in: excluded },
+        maLop: classCode,
+        trangThai: { not: 'DANG_HOC' },
       },
       include: {
         examRecords: {
           select: { id: true },
         },
       },
+      orderBy: [{ ten: 'asc' }, { hoLot: 'asc' }],
     });
 
     const result = students.map((s) => ({
@@ -76,7 +48,8 @@ export async function GET(req: NextRequest) {
       hoTen: s.hoTen || `${s.hoLot || ''} ${s.ten || ''}`.trim(),
       gioiTinh: s.gioiTinh || 'Nam',
       ngaySinh: s.ngaySinh || '',
-      maLop: s.maLop || 'Đã loại khỏi lớp',
+      maLop: s.maLop || classCode,
+      trangThai: s.trangThai || 'BAO_LUU',
       soDienThoai: s.soDienThoai || '',
       ghiChu: s.ghiChu || '',
       examCount: s.examRecords.length,
@@ -111,9 +84,9 @@ export async function POST(req: NextRequest) {
 
     const cleanMaSV = String(maSV).trim().toUpperCase();
 
-    // 🔒 PERMISSION CHECK: Lớp trưởng chỉ có quyền thao tác trên lớp của chính mình
-    const isAdmin = authUser.role === 'admin';
-    const isMonitor = authUser.role === 'lop_truong';
+    // 🔒 PERMISSION CHECK
+    const isAdmin = checkIsAdmin(authUser.role);
+    const isMonitor = checkIsMonitor(authUser.role);
     const userClass = authUser.lop;
 
     if (!isAdmin && !isMonitor) {
@@ -123,7 +96,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. ACTION: RECEIVE (Nhận sinh viên từ lớp khác sang lớp quản lý)
+    // 1. ACTION: RECEIVE (Nhận sinh viên vào lớp)
     if (action === 'RECEIVE') {
       if (!targetClass) {
         return NextResponse.json({ error: 'targetClass là bắt buộc khi nhận sinh viên' }, { status: 400 });
@@ -158,6 +131,7 @@ export async function POST(req: NextRequest) {
             gioiTinh: studentInfo?.gioiTinh || 'Nam',
             ngaySinh: studentInfo?.ngaySinh || null,
             maLop: cleanTargetClass,
+            trangThai: 'DANG_HOC',
             soDienThoai: studentInfo?.soDienThoai || null,
             ghiChu: updatedNote,
           },
@@ -178,38 +152,10 @@ export async function POST(req: NextRequest) {
           where: { maSV: cleanMaSV },
           data: {
             maLop: cleanTargetClass,
+            trangThai: 'DANG_HOC',
             ghiChu: updatedNote,
           },
         });
-      }
-
-      // Update target class config: add to included, remove from excluded
-      const { included, excluded } = await getClassConfig(cleanTargetClass);
-      const newIncluded = Array.from(new Set([...included, cleanMaSV]));
-      const newExcluded = excluded.filter((id) => id !== cleanMaSV);
-
-      await prisma.classConfig.update({
-        where: { classCode: cleanTargetClass },
-        data: {
-          includedStudents: JSON.stringify(newIncluded),
-          excludedStudents: JSON.stringify(newExcluded),
-        },
-      });
-
-      // Update old class config if it exists: remove from included
-      if (oldClass && oldClass !== cleanTargetClass) {
-        const oldCfg = await prisma.classConfig.findUnique({ where: { classCode: oldClass } });
-        if (oldCfg) {
-          const oldInc = (JSON.parse(oldCfg.includedStudents || '[]') as string[]).filter((id) => id !== cleanMaSV);
-          const oldExc = Array.from(new Set([...(JSON.parse(oldCfg.excludedStudents || '[]') as string[]), cleanMaSV]));
-          await prisma.classConfig.update({
-            where: { classCode: oldClass },
-            data: {
-              includedStudents: JSON.stringify(oldInc),
-              excludedStudents: JSON.stringify(oldExc),
-            },
-          });
-        }
       }
 
       return NextResponse.json({
@@ -238,24 +184,22 @@ export async function POST(req: NextRequest) {
       const actionType = type || 'LOAI_BO'; // 'BAO_LUU' | 'NGHI_HOC' | 'CHUYEN_LOP' | 'LOAI_BO'
       const actionReason = reason ? String(reason).trim() : '';
 
-      // Update current class config: add to excluded, remove from included
-      const { included, excluded } = await getClassConfig(cleanCurrentClass);
-      const newExcluded = Array.from(new Set([...excluded, cleanMaSV]));
-      const newIncluded = included.filter((id) => id !== cleanMaSV);
-
-      await prisma.classConfig.update({
-        where: { classCode: cleanCurrentClass },
-        data: {
-          includedStudents: JSON.stringify(newIncluded),
-          excludedStudents: JSON.stringify(newExcluded),
-        },
-      });
-
       let statusNote = '';
-      if (actionType === 'BAO_LUU') statusNote = `[Bảo lưu] ${actionReason}`.trim();
-      else if (actionType === 'NGHI_HOC') statusNote = `[Nghỉ học] ${actionReason}`.trim();
-      else if (actionType === 'CHUYEN_LOP') statusNote = `[Chuyển lớp sang ${targetClass || 'mới'}] ${actionReason}`.trim();
-      else statusNote = `[Loại khỏi lớp ${cleanCurrentClass}] ${actionReason}`.trim();
+      let targetTrangThai = 'BAO_LUU';
+
+      if (actionType === 'BAO_LUU') {
+        targetTrangThai = 'BAO_LUU';
+        statusNote = `[Bảo lưu] ${actionReason}`.trim();
+      } else if (actionType === 'NGHI_HOC') {
+        targetTrangThai = 'NGHI_HOC';
+        statusNote = `[Nghỉ học] ${actionReason}`.trim();
+      } else if (actionType === 'CHUYEN_LOP') {
+        targetTrangThai = 'CHUYEN_LOP';
+        statusNote = `[Chuyển lớp sang ${targetClass || 'mới'}] ${actionReason}`.trim();
+      } else {
+        targetTrangThai = 'LOAI_BO';
+        statusNote = `[Loại khỏi lớp ${cleanCurrentClass}] ${actionReason}`.trim();
+      }
 
       const existingStudent = await prisma.student.findUnique({ where: { maSV: cleanMaSV } });
       const updatedNote = existingStudent?.ghiChu ? `${existingStudent.ghiChu} • ${statusNote}` : statusNote;
@@ -267,27 +211,17 @@ export async function POST(req: NextRequest) {
           where: { maSV: cleanMaSV },
           data: {
             maLop: cleanTargetClass,
+            trangThai: 'DANG_HOC',
             ghiChu: updatedNote,
           },
         });
-
-        // Add to new class included list
-        const targetCfg = await getClassConfig(cleanTargetClass);
-        const targetInc = Array.from(new Set([...targetCfg.included, cleanMaSV]));
-        const targetExc = targetCfg.excluded.filter((id) => id !== cleanMaSV);
-        await prisma.classConfig.update({
-          where: { classCode: cleanTargetClass },
-          data: {
-            includedStudents: JSON.stringify(targetInc),
-            excludedStudents: JSON.stringify(targetExc),
-          },
-        });
       } else {
-        // Just update status note & clear maLop from current class
+        // Keep maLop for class-level history reference, set trangThai to non-active
         await prisma.student.update({
           where: { maSV: cleanMaSV },
           data: {
-            maLop: null,
+            maLop: cleanCurrentClass,
+            trangThai: targetTrangThai,
             ghiChu: updatedNote,
           },
         });
@@ -315,19 +249,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Update class config: remove from excluded, add to included
-      const { included, excluded } = await getClassConfig(cleanTargetClass);
-      const newExcluded = excluded.filter((id) => id !== cleanMaSV);
-      const newIncluded = Array.from(new Set([...included, cleanMaSV]));
-
-      await prisma.classConfig.update({
-        where: { classCode: cleanTargetClass },
-        data: {
-          includedStudents: JSON.stringify(newIncluded),
-          excludedStudents: JSON.stringify(newExcluded),
-        },
-      });
-
       const existingStudent = await prisma.student.findUnique({ where: { maSV: cleanMaSV } });
       const restoreNote = '[Khôi phục vào lớp]';
       const updatedNote = existingStudent?.ghiChu ? `${existingStudent.ghiChu} • ${restoreNote}` : restoreNote;
@@ -336,6 +257,7 @@ export async function POST(req: NextRequest) {
         where: { maSV: cleanMaSV },
         data: {
           maLop: cleanTargetClass,
+          trangThai: 'DANG_HOC',
           ghiChu: updatedNote,
         },
       });

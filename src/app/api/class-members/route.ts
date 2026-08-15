@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
-import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
+import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -26,24 +26,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Mã lớp (classCode) là bắt buộc' }, { status: 400 });
     }
 
-    // Read class config for inclusions/exclusions
-    const config = await prisma.classConfig.findUnique({
-      where: { classCode },
-    });
-
-    const includedList: string[] = config?.includedStudents ? JSON.parse(config.includedStudents) : [];
-    const excludedList: string[] = config?.excludedStudents ? JSON.parse(config.excludedStudents) : [];
-
-    // Query active students for this class
+    // 1. Query active students for this class
     const studentsRaw = await prisma.student.findMany({
       where: {
-        OR: [
-          { maLop: classCode },
-          { maSV: { in: includedList } },
-        ],
-        NOT: {
-          maSV: { in: excludedList },
-        },
+        maLop: classCode,
+        trangThai: 'DANG_HOC',
       },
       include: {
         user: { select: { role: true } },
@@ -54,27 +41,30 @@ export async function GET(req: NextRequest) {
       orderBy: [{ ten: 'asc' }, { hoLot: 'asc' }],
     });
 
-    // Also fetch excluded students summary for this class
-    const excludedStudentsRaw = excludedList.length > 0
-      ? await prisma.student.findMany({
-          where: { maSV: { in: excludedList } },
-          include: {
-            examRecords: { select: { id: true } },
-          },
-        })
-      : [];
-
-    // Find class monitor
-    const monitor = await prisma.user.findFirst({
+    // 2. Query excluded / deferred / transferred students for this class
+    const excludedStudentsRaw = await prisma.student.findMany({
       where: {
-        role: 'lop_truong',
+        maLop: classCode,
+        trangThai: { not: 'DANG_HOC' },
+      },
+      include: {
+        examRecords: { select: { id: true } },
+      },
+      orderBy: [{ ten: 'asc' }, { hoLot: 'asc' }],
+    });
+
+    // 3. Find class monitor
+    const users = await prisma.user.findMany({
+      where: {
         student: { maLop: classCode },
       },
       include: { student: true },
     });
 
+    const monitor = users.find((u) => checkIsMonitor(u.role));
+
     const students = studentsRaw.map((s) => {
-      const isMonitor = s.user?.role === 'lop_truong' || (monitor && monitor.username.toUpperCase() === s.maSV.toUpperCase());
+      const isMon = checkIsMonitor(s.user?.role) || (monitor && monitor.username.toUpperCase() === s.maSV.toUpperCase());
 
       return {
         MaSV: s.maSV,
@@ -84,8 +74,9 @@ export async function GET(req: NextRequest) {
         PHAI: s.gioiTinh || 'Nam',
         NgaySinhC: s.ngaySinh || '',
         MaLop: classCode,
-        isMonitor: !!isMonitor,
-        isTransferred: includedList.includes(s.maSV),
+        trangThai: s.trangThai || 'DANG_HOC',
+        isMonitor: !!isMon,
+        isTransferred: (s.ghiChu || '').includes('[Tiếp nhận'),
         phone: s.soDienThoai || '',
         note: s.ghiChu || '',
         examCount: s.examRecords.length,
@@ -121,7 +112,8 @@ export async function GET(req: NextRequest) {
       HoTen: s.hoTen || `${s.hoLot || ''} ${s.ten || ''}`.trim(),
       PHAI: s.gioiTinh || 'Nam',
       NgaySinhC: s.ngaySinh || '',
-      MaLop: s.maLop || classCode,
+      MaLop: classCode,
+      trangThai: s.trangThai,
       phone: s.soDienThoai || '',
       note: s.ghiChu || '',
       examCount: s.examRecords.length,
@@ -163,6 +155,7 @@ export async function POST(req: NextRequest) {
       NgaySinhC,
       phone,
       note,
+      trangThai,
     } = body;
 
     if (!MaSV || !MaLop) {
@@ -173,7 +166,7 @@ export async function POST(req: NextRequest) {
     const cleanLop = String(MaLop).trim();
 
     // Guard: Class permission check
-    const isAdmin = authUser.role === 'admin';
+    const isAdmin = checkIsAdmin(authUser.role);
     if (!isAdmin && authUser.lop !== cleanLop) {
       return NextResponse.json(
         { error: `Bạn chỉ có quyền chỉnh sửa thông tin thành viên thuộc lớp của mình (${authUser.lop})` },
@@ -196,6 +189,7 @@ export async function POST(req: NextRequest) {
         ngaySinh: NgaySinhC !== undefined ? NgaySinhC : undefined,
         soDienThoai: phone !== undefined ? phone : undefined,
         ghiChu: note !== undefined ? note : undefined,
+        trangThai: trangThai !== undefined ? trangThai : undefined,
       },
       create: {
         maSV: cleanMaSV,
@@ -207,6 +201,7 @@ export async function POST(req: NextRequest) {
         ngaySinh: NgaySinhC || null,
         soDienThoai: phone || null,
         ghiChu: note || null,
+        trangThai: trangThai || 'DANG_HOC',
       },
     });
 
@@ -249,7 +244,7 @@ export async function DELETE(req: NextRequest) {
     const student = await prisma.student.findUnique({ where: { maSV: cleanMaSV } });
     const targetClass = classCode || student?.maLop;
 
-    const isAdmin = authUser.role === 'admin';
+    const isAdmin = checkIsAdmin(authUser.role);
     if (!isAdmin && targetClass && authUser.lop !== targetClass) {
       return NextResponse.json(
         { error: `Bạn chỉ có quyền xóa sinh viên thuộc lớp của mình (${authUser.lop})` },

@@ -7,7 +7,6 @@ export async function GET() {
     const studentCount = await prisma.student.count();
     const userCount = await prisma.user.count();
     const examCount = await prisma.examRecord.count();
-    const classCount = await prisma.classConfig.count();
     const meta = await prisma.systemMeta.findUnique({ where: { key: 'initial_seeded' } });
 
     return NextResponse.json({
@@ -17,7 +16,6 @@ export async function GET() {
         students: studentCount,
         users: userCount,
         examRecords: examCount,
-        classConfigs: classCount,
       },
     });
   } catch (error: any) {

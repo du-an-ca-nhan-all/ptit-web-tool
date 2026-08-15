@@ -18,6 +18,7 @@ import {
   DollarSign,
   Database,
   RefreshCw,
+  Layers,
 } from 'lucide-react';
 import UploadSection from '../components/UploadSection';
 import FilterBar, { FilterState } from '../components/FilterBar';
@@ -32,7 +33,8 @@ import MonitorsList from '../components/MonitorsList';
 import CourseCompare from '../components/CourseCompare';
 import SettlementManager from '../components/SettlementManager';
 import UserProfileModal from '../components/UserProfileModal';
-import { ExamRecord, LoginUser, ExamSession } from '../types';
+import ExamBatchManagement from '../components/ExamBatchManagement';
+import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
 import { buildSessions } from '../utils/dataModel';
 
 const getInitialState = () => {
@@ -62,6 +64,7 @@ const getInitialState = () => {
         | 'settlement'
         | 'settings'
         | 'monitors_list'
+        | 'batches'
         | 'course_compare') || 'personal_schedule',
     search: params.get('search') || '',
     classCode: params.get('classCode') || '',
@@ -76,6 +79,8 @@ const getInitialState = () => {
 export default function Home() {
   const [records, setRecords] = useState<ExamRecord[]>([]);
   const [sessions, setSessions] = useState<ExamSession[]>([]);
+  const [examBatches, setExamBatches] = useState<ExamBatchItem[]>([]);
+  const [activeBatch, setActiveBatch] = useState<ExamBatchItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const initialState = useMemo(getInitialState, []);
@@ -89,17 +94,15 @@ export default function Home() {
     | 'settlement'
     | 'settings'
     | 'monitors_list'
+    | 'batches'
     | 'course_compare'
   >(initialState.tab as any);
 
-  const [currentUser, setCurrentUser] = useState<LoginUser | null>(() => {
-    if (typeof window === 'undefined') return null;
-    const saved = localStorage.getItem('currentUser');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [isMounted, setIsMounted] = useState(false);
+  const [currentUser, setCurrentUser] = useState<LoginUser | null>(null);
 
   const [monitorClass, setMonitorClass] = useState<string>(
-    initialState.monitorClass || currentUser?.lop || ''
+    initialState.monitorClass || ''
   );
   const [filters, setFilters] = useState<FilterState>({
     search: initialState.search,
@@ -139,15 +142,25 @@ export default function Home() {
     setIsMobileMenuOpen(false);
   };
 
-  // 1. Fetch Auth Session from Server
+  // 1. Fetch Auth Session & mount from Server
   useEffect(() => {
+    setIsMounted(true);
+    const saved = localStorage.getItem('currentUser');
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        setCurrentUser(u);
+        if (u.lop) setMonitorClass(u.lop);
+      } catch (e) {}
+    }
+
     fetch('/api/auth/me')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data && data.user) {
           setCurrentUser(data.user);
           localStorage.setItem('currentUser', JSON.stringify(data.user));
-          if (data.user.lop && !monitorClass) {
+          if (data.user.lop) {
             setMonitorClass(data.user.lop);
           }
         }
@@ -156,10 +169,25 @@ export default function Home() {
   }, []);
 
   // 2. Fetch Data from SQLite Backend API
-  const loadDataFromApi = useCallback(async () => {
+  const loadDataFromApi = useCallback(async (selectedBatchCode?: string) => {
     setIsLoading(true);
     try {
-      // Fetch users / monitors
+      // 1. Fetch batches
+      const batchesRes = await fetch('/api/exam-batches');
+      let currentBatchCode = selectedBatchCode;
+      if (batchesRes.ok) {
+        const batchData = await batchesRes.json();
+        if (batchData.batches) {
+          setExamBatches(batchData.batches);
+          const active = batchData.activeBatch || batchData.batches[0] || null;
+          setActiveBatch(active);
+          if (!currentBatchCode && active) {
+            currentBatchCode = active.code;
+          }
+        }
+      }
+
+      // 2. Fetch users / monitors
       const monitorsRes = await fetch('/api/monitors');
       if (monitorsRes.ok) {
         const monData = await monitorsRes.json();
@@ -168,8 +196,11 @@ export default function Home() {
         }
       }
 
-      // Fetch exam records from DB
-      const recordsRes = await fetch('/api/exam-records?all=true');
+      // 3. Fetch exam records from DB (filtered by batchCode if available)
+      const url = currentBatchCode
+        ? `/api/exam-records?all=true&batchCode=${encodeURIComponent(currentBatchCode)}`
+        : '/api/exam-records?all=true';
+      const recordsRes = await fetch(url);
       if (recordsRes.ok) {
         const recData = await recordsRes.json();
         const rawRecords: ExamRecord[] = recData.records || [];
@@ -188,10 +219,14 @@ export default function Home() {
   }, [loadDataFromApi]);
 
   useEffect(() => {
+    if (!isMounted || !currentUser) return;
+    if (!isAdmin && activeTab === 'batches') {
+      setActiveTab('personal_schedule');
+    }
     if (!canAccessMonitorTools && ['monitor', 'envelope', 'envelope_all', 'settlement', 'settings'].includes(activeTab)) {
       setActiveTab('personal_schedule');
     }
-  }, [canAccessMonitorTools, activeTab]);
+  }, [isMounted, currentUser, isAdmin, canAccessMonitorTools, activeTab]);
 
   useEffect(() => {
     setSelectedExamRoom(null);
@@ -365,6 +400,17 @@ export default function Home() {
     localStorage.removeItem('auth_token');
   };
 
+  if (!isMounted) {
+    return (
+      <div className="flex h-screen w-full bg-[#0F172A] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-mono text-slate-400">Đang khởi động S-Exam Portal...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return (
       <LoginScreen
@@ -527,6 +573,19 @@ export default function Home() {
                   >
                     <DollarSign className="w-4 h-4" /> Bù Trừ Thanh Toán
                   </button>
+
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleTabChange('batches')}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                        activeTab === 'batches'
+                          ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+                      }`}
+                    >
+                      <Layers className="w-4 h-4 text-indigo-400" /> Quản Lý Đợt Thi
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -587,6 +646,8 @@ export default function Home() {
                 ? 'So Sánh ĐKMH'
                 : activeTab === 'members'
                 ? 'Danh Sách Lớp'
+                : activeTab === 'batches'
+                ? 'Quản Lý Đợt Thi'
                 : activeTab === 'envelope'
                 ? 'Phân Công Phong Bì Lớp Mình'
                 : activeTab === 'envelope_all'
@@ -595,6 +656,19 @@ export default function Home() {
                 ? 'Bù Trừ Thanh Toán'
                 : 'Công Cụ Lớp Trưởng'}
             </h2>
+
+            {/* Active Exam Batch Selector / Badge in Header */}
+            {activeBatch && (
+              <div className="hidden lg:flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl text-xs font-bold text-indigo-700 shadow-sm">
+                <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="truncate max-w-[170px]" title={activeBatch.name}>
+                  {activeBatch.name}
+                </span>
+                <span className="bg-indigo-200/80 text-indigo-800 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded">
+                  {activeBatch.code}
+                </span>
+              </div>
+            )}
 
             {records.length > 0 && (activeTab === 'schedule' || activeTab === 'personal_schedule') && (
               <div className="relative">
@@ -617,9 +691,9 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-3 md:gap-4">
             <button
-              onClick={loadDataFromApi}
+              onClick={() => loadDataFromApi()}
               title="Đồng bộ lại từ Database"
-              className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
@@ -655,13 +729,66 @@ export default function Home() {
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               <p className="text-sm text-slate-500 font-medium">Đang tải dữ liệu từ máy chủ...</p>
             </div>
+          ) : activeTab === 'batches' ? (
+            <ExamBatchManagement
+              currentUser={currentUser!}
+              initialBatches={examBatches}
+              initialActiveBatch={activeBatch}
+              onBatchChanged={(batch) => {
+                setActiveBatch(batch);
+                loadDataFromApi(batch.code);
+              }}
+            />
+          ) : activeTab === 'monitors_list' ? (
+            <MonitorsList
+              users={loginUsers}
+              onClassClick={(classCode) => {
+                setMonitorClass(classCode);
+                setActiveTab('members');
+                setIsClassGroupOpen(true);
+              }}
+            />
+          ) : activeTab === 'course_compare' ? (
+            <CourseCompare data={courseCompareData} />
+          ) : activeTab === 'members' ? (
+            <ClassMembers
+              records={records}
+              selectedClass={monitorClass}
+              onClassChange={setMonitorClass}
+              currentUser={currentUser}
+              loginUsers={loginUsers}
+              onSelectStudentSchedule={(studentId) => {
+                setSearchInput(studentId);
+                setFilters((prev) => ({ ...prev, search: studentId }));
+                setActiveTab('personal_schedule');
+              }}
+            />
+          ) : activeTab === 'monitor' ? (
+            <ClassMonitorTools
+              records={records}
+              selectedClass={monitorClass}
+              onClassChange={setMonitorClass}
+            />
+          ) : activeTab === 'envelope' ? (
+            <RoomEnvelopeManager
+              sessions={sessions}
+              records={records}
+              selectedClass={currentUser?.lop || monitorClass}
+              onClassChange={setMonitorClass}
+              loginUsers={loginUsers}
+              hideClassSelector={true}
+            />
+          ) : activeTab === 'envelope_all' ? (
+            <AllMonitorsEnvelopes records={records} sessions={sessions} loginUsers={loginUsers} />
+          ) : activeTab === 'settlement' ? (
+            <SettlementManager records={records} sessions={sessions} loginUsers={loginUsers} />
           ) : records.length === 0 ? (
             <UploadSection
               onDataLoaded={(loadedData) => {
                 setRecords(loadedData);
                 setSessions(buildSessions(loadedData));
               }}
-              onRefreshFromDb={loadDataFromApi}
+              onRefreshFromDb={() => loadDataFromApi()}
             />
           ) : activeTab === 'schedule' || activeTab === 'personal_schedule' ? (
             selectedExamRoom ? (
@@ -694,36 +821,6 @@ export default function Home() {
                 />
               </>
             )
-          ) : activeTab === 'monitor' ? (
-            <ClassMonitorTools
-              records={records}
-              selectedClass={monitorClass}
-              onClassChange={setMonitorClass}
-            />
-          ) : activeTab === 'envelope' ? (
-            <RoomEnvelopeManager
-              sessions={sessions}
-              records={records}
-              selectedClass={currentUser?.lop || monitorClass}
-              onClassChange={setMonitorClass}
-              loginUsers={loginUsers}
-              hideClassSelector={true}
-            />
-          ) : activeTab === 'envelope_all' ? (
-            <AllMonitorsEnvelopes records={records} sessions={sessions} loginUsers={loginUsers} />
-          ) : activeTab === 'settlement' ? (
-            <SettlementManager records={records} sessions={sessions} loginUsers={loginUsers} />
-          ) : activeTab === 'monitors_list' ? (
-            <MonitorsList
-              users={loginUsers}
-              onClassClick={(classCode) => {
-                setMonitorClass(classCode);
-                setActiveTab('members');
-                setIsClassGroupOpen(true);
-              }}
-            />
-          ) : activeTab === 'course_compare' ? (
-            <CourseCompare data={courseCompareData} />
           ) : (
             <ClassMembers
               records={records}

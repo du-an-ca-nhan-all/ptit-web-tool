@@ -3,6 +3,8 @@ import Papa from 'papaparse';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
 
+// POST /api/exam-batches/import
+// Upload CSV exam schedule specifically for an Exam Batch
 export async function POST(req: NextRequest) {
   try {
     let authUser = await getCurrentUserFromCookie();
@@ -15,15 +17,34 @@ export async function POST(req: NextRequest) {
     }
 
     if (!authUser || !checkIsAdmin(authUser.role)) {
-      return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền import dữ liệu lịch thi' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Chỉ Quản trị viên (Admin) mới có quyền import dữ liệu lịch thi' },
+        { status: 403 }
+      );
     }
 
     const formData = await req.formData();
     const file = formData.get('file') as File;
-    const mode = formData.get('mode') as string; // 'replace' or 'append'
+    const batchCode = formData.get('batchCode') as string;
+    const mode = (formData.get('mode') as string) || 'replace'; // 'replace' | 'append'
 
     if (!file) {
-      return NextResponse.json({ error: 'Vui lòng tải lên tệp CSV' }, { status: 400 });
+      return NextResponse.json({ error: 'Vui lòng chọn tệp CSV để tải lên' }, { status: 400 });
+    }
+
+    if (!batchCode) {
+      return NextResponse.json({ error: 'Mã đợt thi (batchCode) là bắt buộc' }, { status: 400 });
+    }
+
+    const cleanBatchCode = String(batchCode).trim().toUpperCase();
+
+    // Ensure target batch exists
+    const batch = await prisma.examBatch.findUnique({
+      where: { code: cleanBatchCode },
+    });
+
+    if (!batch) {
+      return NextResponse.json({ error: `Đợt thi ${cleanBatchCode} không tồn tại` }, { status: 404 });
     }
 
     const csvText = await file.text();
@@ -35,10 +56,10 @@ export async function POST(req: NextRequest) {
     const validData = (parsed.data || []).filter((row) => row.MaSV);
 
     if (validData.length === 0) {
-      return NextResponse.json({ error: 'Không tìm thấy dòng dữ liệu hợp lệ nào trong CSV' }, { status: 400 });
+      return NextResponse.json({ error: 'Không tìm thấy bản ghi thi hợp lệ nào trong tệp CSV' }, { status: 400 });
     }
 
-    // Student main class map
+    // Extract student main class
     const studentMainClassMap = new Map<string, string>();
     validData.forEach((row) => {
       if (row.MaSV && row.MaLop && !row.MaLop.includes(',')) {
@@ -77,6 +98,7 @@ export async function POST(req: NextRequest) {
 
       examRecordsList.push({
         maSV,
+        batchCode: cleanBatchCode,
         nhomThi: row.NhomThi ? String(row.NhomThi).trim() : null,
         mapThi: row.MAPTHI ? String(row.MAPTHI).trim() : null,
         maMH: row.MaMH ? String(row.MaMH).trim() : null,
@@ -88,13 +110,16 @@ export async function POST(req: NextRequest) {
         ngayThi: row.NgayThi ? String(row.NgayThi).trim() : null,
         gioThi: row.GioThi ? String(row.GioThi).trim() : null,
         soPhutThi: row.SoPhutThi ? String(row.SoPhutThi).trim() : null,
-        maDotThi: row.MaDotThi ? String(row.MaDotThi).trim() : null,
-        tenDotThi: row.TenDotThi ? String(row.TenDotThi).trim() : null,
+        maDotThi: cleanBatchCode,
+        tenDotThi: batch.name,
       });
     });
 
+    // If replace mode, clear records of this batch first
     if (mode === 'replace') {
-      await prisma.examRecord.deleteMany();
+      await prisma.examRecord.deleteMany({
+        where: { batchCode: cleanBatchCode },
+      });
     }
 
     // Batch upsert students
@@ -136,12 +161,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Đã nhập thành công ${examRecordsList.length} bản ghi lịch thi và ${studentArray.length} sinh viên`,
+      message: `Đã nhập thành công ${examRecordsList.length} bản ghi lịch thi vào đợt "${batch.name}"`,
+      batchCode: cleanBatchCode,
       totalRecords: examRecordsList.length,
       totalStudents: studentArray.length,
     });
   } catch (error: any) {
-    console.error('Import exam records error:', error);
+    console.error('Batch import error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

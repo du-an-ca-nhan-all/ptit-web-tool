@@ -12,7 +12,7 @@ model User {
   id           Int       @id @default(autoincrement())
   username     String    @unique // Mã sinh viên (MaSV) hoặc admin username
   passwordHash String
-  role         String    @default("sinh_vien") // 'admin', 'lop_truong', 'sinh_vien'
+  role         String    @default("sinh_vien") // 'admin', 'lop_truong', 'admin,lop_truong', 'sinh_vien'
   isActive     Boolean   @default(true)
   lastLogin    DateTime?
   
@@ -26,7 +26,7 @@ model User {
   @@index([role])
 }
 
-// 2. Bảng Student: Lưu trữ toàn bộ thông tin sinh viên
+// 2. Bảng Student: Lưu trữ toàn bộ thông tin sinh viên và trạng thái học tập
 model Student {
   id           Int          @id @default(autoincrement())
   maSV         String       @unique // Mã sinh viên
@@ -35,9 +35,10 @@ model Student {
   hoTen        String?      // Họ và tên đầy đủ
   gioiTinh     String?      // 'Nam' | 'Nữ'
   ngaySinh     String?      // Ngày sinh
-  maLop        String?      // Mã lớp học chính (Ví dụ: D25TXCN11-K)
+  maLop        String?      // Mã lớp học quản lý chính (Ví dụ: D25TXCN11-K)
+  trangThai    String?      @default("DANG_HOC") // 'DANG_HOC' | 'BAO_LUU' | 'NGHI_HOC' | 'CHUYEN_LOP'
   soDienThoai  String?      // SĐT liên hệ
-  ghiChu       String?      // Ghi chú
+  ghiChu       String?      // Ghi chú (lý do chuyển lớp, bảo lưu, phân công...)
   
   // Quan hệ 1-1 với User
   user         User?
@@ -50,47 +51,61 @@ model Student {
 
   @@index([maSV])
   @@index([maLop])
+  @@index([trangThai])
   @@index([ten])
 }
 
-// 3. Bảng ExamRecord: Lưu thông tin lịch thi, liên kết với Student qua maSV
-model ExamRecord {
-  id         Int      @id @default(autoincrement())
-  maSV       String   // Foreign key liên kết tới Student.maSV
-  student    Student  @relation(fields: [maSV], references: [maSV], onDelete: Cascade)
+// 3. Bảng ExamBatch: Quản lý các đợt thi của trường
+model ExamBatch {
+  id           Int          @id @default(autoincrement())
+  code         String       @unique // Mã đợt thi (Ví dụ: "20252_TX", "20251_TX", "DOT1_HK2_2526")
+  name         String       // Tên đợt thi (Ví dụ: "ĐHTX HK2 2025-2026")
+  semester     String?      // Học kỳ (HK1, HK2, Hè)
+  academicYear String?      // Năm học (2025-2026)
+  startDate    String?      // Ngày bắt đầu
+  endDate      String?      // Ngày kết thúc
+  isActive     Boolean      @default(true) // Đợt thi đang diễn ra / mặc định
+  description  String?      // Ghi chú / mô tả
   
-  nhomThi    String?  // Nhóm thi
-  mapThi     String?  // Mã phòng thi (MAPTHI)
-  maMH       String?  // Mã môn học
-  tenMH      String?  // Tên môn học
-  maHTThi    String?  // Hình thức thi (TN, TL, TH, VD...)
-  nhomHoc    String?  // Nhóm học
-  toThi      String?  // Tổ thi
-  maLopMH    String?  // Mã lớp môn học từ danh sách thi
-  ngayThi    String?  // Ngày thi
-  gioThi     String?  // Giờ thi
-  soPhutThi  String?  // Thời lượng thi (phút)
-  maDotThi   String?  // Mã đợt thi
-  tenDotThi  String?  // Tên đợt thi
-  createdAt  DateTime @default(now())
+  // Liên kết các bản ghi lịch thi thuộc đợt thi này
+  examRecords  ExamRecord[]
+  
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+}
+
+// 4. Bảng ExamRecord: Lưu thông tin lịch thi, liên kết với Student qua maSV và ExamBatch qua batchCode
+model ExamRecord {
+  id         Int        @id @default(autoincrement())
+  maSV       String     // Foreign key liên kết tới Student.maSV
+  student    Student    @relation(fields: [maSV], references: [maSV], onDelete: Cascade)
+  
+  batchCode  String?    // Foreign key liên kết tới ExamBatch.code
+  examBatch  ExamBatch? @relation(fields: [batchCode], references: [code], onDelete: Cascade)
+
+  nhomThi    String?    // Nhóm thi
+  mapThi     String?    // Mã phòng thi (MAPTHI)
+  maMH       String?    // Mã môn học
+  tenMH      String?    // Tên môn học
+  maHTThi    String?    // Hình thức thi (TN, TL, TH, VD...)
+  nhomHoc    String?    // Nhóm học
+  toThi      String?    // Tổ thi
+  maLopMH    String?    // Mã lớp môn học từ danh sách thi
+  ngayThi    String?    // Ngày thi
+  gioThi     String?    // Giờ thi
+  soPhutThi  String?    // Thời lượng thi (phút)
+  maDotThi   String?    // Mã đợt thi
+  tenDotThi  String?    // Tên đợt thi
+  createdAt  DateTime   @default(now())
 
   @@index([maSV])
+  @@index([batchCode])
   @@index([maMH])
   @@index([ngayThi])
   @@index([mapThi])
-}
-
-// 4. Bảng ClassConfig: Cấu hình và danh sách ngoại lệ của các lớp
-model ClassConfig {
-  id               Int      @id @default(autoincrement())
-  classCode        String   @unique
-  monitorPhone     String?
-  includedStudents String?  // JSON array các mã SV ngoại lệ được gán vào lớp
-  excludedStudents String?  // JSON array các mã SV đã nghỉ/chuyển lớp
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([classCode])
 }
 
 // 5. Bảng CourseRegistration: Lưu dữ liệu so sánh đăng ký môn học
