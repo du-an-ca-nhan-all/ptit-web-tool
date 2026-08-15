@@ -72,8 +72,8 @@ export default function StudentCourseRegistration({
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const isAdmin = currentUser?.isAdmin || (currentUser?.role ? currentUser.role.includes('admin') : false);
-  const isMonitor = currentUser?.isMonitor || (currentUser?.role ? currentUser.role.includes('lop_truong') : false);
+  const isAdmin = !!currentUser?.isAdmin;
+  const isMonitor = !!currentUser?.isMonitor;
 
   // 1. Fetch current registered courses from database
   const fetchRegisteredCourses = async () => {

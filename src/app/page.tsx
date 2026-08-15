@@ -197,6 +197,17 @@ export default function Home() {
   const isMonitor = activeRole === 'lop_truong' || activeRole === 'admin';
   const canAccessMonitorTools = isMonitor || isAdmin;
 
+  const effectiveUser = useMemo(() => {
+    if (!currentUser) return null;
+    return {
+      ...currentUser,
+      role: activeRole,
+      activeRole: activeRole,
+      isAdmin: activeRole === 'admin',
+      isMonitor: activeRole === 'lop_truong' || activeRole === 'admin',
+    };
+  }, [currentUser, activeRole]);
+
   const [courseCompareData, setCourseCompareData] = useState<{
     main: any;
     subAccount: any;
@@ -1128,16 +1139,16 @@ export default function Home() {
                 localStorage.setItem('currentUser', JSON.stringify(updatedUser));
               }}
             />
-          ) : activeTab === 'registered_courses' && currentUser ? (
+          ) : activeTab === 'registered_courses' && effectiveUser ? (
             <StudentCourseRegistration
-              currentUser={currentUser}
+              currentUser={effectiveUser}
               onNavigateTab={(tab) => handleTabChange(tab)}
             />
           ) : activeTab === 'external_accounts_admin' && isAdmin ? (
-            <AdminExternalAccounts currentUser={currentUser!} />
+            <AdminExternalAccounts currentUser={effectiveUser!} />
           ) : activeTab === 'batches' ? (
             <ExamBatchManagement
-              currentUser={currentUser!}
+              currentUser={effectiveUser!}
               initialBatches={examBatches}
               initialActiveBatch={activeBatch}
               onBatchChanged={(batch) => {
@@ -1157,7 +1168,7 @@ export default function Home() {
           ) : activeTab === 'course_compare' ? (
             <CourseCompare
               data={courseCompareData}
-              currentUser={currentUser}
+              currentUser={effectiveUser}
               onNavigateTab={(tab) => handleTabChange(tab)}
               onReload={fetchCourseCompareData}
             />
@@ -1166,7 +1177,7 @@ export default function Home() {
               records={records}
               selectedClass={monitorClass}
               onClassChange={setMonitorClass}
-              currentUser={currentUser}
+              currentUser={effectiveUser}
               loginUsers={loginUsers}
               hasExamSchedule={hasExamSchedule}
               onImpersonate={isAdmin ? handleImpersonate : undefined}
@@ -1186,7 +1197,7 @@ export default function Home() {
             <RoomEnvelopeManager
               sessions={sessions}
               records={records}
-              selectedClass={currentUser?.lop || monitorClass}
+              selectedClass={effectiveUser?.lop || monitorClass}
               onClassChange={setMonitorClass}
               loginUsers={loginUsers}
               hideClassSelector={true}
@@ -1257,7 +1268,7 @@ export default function Home() {
               records={records}
               selectedClass={monitorClass}
               onClassChange={setMonitorClass}
-              currentUser={currentUser}
+              currentUser={effectiveUser}
               loginUsers={loginUsers}
               hasExamSchedule={hasExamSchedule}
               onImpersonate={isAdmin ? handleImpersonate : undefined}

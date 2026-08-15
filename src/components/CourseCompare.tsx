@@ -154,8 +154,7 @@ export default function CourseCompare({
   }, [activeSubAccount]);
 
   const hasMonitorData = monitorCourses.length > 0 && !!data?.main;
-  const isCurrentUserMonitor =
-    currentUser?.isMonitor || (currentUser?.role && currentUser.role.includes('lop_truong')) || false;
+  const isCurrentUserMonitor = !!currentUser?.isMonitor || !!currentUser?.isAdmin;
 
   const popupStats = useMemo(() => {
     if (!selectedCourse || !data?.allSubAccounts) return null;

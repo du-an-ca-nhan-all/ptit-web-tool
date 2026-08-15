@@ -93,8 +93,9 @@ export default function UserProfileScreen({
     };
   }>({});
 
-  const isAdmin = currentUser?.isAdmin || (currentUser?.role ? currentUser.role.includes('admin') : false);
-  const isMonitor = currentUser?.isMonitor || (currentUser?.role ? currentUser.role.includes('lop_truong') : false);
+  const currentEffectiveRole = activeRole || (currentUser?.isAdmin ? 'admin' : currentUser?.isMonitor ? 'lop_truong' : 'sinh_vien');
+  const isAdmin = currentEffectiveRole === 'admin';
+  const isMonitor = currentEffectiveRole === 'lop_truong';
   const fullName = student?.hoTen || currentUser.fullName || currentUser.username;
   const maSV = currentUser.username;
   const maLop = student?.maLop || currentUser.lop || 'Chưa cập nhật';
@@ -399,17 +400,17 @@ export default function UserProfileScreen({
             <div className="min-w-0">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{fullName}</h1>
-                {isAdmin && (
+                {currentEffectiveRole === 'admin' && (
                   <span className="bg-rose-500 text-white text-xs font-black px-3 py-1 rounded-full inline-flex items-center gap-1 shadow-sm">
                     <Crown className="w-3.5 h-3.5 text-amber-300" /> Quản Trị Viên (Admin)
                   </span>
                 )}
-                {isMonitor && (
+                {currentEffectiveRole === 'lop_truong' && (
                   <span className="bg-amber-400 text-slate-900 text-xs font-black px-3 py-1 rounded-full inline-flex items-center gap-1 shadow-sm">
                     <Crown className="w-3.5 h-3.5" /> Lớp Trưởng
                   </span>
                 )}
-                {!isAdmin && !isMonitor && (
+                {currentEffectiveRole === 'sinh_vien' && (
                   <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1">
                     <GraduationCap className="w-3.5 h-3.5" /> Sinh Viên
                   </span>

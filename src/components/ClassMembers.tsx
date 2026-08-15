@@ -140,7 +140,7 @@ export default function ClassMembers({
 
   const userOwnClass = currentUser?.lop;
   const isMyClass = userOwnClass && userOwnClass === selectedClass;
-  const canManageClass = currentUser?.role === 'admin' || (currentUser?.role === 'lop_truong' && isMyClass);
+  const canManageClass = !!currentUser?.isAdmin || (!!currentUser?.isMonitor && isMyClass);
 
   // Search Global Student database
   useEffect(() => {
