@@ -22,6 +22,9 @@ model User {
   // Quan hệ 1-N với ExternalAccount
   externalAccounts ExternalAccount[]
   
+  // Quan hệ 1-1 với TelegramConfig
+  telegramConfig   TelegramConfig?
+  
   // Quan hệ 1-N với ActivityLog
   activityLogs     ActivityLog[]
   
@@ -189,4 +192,32 @@ model ActivityLog {
   @@index([action])
   @@index([targetType])
   @@index([createdAt])
+}
+
+// 9. Bảng TelegramConfig: Lưu cấu hình thông báo Telegram cho từng tài khoản
+model TelegramConfig {
+  id                      Int       @id @default(autoincrement())
+  username                String    @unique // Mã sinh viên / Username
+  user                    User      @relation(fields: [username], references: [username], onDelete: Cascade)
+  
+  botToken                String    // Token Bot do @BotFather cấp (ví dụ: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ)
+  chatId                  String    // ID cuộc trò chuyện / Nhóm / Kênh (ví dụ: 123456789 hoặc -100123456789)
+  threadId                String?   // ID topic/thread trong nhóm (message_thread_id) nếu có
+  
+  isEnabled               Boolean   @default(true) // Bật/Tắt gửi thông báo
+  notifyExamSchedule      Boolean   @default(true) // Nhận thông báo khi có lịch thi / đổi lịch thi
+  notifyCourseRegistration Boolean   @default(true) // Nhận thông báo ĐKMH / học phí
+  notifyClassActivity     Boolean   @default(true) // Nhận thông báo biến động lớp / quyết toán
+  
+  lastTestedAt            DateTime? // Lần cuối gửi tin nhắn test
+  lastTestStatus          String?   // 'SUCCESS' | 'FAILED'
+  lastTestError           String?   // Thông báo lỗi nếu gửi test thất bại
+  botUsername             String?   // Username của bot sau khi test thành công (ví dụ: PTIT_Notify_bot)
+  botFirstName            String?   // Tên hiển thị của bot (ví dụ: PTIT Notification Bot)
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([username])
+  @@index([isEnabled])
 }

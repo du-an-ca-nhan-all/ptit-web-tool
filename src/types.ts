@@ -116,3 +116,22 @@ export const AVAILABLE_EXTERNAL_SYSTEMS = [
     iconKey: 'GraduationCap',
   },
 ];
+
+export interface TelegramConfigItem {
+  id?: number;
+  username: string;
+  botToken: string;
+  chatId: string;
+  threadId?: string | null;
+  isEnabled: boolean;
+  notifyExamSchedule: boolean;
+  notifyCourseRegistration: boolean;
+  notifyClassActivity: boolean;
+  lastTestedAt?: string | null;
+  lastTestStatus?: 'SUCCESS' | 'FAILED' | null;
+  lastTestError?: string | null;
+  botUsername?: string | null;
+  botFirstName?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}

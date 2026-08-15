@@ -30,7 +30,9 @@ import {
   Server,
   Zap,
   FileKey,
+  Send,
 } from 'lucide-react';
+import TelegramConfigSection from './TelegramConfigSection';
 
 interface UserProfileModalProps {
   currentUser: LoginUser & { student?: any };
@@ -38,7 +40,7 @@ interface UserProfileModalProps {
   onLogout: () => void;
   onProfileUpdated?: (updatedUser: any) => void;
   hasExamSchedule?: boolean;
-  initialTab?: 'PROFILE' | 'EXTERNAL_ACCOUNTS';
+  initialTab?: 'PROFILE' | 'EXTERNAL_ACCOUNTS' | 'TELEGRAM';
 }
 
 export default function UserProfileModal({
@@ -50,7 +52,7 @@ export default function UserProfileModal({
   initialTab = 'PROFILE',
 }: UserProfileModalProps) {
   const student = currentUser?.student || {};
-  const [activeTab, setActiveTab] = useState<'PROFILE' | 'EXTERNAL_ACCOUNTS'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'PROFILE' | 'EXTERNAL_ACCOUNTS' | 'TELEGRAM'>(initialTab);
   const [isEditing, setIsEditing] = useState(false);
   const [phone, setPhone] = useState(student?.soDienThoai || currentUser?.phoneNumber || '');
   const [note, setNote] = useState(student?.ghiChu || '');
@@ -373,6 +375,18 @@ export default function UserProfileModal({
                 Chưa kết nối
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('TELEGRAM')}
+            className={`pb-3 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer relative ${
+              activeTab === 'TELEGRAM'
+                ? 'border-sky-600 text-sky-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Send className="w-4 h-4" />
+            <span>Thông Báo Telegram</span>
           </button>
         </div>
 
@@ -749,6 +763,11 @@ export default function UserProfileModal({
                 </div>
               )}
             </div>
+          )}
+
+          {/* TAB 3: TELEGRAM CONFIGURATION */}
+          {activeTab === 'TELEGRAM' && (
+            <TelegramConfigSection currentUser={currentUser} />
           )}
         </div>
 

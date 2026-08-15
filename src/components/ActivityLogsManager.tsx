@@ -220,6 +220,34 @@ const ACTION_CONFIGS: Record<
     border: 'border-emerald-200',
     icon: Globe,
   },
+  SAVE_TELEGRAM_CONFIG: {
+    label: 'Lưu Cấu Hình Telegram',
+    bg: 'bg-sky-50',
+    text: 'text-sky-700',
+    border: 'border-sky-200',
+    icon: Globe,
+  },
+  TEST_TELEGRAM_CONFIG: {
+    label: 'Test Gửi Telegram',
+    bg: 'bg-sky-50',
+    text: 'text-sky-700',
+    border: 'border-sky-200',
+    icon: Globe,
+  },
+  TOGGLE_TELEGRAM_CONFIG: {
+    label: 'Bật/Tắt Telegram',
+    bg: 'bg-blue-50',
+    text: 'text-blue-700',
+    border: 'border-blue-200',
+    icon: Globe,
+  },
+  DELETE_TELEGRAM_CONFIG: {
+    label: 'Xóa Cấu Hình Telegram',
+    bg: 'bg-rose-50',
+    text: 'text-rose-700',
+    border: 'border-rose-200',
+    icon: Trash2,
+  },
 };
 
 export default function ActivityLogsManager({ currentUser }: ActivityLogsManagerProps) {

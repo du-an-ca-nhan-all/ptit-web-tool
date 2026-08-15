@@ -34,7 +34,9 @@ import {
   ChevronRight,
   Shield,
   X,
+  Send,
 } from 'lucide-react';
+import TelegramConfigSection from './TelegramConfigSection';
 
 interface UserProfileScreenProps {
   currentUser: LoginUser & { student?: any };
@@ -58,7 +60,7 @@ export default function UserProfileScreen({
   onSelectRole,
 }: UserProfileScreenProps) {
   const student = currentUser?.student || {};
-  const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'EXTERNAL_ACCOUNTS' | 'EXAMS' | 'SECURITY'>('OVERVIEW');
+  const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'EXTERNAL_ACCOUNTS' | 'TELEGRAM' | 'EXAMS' | 'SECURITY'>('OVERVIEW');
 
   // Edit personal profile state
   const [isEditing, setIsEditing] = useState(false);
@@ -497,6 +499,18 @@ export default function UserProfileScreen({
           {configuredCount > 0 && (
             <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white"></span>
           )}
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('TELEGRAM')}
+          className={`flex-1 min-w-[160px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer relative ${
+            activeSubTab === 'TELEGRAM'
+              ? 'bg-sky-600 text-white shadow-sm shadow-sky-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Send className="w-4 h-4" />
+          <span>Cấu Hình Telegram</span>
         </button>
 
         {hasExamSchedule && (
@@ -1012,6 +1026,11 @@ export default function UserProfileScreen({
             </div>
           )}
         </div>
+      )}
+
+      {/* SUB-TAB: TELEGRAM CONFIGURATION */}
+      {activeSubTab === 'TELEGRAM' && (
+        <TelegramConfigSection currentUser={currentUser} />
       )}
 
       {/* SUB-TAB 3: EXAM SCHEDULE FOR THIS STUDENT */}
