@@ -20,7 +20,8 @@ import {
   Database,
   Star,
   RefreshCw,
-  Info
+  Info,
+  Power,
 } from 'lucide-react';
 import { ExamBatchItem, LoginUser } from '../types';
 
@@ -136,6 +137,35 @@ export default function ExamBatchManagement({
       if (res.ok && data.success) {
         showToast(`Đã đặt "${batch.name}" làm đợt thi mặc định.`);
         fetchBatches();
+        if (onBatchChanged && data.batch) {
+          onBatchChanged(data.batch);
+        }
+      } else {
+        showToast(data.error || 'Có lỗi xảy ra', 'error');
+      }
+    } catch (err) {
+      showToast('Lỗi kết nối máy chủ', 'error');
+    }
+  };
+
+  // Handle Toggle Active (Bật / Tắt đợt thi)
+  const handleToggleBatch = async (batch: ExamBatchItem) => {
+    try {
+      const res = await fetch('/api/exam-batches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TOGGLE',
+          code: batch.code,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(data.message || 'Đã thay đổi trạng thái đợt thi');
+        fetchBatches();
+        if (onBatchChanged && data.batch) {
+          onBatchChanged(data.batch);
+        }
       } else {
         showToast(data.error || 'Có lỗi xảy ra', 'error');
       }
@@ -421,21 +451,12 @@ export default function ExamBatchManagement({
                       : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
                   }`}
                 >
-                  {/* Top Bar: Name & Status Badge */}
+                  {/* Top Bar: Name & Status Badge with Toggle Switch */}
                   <div>
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <h3 className="text-lg font-black text-slate-800 tracking-tight">{batch.name}</h3>
-                          {batch.isActive ? (
-                            <span className="bg-emerald-500 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm shadow-emerald-200">
-                              <Star className="w-3 h-3 fill-current" /> Đang Hoạt Động
-                            </span>
-                          ) : (
-                            <span className="bg-slate-100 text-slate-500 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                              Đã đóng / Chưa kích hoạt
-                            </span>
-                          )}
                         </div>
                         <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
                           <span className="bg-slate-100 px-2 py-0.5 rounded-md font-bold text-slate-700">
@@ -446,6 +467,34 @@ export default function ExamBatchManagement({
                           <span>•</span>
                           <span>{batch.academicYear || '2025-2026'}</span>
                         </div>
+                      </div>
+
+                      {/* Interactive BẬT / TẮT Toggle Switch */}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleBatch(batch)}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            batch.isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-200' : 'bg-slate-300'
+                          }`}
+                          title={batch.isActive ? 'Bấm để TẮT đợt thi này' : 'Bấm để BẬT đợt thi này'}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                              batch.isActive ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                        <span
+                          className={`text-[11px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                            batch.isActive
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs'
+                              : 'bg-slate-100 text-slate-500 border border-slate-200'
+                          }`}
+                        >
+                          <Power className="w-3 h-3" />
+                          {batch.isActive ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
+                        </span>
                       </div>
                     </div>
 
@@ -480,25 +529,41 @@ export default function ExamBatchManagement({
 
                   {/* Actions Bottom Bar */}
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100/80 gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      {!batch.isActive && (
-                        <button
-                          onClick={() => handleSetActive(batch)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition-colors cursor-pointer border border-indigo-200 shadow-sm"
-                          title="Đặt làm đợt thi mặc định cho toàn hệ thống"
-                        >
-                          <Star className="w-3.5 h-3.5" /> Đặt Mặc Định
-                        </button>
-                      )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => handleToggleBatch(batch)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer border shadow-xs ${
+                          batch.isActive
+                            ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                        }`}
+                        title={batch.isActive ? 'Tạm khóa / Tắt đợt thi này' : 'Kích hoạt / Bật đợt thi này'}
+                      >
+                        <Power className="w-3.5 h-3.5" />
+                        {batch.isActive ? 'Tắt Đợt Thi' : 'Bật Đợt Thi'}
+                      </button>
+
+                      <button
+                        onClick={() => handleSetActive(batch)}
+                        disabled={batch.isActive}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-colors border shadow-xs ${
+                          batch.isActive
+                            ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-default'
+                            : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 cursor-pointer'
+                        }`}
+                        title="Đặt làm đợt thi mặc định cho toàn hệ thống"
+                      >
+                        <Star className="w-3.5 h-3.5" />
+                        {batch.isActive ? 'Đang Mặc Định' : 'Đặt Mặc Định'}
+                      </button>
 
                       <button
                         onClick={() => {
                           setImportingBatch(batch);
                           setSelectedFile(null);
-                          setImportMode('replace');
                         }}
-                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-sm shadow-blue-200"
-                        title="Import tệp CSV lịch thi cho đợt này"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl transition-colors cursor-pointer border border-blue-200 shadow-sm"
+                        title="Nạp thêm / ghi đè lịch thi từ file CSV cho đợt này"
                       >
                         <Upload className="w-3.5 h-3.5" /> Import CSV
                       </button>
@@ -520,15 +585,18 @@ export default function ExamBatchManagement({
                           });
                           setIsCreateModalOpen(true);
                         }}
-                        className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-colors cursor-pointer"
+                        className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
                         title="Chỉnh sửa thông tin đợt thi"
                       >
                         <Edit3 className="w-4 h-4" />
                       </button>
 
                       <button
-                        onClick={() => setDeletingBatch(batch)}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                        onClick={() => {
+                          setDeletingBatch(batch);
+                          setDeleteRecordsOption(false);
+                        }}
+                        className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                         title="Xóa đợt thi & lịch thi liên quan"
                       >
                         <Trash2 className="w-4 h-4" />

@@ -154,7 +154,34 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3. ACTION: UPDATE
+    // 3. ACTION: TOGGLE (Bật / Tắt đợt thi)
+    if (action === 'TOGGLE') {
+      if (!code) {
+        return NextResponse.json({ error: 'Mã đợt thi (code) là bắt buộc' }, { status: 400 });
+      }
+
+      const cleanCode = String(code).trim().toUpperCase();
+      const current = await prisma.examBatch.findUnique({ where: { code: cleanCode } });
+      if (!current) {
+        return NextResponse.json({ error: 'Không tìm thấy đợt thi' }, { status: 404 });
+      }
+
+      const newActive = !current.isActive;
+      const updated = await prisma.examBatch.update({
+        where: { code: cleanCode },
+        data: { isActive: newActive },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: newActive
+          ? `Đã BẬT đợt thi "${updated.name}"`
+          : `Đã TẮT đợt thi "${updated.name}"`,
+        batch: updated,
+      });
+    }
+
+    // 4. ACTION: UPDATE
     if (action === 'UPDATE') {
       if (!code) {
         return NextResponse.json({ error: 'Mã đợt thi (code) là bắt buộc' }, { status: 400 });
@@ -186,13 +213,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. ACTION: DELETE
+    // 5. ACTION: DELETE
     if (action === 'DELETE') {
       if (!code) {
         return NextResponse.json({ error: 'Mã đợt thi (code) là bắt buộc' }, { status: 400 });
       }
 
       const cleanCode = String(code).trim().toUpperCase();
+
+      // Đợt thi luôn luôn tồn tại ít nhất 1 đợt
+      const totalCount = await prisma.examBatch.count();
+      if (totalCount <= 1) {
+        return NextResponse.json(
+          { error: 'Hệ thống luôn yêu cầu phải có ít nhất 1 đợt thi. Bạn không thể xóa đợt thi duy nhất còn lại.' },
+          { status: 400 }
+        );
+      }
+
       const deleteRecords = body.deleteRecords === true;
 
       if (deleteRecords) {
