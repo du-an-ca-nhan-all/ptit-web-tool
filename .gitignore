@@ -17,7 +17,7 @@ dist/
 
 # Playwright & test output
 .playwright-mcp/
-coverage/
+coveragLoe/
 
 # OS & Logs
 .DS_Store

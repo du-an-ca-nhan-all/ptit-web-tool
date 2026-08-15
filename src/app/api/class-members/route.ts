@@ -13,9 +13,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Mã lớp (classCode) là bắt buộc' }, { status: 400 });
     }
 
-    // Query students in this class with their exam records & user role
+    // Read class config for inclusions/exclusions
+    const config = await prisma.classConfig.findUnique({
+      where: { classCode },
+    });
+
+    const includedList: string[] = config?.includedStudents ? JSON.parse(config.includedStudents) : [];
+    const excludedList: string[] = config?.excludedStudents ? JSON.parse(config.excludedStudents) : [];
+
+    // Query active students for this class
     const studentsRaw = await prisma.student.findMany({
-      where: { maLop: classCode },
+      where: {
+        OR: [
+          { maLop: classCode },
+          { maSV: { in: includedList } },
+        ],
+        NOT: {
+          maSV: { in: excludedList },
+        },
+      },
       include: {
         user: { select: { role: true } },
         examRecords: {
@@ -24,6 +40,16 @@ export async function GET(req: NextRequest) {
       },
       orderBy: [{ ten: 'asc' }, { hoLot: 'asc' }],
     });
+
+    // Also fetch excluded students summary for this class
+    const excludedStudentsRaw = excludedList.length > 0
+      ? await prisma.student.findMany({
+          where: { maSV: { in: excludedList } },
+          include: {
+            examRecords: { select: { id: true } },
+          },
+        })
+      : [];
 
     // Find class monitor
     const monitor = await prisma.user.findFirst({
@@ -44,8 +70,9 @@ export async function GET(req: NextRequest) {
         HoTen: s.hoTen || `${s.hoLot || ''} ${s.ten || ''}`.trim(),
         PHAI: s.gioiTinh || 'Nam',
         NgaySinhC: s.ngaySinh || '',
-        MaLop: s.maLop || classCode,
+        MaLop: classCode,
         isMonitor: !!isMonitor,
+        isTransferred: includedList.includes(s.maSV),
         phone: s.soDienThoai || '',
         note: s.ghiChu || '',
         examCount: s.examRecords.length,
@@ -64,7 +91,7 @@ export async function GET(req: NextRequest) {
           NhomHoc: r.nhomHoc || '',
           'To thi': r.toThi || '',
           ToThi: r.toThi || '',
-          MaLop: s.maLop || r.maLopMH || classCode,
+          MaLop: classCode,
           NgayThi: r.ngayThi || '',
           GioThi: r.gioThi || '',
           SoPhutThi: r.soPhutThi || '',
@@ -74,8 +101,23 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const excludedStudents = excludedStudentsRaw.map((s) => ({
+      MaSV: s.maSV,
+      HoLotSV: s.hoLot || '',
+      TenSV: s.ten || '',
+      HoTen: s.hoTen || `${s.hoLot || ''} ${s.ten || ''}`.trim(),
+      PHAI: s.gioiTinh || 'Nam',
+      NgaySinhC: s.ngaySinh || '',
+      MaLop: s.maLop || classCode,
+      phone: s.soDienThoai || '',
+      note: s.ghiChu || '',
+      examCount: s.examRecords.length,
+    }));
+
     return NextResponse.json({
       students,
+      excludedStudents,
+      excludedCount: excludedStudents.length,
       monitor: monitor
         ? {
             username: monitor.username,
