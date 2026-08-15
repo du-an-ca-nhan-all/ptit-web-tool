@@ -42,6 +42,9 @@ interface UserProfileScreenProps {
   onProfileUpdated?: (updatedUser: any) => void;
   hasExamSchedule?: boolean;
   onNavigateTab?: (tab: string) => void;
+  userRoles?: string[];
+  activeRole?: string;
+  onSelectRole?: (role: string) => void;
 }
 
 export default function UserProfileScreen({
@@ -50,6 +53,9 @@ export default function UserProfileScreen({
   onProfileUpdated,
   hasExamSchedule = false,
   onNavigateTab,
+  userRoles = [],
+  activeRole,
+  onSelectRole,
 }: UserProfileScreenProps) {
   const student = currentUser?.student || {};
   const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'EXTERNAL_ACCOUNTS' | 'EXAMS' | 'SECURITY'>('OVERVIEW');
@@ -654,6 +660,73 @@ export default function UserProfileScreen({
 
           {/* Side Info Cards */}
           <div className="flex flex-col gap-6">
+            {/* Multi-Role Switcher Card */}
+            {userRoles.length > 1 && onSelectRole && (
+              <div className="bg-gradient-to-br from-indigo-900 to-purple-950 text-white rounded-3xl p-6 shadow-md border border-indigo-500/30 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-white/10 rounded-xl">
+                      <Crown className="w-5 h-5 text-amber-300" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-sm text-white">Chuyển Vai Trò Hoạt Động</h4>
+                      <p className="text-[11px] text-indigo-200">Bạn sở hữu {userRoles.length} vai trò trong hệ thống</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-1">
+                  {userRoles.map((r) => {
+                    const isCurrent = activeRole === r;
+                    return (
+                      <button
+                        key={r}
+                        onClick={() => onSelectRole(r)}
+                        className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all cursor-pointer text-left border ${
+                          isCurrent
+                            ? 'bg-white text-slate-900 font-black border-white shadow-lg scale-[1.02]'
+                            : 'bg-white/10 hover:bg-white/20 text-white border-white/10 font-bold'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {r === 'admin' ? (
+                            <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
+                              👑
+                            </div>
+                          ) : r === 'lop_truong' ? (
+                            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                              🛡️
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                              🎓
+                            </div>
+                          )}
+                          <div>
+                            <div className="text-xs">
+                              {r === 'admin' ? 'Quản Trị Viên (Admin)' : r === 'lop_truong' ? 'Lớp Trưởng' : 'Sinh Viên'}
+                            </div>
+                            <div className={`text-[10px] ${isCurrent ? 'text-slate-500' : 'text-indigo-200'} font-normal`}>
+                              {r === 'admin'
+                                ? 'Toàn quyền cấu hình, đợt thi & QLĐT'
+                                : r === 'lop_truong'
+                                ? 'Quản lý sĩ số, phong bì & so sánh ĐKMH'
+                                : 'Xem lịch thi, môn học & hồ sơ cá nhân'}
+                            </div>
+                          </div>
+                        </div>
+                        {isCurrent && (
+                          <span className="px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded-lg shrink-0">
+                            Đang dùng
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Institution Card */}
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col gap-4">
               <div className="flex items-center gap-3">

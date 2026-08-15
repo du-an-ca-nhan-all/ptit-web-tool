@@ -42,6 +42,8 @@ export interface LoginUser {
   id?: number;
   username: string; // Mã sinh viên
   role?: string;    // 'admin' | 'lop_truong' | 'admin,lop_truong' | 'sinh_vien'
+  roles?: string[];  // Danh sách các vai trò user sở hữu: ['admin', 'lop_truong', 'sinh_vien']
+  activeRole?: string; // Vai trò hiện đang kích hoạt sử dụng
   isAdmin?: boolean;
   isMonitor?: boolean;
   password_hash?: string;

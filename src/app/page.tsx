@@ -24,6 +24,8 @@ import {
   UserCheck,
   ArrowRightLeft,
   ShieldAlert,
+  GraduationCap,
+  Check,
 } from 'lucide-react';
 import UploadSection from '../components/UploadSection';
 import FilterBar, { FilterState } from '../components/FilterBar';
@@ -140,8 +142,59 @@ export default function Home() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileInitialTab, setProfileInitialTab] = useState<'PROFILE' | 'EXTERNAL_ACCOUNTS'>('PROFILE');
 
-  const isAdmin = currentUser?.isAdmin || (currentUser?.role ? currentUser.role.includes('admin') : false);
-  const isMonitor = currentUser?.isMonitor || (currentUser?.role ? currentUser.role.includes('lop_truong') : false);
+  // User Available Roles
+  const userRoles = useMemo(() => {
+    if (!currentUser) return [];
+    const set = new Set<string>();
+    const rawRole = currentUser.role || '';
+    if (rawRole.includes('admin') || currentUser.isAdmin) set.add('admin');
+    if (rawRole.includes('lop_truong') || currentUser.isMonitor) set.add('lop_truong');
+    set.add('sinh_vien');
+    return Array.from(set);
+  }, [currentUser]);
+
+  const [activeRole, setActiveRole] = useState<string>('admin');
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+
+  // Sync activeRole with user selection / localStorage
+  useEffect(() => {
+    if (currentUser && userRoles.length > 0) {
+      const savedRole = localStorage.getItem('active_role_' + currentUser.username);
+      if (savedRole && userRoles.includes(savedRole)) {
+        setActiveRole(savedRole);
+      } else {
+        const defaultRole = userRoles.includes('admin')
+          ? 'admin'
+          : userRoles.includes('lop_truong')
+          ? 'lop_truong'
+          : 'sinh_vien';
+        setActiveRole(defaultRole);
+      }
+    }
+  }, [currentUser, userRoles]);
+
+  const handleSelectRole = (newRole: string) => {
+    if (!userRoles.includes(newRole)) return;
+    setActiveRole(newRole);
+    if (currentUser) {
+      localStorage.setItem('active_role_' + currentUser.username, newRole);
+    }
+    // Auto redirect tab if current tab is not accessible in the new role
+    if (newRole === 'sinh_vien') {
+      const monitorAdminTabs = ['batches', 'external_accounts_admin', 'members', 'monitor', 'envelope', 'envelope_all', 'settlement', 'monitors_list'];
+      if (monitorAdminTabs.includes(activeTab)) {
+        setActiveTab(hasExamSchedule ? 'personal_schedule' : 'registered_courses');
+      }
+    } else if (newRole === 'lop_truong') {
+      const adminOnlyTabs = ['batches', 'external_accounts_admin'];
+      if (adminOnlyTabs.includes(activeTab)) {
+        setActiveTab('members');
+      }
+    }
+  };
+
+  const isAdmin = activeRole === 'admin';
+  const isMonitor = activeRole === 'lop_truong' || activeRole === 'admin';
   const canAccessMonitorTools = isMonitor || isAdmin;
 
   const [courseCompareData, setCourseCompareData] = useState<{
@@ -763,6 +816,48 @@ export default function Home() {
           </div>
         )}
 
+        {/* Multi-Role Switcher in Sidebar */}
+        {currentUser && userRoles.length > 1 && (
+          <div className="mx-3 mb-3 p-2.5 bg-slate-900/90 rounded-2xl border border-slate-800 flex flex-col gap-2 shadow-inner">
+            <div className="flex items-center justify-between text-[10px] uppercase font-bold text-slate-400 px-1 tracking-wider">
+              <span>Chế độ vai trò:</span>
+              <span className="text-indigo-400 font-mono text-[9px] bg-indigo-950/80 px-1.5 py-0.5 rounded border border-indigo-800">
+                {userRoles.length} vai trò
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              {userRoles.map((r) => {
+                const isActive = activeRole === r;
+                return (
+                  <button
+                    key={r}
+                    onClick={() => handleSelectRole(r)}
+                    className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm ring-1 ring-white/20'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {r === 'admin' ? (
+                        <Crown className="w-3.5 h-3.5 text-rose-400" />
+                      ) : r === 'lop_truong' ? (
+                        <Crown className="w-3.5 h-3.5 text-amber-400" />
+                      ) : (
+                        <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
+                      )}
+                      <span>
+                        {r === 'admin' ? 'Quản Trị Viên' : r === 'lop_truong' ? 'Lớp Trưởng' : 'Sinh Viên'}
+                      </span>
+                    </div>
+                    {isActive && <Check className="w-3.5 h-3.5 text-white" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="p-4 border-t border-slate-800 text-slate-500 text-xs text-center flex flex-col gap-1">
           <div className="text-[11px] uppercase tracking-widest font-bold text-slate-400">HK2 2025 - 2026</div>
           <div className="text-[10px] text-slate-600 font-mono">SQLite • Next.js Fullstack</div>
@@ -894,6 +989,75 @@ export default function Home() {
             )}
           </div>
           <div className="flex items-center gap-3 md:gap-4">
+            {/* Multi-Role Quick Switcher in Header */}
+            {currentUser && userRoles.length > 1 && (
+              <div className="relative">
+                <button
+                  onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                  title="Nhấp để chuyển đổi vai trò sử dụng"
+                >
+                  {activeRole === 'admin' ? (
+                    <>
+                      <Crown className="w-3.5 h-3.5 text-rose-600" />
+                      <span className="hidden sm:inline">Quản Trị Viên</span>
+                    </>
+                  ) : activeRole === 'lop_truong' ? (
+                    <>
+                      <Crown className="w-3.5 h-3.5 text-amber-600" />
+                      <span className="hidden sm:inline">Lớp Trưởng</span>
+                    </>
+                  ) : (
+                    <>
+                      <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="hidden sm:inline">Sinh Viên</span>
+                    </>
+                  )}
+                  <ChevronDown className="w-3 h-3 text-slate-500" />
+                </button>
+
+                {isRoleDropdownOpen && (
+                  <div
+                    className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-200 p-1.5 z-40 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150"
+                    onMouseLeave={() => setIsRoleDropdownOpen(false)}
+                  >
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2.5 py-1 border-b border-slate-100">
+                      Chọn vai trò sử dụng:
+                    </div>
+                    {userRoles.map((r) => {
+                      const isActive = activeRole === r;
+                      return (
+                        <button
+                          key={r}
+                          onClick={() => {
+                            handleSelectRole(r);
+                            setIsRoleDropdownOpen(false);
+                          }}
+                          className={`w-full px-2.5 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                            isActive ? 'bg-indigo-50 text-indigo-700 font-black' : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {r === 'admin' ? (
+                              <Crown className="w-3.5 h-3.5 text-rose-600" />
+                            ) : r === 'lop_truong' ? (
+                              <Crown className="w-3.5 h-3.5 text-amber-600" />
+                            ) : (
+                              <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
+                            )}
+                            <span>
+                              {r === 'admin' ? 'Quản Trị Viên' : r === 'lop_truong' ? 'Lớp Trưởng' : 'Sinh Viên'}
+                            </span>
+                          </div>
+                          {isActive && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Impersonate Button (Admin only) */}
             {(isAdmin || !!currentUser?.impersonatedBy) && (
               <button
@@ -956,6 +1120,9 @@ export default function Home() {
               onLogout={handleLogout}
               hasExamSchedule={hasExamSchedule}
               onNavigateTab={(tab) => handleTabChange(tab)}
+              userRoles={userRoles}
+              activeRole={activeRole}
+              onSelectRole={handleSelectRole}
               onProfileUpdated={(updatedUser) => {
                 setCurrentUser(updatedUser);
                 localStorage.setItem('currentUser', JSON.stringify(updatedUser));
