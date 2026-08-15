@@ -83,8 +83,8 @@ model ExamRecord {
   maSV       String     // Foreign key liên kết tới Student.maSV
   student    Student    @relation(fields: [maSV], references: [maSV], onDelete: Cascade)
   
-  batchCode  String?    // Foreign key liên kết tới ExamBatch.code
-  examBatch  ExamBatch? @relation(fields: [batchCode], references: [code], onDelete: Cascade)
+  batchCode  String?    // Foreign key liên kết tới ExamBatch.code (Tùy chọn, có thể có hoặc không)
+  examBatch  ExamBatch? @relation(fields: [batchCode], references: [code], onDelete: SetNull)
 
   nhomThi    String?    // Nhóm thi
   mapThi     String?    // Mã phòng thi (MAPTHI)

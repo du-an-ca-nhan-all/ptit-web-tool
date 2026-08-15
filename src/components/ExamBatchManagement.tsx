@@ -50,6 +50,7 @@ export default function ExamBatchManagement({
   const [editingBatch, setEditingBatch] = useState<ExamBatchItem | null>(null);
   const [importingBatch, setImportingBatch] = useState<ExamBatchItem | null>(null);
   const [deletingBatch, setDeletingBatch] = useState<ExamBatchItem | null>(null);
+  const [deleteRecordsOption, setDeleteRecordsOption] = useState(false);
 
   // Form states for Create/Edit
   const [formData, setFormData] = useState({
@@ -197,6 +198,7 @@ export default function ExamBatchManagement({
         body: JSON.stringify({
           action: 'DELETE',
           code: deletingBatch.code,
+          deleteRecords: deleteRecordsOption,
         }),
       });
 
@@ -204,6 +206,7 @@ export default function ExamBatchManagement({
       if (res.ok && data.success) {
         showToast(data.message || 'Đã xóa đợt thi thành công');
         setDeletingBatch(null);
+        setDeleteRecordsOption(false);
         fetchBatches();
       } else {
         showToast(data.error || 'Không thể xóa đợt thi', 'error');
@@ -867,9 +870,28 @@ export default function ExamBatchManagement({
               </p>
             </div>
 
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-left">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteRecordsOption}
+                  onChange={(e) => setDeleteRecordsOption(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800">
+                    Xóa kèm toàn bộ {deletingBatch.totalRecords || 0} lượt thi thuộc đợt này
+                  </span>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Nếu không tích chọn, dữ liệu lịch thi vẫn được bảo lưu an toàn trong hệ thống.
+                  </p>
+                </div>
+              </label>
+            </div>
+
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs text-left font-medium flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Hành động này không thể hoàn tác.</span>
+              <span>Hành động xóa này không thể hoàn tác.</span>
             </div>
 
             <div className="flex items-center justify-center gap-2.5 pt-2">

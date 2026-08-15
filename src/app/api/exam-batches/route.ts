@@ -193,12 +193,22 @@ export async function POST(req: NextRequest) {
       }
 
       const cleanCode = String(code).trim().toUpperCase();
+      const deleteRecords = body.deleteRecords === true;
 
-      // Delete associated exam records and batch
-      await prisma.examRecord.deleteMany({ where: { batchCode: cleanCode } });
+      if (deleteRecords) {
+        // Delete associated exam records
+        await prisma.examRecord.deleteMany({ where: { batchCode: cleanCode } });
+      } else {
+        // Detach batchCode from exam records (preserve records)
+        await prisma.examRecord.updateMany({
+          where: { batchCode: cleanCode },
+          data: { batchCode: null },
+        });
+      }
+
       await prisma.examBatch.delete({ where: { code: cleanCode } });
 
-      // If active batch was deleted, activate the latest remaining batch
+      // If active batch was deleted, activate the latest remaining batch if any
       const activeRemaining = await prisma.examBatch.findFirst({ where: { isActive: true } });
       if (!activeRemaining) {
         const latest = await prisma.examBatch.findFirst({ orderBy: { createdAt: 'desc' } });
@@ -209,7 +219,9 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Đã xóa đợt thi ${cleanCode} và toàn bộ dữ liệu lịch thi liên quan`,
+        message: deleteRecords
+          ? `Đã xóa đợt thi ${cleanCode} và toàn bộ dữ liệu lịch thi liên quan`
+          : `Đã xóa đợt thi ${cleanCode} (dữ liệu lịch thi vẫn được bảo lưu an toàn)`,
       });
     }
 

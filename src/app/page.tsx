@@ -657,16 +657,34 @@ export default function Home() {
                 : 'Công Cụ Lớp Trưởng'}
             </h2>
 
-            {/* Active Exam Batch Selector / Badge in Header */}
-            {activeBatch && (
-              <div className="hidden lg:flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl text-xs font-bold text-indigo-700 shadow-sm">
-                <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                <span className="truncate max-w-[170px]" title={activeBatch.name}>
-                  {activeBatch.name}
-                </span>
-                <span className="bg-indigo-200/80 text-indigo-800 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded">
-                  {activeBatch.code}
-                </span>
+            {/* Active Exam Batch Selector in Header (Only when batches exist) */}
+            {examBatches.length > 0 && (
+              <div className="hidden lg:flex items-center gap-1.5 bg-indigo-50/80 border border-indigo-200 px-2.5 py-1 rounded-xl text-xs font-semibold shadow-xs">
+                <Layers className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <select
+                  value={activeBatch?.code || 'ALL'}
+                  onChange={(e) => {
+                    const code = e.target.value;
+                    if (code === 'ALL') {
+                      setActiveBatch(null);
+                      loadDataFromApi('ALL');
+                    } else {
+                      const selected = examBatches.find((b) => b.code === code);
+                      if (selected) {
+                        setActiveBatch(selected);
+                        loadDataFromApi(selected.code);
+                      }
+                    }
+                  }}
+                  className="bg-transparent font-bold text-indigo-950 focus:outline-none cursor-pointer py-0.5 pr-1 max-w-[220px] truncate"
+                >
+                  <option value="ALL">🌐 Tất cả đợt thi</option>
+                  {examBatches.map((b) => (
+                    <option key={b.code} value={b.code}>
+                      📁 {b.name} {b.isActive ? '(Mặc định)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 
