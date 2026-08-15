@@ -53,17 +53,10 @@ export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
 }
 
-export async function verifyPassword(password: string, storedHash: string, username: string): Promise<boolean> {
+export async function verifyPassword(password: string, storedHash: string, username?: string): Promise<boolean> {
   const cleanPass = String(password).trim();
-  const cleanUser = String(username).trim();
-
-  // Allow username as password for standard student logins
-  if (cleanPass.toUpperCase() === cleanUser.toUpperCase()) {
-    return true;
-  }
-
-  if (!storedHash) {
-    return cleanPass.toUpperCase() === cleanUser.toUpperCase();
+  if (!storedHash || storedHash.trim() === '') {
+    return false;
   }
 
   // SHA512 hash check (length 128 characters)

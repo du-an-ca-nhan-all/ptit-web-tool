@@ -24,6 +24,13 @@ export async function POST(req: NextRequest) {
     });
 
     if (user) {
+      if (!user.passwordHash || user.passwordHash.trim() === '') {
+        return NextResponse.json(
+          { error: 'Tài khoản chưa được kích hoạt mật khẩu. Vui lòng bấm "Đăng Ký Tài Khoản" để tạo mật khẩu và gửi yêu cầu kích hoạt.' },
+          { status: 401 }
+        );
+      }
+
       const isValid = await verifyPassword(password, user.passwordHash, user.username);
       if (!isValid) {
         await logActivity({
@@ -39,6 +46,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { error: 'Tài khoản hoặc mật khẩu không chính xác' },
           { status: 401 }
+        );
+      }
+
+      if (!user.isActive) {
+        return NextResponse.json(
+          { error: 'Tài khoản của bạn đang bị tạm khoá. Vui lòng liên hệ Quản trị viên.' },
+          { status: 403 }
         );
       }
 
@@ -93,64 +107,16 @@ export async function POST(req: NextRequest) {
       return response;
     }
 
-    // 2. Fallback: If user account not created yet, check if student exists
+    // 2. Check if student exists in Student database
     const student = await prisma.student.findUnique({
       where: { maSV: normalizedUsername },
     });
 
     if (student) {
-      if (password.trim().toUpperCase() === normalizedUsername) {
-        user = await prisma.user.create({
-          data: {
-            username: normalizedUsername,
-            passwordHash: '',
-            role: 'sinh_vien',
-            lastLogin: new Date(),
-          },
-          include: { student: true },
-        });
-
-        const roles = ['sinh_vien'];
-        const authPayload = {
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          roles,
-          isAdmin: false,
-          isMonitor: false,
-          fullName: student.hoTen || student.ten || user.username,
-          phoneNumber: student.soDienThoai || null,
-          lop: student.maLop || null,
-        };
-
-        await logActivity({
-          req,
-          userId: user.id,
-          username: user.username,
-          userRole: user.role,
-          action: 'LOGIN_FIRST_TIME',
-          targetType: 'AUTH',
-          targetId: user.username,
-          description: `Sinh viên ${user.username} (${authPayload.fullName}) đăng nhập lần đầu bằng MSSV`,
-        });
-
-        const token = await createAuthToken(authPayload);
-        const response = NextResponse.json({
-          success: true,
-          user: authPayload,
-          token,
-        });
-
-        response.cookies.set('auth_token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60,
-          path: '/',
-        });
-
-        return response;
-      }
+      return NextResponse.json(
+        { error: 'Tài khoản sinh viên chưa được đăng ký mật khẩu. Vui lòng bấm "Đăng Ký Tài Khoản" để khởi tạo.' },
+        { status: 401 }
+      );
     }
 
     await logActivity({

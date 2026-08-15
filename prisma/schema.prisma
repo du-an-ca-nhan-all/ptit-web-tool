@@ -289,3 +289,26 @@ model ClassScheduleReminderLog {
   @@index([targetDate])
   @@index([reminderType])
 }
+
+// 14. Bảng RegistrationRequest: Quản lý các yêu cầu đăng ký tài khoản chờ Admin xét duyệt
+model RegistrationRequest {
+  id           Int       @id @default(autoincrement())
+  username     String    // Mã sinh viên hoặc tên tài khoản (viết hoa)
+  fullName     String?   // Họ và tên
+  email        String?   // Email liên hệ
+  phoneNumber  String?   // Số điện thoại
+  lop          String?   // Mã lớp (Ví dụ: D25TXCN11-K)
+  passwordHash String    // Mật khẩu đã mã hoá bcrypt
+  status       String    @default("PENDING") // 'PENDING' | 'APPROVED' | 'REJECTED'
+  note         String?   // Ghi chú của người đăng ký hoặc lý do từ chối
+  reviewedBy   String?   // Username admin đã xử lý
+  reviewedAt   DateTime? // Thời điểm xử lý
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([username])
+  @@index([status])
+  @@index([createdAt])
+}
+

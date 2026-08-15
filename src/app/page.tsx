@@ -47,6 +47,7 @@ import ExamBatchManagement from '../components/ExamBatchManagement';
 import AdminExternalAccounts from '../components/AdminExternalAccounts';
 import ActivityLogsManager from '../components/ActivityLogsManager';
 import AdminTelegramBotManager from '../components/AdminTelegramBotManager';
+import AdminRegistrationManager from '../components/AdminRegistrationManager';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
 import { buildSessions } from '../utils/dataModel';
 
@@ -83,6 +84,7 @@ const getInitialState = () => {
         | 'external_accounts_admin'
         | 'activity_logs'
         | 'telegram_admin'
+        | 'user_registrations'
         | 'course_compare') || 'personal_schedule',
     search: params.get('search') || '',
     classCode: params.get('classCode') || '',
@@ -118,6 +120,7 @@ export default function Home() {
     | 'external_accounts_admin'
     | 'activity_logs'
     | 'telegram_admin'
+    | 'user_registrations'
     | 'course_compare'
   >(initialState.tab as any);
 
@@ -215,12 +218,12 @@ export default function Home() {
 
     // Auto redirect tab if current tab is not accessible in the new role
     if (newRole === 'sinh_vien') {
-      const monitorAdminTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'telegram_admin', 'members', 'monitor', 'envelope', 'envelope_all', 'settlement', 'monitors_list'];
+      const monitorAdminTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'telegram_admin', 'user_registrations', 'members', 'monitor', 'envelope', 'envelope_all', 'settlement', 'monitors_list'];
       if (monitorAdminTabs.includes(activeTab)) {
         setActiveTab(hasExamSchedule ? 'personal_schedule' : 'registered_courses');
       }
     } else if (newRole === 'lop_truong') {
-      const adminOnlyTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'telegram_admin'];
+      const adminOnlyTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'telegram_admin', 'user_registrations'];
       if (adminOnlyTabs.includes(activeTab)) {
         setActiveTab('members');
       }
@@ -257,7 +260,7 @@ export default function Home() {
   const [impersonateError, setImpersonateError] = useState('');
 
   const handleTabChange = (tab: any) => {
-    const adminOnlyTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'telegram_admin'];
+    const adminOnlyTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'telegram_admin', 'user_registrations'];
     if (adminOnlyTabs.includes(tab) && !isAdmin) {
       return;
     }
@@ -922,6 +925,18 @@ export default function Home() {
               >
                 <History className="w-4 h-4 text-indigo-400" /> Nhật Ký Hoạt Động
               </button>
+
+              {/* Duyệt Đăng Ký Tài Khoản */}
+              <button
+                onClick={() => handleTabChange('user_registrations')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'user_registrations'
+                    ? 'bg-emerald-600/25 text-emerald-400 border border-emerald-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <UserCheck className="w-4 h-4 text-emerald-400" /> Duyệt Đăng Ký
+              </button>
             </div>
           )}
         </nav>
@@ -1278,6 +1293,8 @@ export default function Home() {
             <ActivityLogsManager currentUser={effectiveUser!} />
           ) : activeTab === 'telegram_admin' && isAdmin ? (
             <AdminTelegramBotManager currentUser={effectiveUser!} />
+          ) : activeTab === 'user_registrations' && isAdmin ? (
+            <AdminRegistrationManager currentUser={effectiveUser!} />
           ) : activeTab === 'batches' ? (
             <ExamBatchManagement
               currentUser={effectiveUser!}
