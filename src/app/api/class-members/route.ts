@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
+import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
+
+async function getAuthUser(req: NextRequest) {
+  let authUser = await getCurrentUserFromCookie();
+  if (!authUser) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      authUser = await verifyAuthToken(token);
+    }
+  }
+  return authUser;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -135,6 +148,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const authUser = await getAuthUser(req);
+    if (!authUser) {
+      return NextResponse.json({ error: 'Vui lòng đăng nhập' }, { status: 401 });
+    }
+
     const body = await req.json();
     const {
       MaSV,
@@ -153,6 +171,16 @@ export async function POST(req: NextRequest) {
 
     const cleanMaSV = String(MaSV).trim().toUpperCase();
     const cleanLop = String(MaLop).trim();
+
+    // Guard: Class permission check
+    const isAdmin = authUser.role === 'admin';
+    if (!isAdmin && authUser.lop !== cleanLop) {
+      return NextResponse.json(
+        { error: `Bạn chỉ có quyền chỉnh sửa thông tin thành viên thuộc lớp của mình (${authUser.lop})` },
+        { status: 403 }
+      );
+    }
+
     const hoLot = HoLotSV !== undefined ? String(HoLotSV).trim() : undefined;
     const ten = TenSV !== undefined ? String(TenSV).trim() : undefined;
     const hoTen = hoLot || ten ? `${hoLot || ''} ${ten || ''}`.trim() : undefined;
@@ -202,14 +230,32 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const authUser = await getAuthUser(req);
+    if (!authUser) {
+      return NextResponse.json({ error: 'Vui lòng đăng nhập' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const maSV = searchParams.get('maSV');
+    const classCode = searchParams.get('classCode');
 
     if (!maSV) {
       return NextResponse.json({ error: 'maSV là bắt buộc' }, { status: 400 });
     }
 
     const cleanMaSV = maSV.toUpperCase();
+
+    // Check student's class
+    const student = await prisma.student.findUnique({ where: { maSV: cleanMaSV } });
+    const targetClass = classCode || student?.maLop;
+
+    const isAdmin = authUser.role === 'admin';
+    if (!isAdmin && targetClass && authUser.lop !== targetClass) {
+      return NextResponse.json(
+        { error: `Bạn chỉ có quyền xóa sinh viên thuộc lớp của mình (${authUser.lop})` },
+        { status: 403 }
+      );
+    }
 
     // Delete student & linked user (cascade)
     await prisma.student.deleteMany({

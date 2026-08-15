@@ -136,6 +136,7 @@ export default function ClassMembers({
 
   const userOwnClass = currentUser?.lop;
   const isMyClass = userOwnClass && userOwnClass === selectedClass;
+  const canManageClass = currentUser?.role === 'admin' || (currentUser?.role === 'lop_truong' && isMyClass);
 
   // Search Global Student database
   useEffect(() => {
@@ -457,18 +458,28 @@ export default function ClassMembers({
             </select>
           </div>
 
-          {/* Button Tiếp Nhận Sinh Viên */}
-          <button
-            onClick={() => {
-              setIsReceiveModalOpen(true);
-              setSearchGlobalQuery('');
-              setGlobalSearchResults([]);
-              setSelectedStudentToReceive(null);
-            }}
-            className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-200 whitespace-nowrap cursor-pointer hover:scale-[1.02]"
-          >
-            <UserPlus className="w-4 h-4" /> Tiếp Nhận SV
-          </button>
+          {/* Button Tiếp Nhận Sinh Viên - Chỉ hiện khi là Lớp Trưởng của lớp này hoặc Admin */}
+          {canManageClass ? (
+            <button
+              onClick={() => {
+                setIsReceiveModalOpen(true);
+                setSearchGlobalQuery('');
+                setGlobalSearchResults([]);
+                setSelectedStudentToReceive(null);
+              }}
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-200 whitespace-nowrap cursor-pointer hover:scale-[1.02]"
+              title="Tiếp nhận sinh viên chuyển biên chế vào lớp này"
+            >
+              <UserPlus className="w-4 h-4" /> Tiếp Nhận SV
+            </button>
+          ) : (
+            <span
+              className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 cursor-default"
+              title={`Chỉ Lớp trưởng của lớp ${selectedClass} mới có quyền tiếp nhận và điều chuyển sinh viên`}
+            >
+              Chế độ chỉ xem
+            </span>
+          )}
 
           <button
             onClick={handleExportCSV}
@@ -738,43 +749,51 @@ export default function ClassMembers({
                                 <Eye className="w-4 h-4" />
                               </button>
 
-                              <button
-                                onClick={() => {
-                                  setFormData({
-                                    phone: student.phone || '',
-                                    note: student.note || '',
-                                  });
-                                  setEditingStudent(student);
-                                }}
-                                className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                                title="Chỉnh sửa SĐT & ghi chú"
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </button>
+                              {canManageClass && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setFormData({
+                                        phone: student.phone || '',
+                                        note: student.note || '',
+                                      });
+                                      setEditingStudent(student);
+                                    }}
+                                    className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Chỉnh sửa SĐT & ghi chú"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
 
-                              {/* Button Điều chuyển / Loại khỏi lớp */}
-                              <button
-                                onClick={() => {
-                                  setStudentToExclude(student);
-                                  setExcludeType('BAO_LUU');
-                                  setExcludeReason('');
-                                  setExcludeTargetClass(classes.find((c) => c !== selectedClass) || '');
-                                }}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                title="Điều chuyển / Bảo lưu / Loại khỏi lớp"
-                              >
-                                <UserMinus className="w-4 h-4" />
-                              </button>
+                                  {/* Button Điều chuyển / Loại khỏi lớp */}
+                                  <button
+                                    onClick={() => {
+                                      setStudentToExclude(student);
+                                      setExcludeType('BAO_LUU');
+                                      setExcludeReason('');
+                                      setExcludeTargetClass(classes.find((c) => c !== selectedClass) || '');
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Điều chuyển / Bảo lưu / Loại khỏi lớp"
+                                  >
+                                    <UserMinus className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
                             </>
                           ) : (
                             /* Actions for Excluded Students: Restore button */
-                            <button
-                              onClick={() => handleRestoreStudent(student)}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors cursor-pointer shadow-sm"
-                              title="Khôi phục lại vào danh sách lớp"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" /> Khôi Phục
-                            </button>
+                            canManageClass ? (
+                              <button
+                                onClick={() => handleRestoreStudent(student)}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors cursor-pointer shadow-sm"
+                                title="Khôi phục lại vào danh sách lớp"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" /> Khôi Phục
+                              </button>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">Chỉ xem</span>
+                            )
                           )}
                         </div>
                       </td>

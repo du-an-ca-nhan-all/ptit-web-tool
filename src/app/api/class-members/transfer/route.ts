@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
+import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
+
+// Helper to get authenticated user
+async function getAuthUser(req: NextRequest) {
+  let authUser = await getCurrentUserFromCookie();
+  if (!authUser) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      authUser = await verifyAuthToken(token);
+    }
+  }
+  return authUser;
+}
 
 // Helper to get or create class config
 async function getClassConfig(classCode: string) {
@@ -80,6 +94,14 @@ export async function POST(req: NextRequest) {
   try {
     await ensureDatabaseSeeded(false);
 
+    const authUser = await getAuthUser(req);
+    if (!authUser) {
+      return NextResponse.json(
+        { error: 'Vui lòng đăng nhập để thực hiện thao tác này' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { action, maSV, currentClass, targetClass, type, reason, studentInfo } = body;
 
@@ -89,6 +111,18 @@ export async function POST(req: NextRequest) {
 
     const cleanMaSV = String(maSV).trim().toUpperCase();
 
+    // 🔒 PERMISSION CHECK: Lớp trưởng chỉ có quyền thao tác trên lớp của chính mình
+    const isAdmin = authUser.role === 'admin';
+    const isMonitor = authUser.role === 'lop_truong';
+    const userClass = authUser.lop;
+
+    if (!isAdmin && !isMonitor) {
+      return NextResponse.json(
+        { error: 'Chỉ lớp trưởng hoặc quản trị viên mới có quyền thay đổi sĩ số lớp' },
+        { status: 403 }
+      );
+    }
+
     // 1. ACTION: RECEIVE (Nhận sinh viên từ lớp khác sang lớp quản lý)
     if (action === 'RECEIVE') {
       if (!targetClass) {
@@ -96,6 +130,14 @@ export async function POST(req: NextRequest) {
       }
 
       const cleanTargetClass = String(targetClass).trim();
+
+      // Guard: Check class permission
+      if (!isAdmin && userClass !== cleanTargetClass) {
+        return NextResponse.json(
+          { error: `Bạn chỉ có quyền tiếp nhận sinh viên vào lớp của mình (${userClass}), không thể thao tác trên lớp ${cleanTargetClass}` },
+          { status: 403 }
+        );
+      }
 
       // Find or create student
       let student = await prisma.student.findUnique({
@@ -184,6 +226,15 @@ export async function POST(req: NextRequest) {
       }
 
       const cleanCurrentClass = String(currentClass).trim();
+
+      // Guard: Check class permission
+      if (!isAdmin && userClass !== cleanCurrentClass) {
+        return NextResponse.json(
+          { error: `Bạn chỉ có quyền loại bỏ/điều chuyển sinh viên thuộc lớp của mình (${userClass}), không thể thao tác trên lớp ${cleanCurrentClass}` },
+          { status: 403 }
+        );
+      }
+
       const actionType = type || 'LOAI_BO'; // 'BAO_LUU' | 'NGHI_HOC' | 'CHUYEN_LOP' | 'LOAI_BO'
       const actionReason = reason ? String(reason).trim() : '';
 
@@ -255,6 +306,14 @@ export async function POST(req: NextRequest) {
       }
 
       const cleanTargetClass = String(targetClass).trim();
+
+      // Guard: Check class permission
+      if (!isAdmin && userClass !== cleanTargetClass) {
+        return NextResponse.json(
+          { error: `Bạn chỉ có quyền khôi phục sinh viên vào lớp của mình (${userClass}), không thể thao tác trên lớp ${cleanTargetClass}` },
+          { status: 403 }
+        );
+      }
 
       // Update class config: remove from excluded, add to included
       const { included, excluded } = await getClassConfig(cleanTargetClass);
