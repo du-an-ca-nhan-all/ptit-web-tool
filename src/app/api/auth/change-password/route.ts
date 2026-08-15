@@ -26,13 +26,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (newPassword.length < 6) {
-      return NextResponse.json(
-        { error: 'Mật khẩu mới phải có độ dài tối thiểu từ 6 ký tự trở lên' },
-        { status: 400 }
-      );
-    }
-
     // Find user in database
     const user = await prisma.user.findUnique({
       where: { id: authUser.id },

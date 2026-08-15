@@ -313,11 +313,6 @@ export default function UserProfileScreen({
       return;
     }
 
-    if (newPassword.length < 6) {
-      setPassErrorMsg('Mật khẩu mới phải có độ dài tối thiểu từ 6 ký tự trở lên.');
-      return;
-    }
-
     if (currentPassword === newPassword) {
       setPassErrorMsg('Mật khẩu mới không được trùng với mật khẩu hiện tại.');
       return;
@@ -1022,7 +1017,7 @@ export default function UserProfileScreen({
             <Shield className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <strong className="block font-bold mb-0.5">Lưu ý về mật khẩu đăng nhập:</strong>
-              Mật khẩu khởi tạo ban đầu là <strong>Mã sinh viên</strong> (viết in hoa). Để bảo mật thông tin học vụ và kết quả đăng ký môn học, bạn nên đổi sang mật khẩu cá nhân có độ dài tối thiểu 6 ký tự.
+              Mật khẩu khởi tạo ban đầu là <strong>Mã sinh viên</strong> (viết in hoa). Bạn có thể đổi sang bất kỳ mật khẩu nào tùy ý và nhập lại 2 lần để xác nhận.
             </div>
           </div>
 
@@ -1086,7 +1081,7 @@ export default function UserProfileScreen({
                   type={showNewPass ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                  placeholder="Nhập mật khẩu mới"
                   className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-10 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   required
                 />
@@ -1098,11 +1093,6 @@ export default function UserProfileScreen({
                   {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {newPassword && newPassword.length < 6 && (
-                <p className="text-[11px] text-amber-600 font-medium mt-1">
-                  • Mật khẩu cần dài ít nhất 6 ký tự ({newPassword.length}/6)
-                </p>
-              )}
             </div>
 
             {/* Field 3: Confirm New Password (2nd time) */}
@@ -1163,8 +1153,7 @@ export default function UserProfileScreen({
                   !currentPassword ||
                   !newPassword ||
                   !confirmPassword ||
-                  newPassword !== confirmPassword ||
-                  newPassword.length < 6
+                  newPassword !== confirmPassword
                 }
                 className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
