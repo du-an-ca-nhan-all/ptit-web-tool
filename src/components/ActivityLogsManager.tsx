@@ -16,6 +16,11 @@ import {
   Globe,
   FileSpreadsheet,
   AlertTriangle,
+  AlertCircle,
+  ShieldAlert,
+  Calendar,
+  Sparkles,
+  Check,
   Info,
   CheckCircle2,
   Trash2,
@@ -264,6 +269,87 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
   });
   const [selectedLogMetadata, setSelectedLogMetadata] = useState<any | null>(null);
 
+  const isAdmin = Boolean(
+    currentUser?.isAdmin ||
+    currentUser?.activeRole === 'admin' ||
+    (currentUser?.role === 'admin' && !currentUser?.activeRole)
+  );
+
+  // Delete / Cleanup logs state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<'COUNT' | 'DAYS' | 'ALL'>('COUNT');
+  const [deleteCount, setDeleteCount] = useState<number>(100);
+  const [customCountInput, setCustomCountInput] = useState<string>('');
+  const [deleteDays, setDeleteDays] = useState<number>(30);
+  const [cleanReminderLogs, setCleanReminderLogs] = useState<boolean>(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState('');
+  const [deleteErrorMsg, setDeleteErrorMsg] = useState('');
+  const [confirmAllText, setConfirmAllText] = useState('');
+
+  const handleDeleteLogs = async () => {
+    setIsDeleting(true);
+    setDeleteSuccessMsg('');
+    setDeleteErrorMsg('');
+
+    try {
+      let finalCount = deleteCount;
+      if (customCountInput && !isNaN(parseInt(customCountInput, 10)) && parseInt(customCountInput, 10) > 0) {
+        finalCount = parseInt(customCountInput, 10);
+      }
+
+      if (
+        deleteMode === 'ALL' &&
+        confirmAllText.trim().toUpperCase() !== 'XÓA TẤT CẢ' &&
+        confirmAllText.trim().toUpperCase() !== 'XOA TAT CA'
+      ) {
+        setDeleteErrorMsg('Vui lòng nhập đúng cụm từ "XÓA TẤT CẢ" để xác nhận xoá toàn bộ log.');
+        setIsDeleting(false);
+        return;
+      }
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const body: any = {
+        mode: deleteMode,
+        cleanReminderLogs,
+      };
+
+      if (deleteMode === 'COUNT') {
+        body.count = finalCount;
+      } else if (deleteMode === 'DAYS') {
+        body.days = deleteDays;
+      }
+
+      const res = await fetch('/api/activity-logs', {
+        method: 'DELETE',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDeleteSuccessMsg(data.message || `Đã xoá ${data.totalDeleted} bản ghi log thành công!`);
+        fetchLogs(1);
+        setTimeout(() => {
+          setShowDeleteModal(false);
+          setDeleteSuccessMsg('');
+          setConfirmAllText('');
+        }, 1800);
+      } else {
+        setDeleteErrorMsg(data.error || 'Lỗi khi xoá nhật ký.');
+      }
+    } catch (err: any) {
+      setDeleteErrorMsg('Lỗi kết nối máy chủ khi thực hiện xoá nhật ký.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const fetchLogs = useCallback(
     async (pageToFetch = 1) => {
       setIsLoading(true);
@@ -348,6 +434,22 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tổng Bản Ghi</div>
             <div className="text-lg font-black text-white">{pagination.total.toLocaleString('vi-VN')}</div>
           </div>
+
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setShowDeleteModal(true);
+                setDeleteSuccessMsg('');
+                setDeleteErrorMsg('');
+                setConfirmAllText('');
+              }}
+              className="px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-2xl transition-all shadow-md shadow-rose-600/30 flex items-center gap-2 cursor-pointer border border-rose-500/40"
+              title="Dọn dẹp và xoá bớt nhật ký hoạt động để giải phóng dung lượng CSDL"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Dọn Dẹp / Xoá Log</span>
+            </button>
+          )}
 
           <button
             onClick={() => fetchLogs(pagination.page)}
@@ -646,6 +748,268 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
                 className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold cursor-pointer"
               >
                 Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DỌN DẸP & XOÁ NHẬT KÝ HOẠT ĐỘNG */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-rose-900 via-slate-900 to-rose-950 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-rose-500/30 text-rose-300 rounded-xl border border-rose-400/30">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm">Dọn Dẹp & Xoá Nhật Ký Hoạt Động</h4>
+                  <p className="text-[11px] text-rose-200/80">
+                    Giải phóng dung lượng cơ sở dữ liệu và tối ưu hiệu năng
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => !isDeleting && setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="text-slate-400 hover:text-white cursor-pointer disabled:opacity-50"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-5 overflow-y-auto max-h-[75vh]">
+              {/* Alert Feedback */}
+              {deleteSuccessMsg && (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-emerald-900 text-xs font-bold animate-in fade-in">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span>{deleteSuccessMsg}</span>
+                </div>
+              )}
+
+              {deleteErrorMsg && (
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-2.5 text-rose-900 text-xs font-bold animate-in fade-in">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  <span>{deleteErrorMsg}</span>
+                </div>
+              )}
+
+              {/* Mode Selection Tabs */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">
+                  Chọn Phương Thức Dọn Dẹp:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'COUNT', label: 'Xoá N Bản Ghi', desc: 'Cũ nhất' },
+                    { id: 'DAYS', label: 'Theo Ngày', desc: 'Cũ hơn X ngày' },
+                    { id: 'ALL', label: 'Xoá Tất Cả', desc: 'Làm sạch toàn bộ' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setDeleteMode(tab.id as any);
+                        setDeleteErrorMsg('');
+                      }}
+                      className={`p-3 rounded-2xl text-left border transition-all cursor-pointer flex flex-col gap-0.5 ${
+                        deleteMode === tab.id
+                          ? tab.id === 'ALL'
+                            ? 'bg-rose-50 border-rose-400 text-rose-900 font-bold shadow-xs'
+                            : 'bg-indigo-50 border-indigo-400 text-indigo-900 font-bold shadow-xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="text-xs">{tab.label}</span>
+                      <span className="text-[10px] opacity-75">{tab.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* MODE 1: DELETE N OLDEST LOGS */}
+              {deleteMode === 'COUNT' && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-800">Số lượng bản ghi cũ cần xoá:</span>
+                    <span className="text-[11px] text-slate-500">
+                      Hiện có: <b>{pagination.total}</b> bản ghi
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {[50, 100, 200, 500, 1000, 5000].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => {
+                          setDeleteCount(num);
+                          setCustomCountInput('');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          deleteCount === num && !customCountInput
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {num.toLocaleString('vi-VN')}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/80">
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Hoặc nhập số lượng tùy chọn N:
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={pagination.total || 999999}
+                      value={customCountInput}
+                      onChange={(e) => {
+                        setCustomCountInput(e.target.value);
+                        if (e.target.value) {
+                          setDeleteCount(parseInt(e.target.value, 10) || 0);
+                        }
+                      }}
+                      placeholder={`Nhập số bản ghi cần xoá (ví dụ: ${deleteCount})...`}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 italic">
+                    💡 Hệ thống sẽ tự động quét và xoá đi <strong>{customCountInput ? parseInt(customCountInput, 10) || 0 : deleteCount}</strong> bản ghi được tạo sớm nhất, giữ lại toàn bộ bản ghi mới nhất.
+                  </p>
+                </div>
+              )}
+
+              {/* MODE 2: DELETE LOGS OLDER THAN X DAYS */}
+              {deleteMode === 'DAYS' && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-3">
+                  <span className="text-xs font-bold text-slate-800">
+                    Xoá các bản ghi được ghi nhận trước:
+                  </span>
+
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { days: 7, label: '7 ngày trước (1 tuần)' },
+                      { days: 14, label: '14 ngày trước (2 tuần)' },
+                      { days: 30, label: '30 ngày trước (1 tháng)' },
+                      { days: 60, label: '60 ngày trước (2 tháng)' },
+                      { days: 90, label: '90 ngày trước (3 tháng)' },
+                    ].map((item) => (
+                      <button
+                        key={item.days}
+                        type="button"
+                        onClick={() => setDeleteDays(item.days)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          deleteDays === item.days
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 italic">
+                    💡 Toàn bộ các nhật ký hoạt động có thời điểm tạo trước <strong>{deleteDays} ngày</strong> sẽ được dọn dẹp khỏi cơ sở dữ liệu.
+                  </p>
+                </div>
+              )}
+
+              {/* MODE 3: DELETE ALL LOGS */}
+              {deleteMode === 'ALL' && (
+                <div className="bg-rose-50 p-4 rounded-2xl border border-rose-300 flex flex-col gap-3">
+                  <div className="flex items-center gap-2 text-rose-800 font-bold text-xs">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>CẢNH BÁO NGUY HIỂM: XOÁ TOÀN BỘ NHẬT KÝ</span>
+                  </div>
+
+                  <p className="text-[11px] text-rose-900 leading-relaxed">
+                    Hành động này sẽ xoá <strong>toàn bộ {pagination.total.toLocaleString('vi-VN')} bản ghi</strong> nhật ký hoạt động trong hệ thống và không thể khôi phục.
+                  </p>
+
+                  <div className="pt-2 border-t border-rose-200">
+                    <label className="block text-[11px] font-bold text-rose-800 mb-1">
+                      Nhập chữ <code className="font-mono text-rose-900 bg-rose-200 px-1 py-0.5 rounded">XÓA TẤT CẢ</code> để xác nhận:
+                    </label>
+                    <input
+                      type="text"
+                      value={confirmAllText}
+                      onChange={(e) => setConfirmAllText(e.target.value)}
+                      placeholder="Gõ XÓA TẤT CẢ..."
+                      className="w-full bg-white border border-rose-300 rounded-xl px-3.5 py-2 text-xs font-bold text-rose-900 outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* OPTIONAL: CLEAN TELEGRAM REMINDER LOGS */}
+              <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-amber-50/70 border border-amber-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={cleanReminderLogs}
+                  onChange={(e) => setCleanReminderLogs(e.target.checked)}
+                  className="w-4 h-4 text-amber-600 rounded mt-0.5 cursor-pointer"
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-amber-900">
+                    Dọn dẹp cả nhật ký thông báo Telegram (Khuyên dùng)
+                  </span>
+                  <p className="text-[11px] text-amber-800/80 mt-0.5 leading-relaxed">
+                    Bao gồm các bản ghi theo dõi nhắc lịch thi, nhắc lịch học và thông báo QLDTTX để giải phóng tối đa dung lượng DB.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="px-5 py-2.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Hủy Bỏ
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteLogs}
+                disabled={
+                  isDeleting ||
+                  (deleteMode === 'ALL' &&
+                    confirmAllText.trim().toUpperCase() !== 'XÓA TẤT CẢ' &&
+                    confirmAllText.trim().toUpperCase() !== 'XOA TAT CA')
+                }
+                className={`px-6 py-2.5 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 ${
+                  deleteMode === 'ALL'
+                    ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'
+                    : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 shadow-rose-600/20'
+                }`}
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Đang dọn dẹp...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>
+                      {deleteMode === 'ALL'
+                        ? 'Xác Nhận Xoá Tất Cả Log'
+                        : deleteMode === 'COUNT'
+                        ? `Xác Nhận Xoá ${customCountInput ? parseInt(customCountInput, 10) || 0 : deleteCount} Log Cũ`
+                        : `Xác Nhận Xoá Log Cũ Hơn ${deleteDays} Ngày`}
+                    </span>
+                  </>
+                )}
               </button>
             </div>
           </div>

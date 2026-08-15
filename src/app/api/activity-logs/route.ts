@@ -140,3 +140,118 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+// DELETE /api/activity-logs
+// Clear logs (ALL, N oldest logs, older than X days, or selected IDs)
+export async function DELETE(req: NextRequest) {
+  try {
+    const authUser = await getAuthUser(req);
+    if (!authUser) {
+      return NextResponse.json({ error: 'Vui lòng đăng nhập để thực hiện' }, { status: 401 });
+    }
+
+    const isAdmin = checkIsAdmin(authUser.role) || (authUser as any).isAdmin;
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền xoá nhật ký hoạt động' }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const { mode, count, days, ids, cleanReminderLogs } = body;
+    let totalDeleted = 0;
+    const details: any = {};
+
+    if (mode === 'ALL') {
+      const deleteRes = await prisma.activityLog.deleteMany({});
+      totalDeleted += deleteRes.count;
+      details.activityLogsDeleted = deleteRes.count;
+
+      if (cleanReminderLogs) {
+        const [r1, r2, r3] = await Promise.all([
+          prisma.examReminderLog.deleteMany({}),
+          prisma.classScheduleReminderLog.deleteMany({}),
+          prisma.qldtAnnouncementLog.deleteMany({}),
+        ]);
+        details.examReminderLogsDeleted = r1.count;
+        details.classScheduleLogsDeleted = r2.count;
+        details.qldtAnnouncementLogsDeleted = r3.count;
+        totalDeleted += r1.count + r2.count + r3.count;
+      }
+    } else if (mode === 'COUNT' || count) {
+      const numToDelete = Math.max(1, parseInt(count, 10) || 100);
+      const oldest = await prisma.activityLog.findMany({
+        select: { id: true },
+        orderBy: { createdAt: 'asc' },
+        take: numToDelete,
+      });
+
+      if (oldest.length > 0) {
+        const deleteRes = await prisma.activityLog.deleteMany({
+          where: { id: { in: oldest.map((l) => l.id) } },
+        });
+        totalDeleted += deleteRes.count;
+        details.activityLogsDeleted = deleteRes.count;
+      }
+    } else if (mode === 'DAYS' || days) {
+      const numDays = Math.max(1, parseInt(days, 10) || 30);
+      const cutoffDate = new Date(Date.now() - numDays * 24 * 60 * 60 * 1000);
+
+      const deleteRes = await prisma.activityLog.deleteMany({
+        where: { createdAt: { lt: cutoffDate } },
+      });
+      totalDeleted += deleteRes.count;
+      details.activityLogsDeleted = deleteRes.count;
+
+      if (cleanReminderLogs) {
+        const [r1, r2, r3] = await Promise.all([
+          prisma.examReminderLog.deleteMany({ where: { sentAt: { lt: cutoffDate } } }),
+          prisma.classScheduleReminderLog.deleteMany({ where: { sentAt: { lt: cutoffDate } } }),
+          prisma.qldtAnnouncementLog.deleteMany({ where: { sentAt: { lt: cutoffDate } } }),
+        ]);
+        details.examReminderLogsDeleted = r1.count;
+        details.classScheduleLogsDeleted = r2.count;
+        details.qldtAnnouncementLogsDeleted = r3.count;
+        totalDeleted += r1.count + r2.count + r3.count;
+      }
+    } else if (mode === 'SELECTED' && Array.isArray(ids) && ids.length > 0) {
+      const numericIds = ids.map((id: any) => Number(id)).filter((id: number) => !isNaN(id));
+      const deleteRes = await prisma.activityLog.deleteMany({
+        where: { id: { in: numericIds } },
+      });
+      totalDeleted += deleteRes.count;
+      details.activityLogsDeleted = deleteRes.count;
+    } else {
+      return NextResponse.json({ error: 'Chế độ xoá không hợp lệ. Vui lòng chọn ALL, COUNT, DAYS hoặc SELECTED' }, { status: 400 });
+    }
+
+    // Log the deletion action for auditing
+    await logActivity({
+      req,
+      userId: authUser.id,
+      username: authUser.username,
+      userRole: authUser.role,
+      action: 'DELETE_LOGS',
+      targetType: 'ACTIVITY_LOG',
+      targetId: mode || 'CLEANUP',
+      description: `Admin ${authUser.username} đã dọn dẹp xoá ${totalDeleted} bản ghi log (${
+        mode === 'ALL'
+          ? 'Xoá tất cả log'
+          : mode === 'COUNT'
+          ? `Xoá ${count} bản ghi cũ nhất`
+          : mode === 'DAYS'
+          ? `Xoá log cũ hơn ${days} ngày`
+          : `Xoá ${ids?.length || 0} log được chọn`
+      })`,
+      metadata: details,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Đã dọn dẹp xoá thành công ${totalDeleted} bản ghi nhật ký!`,
+      totalDeleted,
+      details,
+    });
+  } catch (error: any) {
+    console.error('Delete activity logs error:', error);
+    return NextResponse.json({ error: error.message || 'Lỗi khi xoá nhật ký' }, { status: 500 });
+  }
+}
