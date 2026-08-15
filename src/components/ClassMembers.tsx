@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { ExamRecord, LoginUser } from '../types';
-import { Users, Download, Search, Plus, Calendar, Edit3, Trash2, Phone, Mail, FileText, Crown, X, Check, UserCheck, Eye, Filter, ArrowRight } from 'lucide-react';
+import { Users, Download, Search, Plus, Calendar, Edit3, Trash2, Phone, Crown, X, UserCheck, Eye } from 'lucide-react';
 
 interface ClassMembersProps {
   records: ExamRecord[];
@@ -12,9 +12,7 @@ interface ClassMembersProps {
 }
 
 interface StudentExtraInfo {
-  role?: string;
   phone?: string;
-  email?: string;
   note?: string;
 }
 
@@ -28,7 +26,7 @@ export default function ClassMembers({
 }: ClassMembersProps) {
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<'ALL' | 'NAM' | 'NU'>('ALL');
-  const [roleFilter, setRoleFilter] = useState<'ALL' | 'HAS_ROLE' | 'HAS_NOTE'>('ALL');
+  const [noteFilter, setNoteFilter] = useState<'ALL' | 'HAS_NOTE' | 'HAS_PHONE'>('ALL');
   
   // Selected student for detail/schedule viewing
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<any | null>(null);
@@ -44,43 +42,46 @@ export default function ClassMembers({
     TenSV: '',
     PHAI: 'Nam',
     NgaySinhC: '',
-    role: 'Sinh viên',
     phone: '',
-    email: '',
     note: ''
   });
 
-  // Local storage persistence for student notes/contacts & custom added students
-  const [extraInfoMap, setExtraInfoMap] = useState<Record<string, StudentExtraInfo>>(() => {
-    try {
-      const saved = localStorage.getItem(`class_member_notes_${selectedClass}`);
-      return saved ? JSON.parse(saved) : {};
-    } catch (e) {
-      return {};
-    }
-  });
+  // Database persistence for student notes/contacts
+  const [extraInfoMap, setExtraInfoMap] = useState<Record<string, StudentExtraInfo>>({});
+  const [customStudents, setCustomStudents] = useState<any[]>([]);
 
-  const [customStudents, setCustomStudents] = useState<any[]>(() => {
-    try {
-      const saved = localStorage.getItem(`custom_class_students_${selectedClass}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  // Reload local storage when selectedClass changes
+  // Load from API when selectedClass changes
   useEffect(() => {
-    try {
-      const savedNotes = localStorage.getItem(`class_member_notes_${selectedClass}`);
-      setExtraInfoMap(savedNotes ? JSON.parse(savedNotes) : {});
+    if (!selectedClass) return;
 
-      const savedCustom = localStorage.getItem(`custom_class_students_${selectedClass}`);
-      setCustomStudents(savedCustom ? JSON.parse(savedCustom) : []);
-    } catch (e) {
-      setExtraInfoMap({});
-      setCustomStudents([]);
-    }
+    fetch(`/api/class-members?classCode=${encodeURIComponent(selectedClass)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && Array.isArray(data.students)) {
+          const notes: Record<string, StudentExtraInfo> = {};
+          const custom: any[] = [];
+
+          data.students.forEach((s: any) => {
+            if (s.note || s.phone) {
+              notes[s.MaSV] = {
+                phone: s.phone,
+                note: s.note
+              };
+            }
+          });
+
+          setExtraInfoMap(notes);
+          return;
+        }
+      })
+      .catch(() => {
+        try {
+          const savedNotes = localStorage.getItem(`class_member_notes_${selectedClass}`);
+          setExtraInfoMap(savedNotes ? JSON.parse(savedNotes) : {});
+        } catch (e) {
+          setExtraInfoMap({});
+        }
+      });
   }, [selectedClass]);
 
   // Available classes in dataset
@@ -135,7 +136,6 @@ export default function ClassMembers({
           PHAI: r.PHAI || '',
           NgaySinhC: r.NgaySinhC || '',
           MaLop: r.MaLop,
-          isCustom: false
         });
       }
     });
@@ -146,20 +146,20 @@ export default function ClassMembers({
         studentsMap.set(cs.MaSV, {
           ...cs,
           MaLop: selectedClass,
-          isCustom: true
         });
       }
     });
 
-    // Merge extra info (role, phone, email, notes)
+    // Merge extra info (phone, notes)
     const students = Array.from(studentsMap.values()).map(s => {
       const extra = extraInfoMap[s.MaSV] || {};
       const exams = studentExamsMap.get(s.MaSV) || [];
+      const isMonitor = classMonitor?.username?.toLowerCase() === s.MaSV?.toLowerCase();
+
       return {
         ...s,
-        role: extra.role || (classMonitor?.username?.toLowerCase() === s.MaSV?.toLowerCase() ? 'Lớp trưởng' : 'Sinh viên'),
-        phone: extra.phone || '',
-        email: extra.email || '',
+        isMonitor,
+        phone: extra.phone || (isMonitor ? classMonitor?.phoneNumber : '') || '',
         note: extra.note || '',
         examCount: exams.length,
         exams: exams
@@ -197,21 +197,20 @@ export default function ClassMembers({
         if (phai !== 'nữ' && phai !== 'nu' && phai !== '0') return false;
       }
 
-      // Role filter
-      if (roleFilter === 'HAS_ROLE' && s.role === 'Sinh viên') return false;
-      if (roleFilter === 'HAS_NOTE' && !s.note) return false;
+      // Note / Phone filter
+      if (noteFilter === 'HAS_NOTE' && !s.note) return false;
+      if (noteFilter === 'HAS_PHONE' && !s.phone) return false;
 
       // Text search
       if (!searchStr) return true;
       const id = normalizeString(s.MaSV);
       const name = normalizeString(`${s.HoLotSV} ${s.TenSV}`);
-      const role = normalizeString(s.role);
       const phone = normalizeString(s.phone);
       const note = normalizeString(s.note);
 
-      return id.includes(searchStr) || name.includes(searchStr) || role.includes(searchStr) || phone.includes(searchStr) || note.includes(searchStr);
+      return id.includes(searchStr) || name.includes(searchStr) || phone.includes(searchStr) || note.includes(searchStr);
     });
-  }, [classStudents, search, genderFilter, roleFilter]);
+  }, [classStudents, search, genderFilter, noteFilter]);
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -233,7 +232,7 @@ export default function ClassMembers({
   }, [classStudents]);
 
   // Handle saving note/contact edit
-  const handleSaveStudentEdit = (e: React.FormEvent) => {
+  const handleSaveStudentEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent) return;
 
@@ -241,9 +240,7 @@ export default function ClassMembers({
     const updatedMap = {
       ...extraInfoMap,
       [mssv]: {
-        role: formData.role,
         phone: formData.phone,
-        email: formData.email,
         note: formData.note
       }
     };
@@ -251,58 +248,72 @@ export default function ClassMembers({
     setExtraInfoMap(updatedMap);
     localStorage.setItem(`class_member_notes_${selectedClass}`, JSON.stringify(updatedMap));
 
-    // If it's a custom added student, update basic info too
-    if (editingStudent.isCustom) {
-      const updatedCustom = customStudents.map(c => {
-        if (c.MaSV === mssv) {
-          return {
-            ...c,
-            HoLotSV: formData.HoLotSV,
-            TenSV: formData.TenSV,
-            PHAI: formData.PHAI,
-            NgaySinhC: formData.NgaySinhC
-          };
-        }
-        return c;
+    // Save to SQLite DB via API
+    try {
+      await fetch('/api/class-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          MaSV: mssv,
+          MaLop: selectedClass,
+          phone: formData.phone,
+          note: formData.note,
+        }),
       });
-      setCustomStudents(updatedCustom);
-      localStorage.setItem(`custom_class_students_${selectedClass}`, JSON.stringify(updatedCustom));
+    } catch (err) {
+      console.warn('Could not save member update to database API:', err);
     }
 
     setEditingStudent(null);
   };
 
   // Handle adding new student
-  const handleAddStudentSubmit = (e: React.FormEvent) => {
+  const handleAddStudentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.MaSV.trim() || !formData.TenSV.trim()) return;
 
     const newStudent = {
-      MaSV: formData.MaSV.trim(),
+      MaSV: formData.MaSV.trim().toUpperCase(),
       HoLotSV: formData.HoLotSV.trim(),
       TenSV: formData.TenSV.trim(),
       PHAI: formData.PHAI,
       NgaySinhC: formData.NgaySinhC.trim(),
       MaLop: selectedClass,
-      isCustom: true
     };
 
     const updatedCustom = [...customStudents, newStudent];
     setCustomStudents(updatedCustom);
-    localStorage.setItem(`custom_class_students_${selectedClass}`, JSON.stringify(updatedCustom));
 
-    if (formData.role || formData.phone || formData.email || formData.note) {
+    if (formData.phone || formData.note) {
       const updatedMap = {
         ...extraInfoMap,
         [newStudent.MaSV]: {
-          role: formData.role || 'Sinh viên',
           phone: formData.phone,
-          email: formData.email,
           note: formData.note
         }
       };
       setExtraInfoMap(updatedMap);
       localStorage.setItem(`class_member_notes_${selectedClass}`, JSON.stringify(updatedMap));
+    }
+
+    // Save to DB via API
+    try {
+      await fetch('/api/class-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          MaSV: newStudent.MaSV,
+          MaLop: selectedClass,
+          HoLotSV: newStudent.HoLotSV,
+          TenSV: newStudent.TenSV,
+          PHAI: newStudent.PHAI,
+          NgaySinhC: newStudent.NgaySinhC,
+          phone: formData.phone,
+          note: formData.note,
+        }),
+      });
+    } catch (err) {
+      console.warn('Could not save new student to database API:', err);
     }
 
     setIsAddingStudent(false);
@@ -312,30 +323,36 @@ export default function ClassMembers({
       TenSV: '',
       PHAI: 'Nam',
       NgaySinhC: '',
-      role: 'Sinh viên',
       phone: '',
-      email: '',
       note: ''
     });
   };
 
-  // Delete custom student
-  const handleDeleteCustomStudent = (mssv: string) => {
+  // Delete student
+  const handleDeleteStudent = async (mssv: string) => {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa sinh viên ${mssv} khỏi danh sách?`)) return;
     const updatedCustom = customStudents.filter(c => c.MaSV !== mssv);
     setCustomStudents(updatedCustom);
-    localStorage.setItem(`custom_class_students_${selectedClass}`, JSON.stringify(updatedCustom));
 
     const updatedNotes = { ...extraInfoMap };
     delete updatedNotes[mssv];
     setExtraInfoMap(updatedNotes);
     localStorage.setItem(`class_member_notes_${selectedClass}`, JSON.stringify(updatedNotes));
+
+    // Delete in DB via API
+    try {
+      await fetch(`/api/class-members?maSV=${encodeURIComponent(mssv)}&classCode=${encodeURIComponent(selectedClass)}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.warn('Could not delete student in database API:', err);
+    }
   };
 
   // Export CSV
   const handleExportCSV = () => {
     if (filteredStudents.length === 0) return;
-    const headers = ['STT', 'Mã SV', 'Họ lót', 'Tên', 'Giới tính', 'Ngày sinh', 'Chức vụ', 'SĐT', 'Email', 'Ghi chú', 'Số môn thi'].join(',');
+    const headers = ['STT', 'Mã SV', 'Họ lót', 'Tên', 'Giới tính', 'Ngày sinh', 'SĐT', 'Ghi chú', 'Số môn thi'].join(',');
     const rows = filteredStudents.map((s, index) => 
       [
         index + 1, 
@@ -344,9 +361,7 @@ export default function ClassMembers({
         s.TenSV, 
         s.PHAI, 
         s.NgaySinhC, 
-        s.role || 'Sinh viên',
         s.phone || '',
-        s.email || '',
         s.note || '',
         s.examCount
       ].map(val => `"${val || ''}"`).join(',')
@@ -402,7 +417,7 @@ export default function ClassMembers({
           {userOwnClass && userOwnClass !== selectedClass && (
             <button
               onClick={() => onClassChange(userOwnClass)}
-              className="px-3 py-2 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors shadow-sm whitespace-nowrap"
+              className="px-3 py-2 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors shadow-sm whitespace-nowrap cursor-pointer"
             >
               Về Lớp Của Tôi ({userOwnClass})
             </button>
@@ -425,7 +440,7 @@ export default function ClassMembers({
 
           <button 
             onClick={handleExportCSV}
-            className="flex items-center gap-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl transition-colors shadow-sm whitespace-nowrap"
+            className="flex items-center gap-2 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl transition-colors shadow-sm whitespace-nowrap cursor-pointer"
           >
             <Download className="w-4 h-4 text-blue-600" /> Xuất Danh Sách
           </button>
@@ -496,7 +511,7 @@ export default function ClassMembers({
               onChange={(e) => setSearch(e.target.value)}
             />
             {search && (
-              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             )}
@@ -508,33 +523,33 @@ export default function ClassMembers({
             <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm text-xs font-bold">
               <button
                 onClick={() => setGenderFilter('ALL')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${genderFilter === 'ALL' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${genderFilter === 'ALL' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
               >
                 Tất cả
               </button>
               <button
                 onClick={() => setGenderFilter('NAM')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${genderFilter === 'NAM' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${genderFilter === 'NAM' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
               >
                 Nam
               </button>
               <button
                 onClick={() => setGenderFilter('NU')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${genderFilter === 'NU' ? 'bg-rose-500 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${genderFilter === 'NU' ? 'bg-rose-500 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
               >
                 Nữ
               </button>
             </div>
 
-            {/* Role Filter Selector */}
+            {/* Note Filter Selector */}
             <select
-              value={roleFilter}
-              onChange={(e: any) => setRoleFilter(e.target.value)}
+              value={noteFilter}
+              onChange={(e: any) => setNoteFilter(e.target.value)}
               className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none shadow-sm cursor-pointer"
             >
-              <option value="ALL">Tất cả vai trò</option>
-              <option value="HAS_ROLE">Có chức vụ trong lớp</option>
+              <option value="ALL">Tất cả ghi chú</option>
               <option value="HAS_NOTE">Có ghi chú</option>
+              <option value="HAS_PHONE">Có số điện thoại</option>
             </select>
 
             {/* Add New Student Button */}
@@ -546,14 +561,12 @@ export default function ClassMembers({
                   TenSV: '',
                   PHAI: 'Nam',
                   NgaySinhC: '',
-                  role: 'Sinh viên',
                   phone: '',
-                  email: '',
                   note: ''
                 });
                 setIsAddingStudent(true);
               }}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-3.5 py-2 rounded-xl transition-colors shadow-sm ml-auto sm:ml-0"
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-3.5 py-2 rounded-xl transition-colors shadow-sm ml-auto sm:ml-0 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Thêm Thành Viên
             </button>
@@ -571,7 +584,7 @@ export default function ClassMembers({
                 <th className="px-4 sm:px-6 py-3.5 text-center">Phái</th>
                 <th className="px-4 sm:px-6 py-3.5">Ngày sinh</th>
                 <th className="px-4 sm:px-6 py-3.5 text-center">Số môn thi</th>
-                <th className="px-4 sm:px-6 py-3.5">Chức vụ / Ghi chú</th>
+                <th className="px-4 sm:px-6 py-3.5">SĐT & Ghi chú</th>
                 <th className="px-4 sm:px-6 py-3.5 text-right">Thao tác</th>
               </tr>
             </thead>
@@ -585,7 +598,6 @@ export default function ClassMembers({
               ) : (
                 filteredStudents.map((student, index) => {
                   const isFemale = (student.PHAI || '').toLowerCase().includes('nữ') || (student.PHAI || '').toLowerCase().includes('nu');
-                  const hasRole = student.role && student.role !== 'Sinh viên';
 
                   return (
                     <tr key={student.MaSV} className="hover:bg-blue-50/40 transition-colors">
@@ -593,7 +605,7 @@ export default function ClassMembers({
                       <td className="px-4 sm:px-6 py-3.5 font-mono font-bold text-blue-600">
                         <button
                           onClick={() => setSelectedStudentDetail(student)}
-                          className="hover:underline flex items-center gap-1 text-left"
+                          className="hover:underline flex items-center gap-1 text-left cursor-pointer"
                         >
                           {student.MaSV}
                         </button>
@@ -601,8 +613,10 @@ export default function ClassMembers({
                       <td className="px-4 sm:px-6 py-3.5 font-semibold text-slate-800">
                         <div className="flex items-center gap-2">
                           <span>{student.HoLotSV} <span className="font-extrabold text-slate-900">{student.TenSV}</span></span>
-                          {student.isCustom && (
-                            <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200">Bổ sung</span>
+                          {student.isMonitor && (
+                            <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
+                              <Crown className="w-3 h-3 text-amber-600" /> Lớp trưởng
+                            </span>
                           )}
                         </div>
                       </td>
@@ -619,7 +633,7 @@ export default function ClassMembers({
                       <td className="px-4 sm:px-6 py-3.5 text-center">
                         <button
                           onClick={() => setSelectedStudentDetail(student)}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 border border-slate-200"
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 border border-slate-200 cursor-pointer"
                         >
                           <Calendar className="w-3.5 h-3.5 text-blue-500" />
                           {student.examCount} môn
@@ -627,25 +641,18 @@ export default function ClassMembers({
                       </td>
                       <td className="px-4 sm:px-6 py-3.5">
                         <div className="flex flex-col gap-1">
-                          {hasRole ? (
-                            <span className="inline-flex items-center gap-1 font-bold text-xs bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md w-fit">
-                              <Crown className="w-3 h-3 text-amber-600" />
-                              {student.role}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-400">Sinh viên</span>
-                          )}
-
                           {student.phone && (
-                            <span className="text-[11px] font-mono text-slate-500 flex items-center gap-1">
+                            <span className="text-[11px] font-mono text-slate-700 flex items-center gap-1 font-semibold">
                               <Phone className="w-3 h-3 text-slate-400" /> {student.phone}
                             </span>
                           )}
 
-                          {student.note && (
+                          {student.note ? (
                             <span className="text-xs italic text-slate-500 line-clamp-1" title={student.note}>
                               "{student.note}"
                             </span>
+                          ) : !student.phone && (
+                            <span className="text-xs text-slate-400">—</span>
                           )}
                         </div>
                       </td>
@@ -653,7 +660,7 @@ export default function ClassMembers({
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => setSelectedStudentDetail(student)}
-                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                             title="Xem lịch thi & chi tiết"
                           >
                             <Eye className="w-4 h-4" />
@@ -667,28 +674,24 @@ export default function ClassMembers({
                                 TenSV: student.TenSV,
                                 PHAI: student.PHAI || 'Nam',
                                 NgaySinhC: student.NgaySinhC || '',
-                                role: student.role || 'Sinh viên',
                                 phone: student.phone || '',
-                                email: student.email || '',
                                 note: student.note || ''
                               });
                               setEditingStudent(student);
                             }}
-                            className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                            title="Chỉnh sửa ghi chú & thông tin"
+                            className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                            title="Chỉnh sửa SĐT & ghi chú"
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
 
-                          {student.isCustom && (
-                            <button
-                              onClick={() => handleDeleteCustomStudent(student.MaSV)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                              title="Xóa khỏi danh sách"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleDeleteStudent(student.MaSV)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Xóa khỏi danh sách"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -725,7 +728,7 @@ export default function ClassMembers({
                 </div>
               </div>
 
-              <button onClick={() => setSelectedStudentDetail(null)} className="p-2 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors">
+              <button onClick={() => setSelectedStudentDetail(null)} className="p-2 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -742,19 +745,13 @@ export default function ClassMembers({
                   <span className="font-bold text-slate-800">{selectedStudentDetail.NgaySinhC || '—'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 font-bold uppercase tracking-wider block">Chức vụ:</span>
-                  <span className="font-bold text-amber-700">{selectedStudentDetail.role || 'Sinh viên'}</span>
+                  <span className="text-slate-400 font-bold uppercase tracking-wider block">Lớp:</span>
+                  <span className="font-bold text-blue-600">{selectedStudentDetail.MaLop}</span>
                 </div>
                 {selectedStudentDetail.phone && (
-                  <div>
-                    <span className="text-slate-400 font-bold uppercase tracking-wider block">SĐT:</span>
+                  <div className="col-span-2 sm:col-span-3">
+                    <span className="text-slate-400 font-bold uppercase tracking-wider block">SĐT liên hệ:</span>
                     <span className="font-mono font-bold text-slate-800">{selectedStudentDetail.phone}</span>
-                  </div>
-                )}
-                {selectedStudentDetail.email && (
-                  <div>
-                    <span className="text-slate-400 font-bold uppercase tracking-wider block">Email:</span>
-                    <span className="font-bold text-slate-800">{selectedStudentDetail.email}</span>
                   </div>
                 )}
                 {selectedStudentDetail.note && (
@@ -770,11 +767,11 @@ export default function ClassMembers({
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-bold text-slate-800 flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-blue-600" />
-                    Lịch Thi Đã Đăng Ký ({selectedStudentDetail.exams.length} môn)
+                    Lịch Thi Đã Đăng Ký ({selectedStudentDetail.exams?.length || 0} môn)
                   </h4>
                 </div>
 
-                {selectedStudentDetail.exams.length === 0 ? (
+                {!selectedStudentDetail.exams || selectedStudentDetail.exams.length === 0 ? (
                   <p className="text-slate-400 italic text-xs py-4 text-center border border-dashed rounded-xl">Không có lịch thi nào được tìm thấy cho sinh viên này.</p>
                 ) : (
                   <div className="border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
@@ -807,23 +804,10 @@ export default function ClassMembers({
               </div>
             </div>
 
-            <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
-              {onSelectStudentSchedule ? (
-                <button
-                  onClick={() => {
-                    const id = selectedStudentDetail.MaSV;
-                    setSelectedStudentDetail(null);
-                    onSelectStudentSchedule(id);
-                  }}
-                  className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 border border-blue-200"
-                >
-                  Mở Lịch Thi Cá Nhân <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              ) : <div />}
-
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
               <button
                 onClick={() => setSelectedStudentDetail(null)}
-                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs rounded-xl transition-colors shadow-sm"
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
               >
                 Đóng
               </button>
@@ -832,171 +816,191 @@ export default function ClassMembers({
         </div>
       )}
 
-      {/* MODAL 2: Add or Edit Student */}
-      {(isAddingStudent || editingStudent) && (
+      {/* MODAL 2: Edit Student Info Modal */}
+      {editingStudent && (
         <div 
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6"
           onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setIsAddingStudent(false);
-              setEditingStudent(null);
-            }
+            if (e.target === e.currentTarget) setEditingStudent(null);
           }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden border border-slate-200">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-                <Edit3 className="w-5 h-5 text-blue-600" />
-                {isAddingStudent ? `Thêm Thành Viên Vào Lớp ${selectedClass}` : `Cập Nhật Thông Tin (${editingStudent?.MaSV})`}
+                <Edit3 className="w-4 h-4 text-blue-600" />
+                Chỉnh Sửa Thông Tin
               </h3>
-              <button 
-                onClick={() => {
-                  setIsAddingStudent(false);
-                  setEditingStudent(null);
-                }} 
-                className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors"
-              >
-                <X className="w-5 h-5" />
+              <button onClick={() => setEditingStudent(null)} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors cursor-pointer">
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={isAddingStudent ? handleAddStudentSubmit : handleSaveStudentEdit} className="p-6 flex flex-col gap-4 text-xs font-medium">
-              {/* MSSV */}
+            <form onSubmit={handleSaveStudentEdit} className="p-6 flex flex-col gap-4">
+              <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-500 block">Sinh viên:</span>
+                  <span className="font-bold text-slate-800 text-sm">{editingStudent.HoLotSV} {editingStudent.TenSV}</span>
+                </div>
+                <span className="font-mono font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200">{editingStudent.MaSV}</span>
+              </div>
+
               <div>
-                <label className="block text-slate-500 font-bold mb-1">Mã Sinh Viên (MSSV) *</label>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Số điện thoại liên hệ</label>
                 <input
                   type="text"
-                  disabled={!!editingStudent && !editingStudent.isCustom}
-                  required
-                  value={formData.MaSV}
-                  onChange={(e) => setFormData({ ...formData, MaSV: e.target.value })}
-                  placeholder="Ví dụ: 21110001"
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-mono font-bold text-slate-800 disabled:opacity-60"
+                  placeholder="Ví dụ: 0912345678"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
               </div>
 
-              {/* Name Fields */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-500 font-bold mb-1">Họ và Tên Lót</label>
-                  <input
-                    type="text"
-                    value={formData.HoLotSV}
-                    onChange={(e) => setFormData({ ...formData, HoLotSV: e.target.value })}
-                    placeholder="Nguyễn Văn"
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-500 font-bold mb-1">Tên *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.TenSV}
-                    onChange={(e) => setFormData({ ...formData, TenSV: e.target.value })}
-                    placeholder="An"
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
-                  />
-                </div>
-              </div>
-
-              {/* Gender & DOB */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-500 font-bold mb-1">Phái</label>
-                  <select
-                    value={formData.PHAI}
-                    onChange={(e) => setFormData({ ...formData, PHAI: e.target.value })}
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-800 cursor-pointer"
-                  >
-                    <option value="Nam">Nam</option>
-                    <option value="Nữ">Nữ</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-500 font-bold mb-1">Ngày Sinh</label>
-                  <input
-                    type="text"
-                    value={formData.NgaySinhC}
-                    onChange={(e) => setFormData({ ...formData, NgaySinhC: e.target.value })}
-                    placeholder="01/01/2003"
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
-                  />
-                </div>
-              </div>
-
-              {/* Role & Phone */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-500 font-bold mb-1">Chức Vụ Trách Nhiệm</label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-amber-700 cursor-pointer"
-                  >
-                    <option value="Sinh viên">Sinh viên</option>
-                    <option value="Lớp trưởng">Lớp trưởng</option>
-                    <option value="Lớp phó">Lớp phó</option>
-                    <option value="Bí thư">Bí thư</option>
-                    <option value="Tổ trưởng">Tổ trưởng</option>
-                    <option value="Khác">Chức vụ khác</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-500 font-bold mb-1">Số Điện Thoại</label>
-                  <input
-                    type="text"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="0912345678"
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Email */}
               <div>
-                <label className="block text-slate-500 font-bold mb-1">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="student@example.com"
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
-                />
-              </div>
-
-              {/* Note */}
-              <div>
-                <label className="block text-slate-500 font-bold mb-1">Ghi Chú</label>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Ghi chú</label>
                 <textarea
-                  rows={2}
+                  rows={3}
+                  placeholder="Ghi chú về sinh viên..."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
                   value={formData.note}
                   onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                  placeholder="Ghi chú cá nhân, hỗ trợ thi cử, đặc biệt..."
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 resize-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 mt-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 mt-2 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsAddingStudent(false);
-                    setEditingStudent(null);
-                  }}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-colors"
+                  onClick={() => setEditingStudent(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1.5"
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm shadow-blue-200 cursor-pointer"
                 >
-                  <Check className="w-4 h-4" /> Lưu Thay Đổi
+                  Lưu Thay Đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Add New Student Modal */}
+      {isAddingStudent && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsAddingStudent(false);
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden border border-slate-200">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                <Plus className="w-4 h-4 text-blue-600" />
+                Thêm Thành Viên Vào Lớp {selectedClass}
+              </h3>
+              <button onClick={() => setIsAddingStudent(false)} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddStudentSubmit} className="p-6 flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Mã sinh viên *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ví dụ: B25DTCN001"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono uppercase"
+                  value={formData.MaSV}
+                  onChange={(e) => setFormData({ ...formData, MaSV: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Họ và đệm</label>
+                  <input
+                    type="text"
+                    placeholder="Nguyễn Văn"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    value={formData.HoLotSV}
+                    onChange={(e) => setFormData({ ...formData, HoLotSV: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Tên *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="A"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold"
+                    value={formData.TenSV}
+                    onChange={(e) => setFormData({ ...formData, TenSV: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Giới tính</label>
+                  <select
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
+                    value={formData.PHAI}
+                    onChange={(e) => setFormData({ ...formData, PHAI: e.target.value })}
+                  >
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Ngày sinh</label>
+                  <input
+                    type="text"
+                    placeholder="DD/MM/YYYY"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    value={formData.NgaySinhC}
+                    onChange={(e) => setFormData({ ...formData, NgaySinhC: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Số điện thoại</label>
+                <input
+                  type="text"
+                  placeholder="0912345678"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Ghi chú</label>
+                <input
+                  type="text"
+                  placeholder="Ghi chú..."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  value={formData.note}
+                  onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 mt-2 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingStudent(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm shadow-blue-200 cursor-pointer"
+                >
+                  Thêm Sinh Viên
                 </button>
               </div>
             </form>

@@ -32,17 +32,26 @@ export interface ClassConfig {
 }
 
 export interface LoginUser {
-  username: string;
-  role?: string;
+  id?: number;
+  username: string; // Mã sinh viên
+  role?: string;    // 'admin' | 'lop_truong' | 'sinh_vien'
   password_hash?: string;
-  fullName?: string;
-  phoneNumber?: string;
-  email?: string;
-  lop?: string;
+  fullName?: string; // Lấy từ Student.hoTen
+  phoneNumber?: string; // Lấy từ Student.soDienThoai
+  lop?: string;      // Lấy từ Student.maLop
 }
 
-export interface LoginConfig {
-  users: LoginUser[];
+export interface StudentProfile {
+  id?: number;
+  maSV: string;
+  hoLot?: string;
+  ten?: string;
+  hoTen?: string;
+  gioiTinh?: string;
+  ngaySinh?: string;
+  maLop?: string;
+  soDienThoai?: string;
+  ghiChu?: string;
 }
 
 export interface SessionClassCount {

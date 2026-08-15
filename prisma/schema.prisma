@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// 1. Bảng User: Chuyên lưu thông tin đăng nhập và xác thực (Username là Mã sinh viên)
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique // Mã sinh viên (MaSV) hoặc admin username
+  passwordHash String
+  role         String    @default("sinh_vien") // 'admin', 'lop_truong', 'sinh_vien'
+  isActive     Boolean   @default(true)
+  lastLogin    DateTime?
+  
+  // Quan hệ 1-1 với thông tin sinh viên tương ứng
+  student      Student?  @relation(fields: [username], references: [maSV], onDelete: Cascade)
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([username])
+  @@index([role])
+}
+
+// 2. Bảng Student: Lưu trữ toàn bộ thông tin sinh viên
+model Student {
+  id           Int          @id @default(autoincrement())
+  maSV         String       @unique // Mã sinh viên
+  hoLot        String?      // Họ và tên đệm
+  ten          String?      // Tên
+  hoTen        String?      // Họ và tên đầy đủ
+  gioiTinh     String?      // 'Nam' | 'Nữ'
+  ngaySinh     String?      // Ngày sinh
+  maLop        String?      // Mã lớp học chính (Ví dụ: D25TXCN11-K)
+  soDienThoai  String?      // SĐT liên hệ
+  ghiChu       String?      // Ghi chú
+  
+  // Quan hệ 1-1 với User
+  user         User?
+  
+  // Quan hệ 1-N với Lịch thi
+  examRecords  ExamRecord[]
+  
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([maSV])
+  @@index([maLop])
+  @@index([ten])
+}
+
+// 3. Bảng ExamRecord: Lưu thông tin lịch thi, liên kết với Student qua maSV
+model ExamRecord {
+  id         Int      @id @default(autoincrement())
+  maSV       String   // Foreign key liên kết tới Student.maSV
+  student    Student  @relation(fields: [maSV], references: [maSV], onDelete: Cascade)
+  
+  nhomThi    String?  // Nhóm thi
+  mapThi     String?  // Mã phòng thi (MAPTHI)
+  maMH       String?  // Mã môn học
+  tenMH      String?  // Tên môn học
+  maHTThi    String?  // Hình thức thi (TN, TL, TH, VD...)
+  nhomHoc    String?  // Nhóm học
+  toThi      String?  // Tổ thi
+  maLopMH    String?  // Mã lớp môn học từ danh sách thi
+  ngayThi    String?  // Ngày thi
+  gioThi     String?  // Giờ thi
+  soPhutThi  String?  // Thời lượng thi (phút)
+  maDotThi   String?  // Mã đợt thi
+  tenDotThi  String?  // Tên đợt thi
+  createdAt  DateTime @default(now())
+
+  @@index([maSV])
+  @@index([maMH])
+  @@index([ngayThi])
+  @@index([mapThi])
+}
+
+// 4. Bảng ClassConfig: Cấu hình và danh sách ngoại lệ của các lớp
+model ClassConfig {
+  id               Int      @id @default(autoincrement())
+  classCode        String   @unique
+  monitorPhone     String?
+  includedStudents String?  // JSON array các mã SV ngoại lệ được gán vào lớp
+  excludedStudents String?  // JSON array các mã SV đã nghỉ/chuyển lớp
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([classCode])
+}
+
+// 5. Bảng CourseRegistration: Lưu dữ liệu so sánh đăng ký môn học
+model CourseRegistration {
+  id        Int      @id @default(autoincrement())
+  classCode String
+  type      String   // 'main' (lớp trưởng) hoặc 'sub' (sinh viên)
+  username  String?
+  data      String   // Dữ liệu JSON chi tiết môn học đã đăng ký
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([classCode])
+  @@index([username])
+}
+
+// 6. Bảng SystemMeta: Lưu trạng thái và cấu hình hệ thống
+model SystemMeta {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}

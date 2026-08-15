@@ -70,17 +70,8 @@ export default function MonitorsList({ users, onClassClick }: MonitorsListProps)
                       <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
                         <Phone className="w-4 h-4" />
                       </div>
-                      <span className={monitor.phoneNumber ? "text-slate-700 font-medium" : "text-slate-400 italic"}>
+                      <span className={monitor.phoneNumber ? "text-slate-700 font-medium font-mono" : "text-slate-400 italic"}>
                         {monitor.phoneNumber || 'Chưa có SĐT'}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <span className={monitor.email ? "text-slate-700 font-medium truncate" : "text-slate-400 italic"}>
-                        {monitor.email || 'Chưa có Email'}
                       </span>
                     </div>
                   </div>

@@ -10,6 +10,7 @@ interface SessionEnvelope {
   time: string;
   subject: string;
   subjectCode: string;
+  examFormat?: string;
   classCounts: { className: string; count: number }[];
   isResponsible: boolean;
 }

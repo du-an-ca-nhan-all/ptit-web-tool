@@ -1,8 +1,33 @@
+# dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
 build/
 dist/
+
+# SQLite databases & temp files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Playwright & test output
+.playwright-mcp/
 coverage/
+
+# OS & Logs
 .DS_Store
 *.log
-.env*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env*.local
+.env
 !.env.example
+.idea
