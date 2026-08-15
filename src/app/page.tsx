@@ -31,6 +31,7 @@ import ExamRoomMembers from '../components/ExamRoomMembers';
 import MonitorsList from '../components/MonitorsList';
 import CourseCompare from '../components/CourseCompare';
 import SettlementManager from '../components/SettlementManager';
+import UserProfileModal from '../components/UserProfileModal';
 import { ExamRecord, LoginUser, ExamSession } from '../types';
 import { buildSessions } from '../utils/dataModel';
 
@@ -120,6 +121,7 @@ export default function Home() {
 
   const [loginUsers, setLoginUsers] = useState<LoginUser[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const isMonitor = currentUser?.role === 'lop_truong';
 
@@ -529,6 +531,29 @@ export default function Home() {
           )}
         </nav>
 
+        {currentUser && (
+          <div
+            className="p-3 mx-3 mb-2 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl flex items-center justify-between cursor-pointer transition-colors"
+            onClick={() => setIsProfileOpen(true)}
+            title="Xem hồ sơ cá nhân"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden ring-1 ring-white/20 shrink-0">
+                <img
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`}
+                  alt={currentUser.fullName || currentUser.username}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-200 truncate">{currentUser.fullName || currentUser.username}</div>
+                <div className="text-[10px] font-mono text-slate-400">{currentUser.username}</div>
+              </div>
+            </div>
+            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          </div>
+        )}
+
         <div className="p-4 border-t border-slate-800 text-slate-500 text-xs text-center flex flex-col gap-1">
           <div className="text-[11px] uppercase tracking-widest font-bold text-slate-400">HK2 2025 - 2026</div>
           <div className="text-[10px] text-slate-600 font-mono">SQLite • Next.js Fullstack</div>
@@ -597,9 +622,10 @@ export default function Home() {
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
 
-            <div
-              className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-slate-500 font-bold overflow-hidden"
-              title={currentUser?.fullName || currentUser?.username || 'User'}
+            <button
+              onClick={() => setIsProfileOpen(true)}
+              className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-slate-500 font-bold overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 hover:scale-105 transition-all"
+              title={`Hồ sơ: ${currentUser?.fullName || currentUser?.username} (Bấm để xem)`}
             >
               <img
                 src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${
@@ -608,7 +634,7 @@ export default function Home() {
                 alt={currentUser?.fullName || currentUser?.username || 'User'}
                 className="w-full h-full object-cover"
               />
-            </div>
+            </button>
             {currentUser && (
               <button
                 onClick={handleLogout}
@@ -771,6 +797,19 @@ export default function Home() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* User Profile Modal */}
+      {isProfileOpen && currentUser && (
+        <UserProfileModal
+          currentUser={currentUser}
+          onClose={() => setIsProfileOpen(false)}
+          onLogout={handleLogout}
+          onProfileUpdated={(updatedUser) => {
+            setCurrentUser(updatedUser);
+            localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+          }}
+        />
       )}
     </div>
   );
