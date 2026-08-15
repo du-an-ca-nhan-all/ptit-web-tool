@@ -19,6 +19,7 @@ import {
   Database,
   RefreshCw,
   Layers,
+  Power,
 } from 'lucide-react';
 import UploadSection from '../components/UploadSection';
 import FilterBar, { FilterState } from '../components/FilterBar';
@@ -179,9 +180,9 @@ export default function Home() {
         const batchData = await batchesRes.json();
         if (batchData.batches) {
           setExamBatches(batchData.batches);
-          const active = batchData.activeBatch || batchData.batches[0] || null;
+          const active = batchData.batches.find((b: any) => b.isActive) || null;
           setActiveBatch(active);
-          if (!currentBatchCode && active) {
+          if (currentBatchCode === undefined && active) {
             currentBatchCode = active.code;
           }
         }
@@ -197,7 +198,7 @@ export default function Home() {
       }
 
       // 3. Fetch exam records from DB (filtered by batchCode if available)
-      const url = currentBatchCode
+      const url = currentBatchCode && currentBatchCode !== 'ALL'
         ? `/api/exam-records?all=true&batchCode=${encodeURIComponent(currentBatchCode)}`
         : '/api/exam-records?all=true';
       const recordsRes = await fetch(url);
@@ -214,6 +215,8 @@ export default function Home() {
     }
   }, []);
 
+  const hasActiveBatch = useMemo(() => examBatches.some((b) => b.isActive), [examBatches]);
+
   useEffect(() => {
     loadDataFromApi();
   }, [loadDataFromApi]);
@@ -221,12 +224,15 @@ export default function Home() {
   useEffect(() => {
     if (!isMounted || !currentUser) return;
     if (!isAdmin && activeTab === 'batches') {
-      setActiveTab('personal_schedule');
+      setActiveTab(hasActiveBatch ? 'personal_schedule' : 'members');
     }
     if (!canAccessMonitorTools && ['monitor', 'envelope', 'envelope_all', 'settlement', 'settings'].includes(activeTab)) {
-      setActiveTab('personal_schedule');
+      setActiveTab(hasActiveBatch ? 'personal_schedule' : 'members');
     }
-  }, [isMounted, currentUser, isAdmin, canAccessMonitorTools, activeTab]);
+    if (!hasActiveBatch && !isAdmin && (activeTab === 'schedule' || activeTab === 'personal_schedule')) {
+      setActiveTab('members');
+    }
+  }, [isMounted, currentUser, isAdmin, canAccessMonitorTools, hasActiveBatch, activeTab]);
 
   useEffect(() => {
     setSelectedExamRoom(null);
@@ -459,26 +465,38 @@ export default function Home() {
           </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1 scrollbar-hide">
-          <button
-            onClick={() => handleTabChange('schedule')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-              activeTab === 'schedule'
-                ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
-            }`}
-          >
-            <CalendarDays className="w-4 h-4" /> Lịch Thi Tổng Hợp
-          </button>
-          {currentUser && (
+          {(hasActiveBatch || isAdmin) && (
+            <button
+              onClick={() => handleTabChange('schedule')}
+              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                activeTab === 'schedule'
+                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <CalendarDays className="w-4 h-4" /> Lịch Thi Tổng Hợp
+              </div>
+              {!hasActiveBatch && (
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-mono">Tắt</span>
+              )}
+            </button>
+          )}
+          {currentUser && (hasActiveBatch || isAdmin) && (
             <button
               onClick={() => handleTabChange('personal_schedule')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 activeTab === 'personal_schedule'
                   ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
               }`}
             >
-              <User className="w-4 h-4" /> Lịch Thi Cá Nhân
+              <div className="flex items-center gap-3">
+                <User className="w-4 h-4" /> Lịch Thi Cá Nhân
+              </div>
+              {!hasActiveBatch && (
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-mono">Tắt</span>
+              )}
             </button>
           )}
           {currentUser && !isMonitor && (
@@ -657,8 +675,8 @@ export default function Home() {
                 : 'Công Cụ Lớp Trưởng'}
             </h2>
 
-            {/* Active Exam Batch Selector in Header (Only when batches exist) */}
-            {examBatches.length > 0 && (
+            {/* Active Exam Batch Selector in Header */}
+            {hasActiveBatch ? (
               <div className="hidden lg:flex items-center gap-1.5 bg-indigo-50/80 border border-indigo-200 px-2.5 py-1 rounded-xl text-xs font-semibold shadow-xs">
                 <Layers className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                 <select
@@ -681,10 +699,15 @@ export default function Home() {
                   <option value="ALL">🌐 Tất cả đợt thi</option>
                   {examBatches.map((b) => (
                     <option key={b.code} value={b.code}>
-                      📁 {b.name} {b.isActive ? '(Mặc định)' : ''}
+                      {b.isActive ? '🟢' : '⚪'} {b.name} {b.isActive ? '(Đang mở)' : '(Đã tắt)'}
                     </option>
                   ))}
                 </select>
+              </div>
+            ) : (
+              <div className="hidden lg:flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl text-xs font-bold text-amber-800 shadow-xs">
+                <Power className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>Đợt Thi Tạm Đóng</span>
               </div>
             )}
 
@@ -800,6 +823,24 @@ export default function Home() {
             <AllMonitorsEnvelopes records={records} sessions={sessions} loginUsers={loginUsers} />
           ) : activeTab === 'settlement' ? (
             <SettlementManager records={records} sessions={sessions} loginUsers={loginUsers} />
+          ) : !hasActiveBatch && (activeTab === 'schedule' || activeTab === 'personal_schedule') ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto my-auto animate-in fade-in duration-300">
+              <div className="w-16 h-16 bg-amber-50 border border-amber-200 rounded-3xl flex items-center justify-center text-amber-600 mb-4 shadow-sm">
+                <Power className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-black text-slate-800 mb-2">Hệ Thống Thi Đang Tạm Đóng</h3>
+              <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                Hiện tại tất cả các đợt thi đã được tạm khóa hoặc kết thúc. Màn hình tra cứu lịch thi sẽ tự động hiển thị trở lại khi Quản trị viên kích hoạt đợt thi mới.
+              </p>
+              {isAdmin && (
+                <button
+                  onClick={() => handleTabChange('batches')}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-200 flex items-center gap-2 cursor-pointer"
+                >
+                  <Layers className="w-4 h-4" /> Đi đến Quản Lý Đợt Thi
+                </button>
+              )}
+            </div>
           ) : records.length === 0 ? (
             <UploadSection
               onDataLoaded={(loadedData) => {
