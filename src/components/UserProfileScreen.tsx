@@ -1030,7 +1030,10 @@ export default function UserProfileScreen({
 
       {/* SUB-TAB: TELEGRAM CONFIGURATION */}
       {activeSubTab === 'TELEGRAM' && (
-        <TelegramConfigSection currentUser={currentUser} onNavigateTab={onNavigateTab} />
+        <TelegramConfigSection
+          currentUser={{ ...currentUser, isAdmin, activeRole: currentEffectiveRole }}
+          onNavigateTab={isAdmin ? onNavigateTab : undefined}
+        />
       )}
 
       {/* SUB-TAB 3: EXAM SCHEDULE FOR THIS STUDENT */}

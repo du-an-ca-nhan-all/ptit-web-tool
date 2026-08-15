@@ -74,7 +74,11 @@ export default function UserProfileModal({
     };
   }>({});
 
-  const isAdmin = currentUser?.isAdmin || (currentUser?.role ? currentUser.role.includes('admin') : false);
+  const isAdmin = Boolean(
+    currentUser?.activeRole === 'admin' ||
+    (currentUser?.isAdmin && currentUser?.activeRole !== 'sinh_vien' && currentUser?.activeRole !== 'lop_truong') ||
+    (currentUser?.role === 'admin' && !currentUser?.activeRole)
+  );
   const isMonitor = currentUser?.isMonitor || (currentUser?.role ? currentUser.role.includes('lop_truong') : false);
   const fullName = student?.hoTen || currentUser.fullName || currentUser.username;
   const maSV = currentUser.username;
@@ -767,7 +771,7 @@ export default function UserProfileModal({
 
           {/* TAB 3: TELEGRAM CONFIGURATION */}
           {activeTab === 'TELEGRAM' && (
-            <TelegramConfigSection currentUser={currentUser} />
+            <TelegramConfigSection currentUser={{ ...currentUser, isAdmin }} />
           )}
         </div>
 

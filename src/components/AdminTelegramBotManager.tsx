@@ -29,6 +29,7 @@ import {
   Clock,
   ChevronRight,
   ShieldCheck,
+  ShieldAlert,
   Megaphone,
   BellRing,
   Calendar,
@@ -419,7 +420,25 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
 
   const totalActive = subscribers.filter((s) => s.isEnabled).length;
   const totalSystemBotUsers = subscribers.filter((s) => !s.isCustomBot).length;
-  const totalCustomBotUsers = subscribers.filter((s) => s.isCustomBot).length;
+  const isAdmin = Boolean(
+    currentUser?.activeRole === 'admin' ||
+    (currentUser?.isAdmin && currentUser?.activeRole !== 'sinh_vien' && currentUser?.activeRole !== 'lop_truong') ||
+    (currentUser?.role === 'admin' && !currentUser?.activeRole)
+  );
+
+  if (!isAdmin) {
+    return (
+      <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm flex flex-col items-center justify-center min-h-[400px] text-center max-w-md mx-auto my-8">
+        <div className="p-4 bg-rose-50 text-rose-600 rounded-3xl mb-4 shadow-sm">
+          <ShieldAlert className="w-10 h-10" />
+        </div>
+        <h3 className="text-lg font-black text-slate-800 mb-2">Quyền Truy Cập Bị Giới Hạn</h3>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          Màn hình Quản trị Bot Toàn Cục chỉ hiển thị và cho phép truy cập với người quản trị (Admin).
+        </p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

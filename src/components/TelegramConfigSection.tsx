@@ -96,7 +96,11 @@ export default function TelegramConfigSection({
     error?: string;
   } | null>(null);
 
-  const isAdmin = currentUser?.isAdmin || (currentUser?.role ? currentUser.role.includes('admin') : false);
+  const isAdmin = Boolean(
+    currentUser?.activeRole === 'admin' ||
+    (currentUser?.isAdmin && currentUser?.activeRole !== 'sinh_vien' && currentUser?.activeRole !== 'lop_truong') ||
+    (currentUser?.role === 'admin' && !currentUser?.activeRole)
+  );
   const usernameToQuery = targetUsername || currentUser?.username;
 
   // Fetch current user's Telegram config and System Bot info

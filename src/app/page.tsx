@@ -257,6 +257,10 @@ export default function Home() {
   const [impersonateError, setImpersonateError] = useState('');
 
   const handleTabChange = (tab: any) => {
+    const adminOnlyTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'telegram_admin'];
+    if (adminOnlyTabs.includes(tab) && !isAdmin) {
+      return;
+    }
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
   };
