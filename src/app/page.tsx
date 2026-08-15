@@ -48,6 +48,7 @@ import AdminExternalAccounts from '../components/AdminExternalAccounts';
 import ActivityLogsManager from '../components/ActivityLogsManager';
 import AdminTelegramBotManager from '../components/AdminTelegramBotManager';
 import AdminRegistrationManager from '../components/AdminRegistrationManager';
+import AllStudentsList from '../components/AllStudentsList';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
 import { buildSessions } from '../utils/dataModel';
 
@@ -85,6 +86,7 @@ const getInitialState = () => {
         | 'activity_logs'
         | 'telegram_admin'
         | 'user_registrations'
+        | 'all_students'
         | 'course_compare') || 'personal_schedule',
     search: params.get('search') || '',
     classCode: params.get('classCode') || '',
@@ -121,6 +123,7 @@ export default function Home() {
     | 'activity_logs'
     | 'telegram_admin'
     | 'user_registrations'
+    | 'all_students'
     | 'course_compare'
   >(initialState.tab as any);
 
@@ -794,6 +797,18 @@ export default function Home() {
             >
               <Crown className="w-4 h-4 text-amber-400" /> Danh Sách Lớp Trưởng
             </button>
+
+            {/* Toàn bộ sinh viên */}
+            <button
+              onClick={() => handleTabChange('all_students')}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                activeTab === 'all_students'
+                  ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+              }`}
+            >
+              <GraduationCap className="w-4 h-4 text-indigo-400" /> Toàn Bộ Sinh Viên
+            </button>
           </div>
 
           {/* SECTION 2: CÔNG CỤ LỚP TRƯỞNG */}
@@ -1310,6 +1325,21 @@ export default function Home() {
               users={loginUsers}
               currentUser={effectiveUser}
               onReload={fetchMonitorsData}
+              onClassClick={(classCode) => {
+                setMonitorClass(classCode);
+                setActiveTab('members');
+                setIsClassGroupOpen(true);
+              }}
+            />
+          ) : activeTab === 'all_students' ? (
+            <AllStudentsList
+              currentUser={effectiveUser}
+              onSelectStudentSchedule={(studentId) => {
+                setSearchInput(studentId);
+                setFilters((prev) => ({ ...prev, search: studentId }));
+                setActiveTab('personal_schedule');
+              }}
+              onImpersonate={isAdmin ? handleImpersonate : undefined}
               onClassClick={(classCode) => {
                 setMonitorClass(classCode);
                 setActiveTab('members');
