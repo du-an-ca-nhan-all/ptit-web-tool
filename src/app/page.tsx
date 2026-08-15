@@ -325,6 +325,20 @@ export default function Home() {
     }
   };
 
+  const fetchMonitorsData = async () => {
+    try {
+      const monitorsRes = await fetch('/api/monitors');
+      if (monitorsRes.ok) {
+        const monData = await monitorsRes.json();
+        if (monData.users) {
+          setLoginUsers(monData.users);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load monitors:', err);
+    }
+  };
+
   // 1. Fetch Auth Session & mount from Server
   useEffect(() => {
     setIsMounted(true);
@@ -1277,6 +1291,8 @@ export default function Home() {
           ) : activeTab === 'monitors_list' ? (
             <MonitorsList
               users={loginUsers}
+              currentUser={effectiveUser}
+              onReload={fetchMonitorsData}
               onClassClick={(classCode) => {
                 setMonitorClass(classCode);
                 setActiveTab('members');
@@ -1300,6 +1316,7 @@ export default function Home() {
               hasExamSchedule={hasExamSchedule}
               onImpersonate={isAdmin ? handleImpersonate : undefined}
               onTogglePostpone={handleToggleExamPostpone}
+              onReloadMonitors={fetchMonitorsData}
               onSelectStudentSchedule={(studentId) => {
                 setSearchInput(studentId);
                 setFilters((prev) => ({ ...prev, search: studentId }));
@@ -1401,6 +1418,7 @@ export default function Home() {
               hasExamSchedule={hasExamSchedule}
               onImpersonate={isAdmin ? handleImpersonate : undefined}
               onTogglePostpone={handleToggleExamPostpone}
+              onReloadMonitors={fetchMonitorsData}
               onSelectStudentSchedule={(studentId) => {
                 setSearchInput(studentId);
                 setFilters((prev) => ({ ...prev, search: studentId }));
