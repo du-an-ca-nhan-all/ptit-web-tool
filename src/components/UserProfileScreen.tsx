@@ -27,8 +27,6 @@ import {
   AlertCircle,
   ShieldCheck,
   Server,
-  Zap,
-  FileKey,
   Layers,
   Award,
   Clock,
@@ -64,7 +62,6 @@ export default function UserProfileScreen({
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [copiedMssv, setCopiedMssv] = useState(false);
-  const [copiedToken, setCopiedToken] = useState(false);
 
   // Change password state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -229,6 +226,45 @@ export default function UserProfileScreen({
     }
   };
 
+  // Test Connection
+  const handleTestConnection = async (sys: any) => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setExtForm((prev) => ({
+      ...prev,
+      [sys.systemKey]: { ...prev[sys.systemKey], isTesting: true },
+    }));
+
+    try {
+      const res = await fetch('/api/external-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TEST',
+          systemKey: sys.systemKey,
+          systemName: sys.systemName,
+          systemUrl: sys.systemUrl,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg(data.message);
+        fetchExternalAccounts();
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        setErrorMsg(data.error || 'Kiểm tra kết nối thất bại');
+      }
+    } catch (err) {
+      setErrorMsg('Lỗi kết nối máy chủ');
+    } finally {
+      setExtForm((prev) => ({
+        ...prev,
+        [sys.systemKey]: { ...prev[sys.systemKey], isTesting: false },
+      }));
+    }
+  };
+
   // Delete External Account
   const handleDeleteExternalAccount = async (sys: any) => {
     if (!confirm(`Bạn có chắc chắn muốn hủy liên kết tài khoản ${sys.systemName}?`)) return;
@@ -258,47 +294,7 @@ export default function UserProfileScreen({
     }
   };
 
-  // Get/Refresh Token
-  const handleGetToken = async (sys: any) => {
-    setErrorMsg('');
-    setSuccessMsg('');
-    setExtForm((prev) => ({
-      ...prev,
-      [sys.systemKey]: { ...prev[sys.systemKey], isTesting: true },
-    }));
-
-    try {
-      const res = await fetch('/api/external-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'GET_TOKEN',
-          systemKey: sys.systemKey,
-          systemName: sys.systemName,
-          systemUrl: sys.systemUrl,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setSuccessMsg(data.message);
-        fetchExternalAccounts();
-        setTimeout(() => setSuccessMsg(''), 4000);
-      } else {
-        setErrorMsg(data.error || 'Lấy token thất bại');
-      }
-    } catch (err) {
-      setErrorMsg('Lỗi kết nối máy chủ');
-    } finally {
-      setExtForm((prev) => ({
-        ...prev,
-        [sys.systemKey]: { ...prev[sys.systemKey], isTesting: false },
-      }));
-    }
-  };
-
   const configuredCount = externalAccounts.filter((a) => a.isConfigured).length;
-  const tokenCount = externalAccounts.filter((a) => a.hasToken).length;
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-200">
@@ -393,10 +389,14 @@ export default function UserProfileScreen({
               </div>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 text-center">
+            <div
+              onClick={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
+              className="bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 rounded-2xl p-3 text-center cursor-pointer transition-colors"
+              title="Nhấp để xem liên kết QLĐT"
+            >
               <div className="text-[11px] text-blue-200 uppercase font-bold tracking-wider">Cổng QLĐT</div>
               <div className="text-lg font-black text-emerald-300 mt-0.5">
-                {tokenCount > 0 ? 'Có Token' : configuredCount > 0 ? 'Đã liên kết' : 'Chưa liên kết'}
+                {configuredCount > 0 ? 'Đã liên kết' : 'Chưa liên kết'}
               </div>
             </div>
 
@@ -434,11 +434,9 @@ export default function UserProfileScreen({
         >
           <Globe className="w-4 h-4" />
           <span>Liên Kết QLĐT Từ Xa</span>
-          {tokenCount > 0 ? (
+          {configuredCount > 0 && (
             <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white"></span>
-          ) : configuredCount > 0 ? (
-            <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white"></span>
-          ) : null}
+          )}
         </button>
 
         {hasExamSchedule && (
@@ -471,7 +469,7 @@ export default function UserProfileScreen({
       {/* SUB-TAB 1: OVERVIEW & PERSONAL INFO */}
       {activeSubTab === 'OVERVIEW' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Info Card */}
+          {/* Main Personal Info Card */}
           <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2.5">
@@ -674,7 +672,7 @@ export default function UserProfileScreen({
         </div>
       )}
 
-      {/* SUB-TAB 2: EXTERNAL ACCOUNTS & TOKEN */}
+      {/* SUB-TAB 2: EXTERNAL ACCOUNTS (No Token Display) */}
       {activeSubTab === 'EXTERNAL_ACCOUNTS' && (
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -703,10 +701,9 @@ export default function UserProfileScreen({
           <div className="bg-blue-50/60 border border-blue-200/80 rounded-2xl p-4 text-xs text-slate-700 leading-relaxed flex items-start gap-3">
             <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-blue-900 mb-1">Cơ chế bảo mật và cấp quyền Token</p>
+              <p className="font-bold text-blue-900 mb-1">Cơ chế đồng bộ an toàn</p>
               <p className="text-slate-600">
-                Hệ thống sử dụng tài khoản đăng nhập để tự động xác thực và nhận Bearer Token từ cổng QLDTTX của trường.
-                Token này được dùng để đồng bộ thời khóa biểu, lịch thi, điểm số và đăng ký môn học một cách an toàn.
+                Thông tin đăng nhập được lưu trữ mã hóa và chỉ dùng để tự động đồng bộ lịch thi, đăng ký môn học và thời khóa biểu từ cổng đào tạo của nhà trường.
               </p>
             </div>
           </div>
@@ -731,9 +728,7 @@ export default function UserProfileScreen({
                   <div
                     key={sys.systemKey}
                     className={`rounded-3xl border transition-all p-6 flex flex-col gap-5 ${
-                      sys.hasToken
-                        ? 'bg-white border-emerald-300 ring-2 ring-emerald-500/10 shadow-sm'
-                        : sys.isConfigured
+                      sys.isConfigured
                         ? 'bg-white border-indigo-300 shadow-sm'
                         : 'bg-white border-slate-200 shadow-sm'
                     }`}
@@ -747,20 +742,9 @@ export default function UserProfileScreen({
                             {sys.systemName}
                           </h4>
                           {sys.isConfigured ? (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1">
-                                <Check className="w-3 h-3" /> Đã Liên Kết
-                              </span>
-                              {sys.hasToken ? (
-                                <span className="bg-teal-100 text-teal-800 text-xs font-black px-2.5 py-0.5 rounded-full border border-teal-300 inline-flex items-center gap-1">
-                                  <FileKey className="w-3 h-3" /> Đã Cấp Token
-                                </span>
-                              ) : (
-                                <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
-                                  Chưa Có Token
-                                </span>
-                              )}
-                            </div>
+                            <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Đã Liên Kết
+                            </span>
                           ) : (
                             <span className="bg-slate-100 text-slate-500 text-xs font-bold px-2.5 py-0.5 rounded-full border border-slate-200">
                               Chưa Cấu Hình
@@ -840,33 +824,6 @@ export default function UserProfileScreen({
                       </div>
                     </div>
 
-                    {/* Token Value Display if Available */}
-                    {sys.token && (
-                      <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                            <FileKey className="w-4 h-4 text-emerald-600" />
-                            Access Token hiện tại:
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(sys.token);
-                              setCopiedToken(true);
-                              setTimeout(() => setCopiedToken(false), 2000);
-                            }}
-                            className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            {copiedToken ? <CheckCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{copiedToken ? 'Đã sao chép' : 'Sao chép Token'}</span>
-                          </button>
-                        </div>
-                        <div className="font-mono text-xs text-slate-700 break-all bg-white p-2.5 rounded-xl border border-emerald-200/60 select-all">
-                          {sys.token}
-                        </div>
-                      </div>
-                    )}
-
                     {/* Status Message */}
                     {sys.syncMessage && (
                       <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-2">
@@ -889,23 +846,23 @@ export default function UserProfileScreen({
                           ) : (
                             <Check className="w-3.5 h-3.5" />
                           )}
-                          <span>{sys.isConfigured ? 'Cập Nhật & Lấy Token' : 'Lưu & Kết Nối'}</span>
+                          <span>{sys.isConfigured ? 'Cập Nhật Cấu Hình' : 'Lưu & Kết Nối'}</span>
                         </button>
 
                         {sys.isConfigured && (
                           <button
                             type="button"
-                            onClick={() => handleGetToken(sys)}
+                            onClick={() => handleTestConnection(sys)}
                             disabled={form.isTesting}
-                            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-amber-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            title="Lấy và làm mới Bearer Token từ cổng trường"
+                            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            title="Kiểm tra kết nối tới cổng trường"
                           >
                             {form.isTesting ? (
-                              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-slate-700 rounded-full animate-spin" />
                             ) : (
-                              <Zap className="w-3.5 h-3.5" />
+                              <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
                             )}
-                            <span>Lấy / Làm Mới Token</span>
+                            <span>Kiểm Tra Kết Nối</span>
                           </button>
                         )}
                       </div>
