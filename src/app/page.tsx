@@ -810,6 +810,7 @@ export default function Home() {
               onClassChange={setMonitorClass}
               currentUser={currentUser}
               loginUsers={loginUsers}
+              hasExamSchedule={hasExamSchedule}
               onSelectStudentSchedule={(studentId) => {
                 setSearchInput(studentId);
                 setFilters((prev) => ({ ...prev, search: studentId }));
@@ -975,6 +976,7 @@ export default function Home() {
           currentUser={currentUser}
           onClose={() => setIsProfileOpen(false)}
           onLogout={handleLogout}
+          hasExamSchedule={hasExamSchedule}
           onProfileUpdated={(updatedUser) => {
             setCurrentUser(updatedUser);
             localStorage.setItem('currentUser', JSON.stringify(updatedUser));

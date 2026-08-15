@@ -32,6 +32,7 @@ interface ClassMembersProps {
   currentUser?: LoginUser | null;
   loginUsers?: LoginUser[];
   onSelectStudentSchedule?: (studentId: string) => void;
+  hasExamSchedule?: boolean;
 }
 
 interface StudentExtraInfo {
@@ -46,6 +47,7 @@ export default function ClassMembers({
   currentUser,
   loginUsers = [],
   onSelectStudentSchedule,
+  hasExamSchedule = false,
 }: ClassMembersProps) {
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<'ALL' | 'NAM' | 'NU'>('ALL');
@@ -360,7 +362,18 @@ export default function ClassMembers({
   // Export CSV
   const handleExportCSV = () => {
     if (filteredStudents.length === 0) return;
-    const headers = ['STT', 'Mã SV', 'Họ lót', 'Tên', 'Giới tính', 'Ngày sinh', 'SĐT', 'Ghi chú', 'Số môn thi'].join(',');
+    const headers = [
+      'STT',
+      'Mã SV',
+      'Họ lót',
+      'Tên',
+      'Giới tính',
+      'Ngày sinh',
+      'SĐT',
+      'Ghi chú',
+      ...(hasExamSchedule ? ['Số môn thi'] : []),
+    ].join(',');
+
     const rows = filteredStudents
       .map((s, index) =>
         [
@@ -372,7 +385,7 @@ export default function ClassMembers({
           s.NgaySinhC,
           s.phone || '',
           s.note || '',
-          s.examCount || 0,
+          ...(hasExamSchedule ? [s.examCount || 0] : []),
         ]
           .map((val) => `"${val || ''}"`)
           .join(',')
@@ -491,7 +504,7 @@ export default function ClassMembers({
       </div>
 
       {/* Stats Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
+      <div className={`grid gap-4 shrink-0 ${hasExamSchedule ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
             <Users className="w-6 h-6" />
@@ -527,17 +540,19 @@ export default function ClassMembers({
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-            <Calendar className="w-6 h-6" />
+        {hasExamSchedule && (
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Đăng Ký Thi</p>
+              <p className="text-2xl font-black text-slate-800">
+                {stats.totalExams} <span className="text-xs font-normal text-slate-500">Lượt thi</span>
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Đăng Ký Thi</p>
-            <p className="text-2xl font-black text-slate-800">
-              {stats.totalExams} <span className="text-xs font-normal text-slate-500">Lượt thi</span>
-            </p>
-          </div>
-        </div>
+        )}
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
@@ -645,7 +660,7 @@ export default function ClassMembers({
                 <th className="px-4 sm:px-6 py-3.5">Họ và Tên</th>
                 <th className="px-4 sm:px-6 py-3.5 text-center">Phái</th>
                 <th className="px-4 sm:px-6 py-3.5">Ngày sinh</th>
-                <th className="px-4 sm:px-6 py-3.5 text-center">Môn thi</th>
+                {hasExamSchedule && <th className="px-4 sm:px-6 py-3.5 text-center">Môn thi</th>}
                 <th className="px-4 sm:px-6 py-3.5">SĐT & Ghi chú</th>
                 <th className="px-4 sm:px-6 py-3.5 text-right">Thao tác</th>
               </tr>
@@ -653,7 +668,7 @@ export default function ClassMembers({
             <tbody className="divide-y divide-slate-100 text-sm">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={hasExamSchedule ? 8 : 7} className="px-6 py-12 text-center text-slate-400 font-medium">
                     {activeTab === 'ACTIVE'
                       ? 'Không tìm thấy thành viên nào phù hợp với bộ lọc.'
                       : 'Không có sinh viên nào trong danh sách biến động/bảo lưu.'}
@@ -712,15 +727,17 @@ export default function ClassMembers({
                       <td className="px-4 sm:px-6 py-3.5 text-slate-600 text-xs font-medium">
                         {student.NgaySinhC || '—'}
                       </td>
-                      <td className="px-4 sm:px-6 py-3.5 text-center">
-                        <button
-                          onClick={() => setSelectedStudentDetail(student)}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 border border-slate-200 cursor-pointer"
-                        >
-                          <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                          {student.examCount || 0} môn
-                        </button>
-                      </td>
+                      {hasExamSchedule && (
+                        <td className="px-4 sm:px-6 py-3.5 text-center">
+                          <button
+                            onClick={() => setSelectedStudentDetail(student)}
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 border border-slate-200 cursor-pointer"
+                          >
+                            <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                            {student.examCount || 0} môn
+                          </button>
+                        </td>
+                      )}
                       <td className="px-4 sm:px-6 py-3.5">
                         <div className="flex flex-col gap-1 max-w-[280px]">
                           {student.phone && (
@@ -744,7 +761,7 @@ export default function ClassMembers({
                               <button
                                 onClick={() => setSelectedStudentDetail(student)}
                                 className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                title="Xem lịch thi & chi tiết"
+                                title={hasExamSchedule ? "Xem lịch thi & chi tiết" : "Xem thông tin chi tiết"}
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
@@ -912,8 +929,12 @@ export default function ClassMembers({
                           </div>
                           <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
                             <span>Lớp hiện tại: <strong className="text-slate-700">{st.maLop}</strong></span>
-                            <span>•</span>
-                            <span>{st.examCount || 0} môn thi</span>
+                            {hasExamSchedule && (
+                              <>
+                                <span>•</span>
+                                <span>{st.examCount || 0} môn thi</span>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -1241,50 +1262,52 @@ export default function ClassMembers({
                 )}
               </div>
 
-              {/* Exam Schedule Section */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-bold text-slate-800 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-blue-600" />
-                    Lịch Thi Đã Đăng Ký ({selectedStudentDetail.exams?.length || 0} môn)
-                  </h4>
-                </div>
-
-                {!selectedStudentDetail.exams || selectedStudentDetail.exams.length === 0 ? (
-                  <p className="text-slate-400 italic text-xs py-4 text-center border border-dashed rounded-xl">
-                    Không có lịch thi nào được tìm thấy cho sinh viên này.
-                  </p>
-                ) : (
-                  <div className="border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-100 text-slate-600 sticky top-0 border-b border-slate-200 font-semibold">
-                        <tr>
-                          <th className="px-3 py-2.5">Ngày thi</th>
-                          <th className="px-3 py-2.5">Giờ thi</th>
-                          <th className="px-3 py-2.5">Tên môn học</th>
-                          <th className="px-3 py-2.5 text-center">Phòng</th>
-                          <th className="px-3 py-2.5 text-center">Tổ/Nhóm</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {selectedStudentDetail.exams.map((ex: ExamRecord, idx: number) => (
-                          <tr key={idx} className="hover:bg-blue-50/50">
-                            <td className="px-3 py-2.5 font-bold text-slate-700">{ex.NgayThi}</td>
-                            <td className="px-3 py-2.5 text-blue-600 font-medium">{ex.GioThi}</td>
-                            <td className="px-3 py-2.5 font-bold text-slate-800">
-                              {ex.TenMH} <span className="text-[10px] text-slate-400 font-mono">({ex.MaMH})</span>
-                            </td>
-                            <td className="px-3 py-2.5 text-center font-bold text-emerald-700">{ex.MAPTHI || '—'}</td>
-                            <td className="px-3 py-2.5 text-center text-slate-500">
-                              {ex['To thi'] || ex.NhomThi || '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {/* Exam Schedule Section (Only when exam schedule is active) */}
+              {hasExamSchedule && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-blue-600" />
+                      Lịch Thi Đã Đăng Ký ({selectedStudentDetail.exams?.length || 0} môn)
+                    </h4>
                   </div>
-                )}
-              </div>
+
+                  {!selectedStudentDetail.exams || selectedStudentDetail.exams.length === 0 ? (
+                    <p className="text-slate-400 italic text-xs py-4 text-center border border-dashed rounded-xl">
+                      Không có lịch thi nào được tìm thấy cho sinh viên này.
+                    </p>
+                  ) : (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-100 text-slate-600 sticky top-0 border-b border-slate-200 font-semibold">
+                          <tr>
+                            <th className="px-3 py-2.5">Ngày thi</th>
+                            <th className="px-3 py-2.5">Giờ thi</th>
+                            <th className="px-3 py-2.5">Tên môn học</th>
+                            <th className="px-3 py-2.5 text-center">Phòng</th>
+                            <th className="px-3 py-2.5 text-center">Tổ/Nhóm</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedStudentDetail.exams.map((ex: ExamRecord, idx: number) => (
+                            <tr key={idx} className="hover:bg-blue-50/50">
+                              <td className="px-3 py-2.5 font-bold text-slate-700">{ex.NgayThi}</td>
+                              <td className="px-3 py-2.5 text-blue-600 font-medium">{ex.GioThi}</td>
+                              <td className="px-3 py-2.5 font-bold text-slate-800">
+                                {ex.TenMH} <span className="text-[10px] text-slate-400 font-mono">({ex.MaMH})</span>
+                              </td>
+                              <td className="px-3 py-2.5 text-center font-bold text-emerald-700">{ex.MAPTHI || '—'}</td>
+                              <td className="px-3 py-2.5 text-center text-slate-500">
+                                {ex['To thi'] || ex.NhomThi || '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">

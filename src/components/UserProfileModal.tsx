@@ -22,6 +22,7 @@ interface UserProfileModalProps {
   onClose: () => void;
   onLogout: () => void;
   onProfileUpdated?: (updatedUser: any) => void;
+  hasExamSchedule?: boolean;
 }
 
 export default function UserProfileModal({
@@ -29,6 +30,7 @@ export default function UserProfileModal({
   onClose,
   onLogout,
   onProfileUpdated,
+  hasExamSchedule = false,
 }: UserProfileModalProps) {
   const student = currentUser?.student || {};
   const [isEditing, setIsEditing] = useState(false);
@@ -282,7 +284,7 @@ export default function UserProfileModal({
           </div>
 
           {/* Exam Schedule Summary Section */}
-          {exams && exams.length > 0 && (
+          {hasExamSchedule && exams && exams.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
