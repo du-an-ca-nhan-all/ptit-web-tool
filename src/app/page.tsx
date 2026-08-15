@@ -27,6 +27,7 @@ import {
   GraduationCap,
   Check,
   History,
+  Bot,
 } from 'lucide-react';
 import UploadSection from '../components/UploadSection';
 import FilterBar, { FilterState } from '../components/FilterBar';
@@ -45,6 +46,7 @@ import StudentCourseRegistration from '../components/StudentCourseRegistration';
 import ExamBatchManagement from '../components/ExamBatchManagement';
 import AdminExternalAccounts from '../components/AdminExternalAccounts';
 import ActivityLogsManager from '../components/ActivityLogsManager';
+import AdminTelegramBotManager from '../components/AdminTelegramBotManager';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
 import { buildSessions } from '../utils/dataModel';
 
@@ -80,6 +82,7 @@ const getInitialState = () => {
         | 'batches'
         | 'external_accounts_admin'
         | 'activity_logs'
+        | 'telegram_admin'
         | 'course_compare') || 'personal_schedule',
     search: params.get('search') || '',
     classCode: params.get('classCode') || '',
@@ -114,6 +117,7 @@ export default function Home() {
     | 'batches'
     | 'external_accounts_admin'
     | 'activity_logs'
+    | 'telegram_admin'
     | 'course_compare'
   >(initialState.tab as any);
 
@@ -211,12 +215,12 @@ export default function Home() {
 
     // Auto redirect tab if current tab is not accessible in the new role
     if (newRole === 'sinh_vien') {
-      const monitorAdminTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'members', 'monitor', 'envelope', 'envelope_all', 'settlement', 'monitors_list'];
+      const monitorAdminTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'telegram_admin', 'members', 'monitor', 'envelope', 'envelope_all', 'settlement', 'monitors_list'];
       if (monitorAdminTabs.includes(activeTab)) {
         setActiveTab(hasExamSchedule ? 'personal_schedule' : 'registered_courses');
       }
     } else if (newRole === 'lop_truong') {
-      const adminOnlyTabs = ['batches', 'external_accounts_admin', 'activity_logs'];
+      const adminOnlyTabs = ['batches', 'external_accounts_admin', 'activity_logs', 'telegram_admin'];
       if (adminOnlyTabs.includes(activeTab)) {
         setActiveTab('members');
       }
@@ -881,6 +885,17 @@ export default function Home() {
                       >
                         <History className="w-4 h-4 text-indigo-400" /> Nhật Ký Hoạt Động
                       </button>
+
+                      <button
+                        onClick={() => handleTabChange('telegram_admin')}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                          activeTab === 'telegram_admin'
+                            ? 'bg-sky-600/20 text-sky-400 border border-sky-600/30 font-bold'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent'
+                        }`}
+                      >
+                        <Bot className="w-4 h-4 text-sky-400" /> Bot Telegram Toàn Cục
+                      </button>
                     </>
                   )}
                 </div>
@@ -1024,6 +1039,8 @@ export default function Home() {
                 ? 'Danh Sách Lớp'
                 : activeTab === 'batches'
                 ? 'Quản Lý Đợt Thi'
+                : activeTab === 'telegram_admin'
+                ? 'Quản Trị Bot Telegram Toàn Cục'
                 : activeTab === 'envelope'
                 ? 'Phân Công Phong Bì Lớp Mình'
                 : activeTab === 'envelope_all'
@@ -1237,6 +1254,8 @@ export default function Home() {
             <AdminExternalAccounts currentUser={effectiveUser!} />
           ) : activeTab === 'activity_logs' && isAdmin ? (
             <ActivityLogsManager currentUser={effectiveUser!} />
+          ) : activeTab === 'telegram_admin' && isAdmin ? (
+            <AdminTelegramBotManager currentUser={effectiveUser!} />
           ) : activeTab === 'batches' ? (
             <ExamBatchManagement
               currentUser={effectiveUser!}

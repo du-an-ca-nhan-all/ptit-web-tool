@@ -9,6 +9,7 @@ import {
   getSystemTelegramBotPublicInfo,
   getSystemTelegramBotConfig,
   saveSystemTelegramBot,
+  toggleSystemTelegramBot,
   resolveEffectiveBotToken,
 } from '@/src/lib/telegram-service';
 import { logActivity } from '@/src/lib/activityLog';
@@ -211,6 +212,103 @@ export async function POST(req: NextRequest) {
         success: true,
         message: `Đã lưu Bot Hệ Thống (@${saveRes.botInfo.username || saveRes.botInfo.firstName}) vào bảng TelegramGlobalConfig thành công!`,
         botInfo: saveRes.botInfo,
+      });
+    }
+
+    // 0.1 ACTION: TOGGLE SYSTEM BOT (Admin only)
+    if (action === 'TOGGLE_SYSTEM_BOT') {
+      if (!authUser.isAdmin) {
+        return NextResponse.json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền bật/tắt Bot Hệ Thống' }, { status: 403 });
+      }
+
+      const isActive = body.isActive !== undefined ? Boolean(body.isActive) : true;
+      const updated = await toggleSystemTelegramBot(isActive);
+
+      await logActivity({
+        req,
+        action: 'TOGGLE_SYSTEM_TELEGRAM_BOT',
+        targetType: 'TELEGRAM_GLOBAL_CONFIG',
+        targetId: 'SYSTEM_BOT',
+        description: `Admin ${isActive ? 'bật' : 'tắt'} Bot Telegram Hệ Thống`,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Đã ${isActive ? 'kích hoạt' : 'tạm dừng'} Bot Hệ Thống thành công.`,
+        config: updated,
+      });
+    }
+
+    // 0.2 ACTION: BROADCAST ANNOUNCEMENT (Admin only)
+    if (action === 'BROADCAST') {
+      if (!authUser.isAdmin) {
+        return NextResponse.json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền phát thông báo toàn trường' }, { status: 403 });
+      }
+
+      const title = body.title?.trim();
+      const content = body.content?.trim();
+      if (!title || !content) {
+        return NextResponse.json({ error: 'Vui lòng nhập đầy đủ tiêu đề và nội dung thông báo' }, { status: 400 });
+      }
+
+      const sysConfig = await getSystemTelegramBotConfig();
+      if (!sysConfig || !sysConfig.botToken || !sysConfig.isActive) {
+        return NextResponse.json({ error: 'Bot Hệ Thống chưa được cấu hình hoặc đang tạm dừng' }, { status: 400 });
+      }
+
+      const subscribers = await prisma.telegramConfig.findMany({
+        where: { isEnabled: true },
+        include: {
+          user: {
+            include: {
+              student: true,
+            },
+          },
+        },
+      });
+
+      if (subscribers.length === 0) {
+        return NextResponse.json({
+          success: true,
+          message: 'Chưa có sinh viên nào kích hoạt nhận thông báo Telegram.',
+          totalSent: 0,
+          totalFailed: 0,
+        });
+      }
+
+      const formattedBroadcast = `📢 <b>THÔNG BÁO TỪ QUẢN TRỊ VIÊN - PTIT EDUSYNC</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📌 <b>${title}</b>\n\n${content}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Gửi lúc: ${new Date().toLocaleTimeString('vi-VN')} - ${new Date().toLocaleDateString('vi-VN')}</i>`;
+
+      let sentCount = 0;
+      let failCount = 0;
+
+      for (const sub of subscribers) {
+        const tokenToUse = sub.botToken?.trim() || sysConfig.botToken;
+        const sendRes = await sendTestNotification(tokenToUse, sub.chatId, sub.threadId, {
+          username: sub.username,
+          fullName: sub.user?.student?.hoTen || sub.username,
+          maLop: sub.user?.student?.maLop || 'PTIT',
+        });
+        if (sendRes.success) {
+          sentCount++;
+        } else {
+          failCount++;
+        }
+      }
+
+      await logActivity({
+        req,
+        action: 'BROADCAST_TELEGRAM',
+        targetType: 'TELEGRAM_GLOBAL_CONFIG',
+        targetId: 'BROADCAST',
+        description: `Admin gửi broadcast Telegram "${title}" tới ${sentCount} tài khoản (Thất bại: ${failCount})`,
+        metadata: { title, sentCount, failCount },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Đã gửi phát sóng thông báo tới ${sentCount} tài khoản (Thất bại: ${failCount}).`,
+        totalSent: sentCount,
+        totalFailed: failCount,
       });
     }
 

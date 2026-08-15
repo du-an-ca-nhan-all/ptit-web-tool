@@ -36,12 +36,14 @@ interface TelegramConfigSectionProps {
   currentUser?: LoginUser | null;
   targetUsername?: string;
   onConfigUpdated?: (config: TelegramConfigItem | null) => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export default function TelegramConfigSection({
   currentUser,
   targetUsername,
   onConfigUpdated,
+  onNavigateTab,
 }: TelegramConfigSectionProps) {
   const [config, setConfig] = useState<TelegramConfigItem | null>(null);
   const [systemBot, setSystemBot] = useState<SystemTelegramBotInfo | null>(null);
@@ -369,14 +371,27 @@ export default function TelegramConfigSection({
             </button>
 
             {isAdmin && (
-              <button
-                type="button"
-                onClick={() => setIsAdminPanelOpen(!isAdminPanelOpen)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-400/25 hover:bg-amber-400/35 text-amber-100 rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-amber-300/30"
-              >
-                <Settings className="w-3.5 h-3.5 text-amber-300" />
-                <span>{isAdminPanelOpen ? 'Đóng Quản Trị Bot Hệ Thống' : 'Cấu Hình Bot Toàn Trường (Admin)'}</span>
-              </button>
+              <>
+                {onNavigateTab ? (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('telegram_admin')}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-indigo-400/40 shadow-sm"
+                  >
+                    <Bot className="w-3.5 h-3.5 text-indigo-200" />
+                    <span>Màn Hình Quản Trị Bot Toàn Cục ➜</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsAdminPanelOpen(!isAdminPanelOpen)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-400/25 hover:bg-amber-400/35 text-amber-100 rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-amber-300/30"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-amber-300" />
+                    <span>{isAdminPanelOpen ? 'Đóng Quản Trị Bot Hệ Thống' : 'Cấu Hình Bot Toàn Trường (Admin)'}</span>
+                  </button>
+                )}
+              </>
             )}
 
             {isConnected && (

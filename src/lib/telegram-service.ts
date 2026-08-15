@@ -685,3 +685,19 @@ export async function resolveEffectiveBotToken(
   return { token: sysConfig.botToken, isCustom: false };
 }
 
+/**
+ * Toggle System Telegram Bot Active Status
+ */
+export async function toggleSystemTelegramBot(isActive: boolean) {
+  const existing = await prisma.telegramGlobalConfig.findFirst({
+    orderBy: { id: 'asc' },
+  });
+  if (!existing) {
+    throw new Error('Chưa có cấu hình Bot Hệ Thống để bật/tắt.');
+  }
+  return await prisma.telegramGlobalConfig.update({
+    where: { id: existing.id },
+    data: { isActive },
+  });
+}
+
