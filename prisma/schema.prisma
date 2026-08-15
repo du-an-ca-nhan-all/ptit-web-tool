@@ -17,10 +17,13 @@ model User {
   lastLogin    DateTime?
   
   // Quan hệ 1-1 với thông tin sinh viên tương ứng
-  student      Student?  @relation(fields: [username], references: [maSV], onDelete: Cascade)
+  student          Student?          @relation(fields: [username], references: [maSV], onDelete: Cascade)
   
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  // Quan hệ 1-N với ExternalAccount
+  externalAccounts ExternalAccount[]
+  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([username])
   @@index([role])
@@ -128,4 +131,29 @@ model SystemMeta {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// 7. Bảng ExternalAccount: Lưu trữ tài khoản và mật khẩu cấu hình cho các hệ thống khác (ví dụ https://qldttx.pttc1.edu.vn/)
+model ExternalAccount {
+  id          Int       @id @default(autoincrement())
+  username    String    // Mã sinh viên (User.username)
+  user        User      @relation(fields: [username], references: [username], onDelete: Cascade)
+  
+  systemKey   String    // Mã định danh hệ thống (Ví dụ: "QLDTTX_PTTC1")
+  systemName  String    // Tên hệ thống (Ví dụ: "Cổng Quản Lý Đào Tạo Từ Xa PTTC1")
+  systemUrl   String    // URL hệ thống (Ví dụ: "https://qldttx.pttc1.edu.vn/")
+  
+  extUsername String    // Tên đăng nhập hệ thống ngoài (Mã SV)
+  extPassword String    // Mật khẩu hệ thống ngoài
+  
+  status      String    @default("CONNECTED") // 'CONNECTED' | 'DISCONNECTED' | 'ERROR'
+  lastSyncAt  DateTime?
+  syncMessage String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([username, systemKey])
+  @@index([username])
+  @@index([systemKey])
 }

@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Layers,
   Power,
+  Globe,
 } from 'lucide-react';
 import UploadSection from '../components/UploadSection';
 import FilterBar, { FilterState } from '../components/FilterBar';
@@ -126,6 +127,7 @@ export default function Home() {
   const [loginUsers, setLoginUsers] = useState<LoginUser[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileInitialTab, setProfileInitialTab] = useState<'PROFILE' | 'EXTERNAL_ACCOUNTS'>('PROFILE');
 
   const isAdmin = currentUser?.isAdmin || (currentUser?.role ? currentUser.role.includes('admin') : false);
   const isMonitor = currentUser?.isMonitor || (currentUser?.role ? currentUser.role.includes('lop_truong') : false);
@@ -525,7 +527,21 @@ export default function Home() {
             </button>
           )}
 
-          {/* 5. Danh sách lớp trưởng */}
+          {/* 5. Liên kết hệ thống ngoài (QLDTTX) */}
+          {currentUser && (
+            <button
+              onClick={() => {
+                setProfileInitialTab('EXTERNAL_ACCOUNTS');
+                setIsProfileOpen(true);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors text-slate-400 hover:text-white hover:bg-slate-800/50 border border-transparent cursor-pointer"
+            >
+              <Globe className="w-4 h-4 text-emerald-400" />
+              <span>Liên Kết QLĐT Từ Xa</span>
+            </button>
+          )}
+
+          {/* 6. Danh sách lớp trưởng */}
           <button
             onClick={() => handleTabChange('monitors_list')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors mt-2 ${
@@ -625,8 +641,11 @@ export default function Home() {
         {currentUser && (
           <div
             className="p-3 mx-3 mb-2 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl flex items-center justify-between cursor-pointer transition-colors"
-            onClick={() => setIsProfileOpen(true)}
-            title="Xem hồ sơ cá nhân"
+            onClick={() => {
+              setProfileInitialTab('PROFILE');
+              setIsProfileOpen(true);
+            }}
+            title="Xem hồ sơ & liên kết hệ thống"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden ring-1 ring-white/20 shrink-0">
@@ -977,6 +996,7 @@ export default function Home() {
           onClose={() => setIsProfileOpen(false)}
           onLogout={handleLogout}
           hasExamSchedule={hasExamSchedule}
+          initialTab={profileInitialTab}
           onProfileUpdated={(updatedUser) => {
             setCurrentUser(updatedUser);
             localStorage.setItem('currentUser', JSON.stringify(updatedUser));

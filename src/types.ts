@@ -82,3 +82,30 @@ export interface ExamSession {
   totalStudents: number;
   records: ExamRecord[];
 }
+
+export interface ExternalAccountItem {
+  id?: number;
+  username: string;
+  systemKey: string;
+  systemName: string;
+  systemUrl: string;
+  extUsername: string;
+  extPassword?: string;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
+  lastSyncAt?: string | null;
+  syncMessage?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export const AVAILABLE_EXTERNAL_SYSTEMS = [
+  {
+    key: 'QLDTTX_PTTC1',
+    name: 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
+    url: 'https://qldttx.pttc1.edu.vn/',
+    description: 'Hệ thống quản lý đào tạo trực tuyến / từ xa của Học viện Bưu chính Viễn thông Cơ sở 1.',
+    placeholderUser: 'Nhập mã sinh viên (Ví dụ: K25DTCN402)',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    iconKey: 'GraduationCap',
+  },
+];
