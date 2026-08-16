@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { prisma } from './prisma';
 import { sendTelegramDocument, sendTelegramMessage, getSystemTelegramBotConfig, verifyTelegramBot } from './telegram-service';
 import { getGlobalConfig, setGlobalConfig, BackupTelegramConfigValue, GLOBAL_CONFIG_KEYS } from './globalConfig';
@@ -37,7 +38,7 @@ export interface DatabaseStats {
 
 export interface LocalBackupFile {
   name: string;
-  format: 'sqlite' | 'json';
+  format: 'sql' | 'json' | 'sqlite';
   size: number;
   sizeFormatted: string;
   createdAt: string;
@@ -97,7 +98,6 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
     prisma.registrationRequest.count().catch(() => 0),
   ]);
 
-  const dbPath = getDatabaseFilePath();
   let dbFileSize = 0;
   let dbLastModified: string | null = null;
 
@@ -108,7 +108,7 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
       dbLastModified = new Date().toISOString();
     }
   } catch {
-    // Fallback to SQLite file check if applicable
+    const dbPath = getDatabaseFilePath();
     if (fs.existsSync(dbPath)) {
       const stat = fs.statSync(dbPath);
       dbFileSize = stat.size;
@@ -248,6 +248,194 @@ export async function exportDatabaseAsJson(): Promise<{
   };
 }
 
+function sqlVal(val: any): string {
+  if (val === null || val === undefined) return 'NULL';
+  if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+  if (typeof val === 'number') return String(val);
+  if (val instanceof Date) return `'${val.toISOString()}'`;
+  const str = String(val).replace(/'/g, "''");
+  return `'${str}'`;
+}
+
+/**
+ * Xuất toàn bộ cơ sở dữ liệu PostgreSQL sang script SQL (.sql)
+ */
+export async function exportDatabaseAsSqlDump(): Promise<string> {
+  const json = await exportDatabaseAsJson();
+  const d = json.data;
+  const lines: string[] = [];
+
+  lines.push('-- ================================================================');
+  lines.push('-- PTIT WEB TOOL - POSTGRESQL DATABASE BACKUP (.sql)');
+  lines.push(`-- App: ${json.metadata.appName} (v${json.metadata.version})`);
+  lines.push(`-- Exported At: ${json.metadata.exportedAt}`);
+  lines.push(`-- Total Records: ${json.metadata.stats.totalRecords.toLocaleString('vi-VN')}`);
+  lines.push('-- ================================================================');
+  lines.push('');
+  lines.push('BEGIN;');
+  lines.push("SET session_replication_role = 'replica';");
+  lines.push('');
+
+  // 1. Truncate tables
+  lines.push('-- 1. Clean existing records in cascade');
+  lines.push('TRUNCATE TABLE "ClassScheduleReminderLog", "QldtAnnouncementLog", "ExamReminderLog", "ActivityLog", "TelegramConfig", "ExternalAccount", "CourseRegistration", "ExamRecord", "ExamBatch", "User", "Student", "RegistrationRequest", "GlobalConfig", "SystemMeta" CASCADE;');
+  lines.push('');
+
+  // 2. SystemMeta
+  if (d.systemMeta?.length) {
+    lines.push(`-- SystemMeta (${d.systemMeta.length} rows)`);
+    for (const r of d.systemMeta) {
+      lines.push(`INSERT INTO "SystemMeta" ("id", "key", "value", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.key)}, ${sqlVal(r.value)}, ${sqlVal(r.updatedAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 3. GlobalConfig
+  if (d.globalConfigs?.length) {
+    lines.push(`-- GlobalConfig (${d.globalConfigs.length} rows)`);
+    for (const r of d.globalConfigs) {
+      lines.push(`INSERT INTO "GlobalConfig" ("id", "key", "value", "description", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.key)}, ${sqlVal(r.value)}, ${sqlVal(r.description)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 4. Student
+  if (d.students?.length) {
+    lines.push(`-- Student (${d.students.length} rows)`);
+    for (const r of d.students) {
+      lines.push(`INSERT INTO "Student" ("id", "maSV", "hoLot", "ten", "hoTen", "gioiTinh", "ngaySinh", "maLop", "trangThai", "soDienThoai", "ghiChu", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.maSV)}, ${sqlVal(r.hoLot)}, ${sqlVal(r.ten)}, ${sqlVal(r.hoTen)}, ${sqlVal(r.gioiTinh)}, ${sqlVal(r.ngaySinh)}, ${sqlVal(r.maLop)}, ${sqlVal(r.trangThai)}, ${sqlVal(r.soDienThoai)}, ${sqlVal(r.ghiChu)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 5. User
+  if (d.users?.length) {
+    lines.push(`-- User (${d.users.length} rows)`);
+    for (const r of d.users) {
+      lines.push(`INSERT INTO "User" ("id", "username", "passwordHash", "role", "isActive", "lastLogin", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.passwordHash)}, ${sqlVal(r.role)}, ${sqlVal(r.isActive)}, ${sqlVal(r.lastLogin)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 6. ExamBatch
+  if (d.examBatches?.length) {
+    lines.push(`-- ExamBatch (${d.examBatches.length} rows)`);
+    for (const r of d.examBatches) {
+      lines.push(`INSERT INTO "ExamBatch" ("id", "code", "name", "semester", "academicYear", "startDate", "endDate", "isActive", "description", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.code)}, ${sqlVal(r.name)}, ${sqlVal(r.semester)}, ${sqlVal(r.academicYear)}, ${sqlVal(r.startDate)}, ${sqlVal(r.endDate)}, ${sqlVal(r.isActive)}, ${sqlVal(r.description)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 7. ExamRecord
+  if (d.examRecords?.length) {
+    lines.push(`-- ExamRecord (${d.examRecords.length} rows)`);
+    for (const r of d.examRecords) {
+      lines.push(`INSERT INTO "ExamRecord" ("id", "maSV", "batchCode", "nhomThi", "mapThi", "maMH", "tenMH", "maHTThi", "nhomHoc", "toThi", "maLopMH", "ngayThi", "gioThi", "soPhutThi", "maDotThi", "tenDotThi", "isPostponed", "createdAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.maSV)}, ${sqlVal(r.batchCode)}, ${sqlVal(r.nhomThi)}, ${sqlVal(r.mapThi)}, ${sqlVal(r.maMH)}, ${sqlVal(r.tenMH)}, ${sqlVal(r.maHTThi)}, ${sqlVal(r.nhomHoc)}, ${sqlVal(r.toThi)}, ${sqlVal(r.maLopMH)}, ${sqlVal(r.ngayThi)}, ${sqlVal(r.gioThi)}, ${sqlVal(r.soPhutThi)}, ${sqlVal(r.maDotThi)}, ${sqlVal(r.tenDotThi)}, ${sqlVal(r.isPostponed)}, ${sqlVal(r.createdAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 8. CourseRegistration
+  if (d.courseRegistrations?.length) {
+    lines.push(`-- CourseRegistration (${d.courseRegistrations.length} rows)`);
+    for (const r of d.courseRegistrations) {
+      lines.push(`INSERT INTO "CourseRegistration" ("id", "classCode", "username", "data", "totalCourses", "totalCredits", "tuitionFee", "lastPulledAt", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.classCode)}, ${sqlVal(r.username)}, ${sqlVal(r.data)}, ${sqlVal(r.totalCourses)}, ${sqlVal(r.totalCredits)}, ${sqlVal(r.tuitionFee)}, ${sqlVal(r.lastPulledAt)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 9. ExternalAccount
+  if (d.externalAccounts?.length) {
+    lines.push(`-- ExternalAccount (${d.externalAccounts.length} rows)`);
+    for (const r of d.externalAccounts) {
+      lines.push(`INSERT INTO "ExternalAccount" ("id", "username", "systemKey", "systemName", "systemUrl", "extUsername", "extPassword", "token", "status", "lastSyncAt", "syncMessage", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.systemKey)}, ${sqlVal(r.systemName)}, ${sqlVal(r.systemUrl)}, ${sqlVal(r.extUsername)}, ${sqlVal(r.extPassword)}, ${sqlVal(r.token)}, ${sqlVal(r.status)}, ${sqlVal(r.lastSyncAt)}, ${sqlVal(r.syncMessage)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 10. TelegramConfig
+  if (d.telegramConfigs?.length) {
+    lines.push(`-- TelegramConfig (${d.telegramConfigs.length} rows)`);
+    for (const r of d.telegramConfigs) {
+      lines.push(`INSERT INTO "TelegramConfig" ("id", "username", "botToken", "chatId", "threadId", "isEnabled", "notifyExamSchedule", "notifyClassActivity", "notifyQldtAnnouncements", "qldtCheckInterval", "lastQldtCheckedAt", "notifyClassSchedule", "classReminderBefore", "lastTestedAt", "lastTestStatus", "lastTestError", "botUsername", "botFirstName", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.botToken)}, ${sqlVal(r.chatId)}, ${sqlVal(r.threadId)}, ${sqlVal(r.isEnabled)}, ${sqlVal(r.notifyExamSchedule)}, ${sqlVal(r.notifyClassActivity)}, ${sqlVal(r.notifyQldtAnnouncements)}, ${sqlVal(r.qldtCheckInterval)}, ${sqlVal(r.lastQldtCheckedAt)}, ${sqlVal(r.notifyClassSchedule)}, ${sqlVal(r.classReminderBefore)}, ${sqlVal(r.lastTestedAt)}, ${sqlVal(r.lastTestStatus)}, ${sqlVal(r.lastTestError)}, ${sqlVal(r.botUsername)}, ${sqlVal(r.botFirstName)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 11. RegistrationRequest
+  if (d.registrationRequests?.length) {
+    lines.push(`-- RegistrationRequest (${d.registrationRequests.length} rows)`);
+    for (const r of d.registrationRequests) {
+      lines.push(`INSERT INTO "RegistrationRequest" ("id", "username", "fullName", "email", "phoneNumber", "lop", "passwordHash", "status", "note", "reviewedBy", "reviewedAt", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.fullName)}, ${sqlVal(r.email)}, ${sqlVal(r.phoneNumber)}, ${sqlVal(r.lop)}, ${sqlVal(r.passwordHash)}, ${sqlVal(r.status)}, ${sqlVal(r.note)}, ${sqlVal(r.reviewedBy)}, ${sqlVal(r.reviewedAt)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 12. ActivityLog
+  if (d.activityLogs?.length) {
+    lines.push(`-- ActivityLog (${d.activityLogs.length} rows)`);
+    for (const r of d.activityLogs) {
+      lines.push(`INSERT INTO "ActivityLog" ("id", "userId", "username", "userRole", "action", "targetType", "targetId", "description", "metadata", "ipAddress", "userAgent", "createdAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.userId)}, ${sqlVal(r.username)}, ${sqlVal(r.userRole)}, ${sqlVal(r.action)}, ${sqlVal(r.targetType)}, ${sqlVal(r.targetId)}, ${sqlVal(r.description)}, ${sqlVal(r.metadata)}, ${sqlVal(r.ipAddress)}, ${sqlVal(r.userAgent)}, ${sqlVal(r.createdAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 13. ExamReminderLog
+  if (d.examReminderLogs?.length) {
+    lines.push(`-- ExamReminderLog (${d.examReminderLogs.length} rows)`);
+    for (const r of d.examReminderLogs) {
+      lines.push(`INSERT INTO "ExamReminderLog" ("id", "username", "examRecordId", "reminderType", "targetDate", "sentAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.examRecordId)}, ${sqlVal(r.reminderType)}, ${sqlVal(r.targetDate)}, ${sqlVal(r.sentAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 14. QldtAnnouncementLog
+  if (d.qldtAnnouncementLogs?.length) {
+    lines.push(`-- QldtAnnouncementLog (${d.qldtAnnouncementLogs.length} rows)`);
+    for (const r of d.qldtAnnouncementLogs) {
+      lines.push(`INSERT INTO "QldtAnnouncementLog" ("id", "username", "announcementId", "title", "publishDate", "sentAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.announcementId)}, ${sqlVal(r.title)}, ${sqlVal(r.publishDate)}, ${sqlVal(r.sentAt)});`);
+    }
+    lines.push('');
+  }
+
+  // 15. ClassScheduleReminderLog
+  if (d.classScheduleReminderLogs?.length) {
+    lines.push(`-- ClassScheduleReminderLog (${d.classScheduleReminderLogs.length} rows)`);
+    for (const r of d.classScheduleReminderLogs) {
+      lines.push(`INSERT INTO "ClassScheduleReminderLog" ("id", "username", "courseCode", "reminderType", "targetDate", "sessionInfo", "sentAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.courseCode)}, ${sqlVal(r.reminderType)}, ${sqlVal(r.targetDate)}, ${sqlVal(r.sessionInfo)}, ${sqlVal(r.sentAt)});`);
+    }
+    lines.push('');
+  }
+
+  lines.push("SET session_replication_role = 'origin';");
+  lines.push('');
+  lines.push('-- Reset auto-increment sequences');
+  const tablesWithId = [
+    'User',
+    'Student',
+    'ExamBatch',
+    'ExamRecord',
+    'CourseRegistration',
+    'SystemMeta',
+    'ExternalAccount',
+    'ActivityLog',
+    'TelegramConfig',
+    'GlobalConfig',
+    'ExamReminderLog',
+    'QldtAnnouncementLog',
+    'ClassScheduleReminderLog',
+    'RegistrationRequest',
+  ];
+  for (const t of tablesWithId) {
+    lines.push(`SELECT setval(pg_get_serial_sequence('"${t}"', 'id'), coalesce(max(id), 1), max(id) IS NOT NULL) FROM "${t}";`);
+  }
+  lines.push('');
+  lines.push('COMMIT;');
+  lines.push('');
+
+  return lines.join('\n');
+}
+
 export function generateTimestampString(date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const year = date.getFullYear();
@@ -259,30 +447,28 @@ export function generateTimestampString(date = new Date()): string {
   return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
 }
 
-export async function createLocalBackup(format: 'sqlite' | 'json' | 'all' = 'all'): Promise<LocalBackupFile[]> {
+export async function createLocalBackup(format: 'sql' | 'json' | 'all' = 'all'): Promise<LocalBackupFile[]> {
   const backupsDir = getBackupsDirectory();
   const timestamp = generateTimestampString();
   const createdFiles: LocalBackupFile[] = [];
 
-  // 1. Backup SQLite
-  if (format === 'sqlite' || format === 'all') {
-    const dbPath = getDatabaseFilePath();
-    if (fs.existsSync(dbPath)) {
-      const filename = `ptit-db-backup-${timestamp}.sqlite`;
-      const targetPath = path.join(backupsDir, filename);
-      fs.copyFileSync(dbPath, targetPath);
-      const stat = fs.statSync(targetPath);
-      createdFiles.push({
-        name: filename,
-        format: 'sqlite',
-        size: stat.size,
-        sizeFormatted: formatBytes(stat.size),
-        createdAt: stat.birthtime.toISOString(),
-      });
-    }
+  // 1. Backup PostgreSQL SQL Dump (.sql)
+  if (format === 'sql' || format === 'all') {
+    const sqlDump = await exportDatabaseAsSqlDump();
+    const filename = `ptit-db-backup-${timestamp}.sql`;
+    const targetPath = path.join(backupsDir, filename);
+    fs.writeFileSync(targetPath, sqlDump, 'utf8');
+    const stat = fs.statSync(targetPath);
+    createdFiles.push({
+      name: filename,
+      format: 'sql',
+      size: stat.size,
+      sizeFormatted: formatBytes(stat.size),
+      createdAt: stat.birthtime.toISOString(),
+    });
   }
 
-  // 2. Backup JSON
+  // 2. Backup JSON (.json)
   if (format === 'json' || format === 'all') {
     const jsonDump = await exportDatabaseAsJson();
     const filename = `ptit-db-backup-${timestamp}.json`;
@@ -315,9 +501,11 @@ export function listLocalBackups(): LocalBackupFile[] {
       const stat = fs.statSync(filePath);
       if (!stat.isFile()) continue;
 
-      let format: 'sqlite' | 'json' = 'sqlite';
+      let format: 'sql' | 'json' | 'sqlite' = 'json';
       if (file.endsWith('.json')) {
         format = 'json';
+      } else if (file.endsWith('.sql')) {
+        format = 'sql';
       } else if (file.endsWith('.sqlite') || file.endsWith('.db')) {
         format = 'sqlite';
       } else {
@@ -382,7 +570,6 @@ export async function getBackupTelegramConfig(): Promise<{
     config: config
       ? {
           ...config,
-          // Mask botToken if custom
           botToken: config.botToken ? `${config.botToken.substring(0, 10)}...${config.botToken.slice(-5)}` : '',
         }
       : null,
@@ -402,6 +589,7 @@ export async function saveBackupTelegramConfig(params: {
   threadId?: string | null;
   botToken?: string | null;
   isEnabled?: boolean;
+  sendSql?: boolean;
   sendSqlite?: boolean;
   sendJson?: boolean;
   autoBackupEnabled?: boolean;
@@ -412,7 +600,8 @@ export async function saveBackupTelegramConfig(params: {
     threadId,
     botToken,
     isEnabled = true,
-    sendSqlite = true,
+    sendSql = true,
+    sendSqlite,
     sendJson = true,
     autoBackupEnabled = false,
     scheduleTime = '02:00',
@@ -437,7 +626,8 @@ export async function saveBackupTelegramConfig(params: {
     chatId: chatId.trim(),
     threadId: threadId ? String(threadId).trim() : null,
     botToken: botToken ? botToken.trim() : (existing?.botToken || null),
-    sendSqlite: Boolean(sendSqlite),
+    sendSql: Boolean(sendSql ?? existing?.sendSql ?? true),
+    sendSqlite: Boolean(sendSqlite ?? existing?.sendSqlite ?? true),
     sendJson: Boolean(sendJson),
     autoBackupEnabled: Boolean(autoBackupEnabled),
     scheduleTime: scheduleTime || '02:00',
@@ -494,7 +684,7 @@ export async function testBackupTelegramTarget(params?: {
 
   const now = new Date();
   const timeStr = now.toLocaleTimeString('vi-VN') + ' ' + now.toLocaleDateString('vi-VN');
-  const message = `🔔 <b>KIỂM TRA KẾT NỐI SAO LƯU TELEGRAM</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n✅ <b>Trạng thái:</b> Kết nối thành công!\n📌 <b>Kênh/Nhóm/Chat:</b> <code>${chatId}</code>${threadId ? ` (Topic: <code>${threadId}</code>)` : ''}\n⏰ <b>Thời gian test:</b> <i>${timeStr}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <i>Sẵn sàng nhận các file sao lưu cơ sở dữ liệu (.sqlite / .json) từ PTIT Exam Portal.</i>`;
+  const message = `🔔 <b>KIỂM TRA KẾT NỐI SAO LƯU TELEGRAM (POSTGRESQL)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n✅ <b>Trạng thái:</b> Kết nối thành công!\n📌 <b>Kênh/Nhóm/Chat:</b> <code>${chatId}</code>${threadId ? ` (Topic: <code>${threadId}</code>)` : ''}\n⏰ <b>Thời gian test:</b> <i>${timeStr}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🐘 <i>Sẵn sàng nhận các file sao lưu PostgreSQL (.sql / .json) từ PTIT Exam Portal.</i>`;
 
   const sendRes = await sendTelegramMessage(botToken, chatId, message, {
     threadId: threadId ? Number(threadId) : undefined,
@@ -522,7 +712,7 @@ export async function testBackupTelegramTarget(params?: {
  * Thực hiện backup và gửi file trực tiếp lên Telegram
  */
 export async function sendBackupToTelegram(params?: {
-  format?: 'sqlite' | 'json' | 'all';
+  format?: 'sql' | 'json' | 'all';
   customChatId?: string;
   customThreadId?: string | null;
   customBotToken?: string | null;
@@ -551,15 +741,16 @@ export async function sendBackupToTelegram(params?: {
     botToken = sysBot.botToken;
   }
 
+  const shouldSendSql = storedConfig?.sendSql !== false && storedConfig?.sendSqlite !== false;
+  const shouldSendJson = storedConfig?.sendJson !== false;
+
   const format =
     params?.format ||
-    (storedConfig
-      ? storedConfig.sendSqlite && storedConfig.sendJson
-        ? 'all'
-        : storedConfig.sendSqlite
-        ? 'sqlite'
-        : 'json'
-      : 'all');
+    (shouldSendSql && shouldSendJson
+      ? 'all'
+      : shouldSendSql
+      ? 'sql'
+      : 'json');
 
   const stats = await getDatabaseStats();
   const timestamp = generateTimestampString();
@@ -569,50 +760,56 @@ export async function sendBackupToTelegram(params?: {
   const results: any[] = [];
   const errors: string[] = [];
 
-  // 1. Send SQLite DB
-  if (format === 'sqlite' || format === 'all') {
-    const dbPath = getDatabaseFilePath();
-    if (fs.existsSync(dbPath)) {
-      const sqliteBuffer = fs.readFileSync(dbPath);
-      const filename = `ptit-db-${timestamp}.sqlite`;
-      const sizeFormatted = formatBytes(sqliteBuffer.length);
+  // 1. Send PostgreSQL SQL Dump (.sql)
+  if (format === 'sql' || format === 'all') {
+    try {
+      const sqlDump = await exportDatabaseAsSqlDump();
+      const sqlBuffer = Buffer.from(sqlDump, 'utf-8');
+      const filename = `ptit-db-${timestamp}.sql`;
+      const sizeFormatted = formatBytes(sqlBuffer.length);
 
-      const caption = `💾 <b>BẢN SAO LƯU DATABASE SQLITE (.sqlite)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n👥 <b>Sinh viên:</b> ${stats.tables.students.toLocaleString('vi-VN')} | <b>Lịch thi:</b> ${stats.tables.examRecords.toLocaleString('vi-VN')}\n📁 <b>Tài khoản:</b> ${stats.tables.users.toLocaleString('vi-VN')} | <b>Đợt thi:</b> ${stats.tables.examBatches}\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <i>File nhị phân nguyên gốc dev.db - Khôi phục tức thì hoặc phân tích bằng SQLite Browser / Studio.</i>`;
+      const caption = `🐘 <b>BẢN SAO LƯU DATABASE POSTGRESQL (.sql)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n👥 <b>Sinh viên:</b> ${stats.tables.students.toLocaleString('vi-VN')} | <b>Lịch thi:</b> ${stats.tables.examRecords.toLocaleString('vi-VN')}\n📁 <b>Tài khoản:</b> ${stats.tables.users.toLocaleString('vi-VN')} | <b>Đợt thi:</b> ${stats.tables.examBatches}\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <i>File SQL Dump chuẩn PostgreSQL - Khôi phục tức thì hoặc nạp vào PostgreSQL bằng lệnh psql.</i>`;
 
-      const sendRes = await sendTelegramDocument(botToken, chatId, sqliteBuffer, filename, {
+      const sendRes = await sendTelegramDocument(botToken, chatId, sqlBuffer, filename, {
         threadId: threadId ? Number(threadId) : undefined,
         caption,
       });
 
-      results.push({ file: filename, format: 'sqlite', result: sendRes });
+      results.push({ file: filename, format: 'sql', result: sendRes });
       if (sendRes.success) {
         filesSent.push(filename);
       } else {
-        errors.push(`Lỗi gửi file SQLite: ${sendRes.error}`);
+        errors.push(`Lỗi gửi file SQL: ${sendRes.error}`);
       }
+    } catch (sqlErr: any) {
+      errors.push(`Lỗi tạo file SQL Dump: ${sqlErr.message}`);
     }
   }
 
-  // 2. Send JSON Dump
+  // 2. Send JSON Dump (.json)
   if (format === 'json' || format === 'all') {
-    const jsonDump = await exportDatabaseAsJson();
-    const jsonStr = JSON.stringify(jsonDump, null, 2);
-    const jsonBuffer = Buffer.from(jsonStr, 'utf-8');
-    const filename = `ptit-db-${timestamp}.json`;
-    const sizeFormatted = formatBytes(jsonBuffer.length);
+    try {
+      const jsonDump = await exportDatabaseAsJson();
+      const jsonStr = JSON.stringify(jsonDump, null, 2);
+      const jsonBuffer = Buffer.from(jsonStr, 'utf-8');
+      const filename = `ptit-db-${timestamp}.json`;
+      const sizeFormatted = formatBytes(jsonBuffer.length);
 
-    const caption = `📄 <b>BẢN XUẤT DỮ LIỆU JSON ĐẦY ĐỦ (.json)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n📋 <b>Bao gồm:</b> 14 bảng dữ liệu hệ thống kèm metadata\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🌐 <i>Dữ liệu JSON có cấu trúc đầy đủ, dễ đọc & di chuyển sang mọi hệ quản trị CSDL.</i>`;
+      const caption = `📄 <b>BẢN XUẤT DỮ LIỆU JSON ĐẦY ĐỦ (.json)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n📋 <b>Bao gồm:</b> 14 bảng dữ liệu hệ thống PostgreSQL\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🌐 <i>Dữ liệu JSON có cấu trúc đầy đủ, dễ đọc & di chuyển sang mọi môi trường.</i>`;
 
-    const sendRes = await sendTelegramDocument(botToken, chatId, jsonBuffer, filename, {
-      threadId: threadId ? Number(threadId) : undefined,
-      caption,
-    });
+      const sendRes = await sendTelegramDocument(botToken, chatId, jsonBuffer, filename, {
+        threadId: threadId ? Number(threadId) : undefined,
+        caption,
+      });
 
-    results.push({ file: filename, format: 'json', result: sendRes });
-    if (sendRes.success) {
-      filesSent.push(filename);
-    } else {
-      errors.push(`Lỗi gửi file JSON: ${sendRes.error}`);
+      results.push({ file: filename, format: 'json', result: sendRes });
+      if (sendRes.success) {
+        filesSent.push(filename);
+      } else {
+        errors.push(`Lỗi gửi file JSON: ${sendRes.error}`);
+      }
+    } catch (jsonErr: any) {
+      errors.push(`Lỗi tạo file JSON: ${jsonErr.message}`);
     }
   }
 
@@ -643,20 +840,16 @@ export async function sendBackupToTelegram(params?: {
 
 /**
  * Trình quét tự động kiểm tra và thực hiện sao lưu lúc 10:00 sáng (giờ Việt Nam).
- * Được gọi định kỳ mỗi 5 phút bởi TelegramScheduler trong tiến trình máy chủ.
  */
 export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean; reason?: string }> {
   try {
-    // 1. Giờ Việt Nam hiện tại (UTC+7)
     const nowVN = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
     const currentHour = nowVN.getHours();
     const currentMinute = nowVN.getMinutes();
     const currentDateStr = `${nowVN.getFullYear()}-${String(nowVN.getMonth() + 1).padStart(2, '0')}-${String(nowVN.getDate()).padStart(2, '0')}`;
 
-    // 2. Đọc cấu hình từ GlobalConfig
     const config = await getGlobalConfig<BackupTelegramConfigValue>(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM);
 
-    // Mặc định: autoBackupEnabled = true, scheduleTime = '10:00'
     const isAutoEnabled = config?.autoBackupEnabled !== false;
     const scheduleTime = config?.scheduleTime || '10:00';
     const [targetHourStr, targetMinuteStr] = scheduleTime.split(':');
@@ -667,12 +860,10 @@ export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean
       return { executed: false, reason: 'Tự động sao lưu đang tắt' };
     }
 
-    // Đã sao lưu trong ngày hôm nay rồi thì không chạy lại
     if (config?.lastAutoBackupDate === currentDateStr) {
       return { executed: false, reason: `Đã sao lưu tự động trong ngày hôm nay (${currentDateStr})` };
     }
 
-    // Kiểm tra xem đã đến hoặc vượt qua mốc giờ hẹn trong ngày chưa (ví dụ >= 10:00)
     const isTimeToBackup = currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute);
 
     if (!isTimeToBackup) {
@@ -682,13 +873,13 @@ export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean
       };
     }
 
-    console.log(`⏰ [Auto Backup 10:00 AM VN] Bắt đầu tự động tạo bản sao lưu dữ liệu hệ thống lúc ${scheduleTime} sáng...`);
+    console.log(`⏰ [Auto Backup 10:00 AM VN] Bắt đầu tự động tạo bản sao lưu dữ liệu PostgreSQL lúc ${scheduleTime} sáng...`);
 
     // 1. Tạo snapshot lưu cục bộ trên máy chủ
     const createdFiles = await createLocalBackup('all');
     console.log(`⏰ [Auto Backup 10:00 AM VN] Đã tạo ${createdFiles.length} file snapshot trên máy chủ.`);
 
-    // 2. Nếu có cấu hình Telegram, tự động gửi file lên Telegram
+    // 2. Gửi Telegram nếu có cấu hình
     let telegramResult: any = null;
     if (config?.chatId && config.isEnabled !== false) {
       try {
@@ -699,12 +890,12 @@ export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean
       }
     }
 
-    // 3. Cập nhật ngày sao lưu tự động gần nhất vào GlobalConfig
+    // 3. Cập nhật ngày sao lưu tự động gần nhất
     const updatedConfig: BackupTelegramConfigValue = {
       ...(config || {
         isEnabled: true,
         chatId: '',
-        sendSqlite: true,
+        sendSql: true,
         sendJson: true,
       }),
       autoBackupEnabled: isAutoEnabled,
@@ -730,7 +921,7 @@ export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DATABASE RESTORATION CAPABILITIES (Phục hồi CSDL)
+// DATABASE RESTORATION CAPABILITIES (Phục hồi CSDL PostgreSQL)
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function insertInChunks<T>(
@@ -743,49 +934,6 @@ async function insertInChunks<T>(
     const chunk = items.slice(i, i + chunkSize);
     await insertFn(chunk as any[]);
   }
-}
-
-/**
- * Phục hồi cơ sở dữ liệu từ file nhị phân SQLite (.sqlite / .db)
- */
-export async function restoreFromSqliteFile(
-  sourcePathOrBuffer: string | Buffer
-): Promise<{
-  success: boolean;
-  message: string;
-  preRestoreBackupFile: string;
-  stats: DatabaseStats;
-}> {
-  const timestamp = generateTimestampString();
-  const dbPath = getDatabaseFilePath();
-
-  // 1. Tạo bản sao lưu an toàn trước khi phục hồi
-  const preRestoreFiles = await createLocalBackup('all');
-  const preRestoreName =
-    preRestoreFiles.find((f) => f.format === 'sqlite')?.name || `ptit-db-pre-restore-${timestamp}.sqlite`;
-
-  // 2. Ngắt kết nối Prisma để giải phóng lock file
-  await prisma.$disconnect().catch(() => {});
-
-  // 3. Ghi đè file dev.db
-  if (typeof sourcePathOrBuffer === 'string') {
-    if (!fs.existsSync(sourcePathOrBuffer)) {
-      throw new Error(`File sao lưu SQLite không tồn tại: ${sourcePathOrBuffer}`);
-    }
-    fs.copyFileSync(sourcePathOrBuffer, dbPath);
-  } else {
-    fs.writeFileSync(dbPath, sourcePathOrBuffer);
-  }
-
-  // 4. Kiểm tra thống kê cơ sở dữ liệu mới
-  const stats = await getDatabaseStats();
-
-  return {
-    success: true,
-    message: `Phục hồi cơ sở dữ liệu SQLite thành công! Tổng cộng ${stats.totalRecords.toLocaleString('vi-VN')} bản ghi.`,
-    preRestoreBackupFile: preRestoreName,
-    stats,
-  };
 }
 
 export async function syncPostgresSequences(): Promise<void> {
@@ -814,6 +962,50 @@ export async function syncPostgresSequences(): Promise<void> {
       // Silently ignore if not running on PostgreSQL
     }
   }
+}
+
+/**
+ * Phục hồi cơ sở dữ liệu từ file SQL Dump PostgreSQL (.sql)
+ */
+export async function restoreFromSqlDump(
+  sqlContent: string
+): Promise<{
+  success: boolean;
+  message: string;
+  preRestoreBackupFile: string;
+  stats: DatabaseStats;
+}> {
+  // 1. Tạo bản sao lưu an toàn trước khi phục hồi
+  const preRestoreFiles = await createLocalBackup('json');
+  const preRestoreName = preRestoreFiles[0]?.name || 'pre-restore-backup.json';
+
+  try {
+    await prisma.$executeRawUnsafe(sqlContent);
+  } catch (err: any) {
+    // Nếu khối lớn lỗi, tách theo dấu chấm phẩy và thực thi từng lệnh
+    const statements = sqlContent
+      .split(';')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && !s.startsWith('--'));
+
+    for (const stmt of statements) {
+      if (stmt) {
+        await prisma.$executeRawUnsafe(stmt).catch((e) => {
+          console.warn(`[Restore SQL Warning]: Statement failed: ${stmt.substring(0, 60)}...`, e.message);
+        });
+      }
+    }
+  }
+
+  await syncPostgresSequences().catch(() => {});
+  const stats = await getDatabaseStats();
+
+  return {
+    success: true,
+    message: `Phục hồi cơ sở dữ liệu từ file SQL Dump PostgreSQL thành công! Tổng cộng ${stats.totalRecords.toLocaleString('vi-VN')} bản ghi.`,
+    preRestoreBackupFile: preRestoreName,
+    stats,
+  };
 }
 
 /**
@@ -846,29 +1038,25 @@ export async function restoreFromJsonDump(
 
   // 1. Tạo bản sao lưu an toàn trước khi phục hồi
   const preRestoreFiles = await createLocalBackup('json');
-  const preRestoreName = preRestoreFiles.find((f) => f.format === 'json')?.name || 'pre-restore-backup.json';
+  const preRestoreName = preRestoreFiles[0]?.name || 'pre-restore-backup.json';
 
   const parseDate = (d: any) => (d ? new Date(d) : undefined);
 
-  // Tạm thời tắt ràng buộc nếu là SQLite (nếu trên PostgreSQL thì bỏ qua lỗi)
-  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF;').catch(() => {});
-
-  try {
-    // 2. Xóa sạch dữ liệu cũ
-    await prisma.classScheduleReminderLog.deleteMany({});
-    await prisma.qldtAnnouncementLog.deleteMany({});
-    await prisma.examReminderLog.deleteMany({});
-    await prisma.activityLog.deleteMany({});
-    await prisma.externalAccount.deleteMany({});
-    await prisma.courseRegistration.deleteMany({});
-    await prisma.examRecord.deleteMany({});
-    await prisma.examBatch.deleteMany({});
-    await prisma.telegramConfig.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.student.deleteMany({});
-    await prisma.globalConfig.deleteMany({});
-    await prisma.systemMeta.deleteMany({});
-    await prisma.registrationRequest.deleteMany({});
+  // 2. Xóa sạch dữ liệu cũ theo thứ tự khóa ngoại an toàn
+  await prisma.classScheduleReminderLog.deleteMany({}).catch(() => {});
+  await prisma.qldtAnnouncementLog.deleteMany({}).catch(() => {});
+  await prisma.examReminderLog.deleteMany({}).catch(() => {});
+  await prisma.activityLog.deleteMany({}).catch(() => {});
+  await prisma.telegramConfig.deleteMany({}).catch(() => {});
+  await prisma.externalAccount.deleteMany({}).catch(() => {});
+  await prisma.courseRegistration.deleteMany({}).catch(() => {});
+  await prisma.examRecord.deleteMany({}).catch(() => {});
+  await prisma.examBatch.deleteMany({}).catch(() => {});
+  await prisma.user.deleteMany({}).catch(() => {});
+  await prisma.student.deleteMany({}).catch(() => {});
+  await prisma.registrationRequest.deleteMany({}).catch(() => {});
+  await prisma.globalConfig.deleteMany({}).catch(() => {});
+  await prisma.systemMeta.deleteMany({}).catch(() => {});
 
   let count = 0;
 
@@ -882,7 +1070,7 @@ export async function restoreFromJsonDump(
       value: s.value,
       updatedAt: parseDate(s.updatedAt) || new Date(),
     }));
-    await insertInChunks(items, 200, (c) => prisma.systemMeta.createMany({ data: c }));
+    await insertInChunks(items, 200, (c) => prisma.systemMeta.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -896,7 +1084,7 @@ export async function restoreFromJsonDump(
       createdAt: parseDate(g.createdAt) || new Date(),
       updatedAt: parseDate(g.updatedAt) || new Date(),
     }));
-    await insertInChunks(items, 200, (c) => prisma.globalConfig.createMany({ data: c }));
+    await insertInChunks(items, 200, (c) => prisma.globalConfig.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -917,7 +1105,7 @@ export async function restoreFromJsonDump(
       createdAt: parseDate(s.createdAt) || new Date(),
       updatedAt: parseDate(s.updatedAt) || new Date(),
     }));
-    await insertInChunks(items, 300, (c) => prisma.student.createMany({ data: c }));
+    await insertInChunks(items, 300, (c) => prisma.student.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -933,7 +1121,7 @@ export async function restoreFromJsonDump(
       createdAt: parseDate(u.createdAt) || new Date(),
       updatedAt: parseDate(u.updatedAt) || new Date(),
     }));
-    await insertInChunks(items, 300, (c) => prisma.user.createMany({ data: c }));
+    await insertInChunks(items, 300, (c) => prisma.user.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -952,7 +1140,7 @@ export async function restoreFromJsonDump(
       createdAt: parseDate(b.createdAt) || new Date(),
       updatedAt: parseDate(b.updatedAt) || new Date(),
     }));
-    await insertInChunks(items, 200, (c) => prisma.examBatch.createMany({ data: c }));
+    await insertInChunks(items, 200, (c) => prisma.examBatch.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -978,7 +1166,7 @@ export async function restoreFromJsonDump(
       isPostponed: Boolean(r.isPostponed),
       createdAt: parseDate(r.createdAt) || new Date(),
     }));
-    await insertInChunks(items, 500, (c) => prisma.examRecord.createMany({ data: c }));
+    await insertInChunks(items, 500, (c) => prisma.examRecord.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -996,7 +1184,7 @@ export async function restoreFromJsonDump(
       createdAt: parseDate(cr.createdAt) || new Date(),
       updatedAt: parseDate(cr.updatedAt) || new Date(),
     }));
-    await insertInChunks(items, 200, (c) => prisma.courseRegistration.createMany({ data: c }));
+    await insertInChunks(items, 200, (c) => prisma.courseRegistration.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -1017,7 +1205,7 @@ export async function restoreFromJsonDump(
       createdAt: parseDate(ea.createdAt) || new Date(),
       updatedAt: parseDate(ea.updatedAt) || new Date(),
     }));
-    await insertInChunks(items, 200, (c) => prisma.externalAccount.createMany({ data: c }));
+    await insertInChunks(items, 200, (c) => prisma.externalAccount.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -1045,7 +1233,7 @@ export async function restoreFromJsonDump(
       createdAt: parseDate(tc.createdAt) || new Date(),
       updatedAt: parseDate(tc.updatedAt) || new Date(),
     }));
-    await insertInChunks(items, 200, (c) => prisma.telegramConfig.createMany({ data: c }));
+    await insertInChunks(items, 200, (c) => prisma.telegramConfig.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -1066,7 +1254,7 @@ export async function restoreFromJsonDump(
       createdAt: parseDate(rr.createdAt) || new Date(),
       updatedAt: parseDate(rr.updatedAt) || new Date(),
     }));
-    await insertInChunks(items, 200, (c) => prisma.registrationRequest.createMany({ data: c }));
+    await insertInChunks(items, 200, (c) => prisma.registrationRequest.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -1086,7 +1274,7 @@ export async function restoreFromJsonDump(
       userAgent: al.userAgent ?? null,
       createdAt: parseDate(al.createdAt) || new Date(),
     }));
-    await insertInChunks(items, 500, (c) => prisma.activityLog.createMany({ data: c }));
+    await insertInChunks(items, 500, (c) => prisma.activityLog.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -1100,7 +1288,7 @@ export async function restoreFromJsonDump(
       targetDate: er.targetDate,
       sentAt: parseDate(er.sentAt) || new Date(),
     }));
-    await insertInChunks(items, 300, (c) => prisma.examReminderLog.createMany({ data: c }));
+    await insertInChunks(items, 300, (c) => prisma.examReminderLog.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -1114,7 +1302,7 @@ export async function restoreFromJsonDump(
       publishDate: qa.publishDate ?? null,
       sentAt: parseDate(qa.sentAt) || new Date(),
     }));
-    await insertInChunks(items, 300, (c) => prisma.qldtAnnouncementLog.createMany({ data: c }));
+    await insertInChunks(items, 300, (c) => prisma.qldtAnnouncementLog.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
@@ -1129,24 +1317,107 @@ export async function restoreFromJsonDump(
       sessionInfo: cs.sessionInfo ?? null,
       sentAt: parseDate(cs.sentAt) || new Date(),
     }));
-    await insertInChunks(items, 300, (c) => prisma.classScheduleReminderLog.createMany({ data: c }));
+    await insertInChunks(items, 300, (c) => prisma.classScheduleReminderLog.createMany({ data: c, skipDuplicates: true }));
     count += items.length;
   }
 
-    // Đồng bộ sequence ID trên PostgreSQL sau khi nạp dữ liệu có chỉ định explicit ID
-    await syncPostgresSequences().catch(() => {});
+  // Đồng bộ sequence ID trên PostgreSQL sau khi nạp dữ liệu có chỉ định explicit ID
+  await syncPostgresSequences().catch(() => {});
 
-    const stats = await getDatabaseStats();
+  const stats = await getDatabaseStats();
 
+  return {
+    success: true,
+    message: `Phục hồi cơ sở dữ liệu từ file JSON thành công! Đã nạp ${count.toLocaleString('vi-VN')} bản ghi trên 14 bảng.`,
+    recordsRestored: count,
+    preRestoreBackupFile: preRestoreName,
+    stats,
+  };
+}
+
+/**
+ * Phục hồi cơ sở dữ liệu từ file SQLite cũ (.sqlite / .db) và nạp vào PostgreSQL
+ */
+export async function restoreFromSqliteFile(
+  sourcePathOrBuffer: string | Buffer
+): Promise<{
+  success: boolean;
+  message: string;
+  recordsRestored: number;
+  preRestoreBackupFile: string;
+  stats: DatabaseStats;
+}> {
+  const timestamp = generateTimestampString();
+  const tempDir = path.join(process.cwd(), 'backups', 'temp');
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  let tempSqlitePath = '';
+  if (typeof sourcePathOrBuffer === 'string') {
+    if (!fs.existsSync(sourcePathOrBuffer)) {
+      throw new Error(`File sao lưu SQLite không tồn tại: ${sourcePathOrBuffer}`);
+    }
+    tempSqlitePath = sourcePathOrBuffer;
+  } else {
+    tempSqlitePath = path.join(tempDir, `temp-restore-${timestamp}.sqlite`);
+    fs.writeFileSync(tempSqlitePath, sourcePathOrBuffer);
+  }
+
+  try {
+    const pythonScript = `
+import sqlite3, json, sys
+
+db_path = sys.argv[1]
+conn = sqlite3.connect(db_path)
+conn.row_factory = sqlite3.Row
+cur = conn.cursor()
+
+tables = [
+    ("users", "User"),
+    ("students", "Student"),
+    ("examBatches", "ExamBatch"),
+    ("examRecords", "ExamRecord"),
+    ("courseRegistrations", "CourseRegistration"),
+    ("systemMeta", "SystemMeta"),
+    ("externalAccounts", "ExternalAccount"),
+    ("activityLogs", "ActivityLog"),
+    ("telegramConfigs", "TelegramConfig"),
+    ("globalConfigs", "GlobalConfig"),
+    ("examReminderLogs", "ExamReminderLog"),
+    ("qldtAnnouncementLogs", "QldtAnnouncementLog"),
+    ("classScheduleReminderLogs", "ClassScheduleReminderLog"),
+    ("registrationRequests", "RegistrationRequest"),
+]
+
+data = {}
+for key, tbl in tables:
+    try:
+        cur.execute(f'SELECT * FROM "{tbl}"')
+        rows = [dict(r) for r in cur.fetchall()]
+        data[key] = rows
+    except Exception:
+        data[key] = []
+
+print(json.dumps({"data": data}))
+conn.close()
+`;
+    const output = execSync(`python3 -c '${pythonScript}' "${tempSqlitePath}"`, {
+      maxBuffer: 100 * 1024 * 1024,
+      encoding: 'utf8',
+    });
+    const parsed = JSON.parse(output);
+    const result = await restoreFromJsonDump(parsed);
     return {
-      success: true,
-      message: `Phục hồi cơ sở dữ liệu từ file JSON thành công! Đã nạp ${count.toLocaleString('vi-VN')} bản ghi trên 14 bảng.`,
-      recordsRestored: count,
-      preRestoreBackupFile: preRestoreName,
-      stats,
+      ...result,
+      message: `Đã chuyển đổi và phục hồi thành công dữ liệu từ file SQLite vào PostgreSQL! (${result.recordsRestored} bản ghi)`,
     };
+  } catch (err: any) {
+    throw new Error(`Không thể trích xuất dữ liệu từ file SQLite để nạp vào PostgreSQL: ${err.message}`);
   } finally {
-    await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON;').catch(() => {});
+    if (typeof sourcePathOrBuffer !== 'string' && fs.existsSync(tempSqlitePath)) {
+      try { fs.unlinkSync(tempSqlitePath); } catch {}
+    }
   }
 }
 
@@ -1168,10 +1439,12 @@ export async function restoreFromLocalBackup(filename: string): Promise<{
   if (filename.endsWith('.json')) {
     const jsonContent = fs.readFileSync(filePath, 'utf-8');
     return await restoreFromJsonDump(jsonContent);
+  } else if (filename.endsWith('.sql')) {
+    const sqlContent = fs.readFileSync(filePath, 'utf-8');
+    return await restoreFromSqlDump(sqlContent);
   } else if (filename.endsWith('.sqlite') || filename.endsWith('.db')) {
     return await restoreFromSqliteFile(filePath);
   } else {
-    throw new Error('Định dạng file sao lưu không được hỗ trợ (chỉ chấp nhận .sqlite, .db, .json)');
+    throw new Error('Định dạng file sao lưu không được hỗ trợ (chỉ chấp nhận .sql, .json, .sqlite, .db)');
   }
 }
-

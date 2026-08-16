@@ -78,7 +78,7 @@ interface DatabaseStats {
 
 interface LocalBackupFile {
   name: string;
-  format: 'sqlite' | 'json';
+  format: 'sql' | 'json' | 'sqlite';
   size: number;
   sizeFormatted: string;
   createdAt: string;
@@ -89,7 +89,8 @@ interface BackupTelegramConfigItem {
   chatId: string;
   threadId?: string | null;
   botToken?: string | null;
-  sendSqlite: boolean;
+  sendSql?: boolean;
+  sendSqlite?: boolean;
   sendJson: boolean;
   autoBackupEnabled?: boolean;
   scheduleTime?: string;
@@ -128,14 +129,14 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
   const [deletingFilename, setDeletingFilename] = useState<string | null>(null);
   const [confirmDeleteFile, setConfirmDeleteFile] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [selectedFormat, setSelectedFormat] = useState<'all' | 'sqlite' | 'json'>('all');
+  const [selectedFormat, setSelectedFormat] = useState<'all' | 'sql' | 'json'>('all');
 
   // Telegram Config Form States
   const [telChatId, setTelChatId] = useState('');
   const [telThreadId, setTelThreadId] = useState('');
   const [useCustomBot, setUseCustomBot] = useState(false);
   const [telBotToken, setTelBotToken] = useState('');
-  const [telSendSqlite, setTelSendSqlite] = useState(true);
+  const [telSendSql, setTelSendSql] = useState(true);
   const [telSendJson, setTelSendJson] = useState(true);
   const [telIsEnabled, setTelIsEnabled] = useState(true);
   const [telAutoBackupEnabled, setTelAutoBackupEnabled] = useState(true);
@@ -166,7 +167,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
           setTelegramConfig(data.telegramConfig);
           setTelChatId(data.telegramConfig.chatId || '');
           setTelThreadId(data.telegramConfig.threadId || '');
-          setTelSendSqlite(data.telegramConfig.sendSqlite ?? true);
+          setTelSendSql(data.telegramConfig.sendSql ?? data.telegramConfig.sendSqlite ?? true);
           setTelSendJson(data.telegramConfig.sendJson ?? true);
           setTelIsEnabled(data.telegramConfig.isEnabled ?? true);
           setTelAutoBackupEnabled(data.telegramConfig.autoBackupEnabled !== false);
@@ -193,7 +194,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
   }, [fetchBackupData]);
 
   // Handle direct download from live DB
-  const handleDirectDownload = (format: 'sqlite' | 'json') => {
+  const handleDirectDownload = (format: 'sql' | 'json') => {
     showToast(`Đang chuẩn bị tải về file ${format.toUpperCase()}...`, 'info');
     const url = `/api/backup?download=true&format=${format}`;
     const link = document.createElement('a');
@@ -287,7 +288,8 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
           threadId: telThreadId.trim() || null,
           botToken: useCustomBot && telBotToken.trim() ? telBotToken.trim() : null,
           isEnabled: telIsEnabled,
-          sendSqlite: telSendSqlite,
+          sendSql: telSendSql,
+          sendSqlite: telSendSql,
           sendJson: telSendJson,
           autoBackupEnabled: telAutoBackupEnabled,
           scheduleTime: telScheduleTime || '10:00',
@@ -386,8 +388,8 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
     if (files && files[0]) {
       const file = files[0];
       const name = file.name.toLowerCase();
-      if (!name.endsWith('.sqlite') && !name.endsWith('.db') && !name.endsWith('.json')) {
-        showToast('Vui lòng chọn file sao lưu có định dạng .sqlite, .db hoặc .json', 'error');
+      if (!name.endsWith('.sql') && !name.endsWith('.json') && !name.endsWith('.sqlite') && !name.endsWith('.db')) {
+        showToast('Vui lòng chọn file sao lưu có định dạng .sql, .json hoặc .sqlite / .db', 'error');
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
@@ -594,7 +596,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Khôi phục toàn bộ 14 bảng dữ liệu hệ thống từ file sao lưu <b>.sqlite / .db</b> hoặc <b>.json</b>
+                Khôi phục toàn bộ 14 bảng dữ liệu hệ thống PostgreSQL từ file sao lưu <b>.sql</b>, <b>.json</b> hoặc file cũ <b>.sqlite / .db</b>
               </p>
             </div>
           </div>
@@ -609,7 +611,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
             <div>
               <h3 className="text-sm font-bold text-slate-200">Tải Lên File Sao Lưu Từ Máy Tính Để Phục Hồi</h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Chấp nhận file <code className="text-indigo-400 font-mono">.sqlite</code>, <code className="text-indigo-400 font-mono">.db</code> hoặc <code className="text-emerald-400 font-mono">.json</code>
+                Chấp nhận file <code className="text-sky-400 font-mono">.sql</code> (PostgreSQL), <code className="text-emerald-400 font-mono">.json</code> hoặc <code className="text-amber-400 font-mono">.sqlite / .db</code>
               </p>
             </div>
           </div>
@@ -619,7 +621,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
               type="file"
               ref={fileInputRef}
               onChange={handleFileSelect}
-              accept=".sqlite,.db,.json"
+              accept=".sql,.json,.sqlite,.db"
               className="hidden"
               id="upload-backup-restore-input"
             />
@@ -645,7 +647,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-white">Xác Nhận Phục Hồi Cơ Sở Dữ Liệu</h3>
-                  <span className="text-xs text-amber-400 font-medium">Thao tác này sẽ thay thế dữ liệu hiện tại</span>
+                  <span className="text-xs text-amber-400 font-medium">Thao tác này sẽ thay thế dữ liệu hiện tại trong PostgreSQL</span>
                 </div>
               </div>
               <button
@@ -664,10 +666,12 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
               <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl">
                 <div className="text-[11px] text-slate-500 mb-1">Nguồn phục hồi:</div>
                 <div className="font-mono font-bold text-white flex items-center gap-2">
-                  {restoreTargetFile.endsWith('.sqlite') || restoreTargetFile.endsWith('.db') ? (
-                    <Database className="w-4 h-4 text-indigo-400" />
-                  ) : (
+                  {restoreTargetFile.endsWith('.sql') ? (
+                    <Database className="w-4 h-4 text-sky-400" />
+                  ) : restoreTargetFile.endsWith('.json') ? (
                     <FileCode className="w-4 h-4 text-emerald-400" />
+                  ) : (
+                    <HardDrive className="w-4 h-4 text-amber-400" />
                   )}
                   <span className="truncate">{restoreTargetFile}</span>
                   {restoreSourceType === 'upload' && (
@@ -820,7 +824,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Tự động sao lưu và gửi file SQLite (.sqlite) / JSON (.json) vào Kênh / Nhóm Telegram mỗi ngày lúc 10:00 sáng
+                Tự động sao lưu và gửi file SQL PostgreSQL (.sql) / JSON (.json) vào Kênh / Nhóm Telegram mỗi ngày lúc 10:00 sáng
               </p>
             </div>
           </div>
@@ -1013,11 +1017,11 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={telSendSqlite}
-                  onChange={(e) => setTelSendSqlite(e.target.checked)}
+                  checked={telSendSql}
+                  onChange={(e) => setTelSendSql(e.target.checked)}
                   className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 bg-slate-900 border-slate-700 cursor-pointer"
                 />
-                <span>Gửi file SQLite (.sqlite)</span>
+                <span>Gửi file SQL PostgreSQL (.sql)</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -1064,28 +1068,28 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
 
       {/* Main Actions Panel: Export & Snapshot */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Card 1: Direct Instant Download (SQLite Live) */}
-        <div className="bg-gradient-to-b from-indigo-950/40 to-slate-900 border border-indigo-500/20 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+        {/* Card 1: Direct Instant Download (PostgreSQL SQL Dump Live) */}
+        <div className="bg-gradient-to-b from-sky-950/40 to-slate-900 border border-sky-500/20 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <div className="p-2.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-xl">
+              <div className="p-2.5 bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-xl">
                 <Database className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-white text-base">File SQLite Gốc (.sqlite)</h3>
-                <span className="text-xs text-indigo-400 font-medium">Sao lưu nhị phân đầy đủ 100%</span>
+                <h3 className="font-bold text-white text-base">File SQL Dump (.sql)</h3>
+                <span className="text-xs text-sky-400 font-medium">Bản sao lưu chuẩn PostgreSQL</span>
               </div>
             </div>
             <p className="text-slate-400 text-xs leading-relaxed mb-4">
-              Tải trực tiếp bản sao lưu file SQLite live (<code className="text-indigo-300 font-mono">dev.db</code>). Phù hợp để phục hồi tức thì, mở bằng DB Browser hoặc Prisma Studio.
+              Xuất trực tiếp toàn bộ 14 bảng thành file SQL PostgreSQL đầy đủ. Dễ dàng nạp bằng <code className="text-sky-300 font-mono">psql</code> hoặc phục hồi tức thì trên giao diện Web.
             </p>
           </div>
           <button
-            onClick={() => handleDirectDownload('sqlite')}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30 transition cursor-pointer active:scale-98"
+            onClick={() => handleDirectDownload('sql')}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-sky-900/30 transition cursor-pointer active:scale-98"
           >
             <ArrowDownToLine className="w-4 h-4" />
-            Tải File SQLite (.sqlite)
+            Tải File SQL Dump (.sql)
           </button>
         </div>
 
@@ -1098,11 +1102,11 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
               </div>
               <div>
                 <h3 className="font-bold text-white text-base">Dữ Liệu JSON Toàn Bộ (.json)</h3>
-                <span className="text-xs text-emerald-400 font-medium">Dễ đọc, chuyển đổi & di chuyển</span>
+                <span className="text-xs text-emerald-400 font-medium">Dễ đọc, di động & phục hồi đa nền tảng</span>
               </div>
             </div>
             <p className="text-slate-400 text-xs leading-relaxed mb-4">
-              Xuất toàn bộ 14 bảng dữ liệu cùng metadata thành định dạng JSON chuẩn. Thích hợp cho việc phân tích, di chuyển sang cơ sở dữ liệu khác (Postgres, MySQL).
+              Xuất toàn bộ 14 bảng dữ liệu cùng metadata thành định dạng JSON chuẩn. Thích hợp cho việc lưu trữ đám mây, phân tích hoặc di chuyển hệ thống.
             </p>
           </div>
           <button
@@ -1115,29 +1119,29 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
         </div>
 
         {/* Card 3: Server Snapshot Creation */}
-        <div className="bg-gradient-to-b from-sky-950/40 to-slate-900 border border-sky-500/20 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+        <div className="bg-gradient-to-b from-indigo-950/40 to-slate-900 border border-indigo-500/20 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <div className="p-2.5 bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-xl">
+              <div className="p-2.5 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-xl">
                 <Server className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="font-bold text-white text-base">Lưu Trữ Trên Máy Chủ</h3>
-                <span className="text-xs text-sky-400 font-medium">Tạo snapshot trong thư mục backups/</span>
+                <span className="text-xs text-indigo-400 font-medium">Tạo snapshot trong thư mục backups/</span>
               </div>
             </div>
             <p className="text-slate-400 text-xs leading-relaxed mb-3">
-              Tạo bản lưu trữ đóng dấu thời gian trực tiếp trên máy chủ. Bạn có thể tải lại hoặc quản lý bất kỳ lúc nào.
+              Tạo bản lưu trữ đóng dấu thời gian trực tiếp trên máy chủ. Bạn có thể tải lại hoặc phục hồi bất kỳ lúc nào.
             </p>
             {/* Format choice */}
             <div className="flex items-center gap-2 mb-4">
-              {(['all', 'sqlite', 'json'] as const).map((fmt) => (
+              {(['all', 'sql', 'json'] as const).map((fmt) => (
                 <button
                   key={fmt}
                   onClick={() => setSelectedFormat(fmt)}
                   className={`flex-1 py-1.5 text-[11px] font-semibold rounded-lg border transition cursor-pointer ${
                     selectedFormat === fmt
-                      ? 'bg-sky-600 text-white border-sky-400 shadow-sm'
+                      ? 'bg-indigo-600 text-white border-indigo-400 shadow-sm'
                       : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
                   }`}
                 >
@@ -1149,7 +1153,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
           <button
             onClick={handleCreateServerBackup}
             disabled={isCreatingBackup}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-sky-900/30 transition cursor-pointer disabled:opacity-50 active:scale-98"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-900/30 transition cursor-pointer disabled:opacity-50 active:scale-98"
           >
             {isCreatingBackup ? (
               <>
@@ -1207,22 +1211,26 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                 {localBackups.map((file) => (
                   <tr key={file.name} className="hover:bg-slate-800/40 transition">
                     <td className="py-3 px-4 font-mono text-slate-200 flex items-center gap-2">
-                      {file.format === 'sqlite' ? (
-                        <Database className="w-4 h-4 text-indigo-400 shrink-0" />
-                      ) : (
+                      {file.format === 'sql' ? (
+                        <Database className="w-4 h-4 text-sky-400 shrink-0" />
+                      ) : file.format === 'json' ? (
                         <FileCode className="w-4 h-4 text-emerald-400 shrink-0" />
+                      ) : (
+                        <HardDrive className="w-4 h-4 text-amber-400 shrink-0" />
                       )}
                       <span className="font-semibold">{file.name}</span>
                     </td>
                     <td className="py-3 px-4">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${
-                          file.format === 'sqlite'
-                            ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
-                            : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                          file.format === 'sql'
+                            ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                            : file.format === 'json'
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                            : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                         }`}
                       >
-                        {file.format.toUpperCase()}
+                        {file.format === 'sql' ? 'SQL (POSTGRES)' : file.format === 'json' ? 'JSON' : 'SQLITE (CŨ)'}
                       </span>
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-300">{file.sizeFormatted}</td>

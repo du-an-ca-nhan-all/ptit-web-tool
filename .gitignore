@@ -9,7 +9,8 @@ out/
 build/
 dist/
 
-# SQLite databases & temp files
+# Backups & database dumps
+backups/
 *.db
 *.db-journal
 *.sqlite

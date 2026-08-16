@@ -6,17 +6,18 @@ import { logActivity } from '@/src/lib/activityLog';
 import {
   getDatabaseStats,
   exportDatabaseAsJson,
+  exportDatabaseAsSqlDump,
   createLocalBackup,
   listLocalBackups,
   getSafeBackupFilePath,
   deleteLocalBackup,
-  getDatabaseFilePath,
   generateTimestampString,
   getBackupTelegramConfig,
   saveBackupTelegramConfig,
   testBackupTelegramTarget,
   sendBackupToTelegram,
   restoreFromLocalBackup,
+  restoreFromSqlDump,
   restoreFromSqliteFile,
   restoreFromJsonDump,
 } from '@/src/lib/backupService';
@@ -34,9 +35,9 @@ async function getAuthUser(req: NextRequest) {
 }
 
 // GET /api/backup
-// - ?download=true&format=sqlite (Stream live dev.db as SQLite file)
+// - ?download=true&format=sql (Stream live PostgreSQL .sql dump)
 // - ?download=true&format=json (Stream live full JSON dump)
-// - ?download=true&file=xyz.sqlite (Download existing saved backup file)
+// - ?download=true&file=xyz.sql (Download existing saved backup file)
 // - No download param: return stats, local backup files list, and Telegram backup configuration
 export async function GET(req: NextRequest) {
   try {
@@ -66,8 +67,14 @@ export async function GET(req: NextRequest) {
         }
 
         const fileBuffer = fs.readFileSync(filePath);
-        const isJson = requestedFile.endsWith('.json');
-        const contentType = isJson ? 'application/json; charset=utf-8' : 'application/x-sqlite3';
+        let contentType = 'application/octet-stream';
+        if (requestedFile.endsWith('.json')) {
+          contentType = 'application/json; charset=utf-8';
+        } else if (requestedFile.endsWith('.sql')) {
+          contentType = 'application/sql; charset=utf-8';
+        } else if (requestedFile.endsWith('.sqlite') || requestedFile.endsWith('.db')) {
+          contentType = 'application/x-sqlite3';
+        }
 
         await logActivity({
           req,
@@ -92,40 +99,36 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      // 2. Download Live SQLite DB
-      if (format === 'sqlite') {
-        const dbPath = getDatabaseFilePath();
-        if (!fs.existsSync(dbPath)) {
-          return NextResponse.json({ error: 'Không tìm thấy file cơ sở dữ liệu SQLite dev.db' }, { status: 404 });
-        }
-
-        const fileBuffer = fs.readFileSync(dbPath);
-        const filename = `ptit-db-live-${timestamp}.sqlite`;
+      // 2. Download Live PostgreSQL SQL Dump (.sql)
+      if (format === 'sql') {
+        const sqlDump = await exportDatabaseAsSqlDump();
+        const buffer = Buffer.from(sqlDump, 'utf-8');
+        const filename = `ptit-db-dump-${timestamp}.sql`;
 
         await logActivity({
           req,
           userId: authUser.id,
           username: authUser.username,
           userRole: authUser.role,
-          action: 'BACKUP_SQLITE_LIVE',
+          action: 'EXPORT_SQL_DATABASE',
           targetType: 'DATABASE',
           targetId: filename,
-          description: `Tải về trực tiếp bản sao lưu SQLite live: ${filename}`,
-          metadata: { size: fileBuffer.length },
+          description: `Xuất toàn bộ cơ sở dữ liệu PostgreSQL sang file SQL Dump: ${filename}`,
+          metadata: { size: buffer.length },
         });
 
-        return new Response(fileBuffer, {
+        return new Response(buffer, {
           status: 200,
           headers: {
-            'Content-Type': 'application/x-sqlite3',
+            'Content-Type': 'application/sql; charset=utf-8',
             'Content-Disposition': `attachment; filename="${filename}"`,
-            'Content-Length': fileBuffer.length.toString(),
+            'Content-Length': buffer.length.toString(),
             'Cache-Control': 'no-store',
           },
         });
       }
 
-      // 3. Download Live JSON Dump
+      // 3. Download Live JSON Dump (.json)
       if (format === 'json') {
         const jsonDump = await exportDatabaseAsJson();
         const jsonString = JSON.stringify(jsonDump, null, 2);
@@ -155,7 +158,7 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      return NextResponse.json({ error: 'Định dạng tải về không hợp lệ (hỗ trợ sqlite hoặc json)' }, { status: 400 });
+      return NextResponse.json({ error: 'Định dạng tải về không hợp lệ (hỗ trợ sql hoặc json)' }, { status: 400 });
     }
 
     // Default: Return stats, backups list, and telegram backup config
@@ -181,12 +184,12 @@ export async function GET(req: NextRequest) {
 
 // POST /api/backup
 // Handles:
-// - action: 'CREATE_SNAPSHOT' (or default): Create server snapshot file(s)
+// - action: 'CREATE_SNAPSHOT' (or default): Create server snapshot file(s) (.sql, .json)
 // - action: 'SEND_TELEGRAM': Send live backup files directly to Telegram
 // - action: 'SAVE_TELEGRAM_CONFIG': Save backup telegram settings into GlobalConfig
 // - action: 'TEST_TELEGRAM_TARGET': Test ping destination Telegram chat/thread
 // - action: 'RESTORE_SAVED_BACKUP': Restore from an existing backup in backups/
-// - action: 'RESTORE_UPLOADED_FILE' (multipart/form-data): Upload .sqlite or .json and restore
+// - action: 'RESTORE_UPLOADED_FILE' (multipart/form-data): Upload .sql, .json, or .sqlite and restore
 export async function POST(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -208,7 +211,7 @@ export async function POST(req: NextRequest) {
       const file = formData.get('file') as File | null;
 
       if (!file) {
-        return NextResponse.json({ error: 'Vui lòng chọn file sao lưu (.sqlite hoặc .json) để phục hồi' }, { status: 400 });
+        return NextResponse.json({ error: 'Vui lòng chọn file sao lưu (.sql, .json, hoặc .sqlite) để phục hồi' }, { status: 400 });
       }
 
       const filename = file.name.toLowerCase();
@@ -223,11 +226,14 @@ export async function POST(req: NextRequest) {
       if (filename.endsWith('.json')) {
         const text = buffer.toString('utf-8');
         restoreRes = await restoreFromJsonDump(text);
+      } else if (filename.endsWith('.sql')) {
+        const text = buffer.toString('utf-8');
+        restoreRes = await restoreFromSqlDump(text);
       } else if (filename.endsWith('.sqlite') || filename.endsWith('.db')) {
         restoreRes = await restoreFromSqliteFile(buffer);
       } else {
         return NextResponse.json(
-          { error: 'Định dạng file không được hỗ trợ. Vui lòng tải lên file .sqlite, .db hoặc .json' },
+          { error: 'Định dạng file không được hỗ trợ. Vui lòng tải lên file .sql, .json, hoặc .sqlite / .db' },
           { status: 400 }
         );
       }
@@ -240,7 +246,7 @@ export async function POST(req: NextRequest) {
         action: 'RESTORE_DATABASE',
         targetType: 'DATABASE',
         targetId: file.name,
-        description: `Phục hồi cơ sở dữ liệu từ file tải lên: ${file.name} (${restoreRes.stats.totalRecords} bản ghi)`,
+        description: `Phục hồi cơ sở dữ liệu PostgreSQL từ file tải lên: ${file.name} (${restoreRes.stats?.totalRecords || 0} bản ghi)`,
         metadata: { filename: file.name, preRestoreBackupFile: restoreRes.preRestoreBackupFile },
       });
 
@@ -275,7 +281,7 @@ export async function POST(req: NextRequest) {
         action: 'RESTORE_DATABASE',
         targetType: 'DATABASE',
         targetId: filename,
-        description: `Phục hồi cơ sở dữ liệu từ bản sao lưu máy chủ: ${filename} (${restoreRes.stats.totalRecords} bản ghi)`,
+        description: `Phục hồi cơ sở dữ liệu từ bản sao lưu máy chủ: ${filename} (${restoreRes.stats?.totalRecords || 0} bản ghi)`,
         metadata: { filename, preRestoreBackupFile: restoreRes.preRestoreBackupFile },
       });
 
@@ -291,14 +297,15 @@ export async function POST(req: NextRequest) {
 
     // 2.2. SAVE TELEGRAM BACKUP CONFIGURATION
     if (action === 'SAVE_TELEGRAM_CONFIG') {
-      const { chatId, threadId, botToken, isEnabled, sendSqlite, sendJson, autoBackupEnabled, scheduleTime } = body;
+      const { chatId, threadId, botToken, isEnabled, sendSql, sendSqlite, sendJson, autoBackupEnabled, scheduleTime } = body;
 
       const saved = await saveBackupTelegramConfig({
         chatId,
         threadId,
         botToken,
         isEnabled,
-        sendSqlite,
+        sendSql: sendSql ?? sendSqlite,
+        sendSqlite: sendSqlite ?? sendSql,
         sendJson,
         autoBackupEnabled,
         scheduleTime,
@@ -313,7 +320,7 @@ export async function POST(req: NextRequest) {
         targetType: 'GLOBAL_CONFIG',
         targetId: 'backup_telegram',
         description: `Cập nhật cấu hình gửi backup lên Telegram: Chat ID ${chatId}${threadId ? ` (Topic ${threadId})` : ''}`,
-        metadata: { chatId, threadId, isEnabled, sendSqlite, sendJson, autoBackupEnabled, scheduleTime },
+        metadata: { chatId, threadId, isEnabled, sendSql: saved.sendSql, sendJson: saved.sendJson, autoBackupEnabled, scheduleTime },
       });
 
       const telegramBackup = await getBackupTelegramConfig();
@@ -388,7 +395,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2.5. CREATE SERVER SNAPSHOT (Default)
-    const format = (body.format || 'all') as 'sqlite' | 'json' | 'all';
+    const format = (body.format || 'all') as 'sql' | 'json' | 'all';
     const createdFiles = await createLocalBackup(format);
 
     await logActivity({

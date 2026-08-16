@@ -17,8 +17,9 @@ export interface BackupTelegramConfigValue {
   chatId: string;
   threadId?: string | null;
   botToken?: string | null; // Nếu rỗng sẽ dùng System Bot
-  sendSqlite: boolean; // Mặc định true
-  sendJson: boolean; // Mặc định true
+  sendSql?: boolean; // Gửi file SQL Dump PostgreSQL (.sql)
+  sendSqlite?: boolean; // Legacy fallback
+  sendJson: boolean; // Gửi file JSON đầy đủ (.json)
   autoBackupEnabled?: boolean;
   scheduleTime?: string; // Mặc định: '10:00' (10h sáng hàng ngày)
   lastAutoBackupDate?: string | null; // YYYY-MM-DD
