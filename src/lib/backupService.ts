@@ -719,3 +719,419 @@ export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean
     return { executed: false, reason: err.message };
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DATABASE RESTORATION CAPABILITIES (Phục hồi CSDL)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function insertInChunks<T>(
+  items: T[],
+  chunkSize: number,
+  insertFn: (chunk: any[]) => Promise<any>
+) {
+  if (!items || items.length === 0) return;
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    await insertFn(chunk as any[]);
+  }
+}
+
+/**
+ * Phục hồi cơ sở dữ liệu từ file nhị phân SQLite (.sqlite / .db)
+ */
+export async function restoreFromSqliteFile(
+  sourcePathOrBuffer: string | Buffer
+): Promise<{
+  success: boolean;
+  message: string;
+  preRestoreBackupFile: string;
+  stats: DatabaseStats;
+}> {
+  const timestamp = generateTimestampString();
+  const dbPath = getDatabaseFilePath();
+
+  // 1. Tạo bản sao lưu an toàn trước khi phục hồi
+  const preRestoreFiles = await createLocalBackup('all');
+  const preRestoreName =
+    preRestoreFiles.find((f) => f.format === 'sqlite')?.name || `ptit-db-pre-restore-${timestamp}.sqlite`;
+
+  // 2. Ngắt kết nối Prisma để giải phóng lock file
+  await prisma.$disconnect().catch(() => {});
+
+  // 3. Ghi đè file dev.db
+  if (typeof sourcePathOrBuffer === 'string') {
+    if (!fs.existsSync(sourcePathOrBuffer)) {
+      throw new Error(`File sao lưu SQLite không tồn tại: ${sourcePathOrBuffer}`);
+    }
+    fs.copyFileSync(sourcePathOrBuffer, dbPath);
+  } else {
+    fs.writeFileSync(dbPath, sourcePathOrBuffer);
+  }
+
+  // 4. Kiểm tra thống kê cơ sở dữ liệu mới
+  const stats = await getDatabaseStats();
+
+  return {
+    success: true,
+    message: `Phục hồi cơ sở dữ liệu SQLite thành công! Tổng cộng ${stats.totalRecords.toLocaleString('vi-VN')} bản ghi.`,
+    preRestoreBackupFile: preRestoreName,
+    stats,
+  };
+}
+
+/**
+ * Phục hồi cơ sở dữ liệu từ file JSON dump đầy đủ
+ */
+export async function restoreFromJsonDump(
+  jsonContent: string | object
+): Promise<{
+  success: boolean;
+  message: string;
+  recordsRestored: number;
+  preRestoreBackupFile: string;
+  stats: DatabaseStats;
+}> {
+  let parsed: any;
+  if (typeof jsonContent === 'string') {
+    try {
+      parsed = JSON.parse(jsonContent);
+    } catch (e: any) {
+      throw new Error(`Nội dung file JSON không hợp lệ: ${e.message}`);
+    }
+  } else {
+    parsed = jsonContent;
+  }
+
+  const data = parsed.data || parsed;
+  if (!data || typeof data !== 'object') {
+    throw new Error('Cấu trúc file JSON sao lưu không đúng định dạng (thiếu trường data)');
+  }
+
+  // 1. Tạo bản sao lưu an toàn trước khi phục hồi
+  const preRestoreFiles = await createLocalBackup('all');
+  const preRestoreName = preRestoreFiles.find((f) => f.format === 'sqlite')?.name || 'pre-restore-backup';
+
+  const parseDate = (d: any) => (d ? new Date(d) : undefined);
+
+  // Tạm thời tắt ràng buộc khóa ngoại trong lúc xóa và nạp toàn bộ CSDL
+  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF;');
+
+  try {
+    // 2. Xóa sạch dữ liệu cũ
+    await prisma.classScheduleReminderLog.deleteMany({});
+    await prisma.qldtAnnouncementLog.deleteMany({});
+    await prisma.examReminderLog.deleteMany({});
+    await prisma.activityLog.deleteMany({});
+    await prisma.externalAccount.deleteMany({});
+    await prisma.courseRegistration.deleteMany({});
+    await prisma.examRecord.deleteMany({});
+    await prisma.examBatch.deleteMany({});
+    await prisma.telegramConfig.deleteMany({});
+    await prisma.user.deleteMany({});
+    await prisma.student.deleteMany({});
+    await prisma.globalConfig.deleteMany({});
+    await prisma.systemMeta.deleteMany({});
+    await prisma.registrationRequest.deleteMany({});
+
+  let count = 0;
+
+  // 3. Nạp dữ liệu mới theo thứ tự phụ thuộc chính xác
+
+  // SystemMeta
+  if (Array.isArray(data.systemMeta) && data.systemMeta.length > 0) {
+    const items = data.systemMeta.map((s: any) => ({
+      id: s.id,
+      key: s.key,
+      value: s.value,
+      updatedAt: parseDate(s.updatedAt) || new Date(),
+    }));
+    await insertInChunks(items, 200, (c) => prisma.systemMeta.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // GlobalConfig
+  if (Array.isArray(data.globalConfigs) && data.globalConfigs.length > 0) {
+    const items = data.globalConfigs.map((g: any) => ({
+      id: g.id,
+      key: g.key,
+      value: g.value,
+      description: g.description ?? null,
+      createdAt: parseDate(g.createdAt) || new Date(),
+      updatedAt: parseDate(g.updatedAt) || new Date(),
+    }));
+    await insertInChunks(items, 200, (c) => prisma.globalConfig.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // Student
+  if (Array.isArray(data.students) && data.students.length > 0) {
+    const items = data.students.map((s: any) => ({
+      id: s.id,
+      maSV: s.maSV,
+      hoLot: s.hoLot ?? null,
+      ten: s.ten ?? null,
+      hoTen: s.hoTen ?? null,
+      gioiTinh: s.gioiTinh ?? null,
+      ngaySinh: s.ngaySinh ?? null,
+      maLop: s.maLop ?? null,
+      trangThai: s.trangThai ?? 'DANG_HOC',
+      soDienThoai: s.soDienThoai ?? null,
+      ghiChu: s.ghiChu ?? null,
+      createdAt: parseDate(s.createdAt) || new Date(),
+      updatedAt: parseDate(s.updatedAt) || new Date(),
+    }));
+    await insertInChunks(items, 300, (c) => prisma.student.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // User
+  if (Array.isArray(data.users) && data.users.length > 0) {
+    const items = data.users.map((u: any) => ({
+      id: u.id,
+      username: u.username,
+      passwordHash: u.passwordHash,
+      role: u.role || 'sinh_vien',
+      isActive: u.isActive !== undefined ? Boolean(u.isActive) : true,
+      lastLogin: parseDate(u.lastLogin) || null,
+      createdAt: parseDate(u.createdAt) || new Date(),
+      updatedAt: parseDate(u.updatedAt) || new Date(),
+    }));
+    await insertInChunks(items, 300, (c) => prisma.user.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // ExamBatch
+  if (Array.isArray(data.examBatches) && data.examBatches.length > 0) {
+    const items = data.examBatches.map((b: any) => ({
+      id: b.id,
+      code: b.code,
+      name: b.name,
+      semester: b.semester ?? null,
+      academicYear: b.academicYear ?? null,
+      startDate: b.startDate ?? null,
+      endDate: b.endDate ?? null,
+      isActive: b.isActive !== undefined ? Boolean(b.isActive) : true,
+      description: b.description ?? null,
+      createdAt: parseDate(b.createdAt) || new Date(),
+      updatedAt: parseDate(b.updatedAt) || new Date(),
+    }));
+    await insertInChunks(items, 200, (c) => prisma.examBatch.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // ExamRecord
+  if (Array.isArray(data.examRecords) && data.examRecords.length > 0) {
+    const items = data.examRecords.map((r: any) => ({
+      id: r.id,
+      maSV: r.maSV,
+      batchCode: r.batchCode ?? null,
+      nhomThi: r.nhomThi ?? null,
+      mapThi: r.mapThi ?? null,
+      maMH: r.maMH ?? null,
+      tenMH: r.tenMH ?? null,
+      maHTThi: r.maHTThi ?? null,
+      nhomHoc: r.nhomHoc ?? null,
+      toThi: r.toThi ?? null,
+      maLopMH: r.maLopMH ?? null,
+      ngayThi: r.ngayThi ?? null,
+      gioThi: r.gioThi ?? null,
+      soPhutThi: r.soPhutThi ?? null,
+      maDotThi: r.maDotThi ?? null,
+      tenDotThi: r.tenDotThi ?? null,
+      isPostponed: Boolean(r.isPostponed),
+      createdAt: parseDate(r.createdAt) || new Date(),
+    }));
+    await insertInChunks(items, 500, (c) => prisma.examRecord.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // CourseRegistration
+  if (Array.isArray(data.courseRegistrations) && data.courseRegistrations.length > 0) {
+    const items = data.courseRegistrations.map((cr: any) => ({
+      id: cr.id,
+      classCode: cr.classCode,
+      username: cr.username,
+      data: cr.data,
+      totalCourses: cr.totalCourses ?? 0,
+      totalCredits: cr.totalCredits ?? 0,
+      tuitionFee: cr.tuitionFee ?? 0,
+      lastPulledAt: parseDate(cr.lastPulledAt) || new Date(),
+      createdAt: parseDate(cr.createdAt) || new Date(),
+      updatedAt: parseDate(cr.updatedAt) || new Date(),
+    }));
+    await insertInChunks(items, 200, (c) => prisma.courseRegistration.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // ExternalAccount
+  if (Array.isArray(data.externalAccounts) && data.externalAccounts.length > 0) {
+    const items = data.externalAccounts.map((ea: any) => ({
+      id: ea.id,
+      username: ea.username,
+      systemKey: ea.systemKey,
+      systemName: ea.systemName,
+      systemUrl: ea.systemUrl,
+      extUsername: ea.extUsername,
+      extPassword: ea.extPassword,
+      token: ea.token ?? null,
+      status: ea.status || 'CONNECTED',
+      lastSyncAt: parseDate(ea.lastSyncAt) || null,
+      syncMessage: ea.syncMessage ?? null,
+      createdAt: parseDate(ea.createdAt) || new Date(),
+      updatedAt: parseDate(ea.updatedAt) || new Date(),
+    }));
+    await insertInChunks(items, 200, (c) => prisma.externalAccount.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // TelegramConfig
+  if (Array.isArray(data.telegramConfigs) && data.telegramConfigs.length > 0) {
+    const items = data.telegramConfigs.map((tc: any) => ({
+      id: tc.id,
+      username: tc.username,
+      botToken: tc.botToken ?? null,
+      chatId: tc.chatId,
+      threadId: tc.threadId ?? null,
+      isEnabled: tc.isEnabled !== undefined ? Boolean(tc.isEnabled) : true,
+      notifyExamSchedule: tc.notifyExamSchedule !== undefined ? Boolean(tc.notifyExamSchedule) : true,
+      notifyClassActivity: tc.notifyClassActivity !== undefined ? Boolean(tc.notifyClassActivity) : true,
+      notifyQldtAnnouncements: tc.notifyQldtAnnouncements !== undefined ? Boolean(tc.notifyQldtAnnouncements) : true,
+      qldtCheckInterval: Number(tc.qldtCheckInterval) || 2,
+      lastQldtCheckedAt: parseDate(tc.lastQldtCheckedAt) || null,
+      notifyClassSchedule: tc.notifyClassSchedule !== undefined ? Boolean(tc.notifyClassSchedule) : true,
+      classReminderBefore: Number(tc.classReminderBefore) || 30,
+      lastTestedAt: parseDate(tc.lastTestedAt) || null,
+      lastTestStatus: tc.lastTestStatus ?? null,
+      lastTestError: tc.lastTestError ?? null,
+      botUsername: tc.botUsername ?? null,
+      botFirstName: tc.botFirstName ?? null,
+      createdAt: parseDate(tc.createdAt) || new Date(),
+      updatedAt: parseDate(tc.updatedAt) || new Date(),
+    }));
+    await insertInChunks(items, 200, (c) => prisma.telegramConfig.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // RegistrationRequest
+  if (Array.isArray(data.registrationRequests) && data.registrationRequests.length > 0) {
+    const items = data.registrationRequests.map((rr: any) => ({
+      id: rr.id,
+      username: rr.username,
+      fullName: rr.fullName ?? null,
+      email: rr.email ?? null,
+      phoneNumber: rr.phoneNumber ?? null,
+      lop: rr.lop ?? null,
+      passwordHash: rr.passwordHash,
+      status: rr.status || 'PENDING',
+      note: rr.note ?? null,
+      reviewedBy: rr.reviewedBy ?? null,
+      reviewedAt: parseDate(rr.reviewedAt) || null,
+      createdAt: parseDate(rr.createdAt) || new Date(),
+      updatedAt: parseDate(rr.updatedAt) || new Date(),
+    }));
+    await insertInChunks(items, 200, (c) => prisma.registrationRequest.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // ActivityLog
+  if (Array.isArray(data.activityLogs) && data.activityLogs.length > 0) {
+    const items = data.activityLogs.map((al: any) => ({
+      id: al.id,
+      userId: al.userId ?? null,
+      username: al.username ?? null,
+      userRole: al.userRole ?? null,
+      action: al.action,
+      targetType: al.targetType ?? null,
+      targetId: al.targetId ?? null,
+      description: al.description,
+      metadata: al.metadata ?? null,
+      ipAddress: al.ipAddress ?? null,
+      userAgent: al.userAgent ?? null,
+      createdAt: parseDate(al.createdAt) || new Date(),
+    }));
+    await insertInChunks(items, 500, (c) => prisma.activityLog.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // ExamReminderLog
+  if (Array.isArray(data.examReminderLogs) && data.examReminderLogs.length > 0) {
+    const items = data.examReminderLogs.map((er: any) => ({
+      id: er.id,
+      username: er.username,
+      examRecordId: er.examRecordId,
+      reminderType: er.reminderType,
+      targetDate: er.targetDate,
+      sentAt: parseDate(er.sentAt) || new Date(),
+    }));
+    await insertInChunks(items, 300, (c) => prisma.examReminderLog.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // QldtAnnouncementLog
+  if (Array.isArray(data.qldtAnnouncementLogs) && data.qldtAnnouncementLogs.length > 0) {
+    const items = data.qldtAnnouncementLogs.map((qa: any) => ({
+      id: qa.id,
+      username: qa.username,
+      announcementId: qa.announcementId,
+      title: qa.title ?? null,
+      publishDate: qa.publishDate ?? null,
+      sentAt: parseDate(qa.sentAt) || new Date(),
+    }));
+    await insertInChunks(items, 300, (c) => prisma.qldtAnnouncementLog.createMany({ data: c }));
+    count += items.length;
+  }
+
+  // ClassScheduleReminderLog
+  if (Array.isArray(data.classScheduleReminderLogs) && data.classScheduleReminderLogs.length > 0) {
+    const items = data.classScheduleReminderLogs.map((cs: any) => ({
+      id: cs.id,
+      username: cs.username,
+      courseCode: cs.courseCode,
+      reminderType: cs.reminderType,
+      targetDate: cs.targetDate,
+      sessionInfo: cs.sessionInfo ?? null,
+      sentAt: parseDate(cs.sentAt) || new Date(),
+    }));
+    await insertInChunks(items, 300, (c) => prisma.classScheduleReminderLog.createMany({ data: c }));
+    count += items.length;
+  }
+
+    const stats = await getDatabaseStats();
+
+    return {
+      success: true,
+      message: `Phục hồi cơ sở dữ liệu từ file JSON thành công! Đã nạp ${count.toLocaleString('vi-VN')} bản ghi trên 14 bảng.`,
+      recordsRestored: count,
+      preRestoreBackupFile: preRestoreName,
+      stats,
+    };
+  } finally {
+    await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON;').catch(() => {});
+  }
+}
+
+/**
+ * Phục hồi từ một file sao lưu đã có sẵn trong thư mục backups/
+ */
+export async function restoreFromLocalBackup(filename: string): Promise<{
+  success: boolean;
+  message: string;
+  preRestoreBackupFile: string;
+  stats: DatabaseStats;
+  recordsRestored?: number;
+}> {
+  const filePath = getSafeBackupFilePath(filename);
+  if (!filePath || !fs.existsSync(filePath)) {
+    throw new Error(`File sao lưu không tồn tại trên máy chủ: ${filename}`);
+  }
+
+  if (filename.endsWith('.json')) {
+    const jsonContent = fs.readFileSync(filePath, 'utf-8');
+    return await restoreFromJsonDump(jsonContent);
+  } else if (filename.endsWith('.sqlite') || filename.endsWith('.db')) {
+    return await restoreFromSqliteFile(filePath);
+  } else {
+    throw new Error('Định dạng file sao lưu không được hỗ trợ (chỉ chấp nhận .sqlite, .db, .json)');
+  }
+}
+

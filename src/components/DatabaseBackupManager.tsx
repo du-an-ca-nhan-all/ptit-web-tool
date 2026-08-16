@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Database,
   Download,
@@ -37,6 +37,11 @@ import {
   Play,
   CheckCheck,
   AlarmClock,
+  RotateCcw,
+  UploadCloud,
+  FileUp,
+  X,
+  AlertTriangle,
 } from 'lucide-react';
 import { LoginUser } from '../types';
 
@@ -136,9 +141,17 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
   const [telAutoBackupEnabled, setTelAutoBackupEnabled] = useState(true);
   const [telScheduleTime, setTelScheduleTime] = useState('10:00');
 
+  // Restoration State
+  const [restoreTargetFile, setRestoreTargetFile] = useState<string | null>(null);
+  const [restoreSourceType, setRestoreSourceType] = useState<'server' | 'upload'>('server');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [confirmRestoreChecked, setConfirmRestoreChecked] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ text, type });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 4500);
   };
 
   const fetchBackupData = useCallback(async () => {
@@ -359,6 +372,96 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
     }
   };
 
+  // Open Restore Confirmation Modal for Server Snapshot
+  const handleOpenServerRestore = (filename: string) => {
+    setRestoreTargetFile(filename);
+    setRestoreSourceType('server');
+    setUploadedFile(null);
+    setConfirmRestoreChecked(false);
+  };
+
+  // Handle File Input Selection for Upload & Restore
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files[0]) {
+      const file = files[0];
+      const name = file.name.toLowerCase();
+      if (!name.endsWith('.sqlite') && !name.endsWith('.db') && !name.endsWith('.json')) {
+        showToast('Vui lòng chọn file sao lưu có định dạng .sqlite, .db hoặc .json', 'error');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+      setUploadedFile(file);
+      setRestoreTargetFile(file.name);
+      setRestoreSourceType('upload');
+      setConfirmRestoreChecked(false);
+    }
+  };
+
+  // Execute Database Restoration
+  const handleExecuteRestore = async () => {
+    if (!confirmRestoreChecked) {
+      showToast('Vui lòng tích chọn xác nhận trước khi phục hồi', 'error');
+      return;
+    }
+
+    setIsRestoring(true);
+    try {
+      let res: Response;
+
+      if (restoreSourceType === 'upload') {
+        if (!uploadedFile) {
+          showToast('Chưa chọn file sao lưu tải lên', 'error');
+          setIsRestoring(false);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'RESTORE_UPLOADED_FILE');
+        formData.append('file', uploadedFile);
+
+        res = await fetch('/api/backup', {
+          method: 'POST',
+          body: formData,
+        });
+      } else {
+        if (!restoreTargetFile) {
+          showToast('Chưa chọn file sao lưu để phục hồi', 'error');
+          setIsRestoring(false);
+          return;
+        }
+
+        res = await fetch('/api/backup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'RESTORE_SAVED_BACKUP',
+            filename: restoreTargetFile,
+          }),
+        });
+      }
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(
+          data.message || 'Phục hồi cơ sở dữ liệu thành công! Bản sao lưu an toàn trước phục hồi đã được tạo.',
+          'success'
+        );
+        if (data.stats) setStats(data.stats);
+        if (data.localBackups) setLocalBackups(data.localBackups);
+        setRestoreTargetFile(null);
+        setUploadedFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } else {
+        showToast(data.error || 'Phục hồi cơ sở dữ liệu thất bại', 'error');
+      }
+    } catch (err: any) {
+      showToast('Lỗi kết nối máy chủ khi phục hồi', 'error');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-in fade-in duration-300">
       {/* Toast Notification */}
@@ -390,10 +493,10 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
               </div>
               <div>
                 <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
-                  Sao Lưu & Xuất Dữ Liệu Cơ Sở Dữ Liệu
+                  Sao Lưu & Phục Hồi Cơ Sở Dữ Liệu
                 </h1>
                 <p className="text-slate-400 text-sm">
-                  Hệ thống tự động sao lưu lúc <b>10:00 sáng (Giờ Việt Nam)</b> & Cho phép Quản trị viên <b>chủ động sao lưu tức thì</b>
+                  Quản lý sao lưu an toàn, tự động lúc <b>10:00 sáng VN</b> & <b>phục hồi dữ liệu tức thì</b> (từ Snapshot máy chủ hoặc tải lên từ máy tính)
                 </p>
               </div>
             </div>
@@ -412,7 +515,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
         </div>
       </div>
 
-      {/* SECTION: 1-CLICK INSTANT BACKUP ACTION BAR (Nút Chủ Động Sao Lưu) */}
+      {/* SECTION: 1-CLICK INSTANT ACTION BAR */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -423,11 +526,11 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 Nút Chủ Động Sao Lưu Tức Thì
                 <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-full border border-emerald-500/30">
-                  Thủ công / Khi cần
+                  Thao tác nhanh
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Nhấn vào các nút bên dưới để thực hiện sao lưu và xuất file ngay lập tức mà không cần chờ đến giờ tự động:
+                Nhấn để thực hiện sao lưu ngay lập tức mà không cần đợi lịch tự động 10h00 sáng:
               </p>
             </div>
           </div>
@@ -474,6 +577,161 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
           </div>
         </div>
       </div>
+
+      {/* SECTION: DATABASE RESTORATION (PHỤC HỒI DỮ LIỆU) */}
+      <div className="bg-gradient-to-br from-amber-950/30 via-slate-900 to-rose-950/30 border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl shadow-inner">
+              <RotateCcw className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-white">Phục Hồi Cơ Sở Dữ Liệu (Database Restore)</h2>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  <ShieldAlert className="w-3 h-3 mr-1" />
+                  Tự động sao lưu an toàn trước khi phục hồi
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Khôi phục toàn bộ 14 bảng dữ liệu hệ thống từ file sao lưu <b>.sqlite / .db</b> hoặc <b>.json</b>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Upload File to Restore Card */}
+        <div className="mt-5 bg-slate-950/60 border border-slate-800 rounded-xl p-4.5 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-slate-800 text-sky-400 rounded-xl">
+              <UploadCloud className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-200">Tải Lên File Sao Lưu Từ Máy Tính Để Phục Hồi</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Chấp nhận file <code className="text-indigo-400 font-mono">.sqlite</code>, <code className="text-indigo-400 font-mono">.db</code> hoặc <code className="text-emerald-400 font-mono">.json</code>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept=".sqlite,.db,.json"
+              className="hidden"
+              id="upload-backup-restore-input"
+            />
+            <label
+              htmlFor="upload-backup-restore-input"
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition cursor-pointer shadow-sm active:scale-98"
+            >
+              <FileUp className="w-4 h-4 text-sky-400" />
+              Chọn File Từ Máy Tính
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* RESTORE CONFIRMATION MODAL */}
+      {restoreTargetFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative overflow-hidden">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">Xác Nhận Phục Hồi Cơ Sở Dữ Liệu</h3>
+                  <span className="text-xs text-amber-400 font-medium">Thao tác này sẽ thay thế dữ liệu hiện tại</span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setRestoreTargetFile(null);
+                  setUploadedFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs text-slate-300 mb-6">
+              <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl">
+                <div className="text-[11px] text-slate-500 mb-1">Nguồn phục hồi:</div>
+                <div className="font-mono font-bold text-white flex items-center gap-2">
+                  {restoreTargetFile.endsWith('.sqlite') || restoreTargetFile.endsWith('.db') ? (
+                    <Database className="w-4 h-4 text-indigo-400" />
+                  ) : (
+                    <FileCode className="w-4 h-4 text-emerald-400" />
+                  )}
+                  <span className="truncate">{restoreTargetFile}</span>
+                  {restoreSourceType === 'upload' && (
+                    <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-300 text-[10px] rounded">File Tải Lên</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-amber-950/30 border border-amber-500/30 rounded-xl text-amber-200/90 leading-relaxed">
+                <p className="font-bold mb-1 flex items-center gap-1.5 text-amber-300">
+                  <Shield className="w-4 h-4" /> Bảo Vệ Dữ Liệu Tự Động:
+                </p>
+                Hệ thống sẽ <b>tự động tạo 1 bản sao lưu an toàn (Pre-Restore Snapshot)</b> của cơ sở dữ liệu hiện tại ngay trước khi phục hồi. Bạn có thể khôi phục lại bất kỳ lúc nào nếu cần.
+              </div>
+
+              <label className="flex items-start gap-2.5 cursor-pointer p-3 bg-slate-950/60 border border-slate-800 rounded-xl hover:border-slate-700 transition">
+                <input
+                  type="checkbox"
+                  checked={confirmRestoreChecked}
+                  onChange={(e) => setConfirmRestoreChecked(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded text-amber-600 focus:ring-amber-500 bg-slate-900 border-slate-700 cursor-pointer shrink-0"
+                />
+                <span className="text-xs text-slate-200">
+                  Tôi đã hiểu và xác nhận muốn phục hồi cơ sở dữ liệu từ bản sao lưu này.
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setRestoreTargetFile(null);
+                  setUploadedFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                disabled={isRestoring}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                Huỷ bỏ
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteRestore}
+                disabled={!confirmRestoreChecked || isRestoring}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-amber-950/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
+              >
+                {isRestoring ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Đang phục hồi dữ liệu...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4" />
+                    Bắt Đầu Phục Hồi
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Overview Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -916,7 +1174,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
             <div>
               <h2 className="font-bold text-white text-base">Danh Sách Bản Sao Lưu Trên Máy Chủ</h2>
               <p className="text-xs text-slate-400">
-                Thư mục <code className="text-indigo-400 font-mono">backups/</code> trên máy chủ ({localBackups.length} file)
+                Thư mục <code className="text-indigo-400 font-mono">backups/</code> trên máy chủ ({localBackups.length} file) - Hỗ trợ tải về & <b>phục hồi trực tiếp</b>
               </p>
             </div>
           </div>
@@ -973,6 +1231,16 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {/* Nút Phục Hồi từ file này */}
+                        <button
+                          onClick={() => handleOpenServerRestore(file.name)}
+                          title="Phục hồi dữ liệu từ bản sao lưu này"
+                          className="flex items-center gap-1 px-2.5 py-1 bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 rounded-lg border border-amber-500/30 transition cursor-pointer font-bold text-[11px]"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Phục hồi
+                        </button>
+
                         <button
                           onClick={() => handleDownloadSavedFile(file.name)}
                           title="Tải về máy tính"
@@ -981,6 +1249,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                           <Download className="w-3.5 h-3.5" />
                           Tải về
                         </button>
+
                         {confirmDeleteFile === file.name ? (
                           <div className="flex items-center gap-1">
                             <button
@@ -1024,7 +1293,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
             <div>
               <h2 className="font-bold text-white text-base">Chi Tiết 14 Bảng Dữ Liệu Trong Database</h2>
               <p className="text-xs text-slate-400">
-                Thống kê số lượng bản ghi thực tế được bao gồm trong mỗi lần xuất/sao lưu
+                Thống kê số lượng bản ghi thực tế được bao gồm trong mỗi lần xuất/sao lưu & phục hồi
               </p>
             </div>
           </div>

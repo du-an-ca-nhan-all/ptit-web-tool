@@ -16,6 +16,9 @@ import {
   saveBackupTelegramConfig,
   testBackupTelegramTarget,
   sendBackupToTelegram,
+  restoreFromLocalBackup,
+  restoreFromSqliteFile,
+  restoreFromJsonDump,
 } from '@/src/lib/backupService';
 
 async function getAuthUser(req: NextRequest) {
@@ -182,6 +185,8 @@ export async function GET(req: NextRequest) {
 // - action: 'SEND_TELEGRAM': Send live backup files directly to Telegram
 // - action: 'SAVE_TELEGRAM_CONFIG': Save backup telegram settings into GlobalConfig
 // - action: 'TEST_TELEGRAM_TARGET': Test ping destination Telegram chat/thread
+// - action: 'RESTORE_SAVED_BACKUP': Restore from an existing backup in backups/
+// - action: 'RESTORE_UPLOADED_FILE' (multipart/form-data): Upload .sqlite or .json and restore
 export async function POST(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -194,10 +199,97 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Bạn không có quyền quản trị để thực hiện thao tác này' }, { status: 403 });
     }
 
+    const contentType = req.headers.get('content-type') || '';
+
+    // 1. HANDLE MULTIPART/FORM-DATA (UPLOAD FILE & RESTORE)
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const action = ((formData.get('action') as string) || 'RESTORE_UPLOADED_FILE').toUpperCase();
+      const file = formData.get('file') as File | null;
+
+      if (!file) {
+        return NextResponse.json({ error: 'Vui lòng chọn file sao lưu (.sqlite hoặc .json) để phục hồi' }, { status: 400 });
+      }
+
+      const filename = file.name.toLowerCase();
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      if (buffer.length === 0) {
+        return NextResponse.json({ error: 'File tải lên rỗng' }, { status: 400 });
+      }
+
+      let restoreRes: any;
+      if (filename.endsWith('.json')) {
+        const text = buffer.toString('utf-8');
+        restoreRes = await restoreFromJsonDump(text);
+      } else if (filename.endsWith('.sqlite') || filename.endsWith('.db')) {
+        restoreRes = await restoreFromSqliteFile(buffer);
+      } else {
+        return NextResponse.json(
+          { error: 'Định dạng file không được hỗ trợ. Vui lòng tải lên file .sqlite, .db hoặc .json' },
+          { status: 400 }
+        );
+      }
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'RESTORE_DATABASE',
+        targetType: 'DATABASE',
+        targetId: file.name,
+        description: `Phục hồi cơ sở dữ liệu từ file tải lên: ${file.name} (${restoreRes.stats.totalRecords} bản ghi)`,
+        metadata: { filename: file.name, preRestoreBackupFile: restoreRes.preRestoreBackupFile },
+      });
+
+      const localBackups = listLocalBackups();
+      return NextResponse.json({
+        success: true,
+        message: restoreRes.message,
+        preRestoreBackupFile: restoreRes.preRestoreBackupFile,
+        stats: restoreRes.stats,
+        localBackups,
+      });
+    }
+
+    // 2. HANDLE JSON PAYLOAD
     const body = await req.json().catch(() => ({}));
     const action = (body.action || 'CREATE_SNAPSHOT').toUpperCase();
 
-    // 1. SAVE TELEGRAM BACKUP CONFIGURATION
+    // 2.1. RESTORE FROM AN EXISTING SAVED BACKUP FILE ON SERVER
+    if (action === 'RESTORE_SAVED_BACKUP') {
+      const { filename } = body;
+      if (!filename) {
+        return NextResponse.json({ error: 'Vui lòng cung cấp tên file cần phục hồi' }, { status: 400 });
+      }
+
+      const restoreRes = await restoreFromLocalBackup(filename);
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'RESTORE_DATABASE',
+        targetType: 'DATABASE',
+        targetId: filename,
+        description: `Phục hồi cơ sở dữ liệu từ bản sao lưu máy chủ: ${filename} (${restoreRes.stats.totalRecords} bản ghi)`,
+        metadata: { filename, preRestoreBackupFile: restoreRes.preRestoreBackupFile },
+      });
+
+      const localBackups = listLocalBackups();
+      return NextResponse.json({
+        success: true,
+        message: restoreRes.message,
+        preRestoreBackupFile: restoreRes.preRestoreBackupFile,
+        stats: restoreRes.stats,
+        localBackups,
+      });
+    }
+
+    // 2.2. SAVE TELEGRAM BACKUP CONFIGURATION
     if (action === 'SAVE_TELEGRAM_CONFIG') {
       const { chatId, threadId, botToken, isEnabled, sendSqlite, sendJson, autoBackupEnabled, scheduleTime } = body;
 
@@ -221,7 +313,7 @@ export async function POST(req: NextRequest) {
         targetType: 'GLOBAL_CONFIG',
         targetId: 'backup_telegram',
         description: `Cập nhật cấu hình gửi backup lên Telegram: Chat ID ${chatId}${threadId ? ` (Topic ${threadId})` : ''}`,
-        metadata: { chatId, threadId, isEnabled, sendSqlite, sendJson },
+        metadata: { chatId, threadId, isEnabled, sendSqlite, sendJson, autoBackupEnabled, scheduleTime },
       });
 
       const telegramBackup = await getBackupTelegramConfig();
@@ -232,7 +324,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. TEST TELEGRAM TARGET CONNECTION
+    // 2.3. TEST TELEGRAM TARGET CONNECTION
     if (action === 'TEST_TELEGRAM_TARGET') {
       const { chatId, threadId, botToken } = body;
       const testRes = await testBackupTelegramTarget({ chatId, threadId, botToken });
@@ -256,7 +348,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. SEND BACKUP DIRECTLY TO TELEGRAM
+    // 2.4. SEND BACKUP DIRECTLY TO TELEGRAM
     if (action === 'SEND_TELEGRAM') {
       const { format, customChatId, customThreadId, customBotToken } = body;
 
@@ -295,7 +387,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. CREATE SERVER SNAPSHOT (Default)
+    // 2.5. CREATE SERVER SNAPSHOT (Default)
     const format = (body.format || 'all') as 'sqlite' | 'json' | 'all';
     const createdFiles = await createLocalBackup(format);
 
