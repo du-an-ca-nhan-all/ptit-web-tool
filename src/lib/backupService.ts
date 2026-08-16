@@ -101,10 +101,19 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
   let dbFileSize = 0;
   let dbLastModified: string | null = null;
 
-  if (fs.existsSync(dbPath)) {
-    const stat = fs.statSync(dbPath);
-    dbFileSize = stat.size;
-    dbLastModified = stat.mtime.toISOString();
+  try {
+    const res: any = await (prisma as any).$queryRawUnsafe?.('SELECT pg_database_size(current_database()) AS size;');
+    if (res && res[0] && res[0].size !== undefined) {
+      dbFileSize = Number(res[0].size);
+      dbLastModified = new Date().toISOString();
+    }
+  } catch {
+    // Fallback to SQLite file check if applicable
+    if (fs.existsSync(dbPath)) {
+      const stat = fs.statSync(dbPath);
+      dbFileSize = stat.size;
+      dbLastModified = stat.mtime.toISOString();
+    }
   }
 
   const tableStats = {
@@ -217,7 +226,7 @@ export async function exportDatabaseAsJson(): Promise<{
       appName: 'PTIT Web Tool - Exam & Schedule Portal',
       version: '1.0.0',
       exportedAt: new Date().toISOString(),
-      database: 'SQLite',
+      database: 'PostgreSQL',
       stats,
     },
     data: {
@@ -779,6 +788,34 @@ export async function restoreFromSqliteFile(
   };
 }
 
+export async function syncPostgresSequences(): Promise<void> {
+  const tablesWithId = [
+    'User',
+    'Student',
+    'ExamBatch',
+    'ExamRecord',
+    'CourseRegistration',
+    'SystemMeta',
+    'ExternalAccount',
+    'ActivityLog',
+    'TelegramConfig',
+    'GlobalConfig',
+    'ExamReminderLog',
+    'QldtAnnouncementLog',
+    'ClassScheduleReminderLog',
+    'RegistrationRequest',
+  ];
+  for (const table of tablesWithId) {
+    try {
+      await (prisma as any).$executeRawUnsafe(
+        `SELECT setval(pg_get_serial_sequence('"${table}"', 'id'), coalesce(max(id), 1), max(id) IS NOT NULL) FROM "${table}";`
+      );
+    } catch {
+      // Silently ignore if not running on PostgreSQL
+    }
+  }
+}
+
 /**
  * Phục hồi cơ sở dữ liệu từ file JSON dump đầy đủ
  */
@@ -808,13 +845,13 @@ export async function restoreFromJsonDump(
   }
 
   // 1. Tạo bản sao lưu an toàn trước khi phục hồi
-  const preRestoreFiles = await createLocalBackup('all');
-  const preRestoreName = preRestoreFiles.find((f) => f.format === 'sqlite')?.name || 'pre-restore-backup';
+  const preRestoreFiles = await createLocalBackup('json');
+  const preRestoreName = preRestoreFiles.find((f) => f.format === 'json')?.name || 'pre-restore-backup.json';
 
   const parseDate = (d: any) => (d ? new Date(d) : undefined);
 
-  // Tạm thời tắt ràng buộc khóa ngoại trong lúc xóa và nạp toàn bộ CSDL
-  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF;');
+  // Tạm thời tắt ràng buộc nếu là SQLite (nếu trên PostgreSQL thì bỏ qua lỗi)
+  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF;').catch(() => {});
 
   try {
     // 2. Xóa sạch dữ liệu cũ
@@ -1095,6 +1132,9 @@ export async function restoreFromJsonDump(
     await insertInChunks(items, 300, (c) => prisma.classScheduleReminderLog.createMany({ data: c }));
     count += items.length;
   }
+
+    // Đồng bộ sequence ID trên PostgreSQL sau khi nạp dữ liệu có chỉ định explicit ID
+    await syncPostgresSequences().catch(() => {});
 
     const stats = await getDatabaseStats();
 

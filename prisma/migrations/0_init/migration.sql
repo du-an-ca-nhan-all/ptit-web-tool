@@ -1,19 +1,20 @@
 -- CreateTable
 CREATE TABLE "User" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "username" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
     "role" TEXT NOT NULL DEFAULT 'sinh_vien',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "lastLogin" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "User_username_fkey" FOREIGN KEY ("username") REFERENCES "Student" ("maSV") ON DELETE CASCADE ON UPDATE CASCADE
+    "lastLogin" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Student" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "maSV" TEXT NOT NULL,
     "hoLot" TEXT,
     "ten" TEXT,
@@ -24,13 +25,15 @@ CREATE TABLE "Student" (
     "trangThai" TEXT DEFAULT 'DANG_HOC',
     "soDienThoai" TEXT,
     "ghiChu" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Student_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ExamBatch" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "code" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "semester" TEXT,
@@ -39,13 +42,15 @@ CREATE TABLE "ExamBatch" (
     "endDate" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "description" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ExamBatch_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ExamRecord" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "maSV" TEXT NOT NULL,
     "batchCode" TEXT,
     "nhomThi" TEXT,
@@ -62,36 +67,40 @@ CREATE TABLE "ExamRecord" (
     "maDotThi" TEXT,
     "tenDotThi" TEXT,
     "isPostponed" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "ExamRecord_maSV_fkey" FOREIGN KEY ("maSV") REFERENCES "Student" ("maSV") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "ExamRecord_batchCode_fkey" FOREIGN KEY ("batchCode") REFERENCES "ExamBatch" ("code") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ExamRecord_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CourseRegistration" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "classCode" TEXT NOT NULL,
     "username" TEXT NOT NULL,
     "data" TEXT NOT NULL,
     "totalCourses" INTEGER DEFAULT 0,
     "totalCredits" INTEGER DEFAULT 0,
     "tuitionFee" INTEGER DEFAULT 0,
-    "lastPulledAt" DATETIME DEFAULT CURRENT_TIMESTAMP,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "lastPulledAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "CourseRegistration_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "SystemMeta" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "key" TEXT NOT NULL,
     "value" TEXT NOT NULL,
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SystemMeta_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ExternalAccount" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "username" TEXT NOT NULL,
     "systemKey" TEXT NOT NULL,
     "systemName" TEXT NOT NULL,
@@ -100,16 +109,17 @@ CREATE TABLE "ExternalAccount" (
     "extPassword" TEXT NOT NULL,
     "token" TEXT,
     "status" TEXT NOT NULL DEFAULT 'CONNECTED',
-    "lastSyncAt" DATETIME,
+    "lastSyncAt" TIMESTAMP(3),
     "syncMessage" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "ExternalAccount_username_fkey" FOREIGN KEY ("username") REFERENCES "User" ("username") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ExternalAccount_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ActivityLog" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "userId" INTEGER,
     "username" TEXT,
     "userRole" TEXT,
@@ -120,13 +130,14 @@ CREATE TABLE "ActivityLog" (
     "metadata" TEXT,
     "ipAddress" TEXT,
     "userAgent" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "ActivityLog_username_fkey" FOREIGN KEY ("username") REFERENCES "User" ("username") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ActivityLog_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "TelegramConfig" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "username" TEXT NOT NULL,
     "botToken" TEXT,
     "chatId" TEXT NOT NULL,
@@ -136,63 +147,72 @@ CREATE TABLE "TelegramConfig" (
     "notifyClassActivity" BOOLEAN NOT NULL DEFAULT true,
     "notifyQldtAnnouncements" BOOLEAN NOT NULL DEFAULT true,
     "qldtCheckInterval" INTEGER NOT NULL DEFAULT 2,
-    "lastQldtCheckedAt" DATETIME,
+    "lastQldtCheckedAt" TIMESTAMP(3),
     "notifyClassSchedule" BOOLEAN NOT NULL DEFAULT true,
     "classReminderBefore" INTEGER NOT NULL DEFAULT 30,
-    "lastTestedAt" DATETIME,
+    "lastTestedAt" TIMESTAMP(3),
     "lastTestStatus" TEXT,
     "lastTestError" TEXT,
     "botUsername" TEXT,
     "botFirstName" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "TelegramConfig_username_fkey" FOREIGN KEY ("username") REFERENCES "User" ("username") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TelegramConfig_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "GlobalConfig" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "key" TEXT NOT NULL,
     "value" TEXT NOT NULL,
     "description" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "GlobalConfig_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ExamReminderLog" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "username" TEXT NOT NULL,
     "examRecordId" INTEGER NOT NULL,
     "reminderType" TEXT NOT NULL,
     "targetDate" TEXT NOT NULL,
-    "sentAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "sentAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ExamReminderLog_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "QldtAnnouncementLog" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "username" TEXT NOT NULL,
     "announcementId" TEXT NOT NULL,
     "title" TEXT,
     "publishDate" TEXT,
-    "sentAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "sentAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "QldtAnnouncementLog_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ClassScheduleReminderLog" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "username" TEXT NOT NULL,
     "courseCode" TEXT NOT NULL,
     "reminderType" TEXT NOT NULL,
     "targetDate" TEXT NOT NULL,
     "sessionInfo" TEXT,
-    "sentAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "sentAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ClassScheduleReminderLog_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "RegistrationRequest" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "username" TEXT NOT NULL,
     "fullName" TEXT,
     "email" TEXT,
@@ -202,9 +222,11 @@ CREATE TABLE "RegistrationRequest" (
     "status" TEXT NOT NULL DEFAULT 'PENDING',
     "note" TEXT,
     "reviewedBy" TEXT,
-    "reviewedAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "reviewedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "RegistrationRequest_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -259,25 +281,25 @@ CREATE INDEX "ExamRecord_mapThi_idx" ON "ExamRecord"("mapThi");
 CREATE INDEX "ExamRecord_isPostponed_idx" ON "ExamRecord"("isPostponed");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "CourseRegistration_classCode_username_key" ON "CourseRegistration"("classCode", "username");
+
+-- CreateIndex
 CREATE INDEX "CourseRegistration_classCode_idx" ON "CourseRegistration"("classCode");
 
 -- CreateIndex
 CREATE INDEX "CourseRegistration_username_idx" ON "CourseRegistration"("username");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "CourseRegistration_classCode_username_key" ON "CourseRegistration"("classCode", "username");
+CREATE UNIQUE INDEX "SystemMeta_key_key" ON "SystemMeta"("key");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SystemMeta_key_key" ON "SystemMeta"("key");
+CREATE UNIQUE INDEX "ExternalAccount_username_systemKey_key" ON "ExternalAccount"("username", "systemKey");
 
 -- CreateIndex
 CREATE INDEX "ExternalAccount_username_idx" ON "ExternalAccount"("username");
 
 -- CreateIndex
 CREATE INDEX "ExternalAccount_systemKey_idx" ON "ExternalAccount"("systemKey");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ExternalAccount_username_systemKey_key" ON "ExternalAccount"("username", "systemKey");
 
 -- CreateIndex
 CREATE INDEX "ActivityLog_username_idx" ON "ActivityLog"("username");
@@ -307,6 +329,9 @@ CREATE UNIQUE INDEX "GlobalConfig_key_key" ON "GlobalConfig"("key");
 CREATE INDEX "GlobalConfig_key_idx" ON "GlobalConfig"("key");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "ExamReminderLog_username_examRecordId_reminderType_key" ON "ExamReminderLog"("username", "examRecordId", "reminderType");
+
+-- CreateIndex
 CREATE INDEX "ExamReminderLog_username_idx" ON "ExamReminderLog"("username");
 
 -- CreateIndex
@@ -316,7 +341,7 @@ CREATE INDEX "ExamReminderLog_targetDate_idx" ON "ExamReminderLog"("targetDate")
 CREATE INDEX "ExamReminderLog_reminderType_idx" ON "ExamReminderLog"("reminderType");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ExamReminderLog_username_examRecordId_reminderType_key" ON "ExamReminderLog"("username", "examRecordId", "reminderType");
+CREATE UNIQUE INDEX "QldtAnnouncementLog_username_announcementId_key" ON "QldtAnnouncementLog"("username", "announcementId");
 
 -- CreateIndex
 CREATE INDEX "QldtAnnouncementLog_username_idx" ON "QldtAnnouncementLog"("username");
@@ -325,7 +350,7 @@ CREATE INDEX "QldtAnnouncementLog_username_idx" ON "QldtAnnouncementLog"("userna
 CREATE INDEX "QldtAnnouncementLog_announcementId_idx" ON "QldtAnnouncementLog"("announcementId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "QldtAnnouncementLog_username_announcementId_key" ON "QldtAnnouncementLog"("username", "announcementId");
+CREATE UNIQUE INDEX "ClassScheduleReminderLog_username_courseCode_reminderType_targetDate_key" ON "ClassScheduleReminderLog"("username", "courseCode", "reminderType", "targetDate");
 
 -- CreateIndex
 CREATE INDEX "ClassScheduleReminderLog_username_idx" ON "ClassScheduleReminderLog"("username");
@@ -337,9 +362,6 @@ CREATE INDEX "ClassScheduleReminderLog_targetDate_idx" ON "ClassScheduleReminder
 CREATE INDEX "ClassScheduleReminderLog_reminderType_idx" ON "ClassScheduleReminderLog"("reminderType");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ClassScheduleReminderLog_username_courseCode_reminderType_targetDate_key" ON "ClassScheduleReminderLog"("username", "courseCode", "reminderType", "targetDate");
-
--- CreateIndex
 CREATE INDEX "RegistrationRequest_username_idx" ON "RegistrationRequest"("username");
 
 -- CreateIndex
@@ -348,3 +370,20 @@ CREATE INDEX "RegistrationRequest_status_idx" ON "RegistrationRequest"("status")
 -- CreateIndex
 CREATE INDEX "RegistrationRequest_createdAt_idx" ON "RegistrationRequest"("createdAt");
 
+-- AddForeignKey
+ALTER TABLE "User" ADD CONSTRAINT "User_username_fkey" FOREIGN KEY ("username") REFERENCES "Student"("maSV") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ExamRecord" ADD CONSTRAINT "ExamRecord_maSV_fkey" FOREIGN KEY ("maSV") REFERENCES "Student"("maSV") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ExamRecord" ADD CONSTRAINT "ExamRecord_batchCode_fkey" FOREIGN KEY ("batchCode") REFERENCES "ExamBatch"("code") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ExternalAccount" ADD CONSTRAINT "ExternalAccount_username_fkey" FOREIGN KEY ("username") REFERENCES "User"("username") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ActivityLog" ADD CONSTRAINT "ActivityLog_username_fkey" FOREIGN KEY ("username") REFERENCES "User"("username") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TelegramConfig" ADD CONSTRAINT "TelegramConfig_username_fkey" FOREIGN KEY ("username") REFERENCES "User"("username") ON DELETE CASCADE ON UPDATE CASCADE;

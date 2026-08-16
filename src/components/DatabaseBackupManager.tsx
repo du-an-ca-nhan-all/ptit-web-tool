@@ -749,7 +749,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
             <span>
               {stats?.dbLastModified
                 ? new Date(stats.dbLastModified).toLocaleString('vi-VN')
-                : 'dev.db SQLite'}
+                : 'PostgreSQL Database'}
             </span>
           </div>
         </div>

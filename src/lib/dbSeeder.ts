@@ -4,21 +4,36 @@ import Papa from 'papaparse';
 import { parse as parseYaml } from 'yaml';
 import { prisma } from './prisma';
 
+import { syncPostgresSequences } from './backupService';
+
 export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ success: boolean; message: string; counts?: any }> {
   try {
+    const existingStudentCount = await prisma.student.count().catch(() => 0);
+    const existingUserCount = await prisma.user.count().catch(() => 0);
+    const existingExamCount = await prisma.examRecord.count().catch(() => 0);
+    const existingBatchCount = await prisma.examBatch.count().catch(() => 0);
+
     const meta = await prisma.systemMeta.findUnique({
       where: { key: 'initial_seeded' },
-    });
+    }).catch(() => null);
 
-    if (meta && !force) {
-      const studentCount = await prisma.student.count();
-      const userCount = await prisma.user.count();
-      const examCount = await prisma.examRecord.count();
-      const batchCount = await prisma.examBatch.count();
+    if ((meta || existingStudentCount > 0) && !force) {
+      if (!meta && existingStudentCount > 0) {
+        await prisma.systemMeta.upsert({
+          where: { key: 'initial_seeded' },
+          update: { value: new Date().toISOString() },
+          create: { key: 'initial_seeded', value: new Date().toISOString() },
+        }).catch(() => {});
+      }
       return {
         success: true,
         message: 'Database already seeded',
-        counts: { students: studentCount, users: userCount, examRecords: examCount, examBatches: batchCount },
+        counts: {
+          students: existingStudentCount,
+          users: existingUserCount,
+          examRecords: existingExamCount,
+          examBatches: existingBatchCount,
+        },
       };
     }
 
@@ -359,6 +374,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         const chunk = studentArray.slice(i, i + studentChunkSize);
         await prisma.student.createMany({
           data: chunk,
+          skipDuplicates: true,
         });
         studentCount += chunk.length;
       }
@@ -382,6 +398,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         const chunk = userList.slice(i, i + studentChunkSize);
         await prisma.user.createMany({
           data: chunk,
+          skipDuplicates: true,
         });
         userCount += chunk.length;
       }
@@ -392,10 +409,14 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         const chunk = examRecordsList.slice(i, i + examChunkSize);
         await prisma.examRecord.createMany({
           data: chunk,
+          skipDuplicates: true,
         });
         examCount += chunk.length;
       }
     }
+
+    // Đồng bộ lại Sequence trên PostgreSQL
+    await syncPostgresSequences().catch(() => {});
 
     // Set initial_seeded in SystemMeta
     await prisma.systemMeta.upsert({

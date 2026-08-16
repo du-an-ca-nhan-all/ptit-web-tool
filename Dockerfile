@@ -1,7 +1,7 @@
 # Stage 1: Base image
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl sqlite tzdata
+RUN apk add --no-cache libc6-compat openssl postgresql-client tzdata
 ENV TZ=Asia/Ho_Chi_Minh
 
 # Stage 2: Dependencies
@@ -16,6 +16,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ptit_web_tool?schema=public"
 RUN npx prisma generate
 RUN npm run build
 
@@ -29,8 +30,8 @@ ENV TZ=Asia/Ho_Chi_Minh
 
 WORKDIR /app
 
-# Ensure prisma and backups directories exist
-RUN mkdir -p /app/prisma /app/backups
+# Ensure backups directory exists
+RUN mkdir -p /app/backups
 
 # Copy node_modules, generated prisma client, and build artifacts
 COPY --from=builder /app/node_modules ./node_modules

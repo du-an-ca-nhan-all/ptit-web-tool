@@ -166,6 +166,7 @@ export async function POST(req: NextRequest) {
       const chunk = examRecordsList.slice(i, i + chunkSize);
       await prisma.examRecord.createMany({
         data: chunk,
+        skipDuplicates: true,
       });
     }
 

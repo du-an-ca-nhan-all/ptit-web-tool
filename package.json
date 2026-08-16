@@ -12,6 +12,8 @@
     "db:migrate:create": "prisma migrate dev --create-only",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:status": "prisma migrate status",
+    "db:migrate:from-sqlite": "tsx scripts/migrate-sqlite-to-postgres.ts",
+    "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "lint": "tsc --noEmit"
   },
