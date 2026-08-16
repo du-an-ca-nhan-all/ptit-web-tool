@@ -43,5 +43,5 @@ COPY --from=builder /app/next.config.mjs ./next.config.mjs
 
 EXPOSE 3000
 
-# On container start, ensure schema is generated and start Next.js
-CMD ["sh", "-c", "npx prisma generate && npm start"]
+# On container start: automatically apply database migrations, generate client, and start server
+CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma generate && npm start"]

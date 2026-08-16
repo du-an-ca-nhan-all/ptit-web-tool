@@ -8,7 +8,10 @@
     "build": "prisma generate && next build --webpack",
     "start": "next start --port=3000",
     "db:backup": "tsx scripts/backup-db.ts",
-    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:create": "prisma migrate dev --create-only",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:status": "prisma migrate status",
     "db:studio": "prisma studio",
     "lint": "tsc --noEmit"
   },
