@@ -37,7 +37,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
   const [showStudentList, setShowStudentList] = useState<boolean>(false);
   const [studentClassFilter, setStudentClassFilter] = useState<string>('ALL');
   const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
-  const [excludedStudents, setExcludedStudents] = useState<Set<string>>(new Set());
+  const [excludedOverrides, setExcludedOverrides] = useState<Map<string, boolean>>(new Map());
   const studentListRef = React.useRef<HTMLDivElement>(null);
 
   const handleOpenStudentListForClass = (clsName: string) => {
@@ -145,21 +145,22 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
   }, [monitorClasses, records]);
 
   // Helpers for exclusion
-  const isStudentExcluded = (sessionId: string, r: ExamRecord) => {
+  const isStudentExcluded = useCallback((sessionId: string, r: ExamRecord) => {
     const key = getExclusionKey(sessionId, r.MaSV || '');
-    if (excludedStudents.has(key)) return true;
+    if (excludedOverrides.has(key)) {
+      return Boolean(excludedOverrides.get(key));
+    }
     return Boolean(r.isPostponed);
-  };
+  }, [excludedOverrides]);
 
   const toggleStudentExclusion = async (session: any, r: ExamRecord) => {
     const isExcluded = isStudentExcluded(session.id, r);
     const newExcluded = !isExcluded;
     const key = getExclusionKey(session.id, r.MaSV || '');
 
-    setExcludedStudents(prev => {
-      const next = new Set(prev);
-      if (newExcluded) next.add(key);
-      else next.delete(key);
+    setExcludedOverrides(prev => {
+      const next = new Map(prev);
+      next.set(key, newExcluded);
       return next;
     });
 
@@ -169,9 +170,9 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
   };
 
   const clearSessionExclusions = (session: any) => {
-    setExcludedStudents(prev => {
-      const next = new Set(prev);
-      for (const key of Array.from(next)) {
+    setExcludedOverrides(prev => {
+      const next = new Map(prev);
+      for (const key of Array.from(next.keys())) {
         if (key.startsWith(`${session.id}||`)) next.delete(key);
       }
       return next;
@@ -220,7 +221,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
       // Recalculate effective class counts (excluding students marked as hoãn thi / excluded)
       const effectiveCounts = new Map<string, number>();
       session.records.forEach(r => {
-        const isExcluded = r.isPostponed || excludedStudents.has(getExclusionKey(session.id, r.MaSV || ''));
+        const isExcluded = isStudentExcluded(session.id, r);
         if (!isExcluded) {
           const cls = r.MaLop || 'Khác';
           effectiveCounts.set(cls, (effectiveCounts.get(cls) || 0) + 1);
@@ -239,7 +240,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
       const responsibleClass = monitoredClassesInRoom[0].className;
       const totalMonitoredStudents = monitoredClassesInRoom.reduce((acc, c) => acc + c.count, 0);
       const roomPrice = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat);
-      const pricePerStudent = roomPrice / totalMonitoredStudents;
+      const pricePerStudent = totalMonitoredStudents > 0 ? roomPrice / totalMonitoredStudents : 0;
 
       monitoredClassesInRoom.forEach(c => {
         if (c.className !== responsibleClass) {
@@ -303,7 +304,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
 
     return { receivables, payables, settled, totalReceive, totalPay, netTotal: totalReceive - totalPay };
 
-  }, [sessions, selectedClass, monitorClasses, loginUsers, excludedStudents]);
+  }, [sessions, selectedClass, monitorClasses, loginUsers, isStudentExcluded]);
 
   // Compute effective class counts for the detail modal (accounting for exclusions)
   const effectiveClassCountsForModal = useMemo(() => {
@@ -317,7 +318,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
       }
     });
     return map;
-  }, [selectedDetail, currentRoomRecords, excludedStudents]);
+  }, [selectedDetail, currentRoomRecords, isStudentExcluded]);
 
   // Count excluded students for the current session in modal
   const excludedCountForModal = useMemo(() => {
@@ -325,7 +326,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
     return currentRoomRecords.filter((r: ExamRecord) =>
       isStudentExcluded(selectedDetail.session.id, r)
     ).length;
-  }, [selectedDetail, currentRoomRecords, excludedStudents]);
+  }, [selectedDetail, currentRoomRecords, isStudentExcluded]);
 
   // Dynamic live calculation for the modal when students are toggled
   const activeDetailCalc = useMemo(() => {

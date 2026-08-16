@@ -24,13 +24,18 @@ export function buildSessions(records: ExamRecord[]): ExamSession[] {
     session.totalStudents++;
   });
 
-  // Calculate class counts for each session
+  // Calculate class counts for each session (excluding postponed students from active head count)
   const result = Array.from(sessionMap.values());
   result.forEach(session => {
     const counts = new Map<string, number>();
     session.records.forEach(r => {
       const cls = r.MaLop || 'Khác';
-      counts.set(cls, (counts.get(cls) || 0) + 1);
+      if (!counts.has(cls)) {
+        counts.set(cls, 0);
+      }
+      if (!r.isPostponed) {
+        counts.set(cls, counts.get(cls)! + 1);
+      }
     });
 
     session.classCounts = Array.from(counts.entries())

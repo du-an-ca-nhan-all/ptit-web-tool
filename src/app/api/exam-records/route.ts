@@ -150,36 +150,60 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    let authUser = await getCurrentUserFromCookie();
-    if (!authUser) {
-      const authHeader = req.headers.get('authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        authUser = await verifyAuthToken(token);
+    let authUser = null;
+    try {
+      authUser = await getCurrentUserFromCookie();
+      if (!authUser) {
+        const authHeader = req.headers.get('authorization');
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          const token = authHeader.substring(7);
+          authUser = await verifyAuthToken(token);
+        }
       }
+    } catch (authErr) {
+      console.warn('Auth extraction error in exam-records PATCH:', authErr);
     }
 
     const body = await req.json().catch(() => ({}));
-    const { id, ids, isPostponed, maSV, maMH, mapThi, ngayThi, gioThi } = body;
+    const rawId = body.id ?? body.Id ?? body.ID;
+    const rawIds = body.ids ?? body.Ids ?? body.IDS;
+    const rawIsPostponed = body.isPostponed ?? body.IsPostponed ?? body.is_postponed;
+    const rawMaSV = body.maSV ?? body.MaSV ?? body.MASV ?? body.studentId;
+    const rawMaMH = body.maMH ?? body.MaMH ?? body.MAMH ?? body.subjectCode;
+    const rawMapThi = body.mapThi ?? body.MAPTHI ?? body.MapThi ?? body.room;
+    const rawNgayThi = body.ngayThi ?? body.NgayThi ?? body.NGAYTHI ?? body.date;
+    const rawGioThi = body.gioThi ?? body.GioThi ?? body.GIOTHI ?? body.time;
 
-    if (typeof isPostponed !== 'boolean') {
-      return NextResponse.json({ error: 'Giá trị isPostponed (true/false) là bắt buộc' }, { status: 400 });
+    // Normalize boolean
+    let cleanIsPostponed = false;
+    if (typeof rawIsPostponed === 'boolean') {
+      cleanIsPostponed = rawIsPostponed;
+    } else if (rawIsPostponed === 'true' || rawIsPostponed === 1 || rawIsPostponed === '1') {
+      cleanIsPostponed = true;
+    } else if (rawIsPostponed === 'false' || rawIsPostponed === 0 || rawIsPostponed === '0') {
+      cleanIsPostponed = false;
+    } else {
+      return NextResponse.json(
+        { error: 'Giá trị isPostponed (true/false) là bắt buộc' },
+        { status: 400 }
+      );
     }
 
     let updatedCount = 0;
     let targetDesc = '';
 
     // 1. Try update by specific numeric id if provided
-    if (id && !isNaN(Number(id))) {
+    if (rawId !== undefined && rawId !== null && !isNaN(Number(rawId))) {
+      const numId = Number(rawId);
       try {
-        const existing = await prisma.examRecord.findUnique({ where: { id: Number(id) } });
+        const existing = await prisma.examRecord.findUnique({ where: { id: numId } });
         if (existing) {
           await prisma.examRecord.update({
-            where: { id: Number(id) },
-            data: { isPostponed },
+            where: { id: numId },
+            data: { isPostponed: cleanIsPostponed },
           });
           updatedCount = 1;
-          targetDesc = `ID ${id} (SV: ${existing.maSV} - Môn: ${existing.tenMH || existing.maMH})`;
+          targetDesc = `ID ${numId} (SV: ${existing.maSV} - Môn: ${existing.tenMH || existing.maMH})`;
         }
       } catch (err) {
         console.warn('Prisma find/update by ID error, will try query fallback:', err);
@@ -187,94 +211,124 @@ export async function PATCH(req: NextRequest) {
     }
 
     // 2. Try update by array of numeric ids
-    if (updatedCount === 0 && Array.isArray(ids) && ids.length > 0) {
-      const validIds = ids.map(Number).filter((n) => !isNaN(n));
+    if (updatedCount === 0 && Array.isArray(rawIds) && rawIds.length > 0) {
+      const validIds = rawIds.map(Number).filter((n) => !isNaN(n));
       if (validIds.length > 0) {
-        const result = await prisma.examRecord.updateMany({
-          where: { id: { in: validIds } },
-          data: { isPostponed },
-        });
-        updatedCount = result.count;
-        targetDesc = `${updatedCount} bản ghi (IDs: ${validIds.join(', ')})`;
+        try {
+          const result = await prisma.examRecord.updateMany({
+            where: { id: { in: validIds } },
+            data: { isPostponed: cleanIsPostponed },
+          });
+          updatedCount = result.count;
+          targetDesc = `${updatedCount} bản ghi (IDs: ${validIds.join(', ')})`;
+        } catch (err) {
+          console.warn('updateMany with IDs error:', err);
+        }
       }
     }
 
     // 3. Fallback: match by (maSV + maMH) and optional (mapThi, ngayThi, gioThi)
-    if (updatedCount === 0 && maSV) {
-      const cleanMaSV = String(maSV).trim().toUpperCase();
+    const cleanMaSV = rawMaSV ? String(rawMaSV).trim().toUpperCase() : '';
+    const cleanMaMH = rawMaMH ? String(rawMaMH).trim() : '';
+    const cleanMapThi = rawMapThi ? String(rawMapThi).trim() : '';
+    const cleanNgayThi = rawNgayThi ? String(rawNgayThi).trim() : '';
+    const cleanGioThi = rawGioThi ? String(rawGioThi).trim() : '';
+
+    if (updatedCount === 0 && cleanMaSV) {
       const whereCond: any = { maSV: cleanMaSV };
 
-      if (maMH) {
-        whereCond.maMH = String(maMH).trim();
-      }
-      if (mapThi) {
-        whereCond.mapThi = String(mapThi).trim();
-      }
-      if (ngayThi) {
-        whereCond.ngayThi = String(ngayThi).trim();
-      }
-      if (gioThi) {
-        whereCond.gioThi = String(gioThi).trim();
-      }
+      if (cleanMaMH) whereCond.maMH = cleanMaMH;
+      if (cleanMapThi) whereCond.mapThi = cleanMapThi;
+      if (cleanNgayThi) whereCond.ngayThi = cleanNgayThi;
+      if (cleanGioThi) whereCond.gioThi = cleanGioThi;
 
-      const result = await prisma.examRecord.updateMany({
-        where: whereCond,
-        data: { isPostponed },
-      });
-      updatedCount = result.count;
+      try {
+        const result = await prisma.examRecord.updateMany({
+          where: whereCond,
+          data: { isPostponed: cleanIsPostponed },
+        });
+        updatedCount = result.count;
+      } catch (err) {
+        console.warn('updateMany with strict filter error:', err);
+      }
 
       // If strict filter didn't find any, try looser filter with just maSV + maMH
-      if (updatedCount === 0 && maMH) {
-        const fallbackResult = await prisma.examRecord.updateMany({
-          where: {
-            maSV: cleanMaSV,
-            maMH: String(maMH).trim(),
-          },
-          data: { isPostponed },
-        });
-        updatedCount = fallbackResult.count;
+      if (updatedCount === 0 && cleanMaMH) {
+        try {
+          const fallbackResult = await prisma.examRecord.updateMany({
+            where: {
+              maSV: cleanMaSV,
+              maMH: cleanMaMH,
+            },
+            data: { isPostponed: cleanIsPostponed },
+          });
+          updatedCount = fallbackResult.count;
+        } catch (err) {
+          console.warn('updateMany with loose filter error:', err);
+        }
       }
 
-      targetDesc = `SV ${maSV} - Môn ${maMH || 'Tất cả'} (Cập nhật ${updatedCount} bản ghi)`;
+      targetDesc = `SV ${cleanMaSV} - Môn ${cleanMaMH || 'Tất cả'} (Cập nhật ${updatedCount} bản ghi)`;
     }
 
-    // 4. Log activity if user is authenticated
+    // 4. Log activity if user is authenticated (never break response if logging fails)
     if (authUser) {
-      await logActivity({
-        req,
-        userId: authUser.id,
-        username: authUser.username,
-        userRole: authUser.role,
-        action: isPostponed ? 'MARK_EXAM_POSTPONED' : 'UNMARK_EXAM_POSTPONED',
-        targetType: 'EXAM_RECORD',
-        targetId: String(id || ids?.[0] || maSV || 'UNKNOWN'),
-        description: `${authUser.fullName || authUser.username} đã ${
-          isPostponed ? 'đánh dấu hoãn thi/không thi (không chia tiền)' : 'bỏ đánh dấu hoãn thi'
-        } cho ${targetDesc || maSV || 'bản ghi'}`,
-        metadata: { id, ids, maSV, maMH, mapThi, ngayThi, gioThi, isPostponed, updatedCount },
-      }).catch(() => {});
+      try {
+        await logActivity({
+          req,
+          userId: authUser.id,
+          username: authUser.username,
+          userRole: authUser.role,
+          action: cleanIsPostponed ? 'MARK_EXAM_POSTPONED' : 'UNMARK_EXAM_POSTPONED',
+          targetType: 'EXAM_RECORD',
+          targetId: String(rawId || rawIds?.[0] || cleanMaSV || 'UNKNOWN'),
+          description: `${authUser.fullName || authUser.username} đã ${
+            cleanIsPostponed ? 'đánh dấu hoãn thi/không thi (không chia tiền)' : 'bỏ đánh dấu hoãn thi'
+          } cho ${targetDesc || cleanMaSV || 'bản ghi'}`,
+          metadata: {
+            id: rawId,
+            ids: rawIds,
+            maSV: cleanMaSV,
+            maMH: cleanMaMH,
+            mapThi: cleanMapThi,
+            ngayThi: cleanNgayThi,
+            gioThi: cleanGioThi,
+            isPostponed: cleanIsPostponed,
+            updatedCount,
+          },
+        });
+      } catch (logErr) {
+        console.warn('[ActivityLog] Ghi log thất bại:', logErr);
+      }
     }
 
     // 5. Dispatch Telegram notification asynchronously
-    if (maSV) {
-      dispatchExamPostponed({
-        username: String(maSV).trim(),
-        subjectCode: maMH ? String(maMH).trim() : undefined,
-        isPostponed,
-        examDate: ngayThi ? String(ngayThi).trim() : undefined,
-        examTime: gioThi ? String(gioThi).trim() : undefined,
-        examRoom: mapThi ? String(mapThi).trim() : undefined,
-      }).catch((err) => console.error('Dispatch exam postponed error:', err));
+    if (cleanMaSV) {
+      try {
+        dispatchExamPostponed({
+          username: cleanMaSV,
+          subjectCode: cleanMaMH || undefined,
+          isPostponed: cleanIsPostponed,
+          examDate: cleanNgayThi || undefined,
+          examTime: cleanGioThi || undefined,
+          examRoom: cleanMapThi || undefined,
+        }).catch((err) => console.error('Dispatch exam postponed error:', err));
+      } catch (dispatchErr) {
+        console.warn('Dispatch notification error in exam-records PATCH:', dispatchErr);
+      }
     }
 
     return NextResponse.json({
       success: true,
       updatedCount,
-      isPostponed,
-      message: `Đã ${isPostponed ? 'đánh dấu hoãn thi' : 'hủy hoãn thi'} thành công (${updatedCount} bản ghi)`,
+      isPostponed: cleanIsPostponed,
+      message: `Đã ${cleanIsPostponed ? 'đánh dấu hoãn thi' : 'hủy hoãn thi'} thành công (${updatedCount} bản ghi)`,
     });
   } catch (error: any) {
     console.error('Exam records PATCH error:', error);
-    return NextResponse.json({ error: error.message || 'Lỗi khi cập nhật trạng thái hoãn thi' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Lỗi khi cập nhật trạng thái hoãn thi' },
+      { status: 500 }
+    );
   }
 }

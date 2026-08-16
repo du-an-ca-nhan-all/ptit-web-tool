@@ -427,12 +427,12 @@ export default function Home() {
       setRecords((prev) => {
         const next = prev.map((r) => {
           const isMatch =
-            (record.id && r.id === record.id) ||
-            (r.MaSV === record.MaSV &&
-              r.MaMH === record.MaMH &&
-              r.MAPTHI === record.MAPTHI &&
-              r.NgayThi === record.NgayThi &&
-              r.GioThi === record.GioThi);
+            (record.id !== undefined && r.id !== undefined && r.id === record.id) ||
+            (String(r.MaSV || '').trim().toUpperCase() === String(record.MaSV || '').trim().toUpperCase() &&
+              String(r.MaMH || '').trim() === String(record.MaMH || '').trim() &&
+              String(r.MAPTHI || '').trim() === String(record.MAPTHI || '').trim() &&
+              String(r.NgayThi || '').trim() === String(record.NgayThi || '').trim() &&
+              String(r.GioThi || '').trim() === String(record.GioThi || '').trim());
           if (isMatch) {
             return { ...r, isPostponed: newStatus };
           }
