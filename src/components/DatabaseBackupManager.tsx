@@ -34,6 +34,9 @@ import {
   HelpCircle,
   SendHorizontal,
   CloudUpload,
+  Play,
+  CheckCheck,
+  AlarmClock,
 } from 'lucide-react';
 import { LoginUser } from '../types';
 
@@ -85,6 +88,7 @@ interface BackupTelegramConfigItem {
   sendJson: boolean;
   autoBackupEnabled?: boolean;
   scheduleTime?: string;
+  lastAutoBackupDate?: string | null;
   lastBackupSentAt?: string | null;
   lastBackupStatus?: 'SUCCESS' | 'FAILED' | null;
   lastBackupError?: string | null;
@@ -122,7 +126,6 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
   const [selectedFormat, setSelectedFormat] = useState<'all' | 'sqlite' | 'json'>('all');
 
   // Telegram Config Form States
-  const [isTelegramSectionOpen, setIsTelegramSectionOpen] = useState(true);
   const [telChatId, setTelChatId] = useState('');
   const [telThreadId, setTelThreadId] = useState('');
   const [useCustomBot, setUseCustomBot] = useState(false);
@@ -130,6 +133,8 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
   const [telSendSqlite, setTelSendSqlite] = useState(true);
   const [telSendJson, setTelSendJson] = useState(true);
   const [telIsEnabled, setTelIsEnabled] = useState(true);
+  const [telAutoBackupEnabled, setTelAutoBackupEnabled] = useState(true);
+  const [telScheduleTime, setTelScheduleTime] = useState('10:00');
 
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ text, type });
@@ -151,6 +156,8 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
           setTelSendSqlite(data.telegramConfig.sendSqlite ?? true);
           setTelSendJson(data.telegramConfig.sendJson ?? true);
           setTelIsEnabled(data.telegramConfig.isEnabled ?? true);
+          setTelAutoBackupEnabled(data.telegramConfig.autoBackupEnabled !== false);
+          setTelScheduleTime(data.telegramConfig.scheduleTime || '10:00');
           const hasCustom = !!data.telegramConfig.botToken;
           setUseCustomBot(hasCustom);
           setTelBotToken(data.telegramConfig.botToken || '');
@@ -200,7 +207,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
     document.body.removeChild(link);
   };
 
-  // Handle creating snapshot on server
+  // Handle creating snapshot on server (Chủ động tạo bản sao lưu)
   const handleCreateServerBackup = async () => {
     setIsCreatingBackup(true);
     try {
@@ -211,7 +218,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast(data.message || 'Đã tạo bản sao lưu thành công!', 'success');
+        showToast(data.message || 'Đã tạo bản sao lưu máy chủ thành công!', 'success');
         if (data.stats) setStats(data.stats);
         if (data.localBackups) setLocalBackups(data.localBackups);
       } else {
@@ -269,12 +276,14 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
           isEnabled: telIsEnabled,
           sendSqlite: telSendSqlite,
           sendJson: telSendJson,
+          autoBackupEnabled: telAutoBackupEnabled,
+          scheduleTime: telScheduleTime || '10:00',
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast('Đã lưu cấu hình gửi backup lên Telegram thành công!', 'success');
+        showToast('Đã lưu cấu hình sao lưu Telegram thành công!', 'success');
         if (data.telegramConfig) setTelegramConfig(data.telegramConfig);
       } else {
         showToast(data.error || 'Không thể lưu cấu hình Telegram', 'error');
@@ -320,10 +329,10 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
     }
   };
 
-  // Handle sending backup immediately to Telegram
+  // Handle sending backup immediately to Telegram (Chủ động sao lưu và gửi ngay)
   const handleSendBackupToTelegram = async () => {
     setIsSendingTelegram(true);
-    showToast('Đang tạo bản sao lưu và gửi lên Telegram...', 'info');
+    showToast('Đang tạo bản sao lưu và gửi ngay lên Telegram...', 'info');
 
     try {
       const res = await fetch('/api/backup', {
@@ -384,7 +393,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                   Sao Lưu & Xuất Dữ Liệu Cơ Sở Dữ Liệu
                 </h1>
                 <p className="text-slate-400 text-sm">
-                  Quản lý sao lưu an toàn (Tải về máy, Lưu trên máy chủ, và Gửi trực tiếp lên Telegram)
+                  Hệ thống tự động sao lưu lúc <b>10:00 sáng (Giờ Việt Nam)</b> & Cho phép Quản trị viên <b>chủ động sao lưu tức thì</b>
                 </p>
               </div>
             </div>
@@ -398,6 +407,69 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               Làm mới
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION: 1-CLICK INSTANT BACKUP ACTION BAR (Nút Chủ Động Sao Lưu) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-indigo-500/20 text-indigo-400 rounded-xl">
+              <Play className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                Nút Chủ Động Sao Lưu Tức Thì
+                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-full border border-emerald-500/30">
+                  Thủ công / Khi cần
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Nhấn vào các nút bên dưới để thực hiện sao lưu và xuất file ngay lập tức mà không cần chờ đến giờ tự động:
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Nút Chủ Động: Sao Lưu & Gửi Ngay Lên Telegram */}
+            <button
+              onClick={handleSendBackupToTelegram}
+              disabled={isSendingTelegram || !telegramConfig?.chatId}
+              title={!telegramConfig?.chatId ? 'Vui lòng cấu hình Chat ID Telegram bên dưới trước' : 'Gửi file sao lưu ngay lập tức lên Telegram'}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-sky-950/60 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
+            >
+              {isSendingTelegram ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Đang sao lưu & gửi Telegram...
+                </>
+              ) : (
+                <>
+                  <SendHorizontal className="w-4 h-4" />
+                  Sao Lưu & Gửi Ngay Lên Telegram
+                </>
+              )}
+            </button>
+
+            {/* Nút Chủ Động: Tạo Snapshot Máy Chủ */}
+            <button
+              onClick={handleCreateServerBackup}
+              disabled={isCreatingBackup}
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 shadow-md transition cursor-pointer disabled:opacity-50 active:scale-98"
+            >
+              {isCreatingBackup ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Đang tạo snapshot...
+                </>
+              ) : (
+                <>
+                  <Server className="w-4 h-4 text-emerald-400" />
+                  Tạo Snapshot Máy Chủ
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -465,7 +537,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
         </div>
       </div>
 
-      {/* SECTION: TELEGRAM CLOUD BACKUP INTEGRATION */}
+      {/* SECTION: TELEGRAM CLOUD BACKUP & 10:00 AM AUTO SCHEDULE */}
       <div className="bg-gradient-to-br from-sky-950/40 via-slate-900 to-indigo-950/40 border border-sky-500/30 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
           <div className="flex items-center gap-3">
@@ -474,73 +546,87 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white">Gửi File Sao Lưu Lên Telegram</h2>
+                <h2 className="text-lg font-bold text-white">Cấu Hình Sao Lưu & Gửi Lên Telegram</h2>
                 <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
                     telegramConfig?.chatId
                       ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                       : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                   }`}
                 >
-                  {telegramConfig?.chatId ? '● Đã Cấu Hình' : '○ Chưa Cấu Hình'}
+                  {telegramConfig?.chatId ? '● Đã Cấu Hình Telegram' : '○ Chưa Cấu Hình Chat ID'}
+                </span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                  <AlarmClock className="w-3 h-3 text-indigo-400" />
+                  Tự động 10h00 sáng (VN)
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Tự động gửi file SQLite (.sqlite) và JSON (.json) trực tiếp vào Kênh / Nhóm Telegram riêng của Quản trị viên
+                Tự động sao lưu và gửi file SQLite (.sqlite) / JSON (.json) vào Kênh / Nhóm Telegram mỗi ngày lúc 10:00 sáng
               </p>
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleSendBackupToTelegram}
-              disabled={isSendingTelegram || !telegramConfig?.chatId}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-sky-950/50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
-            >
-              {isSendingTelegram ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Đang gửi file...
-                </>
-              ) : (
-                <>
-                  <SendHorizontal className="w-4 h-4" />
-                  Sao Lưu & Gửi Ngay Lên Telegram
-                </>
-              )}
-            </button>
-          </div>
         </div>
 
-        {/* Last Telegram Status Banner */}
-        {telegramConfig?.lastBackupSentAt && (
+        {/* Schedule & Last Telegram Status Banner */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+          {/* Box 1: Auto Schedule Status */}
+          <div className="p-3.5 rounded-xl border border-indigo-500/30 bg-indigo-950/40 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <AlarmClock className="w-5 h-5 text-indigo-400 shrink-0" />
+              <div>
+                <div className="font-bold text-indigo-200">Lịch Tự Động Sao Lưu Hệ Thống</div>
+                <div className="text-[11px] text-slate-300 mt-0.5">
+                  Mỗi ngày lúc <b>{telScheduleTime || '10:00'} sáng</b> (Múi giờ Việt Nam UTC+7)
+                </div>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded font-mono text-[10px] font-bold">
+              {telAutoBackupEnabled ? 'BẬT' : 'TẮT'}
+            </span>
+          </div>
+
+          {/* Box 2: Last Backup Delivery */}
           <div
-            className={`mt-4 p-3.5 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
-              telegramConfig.lastBackupStatus === 'SUCCESS'
-                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
-                : 'bg-rose-950/40 border-rose-500/30 text-rose-200'
+            className={`p-3.5 rounded-xl border text-xs flex items-center justify-between ${
+              telegramConfig?.lastBackupSentAt
+                ? telegramConfig.lastBackupStatus === 'SUCCESS'
+                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
+                  : 'bg-rose-950/40 border-rose-500/30 text-rose-200'
+                : 'bg-slate-950/40 border-slate-800 text-slate-400'
             }`}
           >
             <div className="flex items-center gap-2.5">
-              {telegramConfig.lastBackupStatus === 'SUCCESS' ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              {telegramConfig?.lastBackupSentAt ? (
+                telegramConfig.lastBackupStatus === 'SUCCESS' ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                )
               ) : (
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <Clock className="w-5 h-5 text-slate-500 shrink-0" />
               )}
               <div>
-                <span className="font-bold">Lần gửi Telegram gần nhất:</span>{' '}
-                <span>{new Date(telegramConfig.lastBackupSentAt).toLocaleString('vi-VN')}</span>
-                {telegramConfig.lastBackupFiles && telegramConfig.lastBackupFiles.length > 0 && (
-                  <span className="ml-2 opacity-80">({telegramConfig.lastBackupFiles.join(', ')})</span>
-                )}
-                {telegramConfig.lastBackupError && (
-                  <div className="text-[11px] text-rose-300 mt-0.5">{telegramConfig.lastBackupError}</div>
-                )}
+                <div className="font-bold">
+                  {telegramConfig?.lastBackupSentAt ? 'Lần gửi Telegram gần nhất:' : 'Chưa có lượt gửi nào'}
+                </div>
+                <div className="text-[11px] opacity-80 mt-0.5">
+                  {telegramConfig?.lastBackupSentAt
+                    ? new Date(telegramConfig.lastBackupSentAt).toLocaleString('vi-VN')
+                    : 'Nhấn "Sao Lưu & Gửi Ngay" để kiểm tra'}
+                  {telegramConfig?.lastBackupFiles && telegramConfig.lastBackupFiles.length > 0 && (
+                    <span className="ml-1 font-mono">({telegramConfig.lastBackupFiles.join(', ')})</span>
+                  )}
+                </div>
               </div>
             </div>
-            <span className="text-[11px] font-mono opacity-70">Đích: {telegramConfig.chatId}</span>
+            {telegramConfig?.chatId && (
+              <span className="text-[10px] font-mono opacity-70 truncate max-w-[120px]">
+                {telegramConfig.chatId}
+              </span>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Telegram Configuration Form */}
         <form onSubmit={handleSaveTelegramConfig} className="mt-5 space-y-4">
@@ -580,6 +666,37 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                 placeholder="Để trống nếu là chat thường hoặc không dùng topic"
                 className="w-full bg-slate-950/60 border border-slate-700 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 font-mono transition"
               />
+            </div>
+          </div>
+
+          {/* Schedule Configuration Row */}
+          <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlarmClock className="w-4 h-4 text-indigo-400" />
+                <span className="text-xs font-bold text-slate-200">Cấu Hình Lịch Tự Động Sao Lưu</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={telAutoBackupEnabled}
+                    onChange={(e) => setTelAutoBackupEnabled(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-700 cursor-pointer"
+                  />
+                  <span>Bật tự động sao lưu hàng ngày</span>
+                </label>
+                <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-lg">
+                  <span className="text-[11px] text-slate-400">Giờ sao lưu:</span>
+                  <input
+                    type="time"
+                    value={telScheduleTime}
+                    onChange={(e) => setTelScheduleTime(e.target.value)}
+                    className="bg-transparent text-xs text-white font-mono focus:outline-none cursor-pointer"
+                  />
+                  <span className="text-[10px] text-indigo-400 font-bold">(VN)</span>
+                </div>
+              </div>
             </div>
           </div>
 

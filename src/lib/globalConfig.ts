@@ -20,7 +20,8 @@ export interface BackupTelegramConfigValue {
   sendSqlite: boolean; // Mặc định true
   sendJson: boolean; // Mặc định true
   autoBackupEnabled?: boolean;
-  scheduleTime?: string; // Ví dụ: '02:00'
+  scheduleTime?: string; // Mặc định: '10:00' (10h sáng hàng ngày)
+  lastAutoBackupDate?: string | null; // YYYY-MM-DD
   lastBackupSentAt?: string | null;
   lastBackupStatus?: 'SUCCESS' | 'FAILED' | null;
   lastBackupError?: string | null;

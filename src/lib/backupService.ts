@@ -631,3 +631,91 @@ export async function sendBackupToTelegram(params?: {
     error: errorMsg || undefined,
   };
 }
+
+/**
+ * Trình quét tự động kiểm tra và thực hiện sao lưu lúc 10:00 sáng (giờ Việt Nam).
+ * Được gọi định kỳ mỗi 5 phút bởi TelegramScheduler trong tiến trình máy chủ.
+ */
+export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean; reason?: string }> {
+  try {
+    // 1. Giờ Việt Nam hiện tại (UTC+7)
+    const nowVN = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+    const currentHour = nowVN.getHours();
+    const currentMinute = nowVN.getMinutes();
+    const currentDateStr = `${nowVN.getFullYear()}-${String(nowVN.getMonth() + 1).padStart(2, '0')}-${String(nowVN.getDate()).padStart(2, '0')}`;
+
+    // 2. Đọc cấu hình từ GlobalConfig
+    const config = await getGlobalConfig<BackupTelegramConfigValue>(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM);
+
+    // Mặc định: autoBackupEnabled = true, scheduleTime = '10:00'
+    const isAutoEnabled = config?.autoBackupEnabled !== false;
+    const scheduleTime = config?.scheduleTime || '10:00';
+    const [targetHourStr, targetMinuteStr] = scheduleTime.split(':');
+    const targetHour = parseInt(targetHourStr || '10', 10);
+    const targetMinute = parseInt(targetMinuteStr || '0', 10);
+
+    if (!isAutoEnabled) {
+      return { executed: false, reason: 'Tự động sao lưu đang tắt' };
+    }
+
+    // Đã sao lưu trong ngày hôm nay rồi thì không chạy lại
+    if (config?.lastAutoBackupDate === currentDateStr) {
+      return { executed: false, reason: `Đã sao lưu tự động trong ngày hôm nay (${currentDateStr})` };
+    }
+
+    // Kiểm tra xem đã đến hoặc vượt qua mốc giờ hẹn trong ngày chưa (ví dụ >= 10:00)
+    const isTimeToBackup = currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute);
+
+    if (!isTimeToBackup) {
+      return {
+        executed: false,
+        reason: `Chưa đến giờ sao lưu (Hiện tại: ${currentHour}:${String(currentMinute).padStart(2, '0')} VN, Lịch hẹn: ${scheduleTime} VN)`,
+      };
+    }
+
+    console.log(`⏰ [Auto Backup 10:00 AM VN] Bắt đầu tự động tạo bản sao lưu dữ liệu hệ thống lúc ${scheduleTime} sáng...`);
+
+    // 1. Tạo snapshot lưu cục bộ trên máy chủ
+    const createdFiles = await createLocalBackup('all');
+    console.log(`⏰ [Auto Backup 10:00 AM VN] Đã tạo ${createdFiles.length} file snapshot trên máy chủ.`);
+
+    // 2. Nếu có cấu hình Telegram, tự động gửi file lên Telegram
+    let telegramResult: any = null;
+    if (config?.chatId && config.isEnabled !== false) {
+      try {
+        telegramResult = await sendBackupToTelegram();
+        console.log(`⏰ [Auto Backup 10:00 AM VN] Đã gửi ${telegramResult.filesSent?.length || 0} file lên Telegram.`);
+      } catch (telErr: any) {
+        console.error(`⏰ [Auto Backup 10:00 AM VN] Lỗi khi gửi file lên Telegram:`, telErr.message);
+      }
+    }
+
+    // 3. Cập nhật ngày sao lưu tự động gần nhất vào GlobalConfig
+    const updatedConfig: BackupTelegramConfigValue = {
+      ...(config || {
+        isEnabled: true,
+        chatId: '',
+        sendSqlite: true,
+        sendJson: true,
+      }),
+      autoBackupEnabled: isAutoEnabled,
+      scheduleTime,
+      lastAutoBackupDate: currentDateStr,
+      lastBackupSentAt: telegramResult?.success ? new Date().toISOString() : config?.lastBackupSentAt || new Date().toISOString(),
+      lastBackupStatus: telegramResult ? (telegramResult.success ? 'SUCCESS' : 'FAILED') : config?.lastBackupStatus || 'SUCCESS',
+      lastBackupError: telegramResult?.error || config?.lastBackupError || null,
+      lastBackupFiles: telegramResult?.filesSent || createdFiles.map((f) => f.name),
+    };
+
+    await setGlobalConfig(
+      GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM,
+      updatedConfig,
+      'Cấu hình tự động gửi file backup cơ sở dữ liệu lên Telegram'
+    );
+
+    return { executed: true };
+  } catch (err: any) {
+    console.error('[Auto Backup Error]:', err);
+    return { executed: false, reason: err.message };
+  }
+}
