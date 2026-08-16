@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --port=3000",
     "build": "prisma generate && next build --webpack",
-    "start": "next start --port=3000",
+    "start": "next start -H 0.0.0.0 --port=3000",
     "db:backup": "tsx scripts/backup-db.ts",
     "db:migrate": "prisma migrate dev",
     "db:migrate:create": "prisma migrate dev --create-only",
