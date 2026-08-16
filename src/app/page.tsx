@@ -156,6 +156,15 @@ export default function Home() {
   );
 
   const [loginUsers, setLoginUsers] = useState<LoginUser[]>([]);
+  const [filterMeta, setFilterMeta] = useState<{
+    classes: string[];
+    subjects: { code: string; name: string }[];
+    dates: string[];
+  }>({
+    classes: [],
+    subjects: [],
+    dates: [],
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileInitialTab, setProfileInitialTab] = useState<'PROFILE' | 'EXTERNAL_ACCOUNTS'>('PROFILE');
@@ -349,8 +358,8 @@ export default function Home() {
     }
   };
 
-  // 1. Fetch Auth Session & mount from Server
-  useEffect(() => {
+  // 1. Fetch initial light metadata (Auth, Batches, Monitors) in PARALLEL and on-demand records
+  const loadInitialData = useCallback(async () => {
     setIsMounted(true);
     const saved = localStorage.getItem('currentUser');
     if (saved) {
@@ -361,21 +370,88 @@ export default function Home() {
       } catch (e) {}
     }
 
-    fetch('/api/auth/me')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && data.user) {
-          setCurrentUser(data.user);
-          localStorage.setItem('currentUser', JSON.stringify(data.user));
-          if (data.user.lop) {
-            setMonitorClass(data.user.lop);
-          }
+    setIsLoading(true);
+    try {
+      const [authRes, batchesRes, monitorsRes] = await Promise.all([
+        fetch('/api/auth/me').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/exam-batches').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/monitors').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      ]);
+
+      let user = currentUser;
+      if (authRes?.user) {
+        user = authRes.user;
+        setCurrentUser(user);
+        localStorage.setItem('currentUser', JSON.stringify(user));
+        if (user.lop) setMonitorClass(user.lop);
+      }
+
+      let active: any = null;
+      if (batchesRes?.batches) {
+        setExamBatches(batchesRes.batches);
+        active = batchesRes.batches.find((b: any) => b.isActive) || null;
+        setActiveBatch(active);
+      }
+
+      if (monitorsRes?.users) {
+        setLoginUsers(monitorsRes.users);
+      }
+
+      const currentTab = getInitialState().tab;
+      const batchCode = active?.code;
+
+      // Fast fetch filter metadata if active batch exists
+      if (batchCode) {
+        fetch(`/api/exam-records?distinct=true&batchCode=${encodeURIComponent(batchCode)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (d) {
+              setFilterMeta({
+                classes: d.classes || [],
+                subjects: (d.subjects || []).map((s: string) => {
+                  const [code, ...nameParts] = s.split(' - ');
+                  return { code: code.trim(), name: nameParts.join(' - ').trim() || code.trim() };
+                }),
+                dates: d.dates || [],
+              });
+            }
+          })
+          .catch(() => {});
+      }
+
+      // Targeted Fetching: Only fetch heavy exam records if the initial screen actually needs them!
+      if (currentTab === 'personal_schedule' && user?.username) {
+        // Fast path: Only pull the ~5-10 records for this student
+        const recUrl = batchCode
+          ? `/api/exam-records?all=true&maSV=${encodeURIComponent(user.username)}&batchCode=${encodeURIComponent(batchCode)}`
+          : `/api/exam-records?all=true&maSV=${encodeURIComponent(user.username)}`;
+        const recordsRes = await fetch(recUrl);
+        if (recordsRes.ok) {
+          const recData = await recordsRes.json();
+          const rawRecords: ExamRecord[] = recData.records || [];
+          setRecords(rawRecords);
+          setSessions(buildSessions(rawRecords));
         }
-      })
-      .catch((err) => console.warn('Auth check error:', err));
+      } else if (['schedule', 'envelope', 'envelope_all', 'settlement', 'monitor'].includes(currentTab) && batchCode) {
+        // Pull full batch records for full schedule / envelopes
+        const recordsRes = await fetch(`/api/exam-records?all=true&batchCode=${encodeURIComponent(batchCode)}`);
+        if (recordsRes.ok) {
+          const recData = await recordsRes.json();
+          const rawRecords: ExamRecord[] = recData.records || [];
+          setRecords(rawRecords);
+          setSessions(buildSessions(rawRecords));
+        }
+      }
+      // For all other tabs (all_students, members, course_compare, registered_courses, batches, etc.),
+      // skip heavy exam records fetch to make the initial page load instant!
+    } catch (err) {
+      console.error('Failed to load initial data:', err);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  // 2. Fetch Data from PostgreSQL Backend API
+  // 2. Fetch Data from PostgreSQL Backend API (used on batch switch or full reload)
   const loadDataFromApi = useCallback(async (selectedBatchCode?: string) => {
     setIsLoading(true);
     try {
@@ -395,15 +471,28 @@ export default function Home() {
       }
 
       // 2. Fetch users / monitors
-      const monitorsRes = await fetch('/api/monitors');
-      if (monitorsRes.ok) {
-        const monData = await monitorsRes.json();
-        if (monData.users) {
-          setLoginUsers(monData.users);
-        }
+      fetchMonitorsData();
+
+      // 3. Fetch filter metadata
+      if (currentBatchCode && currentBatchCode !== 'ALL') {
+        fetch(`/api/exam-records?distinct=true&batchCode=${encodeURIComponent(currentBatchCode)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (d) {
+              setFilterMeta({
+                classes: d.classes || [],
+                subjects: (d.subjects || []).map((s: string) => {
+                  const [code, ...nameParts] = s.split(' - ');
+                  return { code: code.trim(), name: nameParts.join(' - ').trim() || code.trim() };
+                }),
+                dates: d.dates || [],
+              });
+            }
+          })
+          .catch(() => {});
       }
 
-      // 3. Fetch exam records from DB (filtered by batchCode if available)
+      // 4. Fetch exam records from DB (filtered by batchCode if available)
       const url = currentBatchCode && currentBatchCode !== 'ALL'
         ? `/api/exam-records?all=true&batchCode=${encodeURIComponent(currentBatchCode)}`
         : '/api/exam-records?all=true';
@@ -470,11 +559,41 @@ export default function Home() {
   );
 
   const hasActiveBatch = useMemo(() => examBatches.some((b) => b.isActive), [examBatches]);
-  const hasExamSchedule = hasActiveBatch && records.length > 0;
+  const hasExamSchedule = hasActiveBatch && ((activeBatch?.totalRecords ?? 0) > 0 || records.length > 0);
 
   useEffect(() => {
-    loadDataFromApi();
-  }, [loadDataFromApi]);
+    loadInitialData();
+  }, [loadInitialData]);
+
+  // Lazy load full batch exam records when navigating to a tab that requires them
+  useEffect(() => {
+    const batchCode = activeBatch?.code;
+    if (!batchCode) return;
+
+    const needsFullRecords = ['schedule', 'envelope', 'envelope_all', 'settlement', 'monitor'].includes(activeTab);
+    
+    // Check if we only have personal records in memory (<20 records for current student)
+    const hasOnlyPersonalRecords =
+      currentUser &&
+      records.length > 0 &&
+      records.length <= 20 &&
+      records.every((r) => r.MaSV?.toUpperCase() === currentUser.username?.toUpperCase());
+
+    if (needsFullRecords && (records.length === 0 || hasOnlyPersonalRecords)) {
+      setIsLoading(true);
+      fetch(`/api/exam-records?all=true&batchCode=${encodeURIComponent(batchCode)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((recData) => {
+          if (recData?.records) {
+            const rawRecords: ExamRecord[] = recData.records || [];
+            setRecords(rawRecords);
+            setSessions(buildSessions(rawRecords));
+          }
+        })
+        .catch((err) => console.error('Lazy load exam records error:', err))
+        .finally(() => setIsLoading(false));
+    }
+  }, [activeTab, activeBatch, currentUser, records]);
 
   useEffect(() => {
     if (!isMounted || !currentUser) return;
@@ -493,11 +612,11 @@ export default function Home() {
     setSelectedExamRoom(null);
   }, [activeTab]);
 
-  // Load Course Compare Data from DB API
+  // Load Course Compare Data from DB API only when course_compare tab is active
   const fetchCourseCompareData = useCallback(() => {
     const classCode = currentUser?.lop || monitorClass || 'D25TXCN11-K';
 
-    if (currentUser) {
+    if (currentUser && activeTab === 'course_compare') {
       fetch(`/api/course-compare?classCode=${encodeURIComponent(classCode)}&username=${encodeURIComponent(currentUser.username)}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
@@ -518,10 +637,12 @@ export default function Home() {
           setCourseCompareData(null);
         });
     }
-  }, [currentUser, monitorClass]);
+  }, [currentUser, monitorClass, activeTab]);
 
   useEffect(() => {
-    fetchCourseCompareData();
+    if (activeTab === 'course_compare') {
+      fetchCourseCompareData();
+    }
   }, [fetchCourseCompareData, activeTab]);
 
   useEffect(() => {
@@ -586,32 +707,41 @@ export default function Home() {
   }, [records, activeTab, currentUser]);
 
   const classes = useMemo(() => {
-    const cls = new Set(baseRecords.map((r) => r.MaLop).filter(Boolean));
-    return Array.from(cls).sort();
-  }, [baseRecords]);
+    if (baseRecords.length > 0) {
+      const cls = new Set(baseRecords.map((r) => r.MaLop).filter(Boolean));
+      return Array.from(cls).sort();
+    }
+    return filterMeta.classes || [];
+  }, [baseRecords, filterMeta.classes]);
 
   const subjects = useMemo(() => {
-    const subs = new Map<string, string>();
-    baseRecords.forEach((r) => {
-      if (r.MaMH && r.TenMH) {
-        subs.set(r.MaMH, r.TenMH);
-      }
-    });
-    return Array.from(subs.entries())
-      .map(([code, name]) => ({ code, name }))
-      .sort((a, b) => a.code.localeCompare(b.code));
-  }, [baseRecords]);
+    if (baseRecords.length > 0) {
+      const subs = new Map<string, string>();
+      baseRecords.forEach((r) => {
+        if (r.MaMH && r.TenMH) {
+          subs.set(r.MaMH, r.TenMH);
+        }
+      });
+      return Array.from(subs.entries())
+        .map(([code, name]) => ({ code, name }))
+        .sort((a, b) => a.code.localeCompare(b.code));
+    }
+    return filterMeta.subjects || [];
+  }, [baseRecords, filterMeta.subjects]);
 
   const dates = useMemo(() => {
-    const dts = new Set<string>(baseRecords.map((r) => r.NgayThi).filter(Boolean));
-    return Array.from(dts).sort((a, b) => {
-      const [d1, m1, y1] = a.split('/').map(Number);
-      const [d2, m2, y2] = b.split('/').map(Number);
-      if (y1 !== y2) return (y1 || 0) - (y2 || 0);
-      if (m1 !== m2) return (m1 || 0) - (m2 || 0);
-      return (d1 || 0) - (d2 || 0);
-    });
-  }, [baseRecords]);
+    if (baseRecords.length > 0) {
+      const dts = new Set<string>(baseRecords.map((r) => r.NgayThi).filter(Boolean));
+      return Array.from(dts).sort((a, b) => {
+        const [d1, m1, y1] = a.split('/').map(Number);
+        const [d2, m2, y2] = b.split('/').map(Number);
+        if (y1 !== y2) return (y1 || 0) - (y2 || 0);
+        if (m1 !== m2) return (m1 || 0) - (m2 || 0);
+        return (d1 || 0) - (d2 || 0);
+      });
+    }
+    return filterMeta.dates || [];
+  }, [baseRecords, filterMeta.dates]);
 
   // Apply filters
   const filteredRecords = useMemo(() => {

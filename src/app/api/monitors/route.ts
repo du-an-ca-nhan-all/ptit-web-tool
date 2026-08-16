@@ -20,7 +20,20 @@ export async function GET(req: NextRequest) {
   try {
     await ensureDatabaseSeeded(false);
 
+    const { searchParams } = new URL(req.url);
+    const includeAll = searchParams.get('all') === 'true';
+
+    const where: any = includeAll
+      ? {}
+      : {
+          OR: [
+            { role: { contains: 'lop_truong', mode: 'insensitive' } },
+            { role: { contains: 'admin', mode: 'insensitive' } },
+          ],
+        };
+
     const usersRaw = await prisma.user.findMany({
+      where,
       include: {
         student: true,
       },
