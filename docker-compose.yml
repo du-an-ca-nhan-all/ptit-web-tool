@@ -1,0 +1,18 @@
+services:
+  ptit-web-tool:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ptit-web-tool
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TZ=Asia/Ho_Chi_Minh
+    volumes:
+      # Mount file CSDL dev.db để lưu trữ dữ liệu vĩnh viễn trên máy host
+      - ./prisma/dev.db:/app/prisma/dev.db
+      # Mount thư mục backups để lưu và quản lý các file sao lưu bên ngoài container
+      - ./backups:/app/backups

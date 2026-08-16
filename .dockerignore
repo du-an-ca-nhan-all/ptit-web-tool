@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.github
+.idea
+.playwright-mcp
+dist
+backups/*.json
+backups/*.sqlite
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store

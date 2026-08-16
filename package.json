@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --port=3000",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && next build --webpack",
     "start": "next start --port=3000",
-    "db:seed": "npx tsx prisma/seed.ts",
+    "db:backup": "tsx scripts/backup-db.ts",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "lint": "tsc --noEmit"
