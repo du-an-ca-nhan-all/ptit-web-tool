@@ -468,7 +468,7 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
             Cấu Hình Bot Toàn Cục & Tự Động Nhắc Lịch Thi
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-            Thiết lập Bot Telegram đại diện toàn trường trong bảng <code className="text-sky-300 font-mono font-bold">TelegramGlobalConfig</code>, quản lý các kênh/nhóm đăng ký nhận tin của sinh viên và kích hoạt tự động nhắc lịch thi trước 1 ngày & lúc 7h sáng hôm thi.
+            Thiết lập Bot Telegram đại diện toàn trường trong bảng cấu hình mở rộng <code className="text-sky-300 font-mono font-bold">GlobalConfig</code> (key: <code className="text-sky-200 font-mono">telegram_bot</code>), quản lý các kênh/nhóm đăng ký nhận tin của sinh viên và kích hoạt tự động nhắc lịch thi trước 1 ngày & lúc 7h sáng hôm thi.
           </p>
 
           {/* Quick Metrics */}
@@ -599,7 +599,7 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
                     Cấu Hình Telegram Bot Toàn Cục
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Lưu trữ trong bảng SQLite <code className="font-mono text-indigo-600">TelegramGlobalConfig</code>
+                    Lưu trữ trong bảng SQLite <code className="font-mono text-indigo-600">GlobalConfig</code> (key: <code className="font-mono text-slate-600">telegram_bot</code>)
                   </p>
                 </div>
               </div>

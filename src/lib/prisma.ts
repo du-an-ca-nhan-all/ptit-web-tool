@@ -15,7 +15,7 @@ export function getPrismaClient(): PrismaClient {
   if (
     !client ||
     (client as any).telegramConfig === undefined ||
-    (client as any).telegramGlobalConfig === undefined ||
+    (client as any).globalConfig === undefined ||
     (client as any).examReminderLog === undefined ||
     (client as any).qldtAnnouncementLog === undefined ||
     (client as any).classScheduleReminderLog === undefined

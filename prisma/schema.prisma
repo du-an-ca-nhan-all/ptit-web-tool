@@ -227,22 +227,16 @@ model TelegramConfig {
   @@index([isEnabled])
 }
 
-// 10. Bảng TelegramGlobalConfig: Cấu hình Bot Telegram chung toàn hệ thống (Do Admin thiết lập)
-model TelegramGlobalConfig {
-  id              Int       @id @default(autoincrement())
-  botToken        String    // Token Bot Telegram chung do @BotFather cấp
-  botUsername     String?   // Username Telegram của Bot (ví dụ: PTIT_Notification_bot)
-  botFirstName    String?   // Tên hiển thị của Bot (ví dụ: PTIT EduSync Official Bot)
-  botId           String?   // Telegram Bot ID
-  isActive        Boolean   @default(true) // Trạng thái hoạt động của Bot hệ thống
-  description     String?   // Ghi chú / mô tả
-  lastTestedAt    DateTime? // Thời điểm Admin test gần nhất
-  lastTestStatus  String?   // 'SUCCESS' | 'FAILED'
-  lastTestError   String?   // Lỗi test gần nhất nếu có
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+// 10. Bảng GlobalConfig: Cấu hình chung toàn hệ thống (Lưu trữ dạng key-value JSON mở rộng)
+model GlobalConfig {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique // Khóa định danh cấu hình (Ví dụ: "telegram_bot", "mail_smtp", "app_general")
+  value       String   // Giá trị cấu hình định dạng JSON string
+  description String?  // Ghi chú / mô tả mục đích cấu hình
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@index([isActive])
+  @@index([key])
 }
 
 // 11. Bảng ExamReminderLog: Nhật ký nhắc lịch thi tự động để tránh gửi trùng

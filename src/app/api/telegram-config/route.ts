@@ -451,7 +451,7 @@ export async function POST(req: NextRequest) {
         const sysPublic = await getSystemTelegramBotPublicInfo();
         if (!sysPublic.isConfigured) {
           return NextResponse.json(
-            { error: 'Bot Hệ Thống chưa được Admin thiết lập trong bảng TelegramGlobalConfig. Vui lòng liên hệ Admin hoặc nhập Bot Token riêng.' },
+            { error: 'Bot Hệ Thống chưa được Admin thiết lập trong cấu hình GlobalConfig (key: telegram_bot). Vui lòng liên hệ Admin hoặc nhập Bot Token riêng.' },
             { status: 400 }
           );
         }

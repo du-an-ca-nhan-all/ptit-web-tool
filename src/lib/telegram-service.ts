@@ -517,6 +517,8 @@ export async function createTelegramForumTopic(
   }
 }
 
+import { getGlobalConfig, setGlobalConfig, TelegramBotConfigValue, GLOBAL_CONFIG_KEYS } from './globalConfig';
+
 export interface SystemBotConfigData {
   id?: number;
   botToken: string;
@@ -532,28 +534,24 @@ export interface SystemBotConfigData {
 }
 
 /**
- * Get System Telegram Bot Token & info from TelegramGlobalConfig table or Environment
+ * Get System Telegram Bot Token & info from GlobalConfig table (key: "telegram_bot") or Environment
  */
 export async function getSystemTelegramBotConfig(): Promise<SystemBotConfigData | null> {
   try {
-    const globalConfig = await prisma.telegramGlobalConfig.findFirst({
-      where: { isActive: true },
-      orderBy: { updatedAt: 'desc' },
-    });
+    const botConfig = await getGlobalConfig<TelegramBotConfigValue>(GLOBAL_CONFIG_KEYS.TELEGRAM_BOT);
 
-    if (globalConfig && globalConfig.botToken) {
+    if (botConfig && botConfig.botToken) {
       return {
-        id: globalConfig.id,
-        botToken: globalConfig.botToken,
-        botUsername: globalConfig.botUsername,
-        botFirstName: globalConfig.botFirstName || 'PTIT EduSync Official Bot',
-        botId: globalConfig.botId,
-        isActive: globalConfig.isActive,
-        description: globalConfig.description,
-        lastTestedAt: globalConfig.lastTestedAt ? globalConfig.lastTestedAt.toISOString() : null,
-        lastTestStatus: globalConfig.lastTestStatus,
-        lastTestError: globalConfig.lastTestError,
-        updatedAt: globalConfig.updatedAt.toISOString(),
+        botToken: botConfig.botToken,
+        botUsername: botConfig.botUsername || null,
+        botFirstName: botConfig.botFirstName || 'PTIT EduSync Official Bot',
+        botId: botConfig.botId || null,
+        isActive: botConfig.isActive ?? true,
+        description: botConfig.description || null,
+        lastTestedAt: botConfig.lastTestedAt || null,
+        lastTestStatus: botConfig.lastTestStatus || null,
+        lastTestError: botConfig.lastTestError || null,
+        updatedAt: new Date().toISOString(),
       };
     }
 
@@ -571,7 +569,7 @@ export async function getSystemTelegramBotConfig(): Promise<SystemBotConfigData 
 
     return null;
   } catch (err) {
-    console.error('Error loading system telegram bot config from TelegramGlobalConfig:', err);
+    console.error('Error loading system telegram bot config from GlobalConfig:', err);
     return null;
   }
 }
@@ -608,7 +606,7 @@ export async function getSystemTelegramBotPublicInfo() {
 }
 
 /**
- * Save System Bot Token (Admin only) to TelegramGlobalConfig table
+ * Save System Bot Token (Admin only) to GlobalConfig table
  */
 export async function saveSystemTelegramBot(botToken: string, description?: string) {
   const token = botToken?.trim();
@@ -621,51 +619,39 @@ export async function saveSystemTelegramBot(botToken: string, description?: stri
     throw new Error(verifyRes.error || 'Token Bot hệ thống không hợp lệ');
   }
 
-  const existing = await prisma.telegramGlobalConfig.findFirst({
-    orderBy: { id: 'asc' },
-  });
+  const existingConfig = await getGlobalConfig<TelegramBotConfigValue>(GLOBAL_CONFIG_KEYS.TELEGRAM_BOT);
 
-  let savedRecord;
-  if (existing) {
-    savedRecord = await prisma.telegramGlobalConfig.update({
-      where: { id: existing.id },
-      data: {
-        botToken: token,
-        botUsername: verifyRes.botInfo.username || null,
-        botFirstName: verifyRes.botInfo.firstName || 'PTIT EduSync Official Bot',
-        botId: verifyRes.botInfo.id ? String(verifyRes.botInfo.id) : null,
-        isActive: true,
-        description: description || existing.description || 'Bot Telegram thông báo chính thức của hệ thống PTIT EduSync',
-        lastTestedAt: new Date(),
-        lastTestStatus: 'SUCCESS',
-        lastTestError: null,
-      },
-    });
-  } else {
-    savedRecord = await prisma.telegramGlobalConfig.create({
-      data: {
-        botToken: token,
-        botUsername: verifyRes.botInfo.username || null,
-        botFirstName: verifyRes.botInfo.firstName || 'PTIT EduSync Official Bot',
-        botId: verifyRes.botInfo.id ? String(verifyRes.botInfo.id) : null,
-        isActive: true,
-        description: description || 'Bot Telegram thông báo chính thức của hệ thống PTIT EduSync',
-        lastTestedAt: new Date(),
-        lastTestStatus: 'SUCCESS',
-        lastTestError: null,
-      },
-    });
-  }
+  const newConfigValue: TelegramBotConfigValue = {
+    botToken: token,
+    botUsername: verifyRes.botInfo.username || null,
+    botFirstName: verifyRes.botInfo.firstName || 'PTIT EduSync Official Bot',
+    botId: verifyRes.botInfo.id ? String(verifyRes.botInfo.id) : null,
+    isActive: true,
+    description: description || existingConfig?.description || 'Bot Telegram thông báo chính thức của hệ thống PTIT EduSync',
+    lastTestedAt: new Date().toISOString(),
+    lastTestStatus: 'SUCCESS',
+    lastTestError: null,
+  };
+
+  const savedRecord = await setGlobalConfig(
+    GLOBAL_CONFIG_KEYS.TELEGRAM_BOT,
+    newConfigValue,
+    newConfigValue.description || undefined
+  );
 
   return {
     success: true,
     botInfo: verifyRes.botInfo,
-    config: savedRecord,
+    config: {
+      ...newConfigValue,
+      id: savedRecord.id,
+      updatedAt: savedRecord.updatedAt.toISOString(),
+    },
   };
 }
 
 /**
- * Resolve effective bot token: uses customToken if provided, otherwise falls back to TelegramGlobalConfig
+ * Resolve effective bot token: uses customToken if provided, otherwise falls back to GlobalConfig
  */
 export async function resolveEffectiveBotToken(
   customToken?: string | null
@@ -674,11 +660,11 @@ export async function resolveEffectiveBotToken(
     return { token: customToken.trim(), isCustom: true };
   }
 
-  // Fallback to GLOBAL SYSTEM BOT from TelegramGlobalConfig
+  // Fallback to GLOBAL SYSTEM BOT from GlobalConfig
   const sysConfig = await getSystemTelegramBotConfig();
   if (!sysConfig || !sysConfig.botToken) {
     throw new Error(
-      'Bot Hệ Thống chưa được Admin thiết lập trong bảng TelegramGlobalConfig. Vui lòng liên hệ Quản trị viên hoặc nhập Bot Token riêng.'
+      'Bot Hệ Thống chưa được Admin thiết lập trong bảng GlobalConfig. Vui lòng liên hệ Quản trị viên hoặc nhập Bot Token riêng.'
     );
   }
 
@@ -689,15 +675,14 @@ export async function resolveEffectiveBotToken(
  * Toggle System Telegram Bot Active Status
  */
 export async function toggleSystemTelegramBot(isActive: boolean) {
-  const existing = await prisma.telegramGlobalConfig.findFirst({
-    orderBy: { id: 'asc' },
-  });
+  const existing = await getGlobalConfig<TelegramBotConfigValue>(GLOBAL_CONFIG_KEYS.TELEGRAM_BOT);
   if (!existing) {
     throw new Error('Chưa có cấu hình Bot Hệ Thống để bật/tắt.');
   }
-  return await prisma.telegramGlobalConfig.update({
-    where: { id: existing.id },
-    data: { isActive },
-  });
+  const updatedValue: TelegramBotConfigValue = {
+    ...existing,
+    isActive,
+  };
+  return await setGlobalConfig(GLOBAL_CONFIG_KEYS.TELEGRAM_BOT, updatedValue);
 }
 

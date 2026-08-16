@@ -550,7 +550,7 @@ export default function TelegramConfigSection({
                   Cấu Hình Bot Telegram Hệ Thống (Toàn Trường)
                 </h3>
                 <p className="text-xs text-slate-600">
-                  Dành riêng cho Quản trị viên: Lưu vào bảng <code className="font-mono text-indigo-700 font-bold">TelegramGlobalConfig</code>. Toàn bộ sinh viên có thể dùng bot này mà không cần tự tạo bot.
+                  Dành riêng cho Quản trị viên: Lưu vào bảng cấu hình <code className="font-mono text-indigo-700 font-bold">GlobalConfig</code>. Toàn bộ sinh viên có thể dùng bot này mà không cần tự tạo bot.
                 </p>
               </div>
             </div>
