@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     // 1. Find class monitor user dynamically from User/Student role
     let monitorUser = await prisma.user.findFirst({
       where: {
-        role: { contains: 'lop_truong' },
+        role: { contains: 'lop_truong', mode: 'insensitive' },
         student: { maLop: classCode },
       },
     });
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     // Fallback if class not linked in student profile
     if (!monitorUser) {
       monitorUser = await prisma.user.findFirst({
-        where: { role: { contains: 'lop_truong' } },
+        where: { role: { contains: 'lop_truong', mode: 'insensitive' } },
       });
     }
 

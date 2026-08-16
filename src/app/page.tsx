@@ -375,7 +375,7 @@ export default function Home() {
       .catch((err) => console.warn('Auth check error:', err));
   }, []);
 
-  // 2. Fetch Data from SQLite Backend API
+  // 2. Fetch Data from PostgreSQL Backend API
   const loadDataFromApi = useCallback(async (selectedBatchCode?: string) => {
     setIsLoading(true);
     try {
@@ -415,7 +415,7 @@ export default function Home() {
         setSessions(buildSessions(rawRecords));
       }
     } catch (err) {
-      console.error('Failed to load data from SQLite API:', err);
+      console.error('Failed to load data from PostgreSQL API:', err);
     } finally {
       setIsLoading(false);
     }
@@ -700,7 +700,7 @@ export default function Home() {
             <div>
               <h1 className="text-white font-bold text-base tracking-tight">PTIT EduSync</h1>
               <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono">
-                <Database className="w-2.5 h-2.5" /> SQLite Server-Side
+                <Database className="w-2.5 h-2.5" /> PostgreSQL Server-Side
               </div>
             </div>
           </div>
@@ -1043,7 +1043,7 @@ export default function Home() {
 
         <div className="p-4 border-t border-slate-800 text-slate-500 text-xs text-center flex flex-col gap-1">
           <div className="text-[11px] uppercase tracking-widest font-bold text-slate-400">HK2 2025 - 2026</div>
-          <div className="text-[10px] text-slate-600 font-mono">SQLite • Next.js Fullstack</div>
+          <div className="text-[10px] text-slate-600 font-mono">PostgreSQL • Next.js Fullstack</div>
         </div>
       </aside>
 

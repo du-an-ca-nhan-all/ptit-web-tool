@@ -598,7 +598,7 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
                     Cấu Hình Telegram Bot Toàn Cục
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Lưu trữ trong bảng SQLite <code className="font-mono text-indigo-600">GlobalConfig</code> (key: <code className="font-mono text-slate-600">telegram_bot</code>)
+                    Lưu trữ trong bảng PostgreSQL <code className="font-mono text-indigo-600">GlobalConfig</code> (key: <code className="font-mono text-slate-600">telegram_bot</code>)
                   </p>
                 </div>
               </div>

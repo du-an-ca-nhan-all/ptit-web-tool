@@ -65,13 +65,13 @@ export async function GET(req: NextRequest) {
     if (search) {
       const q = search.trim();
       where.OR = [
-        { maSV: { contains: q } },
-        { tenMH: { contains: q } },
-        { maMH: { contains: q } },
-        { mapThi: { contains: q } },
-        { student: { ten: { contains: q } } },
-        { student: { hoLot: { contains: q } } },
-        { student: { hoTen: { contains: q } } },
+        { maSV: { contains: q, mode: 'insensitive' } },
+        { tenMH: { contains: q, mode: 'insensitive' } },
+        { maMH: { contains: q, mode: 'insensitive' } },
+        { mapThi: { contains: q, mode: 'insensitive' } },
+        { student: { ten: { contains: q, mode: 'insensitive' } } },
+        { student: { hoLot: { contains: q, mode: 'insensitive' } } },
+        { student: { hoTen: { contains: q, mode: 'insensitive' } } },
       ];
     }
 

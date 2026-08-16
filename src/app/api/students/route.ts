@@ -47,12 +47,17 @@ export async function GET(req: NextRequest) {
 
     if (search) {
       where.OR = [
-        { maSV: { contains: search.toUpperCase() } },
-        { ten: { contains: search } },
-        { hoLot: { contains: search } },
-        { hoTen: { contains: search } },
-        { maLop: { contains: search } },
-        ...(isAdmin ? [{ soDienThoai: { contains: search } }, { ghiChu: { contains: search } }] : []),
+        { maSV: { contains: search, mode: 'insensitive' } },
+        { ten: { contains: search, mode: 'insensitive' } },
+        { hoLot: { contains: search, mode: 'insensitive' } },
+        { hoTen: { contains: search, mode: 'insensitive' } },
+        { maLop: { contains: search, mode: 'insensitive' } },
+        ...(isAdmin
+          ? [
+              { soDienThoai: { contains: search, mode: 'insensitive' } },
+              { ghiChu: { contains: search, mode: 'insensitive' } },
+            ]
+          : []),
       ];
     }
 

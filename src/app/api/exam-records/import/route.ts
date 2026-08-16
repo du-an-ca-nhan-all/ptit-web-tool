@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
     });
 
     const studentMap = new Map<string, any>();
+    const batchesMap = new Map<string, string>();
     const examRecordsList: any[] = [];
 
     validData.forEach((row) => {
@@ -58,6 +59,12 @@ export async function POST(req: NextRequest) {
       if (!maSV) return;
 
       const maLop = studentMainClassMap.get(maSV) || row.MaLop;
+      const batchCode = row.MaDotThi ? String(row.MaDotThi).trim() : null;
+      const batchName = row.TenDotThi ? String(row.TenDotThi).trim() : (batchCode || 'Đợt thi chính thức');
+
+      if (batchCode && !batchesMap.has(batchCode)) {
+        batchesMap.set(batchCode, batchName);
+      }
 
       if (!studentMap.has(maSV)) {
         const hoLot = row.HoLotSV ? String(row.HoLotSV).trim() : '';
@@ -78,6 +85,7 @@ export async function POST(req: NextRequest) {
 
       examRecordsList.push({
         maSV,
+        batchCode: batchCode || null,
         nhomThi: row.NhomThi ? String(row.NhomThi).trim() : null,
         mapThi: row.MAPTHI ? String(row.MAPTHI).trim() : null,
         maMH: row.MaMH ? String(row.MaMH).trim() : null,
@@ -89,8 +97,8 @@ export async function POST(req: NextRequest) {
         ngayThi: row.NgayThi ? String(row.NgayThi).trim() : null,
         gioThi: row.GioThi ? String(row.GioThi).trim() : null,
         soPhutThi: row.SoPhutThi ? String(row.SoPhutThi).trim() : null,
-        maDotThi: row.MaDotThi ? String(row.MaDotThi).trim() : null,
-        tenDotThi: row.TenDotThi ? String(row.TenDotThi).trim() : null,
+        maDotThi: batchCode,
+        tenDotThi: batchName,
         isPostponed:
           row.isPostponed === true ||
           row.isPostponed === 'true' ||
@@ -104,6 +112,19 @@ export async function POST(req: NextRequest) {
 
     if (mode === 'replace') {
       await prisma.examRecord.deleteMany();
+    }
+
+    // Upsert batches to guarantee PostgreSQL foreign key integrity
+    for (const [bCode, bName] of batchesMap.entries()) {
+      await prisma.examBatch.upsert({
+        where: { code: bCode },
+        update: { name: bName },
+        create: {
+          code: bCode,
+          name: bName,
+          isActive: true,
+        },
+      });
     }
 
     // Batch upsert students

@@ -44,11 +44,11 @@ export async function GET(req: NextRequest) {
 
     if (search) {
       where.OR = [
-        { username: { contains: search } },
-        { fullName: { contains: search } },
-        { lop: { contains: search } },
-        { phoneNumber: { contains: search } },
-        { note: { contains: search } },
+        { username: { contains: search, mode: 'insensitive' } },
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { lop: { contains: search, mode: 'insensitive' } },
+        { phoneNumber: { contains: search, mode: 'insensitive' } },
+        { note: { contains: search, mode: 'insensitive' } },
       ];
     }
 

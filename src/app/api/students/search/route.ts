@@ -17,11 +17,11 @@ export async function GET(req: NextRequest) {
     const studentsRaw = await prisma.student.findMany({
       where: {
         OR: [
-          { maSV: { contains: q.toUpperCase() } },
-          { ten: { contains: q } },
-          { hoLot: { contains: q } },
-          { hoTen: { contains: q } },
-          { maLop: { contains: q } },
+          { maSV: { contains: q, mode: 'insensitive' } },
+          { ten: { contains: q, mode: 'insensitive' } },
+          { hoLot: { contains: q, mode: 'insensitive' } },
+          { hoTen: { contains: q, mode: 'insensitive' } },
+          { maLop: { contains: q, mode: 'insensitive' } },
         ],
       },
       include: {

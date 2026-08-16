@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       const currentClassUsers = await prisma.user.findMany({
         where: {
           student: { maLop: cleanClassCode },
-          role: { contains: 'lop_truong' },
+          role: { contains: 'lop_truong', mode: 'insensitive' },
         },
         include: { student: true },
       });
@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
           ? { username: fromMaSV.trim().toUpperCase() }
           : {
               student: { maLop: cleanClassCode },
-              role: { contains: 'lop_truong' },
+              role: { contains: 'lop_truong', mode: 'insensitive' },
             },
         include: { student: true },
       });

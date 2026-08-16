@@ -39,7 +39,7 @@ export default function UploadSection({ onDataLoaded, onRefreshFromDb }: UploadS
 
         const data = await res.json();
         if (res.ok && data.success) {
-          setSuccessMsg(data.message || 'Đã lưu dữ liệu vào cơ sở dữ liệu SQLite thành công!');
+          setSuccessMsg(data.message || 'Đã lưu dữ liệu vào cơ sở dữ liệu PostgreSQL thành công!');
           if (onRefreshFromDb) {
             onRefreshFromDb();
           } else {
@@ -142,7 +142,7 @@ export default function UploadSection({ onDataLoaded, onRefreshFromDb }: UploadS
           />
           <span className="flex items-center gap-1">
             <Database className="w-3.5 h-3.5 text-blue-600" />
-            Lưu trực tiếp vào Cơ sở dữ liệu SQLite Server-side
+            Lưu trực tiếp vào Cơ sở dữ liệu PostgreSQL Server-side
           </span>
         </label>
       </div>
