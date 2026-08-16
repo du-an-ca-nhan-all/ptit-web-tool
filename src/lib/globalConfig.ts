@@ -12,8 +12,27 @@ export interface TelegramBotConfigValue {
   lastTestError?: string | null;
 }
 
+export interface BackupTelegramConfigValue {
+  isEnabled: boolean;
+  chatId: string;
+  threadId?: string | null;
+  botToken?: string | null; // Nếu rỗng sẽ dùng System Bot
+  sendSqlite: boolean; // Mặc định true
+  sendJson: boolean; // Mặc định true
+  autoBackupEnabled?: boolean;
+  scheduleTime?: string; // Ví dụ: '02:00'
+  lastBackupSentAt?: string | null;
+  lastBackupStatus?: 'SUCCESS' | 'FAILED' | null;
+  lastBackupError?: string | null;
+  lastBackupFiles?: string[];
+  lastTestedAt?: string | null;
+  lastTestStatus?: 'SUCCESS' | 'FAILED' | null;
+  lastTestError?: string | null;
+}
+
 export const GLOBAL_CONFIG_KEYS = {
   TELEGRAM_BOT: 'telegram_bot',
+  BACKUP_TELEGRAM: 'backup_telegram',
 } as const;
 
 /**

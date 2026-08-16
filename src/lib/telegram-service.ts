@@ -170,6 +170,79 @@ export async function sendTelegramMessage(
 }
 
 /**
+ * Send a document/file via Telegram Bot API (sendDocument)
+ */
+export async function sendTelegramDocument(
+  botToken: string,
+  chatId: string,
+  fileBuffer: Buffer | Uint8Array,
+  filename: string,
+  options?: {
+    threadId?: string | number | null;
+    caption?: string;
+    parseMode?: 'HTML' | 'MarkdownV2' | 'Markdown';
+  }
+): Promise<TelegramSendResult> {
+  const token = botToken?.trim();
+  const chat = chatId?.trim();
+
+  if (!token) {
+    return { success: false, error: 'Thiếu Bot Token' };
+  }
+  if (!chat) {
+    return { success: false, error: 'Thiếu Chat ID' };
+  }
+  if (!fileBuffer || fileBuffer.length === 0) {
+    return { success: false, error: 'Dữ liệu file trống' };
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('chat_id', chat);
+    if (options?.caption) {
+      formData.append('caption', options.caption);
+      formData.append('parse_mode', options.parseMode || 'HTML');
+    }
+    if (options?.threadId) {
+      const threadNum = Number(options.threadId);
+      if (!isNaN(threadNum) && threadNum > 0) {
+        formData.append('message_thread_id', String(threadNum));
+      }
+    }
+
+    const blob = new Blob([fileBuffer]);
+    formData.append('document', blob, filename);
+
+    const url = `https://api.telegram.org/bot${token}/sendDocument`;
+    const res = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (res.ok && data.ok && data.result) {
+      return {
+        success: true,
+        messageId: data.result.message_id,
+        rawResponse: data.result,
+      };
+    }
+
+    return {
+      success: false,
+      errorCode: data.error_code,
+      error: formatTelegramError(data.description || 'Gửi file lên Telegram thất bại', data.error_code),
+      rawResponse: data,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: `Không thể gửi file đến Telegram: ${err.message || 'Lỗi mạng'}`,
+    };
+  }
+}
+
+/**
  * Send a formatted test notification to Telegram
  */
 export async function sendTestNotification(

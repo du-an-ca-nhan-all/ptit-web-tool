@@ -4,6 +4,7 @@ import {
   getDatabaseStats,
   createLocalBackup,
   getBackupsDirectory,
+  sendBackupToTelegram,
 } from '../src/lib/backupService';
 
 async function main() {
@@ -11,6 +12,9 @@ async function main() {
   console.log('       PTIT WEB TOOL - DATABASE BACKUP SCRIPT       ');
   console.log('====================================================');
   console.log(`[Backup] Time: ${new Date().toLocaleString('vi-VN')}`);
+
+  const args = process.argv.slice(2);
+  const shouldSendTelegram = args.includes('--telegram') || args.includes('--send-telegram');
 
   const startTime = Date.now();
 
@@ -31,10 +35,24 @@ async function main() {
 
     const createdFiles = await createLocalBackup('all');
 
-    console.log('\n[3/3] Backup completed successfully!');
+    console.log('\n[3/3] Local backup completed!');
     createdFiles.forEach((file) => {
       console.log(`  -> File created: ${file.name} (${file.sizeFormatted}) [${file.format.toUpperCase()}]`);
     });
+
+    if (shouldSendTelegram) {
+      console.log('\n[+] Sending backup files to Telegram...');
+      try {
+        const telRes = await sendBackupToTelegram();
+        if (telRes.success) {
+          console.log(`  -> [Telegram SUCCESS] Sent ${telRes.filesSent.length} files: ${telRes.filesSent.join(', ')}`);
+        } else {
+          console.warn(`  -> [Telegram FAILED] ${telRes.error || telRes.message}`);
+        }
+      } catch (telErr: any) {
+        console.error(`  -> [Telegram ERROR] ${telErr.message}`);
+      }
+    }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`\n====================================================`);

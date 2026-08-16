@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { prisma } from './prisma';
+import { sendTelegramDocument, sendTelegramMessage, getSystemTelegramBotConfig, verifyTelegramBot } from './telegram-service';
+import { getGlobalConfig, setGlobalConfig, BackupTelegramConfigValue, GLOBAL_CONFIG_KEYS } from './globalConfig';
 
 export interface TableStat {
   name: string;
@@ -132,7 +134,7 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
     { name: 'CourseRegistration', label: 'Đăng ký môn học', count: courseRegistrations, description: 'Dữ liệu kết quả ĐKMH kéo từ cổng QLDTTX' },
     { name: 'ExternalAccount', label: 'Tài khoản QLDTTX', count: externalAccounts, description: 'Cấu hình đồng bộ cổng ngoài và token' },
     { name: 'TelegramConfig', label: 'Cấu hình Telegram cá nhân', count: telegramConfigs, description: 'Thiết lập nhận thông báo bot Telegram theo SV' },
-    { name: 'GlobalConfig', label: 'Cấu hình toàn cục hệ thống', count: globalConfigs, description: 'Cấu hình chung hệ thống lưu dạng key-value JSON (Bot Telegram, v.v.)' },
+    { name: 'GlobalConfig', label: 'Cấu hình toàn cục hệ thống', count: globalConfigs, description: 'Cấu hình chung hệ thống lưu dạng key-value JSON (Bot Telegram, Backup Telegram, v.v.)' },
     { name: 'RegistrationRequest', label: 'Yêu cầu đăng ký', count: registrationRequests, description: 'Hồ sơ tài khoản chờ Admin xét duyệt' },
     { name: 'ActivityLog', label: 'Nhật ký hoạt động', count: activityLogs, description: 'Lịch sử thao tác người dùng và hệ thống' },
     { name: 'ExamReminderLog', label: 'Nhật ký nhắc lịch thi', count: examReminderLogs, description: 'Lịch sử gửi thông báo nhắc thi' },
@@ -351,4 +353,281 @@ export function deleteLocalBackup(filename: string): boolean {
     console.error(`[BackupService] Failed to delete backup file: ${filename}`, err);
     return false;
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TELEGRAM CLOUD BACKUP CAPABILITIES
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lấy cấu hình gửi backup lên Telegram
+ */
+export async function getBackupTelegramConfig(): Promise<{
+  config: BackupTelegramConfigValue | null;
+  systemBotInfo: { isConfigured: boolean; botUsername?: string | null; botFirstName?: string | null };
+}> {
+  const config = await getGlobalConfig<BackupTelegramConfigValue>(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM);
+  const sysBot = await getSystemTelegramBotConfig();
+
+  return {
+    config: config
+      ? {
+          ...config,
+          // Mask botToken if custom
+          botToken: config.botToken ? `${config.botToken.substring(0, 10)}...${config.botToken.slice(-5)}` : '',
+        }
+      : null,
+    systemBotInfo: {
+      isConfigured: !!(sysBot && sysBot.botToken),
+      botUsername: sysBot?.botUsername || null,
+      botFirstName: sysBot?.botFirstName || null,
+    },
+  };
+}
+
+/**
+ * Lưu cấu hình gửi backup lên Telegram
+ */
+export async function saveBackupTelegramConfig(params: {
+  chatId: string;
+  threadId?: string | null;
+  botToken?: string | null;
+  isEnabled?: boolean;
+  sendSqlite?: boolean;
+  sendJson?: boolean;
+  autoBackupEnabled?: boolean;
+  scheduleTime?: string;
+}): Promise<BackupTelegramConfigValue> {
+  const {
+    chatId,
+    threadId,
+    botToken,
+    isEnabled = true,
+    sendSqlite = true,
+    sendJson = true,
+    autoBackupEnabled = false,
+    scheduleTime = '02:00',
+  } = params;
+
+  if (!chatId || !chatId.trim()) {
+    throw new Error('Vui lòng nhập Chat ID nhận file backup');
+  }
+
+  // If custom token is provided, verify it
+  if (botToken && botToken.trim()) {
+    const verify = await verifyTelegramBot(botToken.trim());
+    if (!verify.success) {
+      throw new Error(verify.error || 'Token Bot riêng không hợp lệ');
+    }
+  }
+
+  const existing = await getGlobalConfig<BackupTelegramConfigValue>(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM);
+
+  const newConfig: BackupTelegramConfigValue = {
+    isEnabled: Boolean(isEnabled),
+    chatId: chatId.trim(),
+    threadId: threadId ? String(threadId).trim() : null,
+    botToken: botToken ? botToken.trim() : (existing?.botToken || null),
+    sendSqlite: Boolean(sendSqlite),
+    sendJson: Boolean(sendJson),
+    autoBackupEnabled: Boolean(autoBackupEnabled),
+    scheduleTime: scheduleTime || '02:00',
+    lastBackupSentAt: existing?.lastBackupSentAt || null,
+    lastBackupStatus: existing?.lastBackupStatus || null,
+    lastBackupError: existing?.lastBackupError || null,
+    lastBackupFiles: existing?.lastBackupFiles || [],
+    lastTestedAt: existing?.lastTestedAt || null,
+    lastTestStatus: existing?.lastTestStatus || null,
+    lastTestError: existing?.lastTestError || null,
+  };
+
+  await setGlobalConfig(
+    GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM,
+    newConfig,
+    'Cấu hình tự động gửi file backup cơ sở dữ liệu lên Telegram'
+  );
+
+  return newConfig;
+}
+
+/**
+ * Kiểm tra kết nối / gửi thông điệp test đến đích Telegram
+ */
+export async function testBackupTelegramTarget(params?: {
+  chatId?: string;
+  threadId?: string | null;
+  botToken?: string | null;
+}): Promise<{ success: boolean; message?: string; error?: string }> {
+  let chatId = params?.chatId?.trim();
+  let threadId = params?.threadId !== undefined ? (params.threadId ? String(params.threadId).trim() : null) : undefined;
+  let botToken = params?.botToken?.trim();
+
+  if (!chatId || !botToken) {
+    const stored = await getGlobalConfig<BackupTelegramConfigValue>(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM);
+    if (stored) {
+      if (!chatId) chatId = stored.chatId;
+      if (threadId === undefined) threadId = stored.threadId || null;
+      if (!botToken && stored.botToken) botToken = stored.botToken;
+    }
+  }
+
+  if (!botToken) {
+    const sysBot = await getSystemTelegramBotConfig();
+    if (!sysBot || !sysBot.botToken) {
+      return { success: false, error: 'Chưa có Bot Token (Bot hệ thống hoặc Bot riêng)' };
+    }
+    botToken = sysBot.botToken;
+  }
+
+  if (!chatId) {
+    return { success: false, error: 'Vui lòng nhập Chat ID Telegram nhận file backup' };
+  }
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('vi-VN') + ' ' + now.toLocaleDateString('vi-VN');
+  const message = `🔔 <b>KIỂM TRA KẾT NỐI SAO LƯU TELEGRAM</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n✅ <b>Trạng thái:</b> Kết nối thành công!\n📌 <b>Kênh/Nhóm/Chat:</b> <code>${chatId}</code>${threadId ? ` (Topic: <code>${threadId}</code>)` : ''}\n⏰ <b>Thời gian test:</b> <i>${timeStr}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <i>Sẵn sàng nhận các file sao lưu cơ sở dữ liệu (.sqlite / .json) từ PTIT Exam Portal.</i>`;
+
+  const sendRes = await sendTelegramMessage(botToken, chatId, message, {
+    threadId: threadId ? Number(threadId) : undefined,
+  });
+
+  // Update test status in global config
+  const existing = await getGlobalConfig<BackupTelegramConfigValue>(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM);
+  if (existing) {
+    await setGlobalConfig(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM, {
+      ...existing,
+      lastTestedAt: now.toISOString(),
+      lastTestStatus: sendRes.success ? 'SUCCESS' : 'FAILED',
+      lastTestError: sendRes.success ? null : (sendRes.error || 'Lỗi gửi tin nhắn test'),
+    });
+  }
+
+  if (sendRes.success) {
+    return { success: true, message: 'Đã gửi tin nhắn kiểm tra thành công lên Telegram!' };
+  } else {
+    return { success: false, error: sendRes.error || 'Không thể gửi tin nhắn kiểm tra đến Telegram' };
+  }
+}
+
+/**
+ * Thực hiện backup và gửi file trực tiếp lên Telegram
+ */
+export async function sendBackupToTelegram(params?: {
+  format?: 'sqlite' | 'json' | 'all';
+  customChatId?: string;
+  customThreadId?: string | null;
+  customBotToken?: string | null;
+}): Promise<{
+  success: boolean;
+  message: string;
+  filesSent: string[];
+  results: any[];
+  error?: string;
+}> {
+  const storedConfig = await getGlobalConfig<BackupTelegramConfigValue>(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM);
+
+  const chatId = params?.customChatId?.trim() || storedConfig?.chatId;
+  const threadId = params?.customThreadId !== undefined ? params.customThreadId : storedConfig?.threadId;
+  let botToken = params?.customBotToken?.trim() || storedConfig?.botToken;
+
+  if (!chatId) {
+    throw new Error('Chưa cấu hình Chat ID Telegram để gửi file backup. Vui lòng thiết lập trong phần cấu hình.');
+  }
+
+  if (!botToken) {
+    const sysBot = await getSystemTelegramBotConfig();
+    if (!sysBot || !sysBot.botToken) {
+      throw new Error('Chưa có Bot Telegram. Vui lòng thiết lập Bot Hệ Thống hoặc cấu hình Bot Token riêng.');
+    }
+    botToken = sysBot.botToken;
+  }
+
+  const format =
+    params?.format ||
+    (storedConfig
+      ? storedConfig.sendSqlite && storedConfig.sendJson
+        ? 'all'
+        : storedConfig.sendSqlite
+        ? 'sqlite'
+        : 'json'
+      : 'all');
+
+  const stats = await getDatabaseStats();
+  const timestamp = generateTimestampString();
+  const timeDisplay = new Date().toLocaleTimeString('vi-VN') + ' - ' + new Date().toLocaleDateString('vi-VN');
+
+  const filesSent: string[] = [];
+  const results: any[] = [];
+  const errors: string[] = [];
+
+  // 1. Send SQLite DB
+  if (format === 'sqlite' || format === 'all') {
+    const dbPath = getDatabaseFilePath();
+    if (fs.existsSync(dbPath)) {
+      const sqliteBuffer = fs.readFileSync(dbPath);
+      const filename = `ptit-db-${timestamp}.sqlite`;
+      const sizeFormatted = formatBytes(sqliteBuffer.length);
+
+      const caption = `💾 <b>BẢN SAO LƯU DATABASE SQLITE (.sqlite)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n👥 <b>Sinh viên:</b> ${stats.tables.students.toLocaleString('vi-VN')} | <b>Lịch thi:</b> ${stats.tables.examRecords.toLocaleString('vi-VN')}\n📁 <b>Tài khoản:</b> ${stats.tables.users.toLocaleString('vi-VN')} | <b>Đợt thi:</b> ${stats.tables.examBatches}\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <i>File nhị phân nguyên gốc dev.db - Khôi phục tức thì hoặc phân tích bằng SQLite Browser / Studio.</i>`;
+
+      const sendRes = await sendTelegramDocument(botToken, chatId, sqliteBuffer, filename, {
+        threadId: threadId ? Number(threadId) : undefined,
+        caption,
+      });
+
+      results.push({ file: filename, format: 'sqlite', result: sendRes });
+      if (sendRes.success) {
+        filesSent.push(filename);
+      } else {
+        errors.push(`Lỗi gửi file SQLite: ${sendRes.error}`);
+      }
+    }
+  }
+
+  // 2. Send JSON Dump
+  if (format === 'json' || format === 'all') {
+    const jsonDump = await exportDatabaseAsJson();
+    const jsonStr = JSON.stringify(jsonDump, null, 2);
+    const jsonBuffer = Buffer.from(jsonStr, 'utf-8');
+    const filename = `ptit-db-${timestamp}.json`;
+    const sizeFormatted = formatBytes(jsonBuffer.length);
+
+    const caption = `📄 <b>BẢN XUẤT DỮ LIỆU JSON ĐẦY ĐỦ (.json)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n📋 <b>Bao gồm:</b> 14 bảng dữ liệu hệ thống kèm metadata\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🌐 <i>Dữ liệu JSON có cấu trúc đầy đủ, dễ đọc & di chuyển sang mọi hệ quản trị CSDL.</i>`;
+
+    const sendRes = await sendTelegramDocument(botToken, chatId, jsonBuffer, filename, {
+      threadId: threadId ? Number(threadId) : undefined,
+      caption,
+    });
+
+    results.push({ file: filename, format: 'json', result: sendRes });
+    if (sendRes.success) {
+      filesSent.push(filename);
+    } else {
+      errors.push(`Lỗi gửi file JSON: ${sendRes.error}`);
+    }
+  }
+
+  const isSuccess = filesSent.length > 0;
+  const errorMsg = errors.join('; ');
+
+  // Update last sent status in GlobalConfig
+  if (storedConfig) {
+    await setGlobalConfig(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM, {
+      ...storedConfig,
+      lastBackupSentAt: new Date().toISOString(),
+      lastBackupStatus: isSuccess ? 'SUCCESS' : 'FAILED',
+      lastBackupError: errorMsg || null,
+      lastBackupFiles: filesSent,
+    });
+  }
+
+  return {
+    success: isSuccess,
+    message: isSuccess
+      ? `Đã gửi thành công ${filesSent.length} file sao lưu lên Telegram!`
+      : `Gửi file sao lưu lên Telegram thất bại: ${errorMsg}`,
+    filesSent,
+    results,
+    error: errorMsg || undefined,
+  };
 }

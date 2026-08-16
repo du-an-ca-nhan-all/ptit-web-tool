@@ -12,6 +12,10 @@ import {
   deleteLocalBackup,
   getDatabaseFilePath,
   generateTimestampString,
+  getBackupTelegramConfig,
+  saveBackupTelegramConfig,
+  testBackupTelegramTarget,
+  sendBackupToTelegram,
 } from '@/src/lib/backupService';
 
 async function getAuthUser(req: NextRequest) {
@@ -30,7 +34,7 @@ async function getAuthUser(req: NextRequest) {
 // - ?download=true&format=sqlite (Stream live dev.db as SQLite file)
 // - ?download=true&format=json (Stream live full JSON dump)
 // - ?download=true&file=xyz.sqlite (Download existing saved backup file)
-// - No download param: return stats and local backup files list
+// - No download param: return stats, local backup files list, and Telegram backup configuration
 export async function GET(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -151,14 +155,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Định dạng tải về không hợp lệ (hỗ trợ sqlite hoặc json)' }, { status: 400 });
     }
 
-    // Default: Return stats and backups list
-    const stats = await getDatabaseStats();
-    const localBackups = listLocalBackups();
+    // Default: Return stats, backups list, and telegram backup config
+    const [stats, localBackups, telegramBackup] = await Promise.all([
+      getDatabaseStats(),
+      Promise.resolve(listLocalBackups()),
+      getBackupTelegramConfig(),
+    ]);
 
     return NextResponse.json({
       success: true,
       stats,
       localBackups,
+      telegramConfig: telegramBackup.config,
+      systemBotInfo: telegramBackup.systemBotInfo,
       serverTime: new Date().toISOString(),
     });
   } catch (error: any) {
@@ -168,12 +177,16 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/backup
-// Create a new snapshot stored in the backups/ folder on server
+// Handles:
+// - action: 'CREATE_SNAPSHOT' (or default): Create server snapshot file(s)
+// - action: 'SEND_TELEGRAM': Send live backup files directly to Telegram
+// - action: 'SAVE_TELEGRAM_CONFIG': Save backup telegram settings into GlobalConfig
+// - action: 'TEST_TELEGRAM_TARGET': Test ping destination Telegram chat/thread
 export async function POST(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
     if (!authUser) {
-      return NextResponse.json({ error: 'Vui lòng đăng nhập để tạo bản sao lưu' }, { status: 401 });
+      return NextResponse.json({ error: 'Vui lòng đăng nhập để thực hiện thao tác' }, { status: 401 });
     }
 
     const isAdmin = checkIsAdmin(authUser.role);
@@ -182,8 +195,108 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const format = (body.format || 'all') as 'sqlite' | 'json' | 'all';
+    const action = (body.action || 'CREATE_SNAPSHOT').toUpperCase();
 
+    // 1. SAVE TELEGRAM BACKUP CONFIGURATION
+    if (action === 'SAVE_TELEGRAM_CONFIG') {
+      const { chatId, threadId, botToken, isEnabled, sendSqlite, sendJson, autoBackupEnabled, scheduleTime } = body;
+
+      const saved = await saveBackupTelegramConfig({
+        chatId,
+        threadId,
+        botToken,
+        isEnabled,
+        sendSqlite,
+        sendJson,
+        autoBackupEnabled,
+        scheduleTime,
+      });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'SAVE_BACKUP_TELEGRAM_CONFIG',
+        targetType: 'GLOBAL_CONFIG',
+        targetId: 'backup_telegram',
+        description: `Cập nhật cấu hình gửi backup lên Telegram: Chat ID ${chatId}${threadId ? ` (Topic ${threadId})` : ''}`,
+        metadata: { chatId, threadId, isEnabled, sendSqlite, sendJson },
+      });
+
+      const telegramBackup = await getBackupTelegramConfig();
+      return NextResponse.json({
+        success: true,
+        message: 'Đã lưu cấu hình gửi sao lưu lên Telegram thành công!',
+        telegramConfig: telegramBackup.config,
+      });
+    }
+
+    // 2. TEST TELEGRAM TARGET CONNECTION
+    if (action === 'TEST_TELEGRAM_TARGET') {
+      const { chatId, threadId, botToken } = body;
+      const testRes = await testBackupTelegramTarget({ chatId, threadId, botToken });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'TEST_BACKUP_TELEGRAM',
+        targetType: 'TELEGRAM',
+        targetId: chatId || 'saved_target',
+        description: `Kiểm tra gửi test Telegram sao lưu: ${testRes.success ? 'Thành công' : 'Thất bại'}`,
+        metadata: { success: testRes.success, error: testRes.error },
+      });
+
+      if (testRes.success) {
+        return NextResponse.json({ success: true, message: testRes.message });
+      } else {
+        return NextResponse.json({ error: testRes.error }, { status: 400 });
+      }
+    }
+
+    // 3. SEND BACKUP DIRECTLY TO TELEGRAM
+    if (action === 'SEND_TELEGRAM') {
+      const { format, customChatId, customThreadId, customBotToken } = body;
+
+      const sendRes = await sendBackupToTelegram({
+        format,
+        customChatId,
+        customThreadId,
+        customBotToken,
+      });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'SEND_BACKUP_TELEGRAM',
+        targetType: 'DATABASE',
+        targetId: sendRes.filesSent.join(', '),
+        description: `Gửi bản sao lưu lên Telegram: ${sendRes.filesSent.join(', ')} (${sendRes.success ? 'Thành công' : 'Thất bại'})`,
+        metadata: { filesSent: sendRes.filesSent, success: sendRes.success, error: sendRes.error },
+      });
+
+      const telegramBackup = await getBackupTelegramConfig();
+      if (sendRes.success) {
+        return NextResponse.json({
+          success: true,
+          message: sendRes.message,
+          filesSent: sendRes.filesSent,
+          telegramConfig: telegramBackup.config,
+        });
+      } else {
+        return NextResponse.json(
+          { error: sendRes.error || 'Gửi file sao lưu lên Telegram thất bại', telegramConfig: telegramBackup.config },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 4. CREATE SERVER SNAPSHOT (Default)
+    const format = (body.format || 'all') as 'sqlite' | 'json' | 'all';
     const createdFiles = await createLocalBackup(format);
 
     await logActivity({
@@ -210,7 +323,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[API /api/backup POST error]:', error);
-    return NextResponse.json({ error: error.message || 'Không thể tạo bản sao lưu' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Lỗi xử lý yêu cầu sao lưu' }, { status: 500 });
   }
 }
 
