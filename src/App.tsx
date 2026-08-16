@@ -14,7 +14,7 @@ import ExamRoomMembers from './components/ExamRoomMembers';
 import MonitorsList from './components/MonitorsList';
 import CourseCompare from './components/CourseCompare';
 import SettlementManager from './components/SettlementManager';
-import { ExamRecord, LoginUser, ExamSession } from './types';
+import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from './types';
 import { buildSessions } from './utils/dataModel';
 
 const getInitialState = () => {
@@ -71,7 +71,7 @@ export default function App() {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const isMonitor = currentUser?.role === 'lop_truong';
+  const isMonitor = Boolean(isUserMonitor(currentUser) || currentUser?.isAdmin || currentUser?.role === 'admin');
 
   const [courseCompareData, setCourseCompareData] = useState<{main: any, subAccount: any, allSubAccounts?: any[]} | null>(null);
   const [showCourseCompare, setShowCourseCompare] = useState(false);

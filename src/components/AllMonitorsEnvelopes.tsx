@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ExamRecord, LoginUser, ExamSession } from '../types';
+import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from '../types';
 import { Mail, Search, MapPin, DollarSign } from 'lucide-react';
 import { calculateRoomPrice, formatCurrency } from '../config/pricingConfig';
 
@@ -13,7 +13,13 @@ export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [] }:
   const [searchTerm, setSearchTerm] = useState('');
 
   const monitorClasses = useMemo<Set<string>>(() => {
-    return new Set(loginUsers.filter(u => u.role === 'lop_truong' && u.lop).map(u => u.lop as string));
+    const set = new Set<string>();
+    loginUsers.forEach((u) => {
+      if (isUserMonitor(u) && u.lop && u.lop.trim()) {
+        set.add(u.lop.trim());
+      }
+    });
+    return set;
   }, [loginUsers]);
 
   // Compute responsible classes for each session
@@ -156,7 +162,13 @@ export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [] }:
                       <div className="flex flex-col gap-2">
                         {session.responsibleClasses.map(cls => {
                           const isMonitorClass = monitorClasses.has(cls);
-                          const user = loginUsers.find(u => u.lop === cls);
+                          const cleanCls = cls.trim().toUpperCase();
+                          const monitorUser = loginUsers.find(
+                            (u) =>
+                              isUserMonitor(u) &&
+                              u.lop &&
+                              u.lop.trim().toUpperCase() === cleanCls
+                          );
                           
                           if (isMonitorClass) {
                             return (
@@ -165,9 +177,9 @@ export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [] }:
                                   <Mail className="w-3.5 h-3.5" />
                                   <span>{cls}</span>
                                 </div>
-                                {user && (
+                                {monitorUser && (
                                   <span className="text-xs text-emerald-600 font-medium opacity-90 pl-5">
-                                    {user.fullName}
+                                    LT: {monitorUser.fullName || monitorUser.username}
                                   </span>
                                 )}
                               </div>

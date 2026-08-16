@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { ExamRecord, LoginUser, ExamSession } from '../types';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from '../types';
 import { DollarSign, ChevronDown, ChevronUp, FileText, ArrowDownLeft, ArrowUpRight, CheckCircle2, User, X, Mail, Users, Search } from 'lucide-react';
 import { calculateRoomPrice, formatCurrency } from '../config/pricingConfig';
 
@@ -90,15 +90,59 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
     });
   }, [currentRoomRecords, studentClassFilter, studentSearchQuery]);
 
-  const getMonitorName = (cls: string) => {
-    return loginUsers.find(u => u.lop === cls)?.fullName || 'Chưa cập nhật';
-  };
-
-  const monitorClasses = useMemo<Set<string>>(() => {
-    return new Set(loginUsers.filter(u => u.role === 'lop_truong' && u.lop).map(u => u.lop as string));
+  const getMonitorUser = useCallback((cls: string): LoginUser | null => {
+    if (!cls) return null;
+    const cleanCls = cls.trim().toUpperCase();
+    return (
+      loginUsers.find(
+        (u) =>
+          isUserMonitor(u) &&
+          u.lop &&
+          u.lop.trim().toUpperCase() === cleanCls
+      ) || null
+    );
   }, [loginUsers]);
 
-  const monitorClassList: string[] = (Array.from(monitorClasses) as string[]).sort();
+  const getMonitorName = useCallback((cls: string): string => {
+    const mon = getMonitorUser(cls);
+    if (mon) {
+      return mon.fullName || mon.username;
+    }
+    return 'Chưa cập nhật';
+  }, [getMonitorUser]);
+
+  const monitorClasses = useMemo<Set<string>>(() => {
+    const set = new Set<string>();
+    loginUsers.forEach((u) => {
+      if (isUserMonitor(u) && u.lop && u.lop.trim()) {
+        set.add(u.lop.trim());
+      }
+    });
+    return set;
+  }, [loginUsers]);
+
+  const monitorClassList: string[] = useMemo(() => {
+    return Array.from(monitorClasses).sort((a, b) => a.localeCompare(b));
+  }, [monitorClasses]);
+
+  const availableClasses = useMemo(() => {
+    const monClasses = Array.from(monitorClasses).sort((a, b) => a.localeCompare(b));
+    const recordClassesSet = new Set<string>();
+    records.forEach((r) => {
+      if (r.MaLop && r.MaLop.trim()) {
+        const cls = r.MaLop.trim();
+        if (!monitorClasses.has(cls)) {
+          recordClassesSet.add(cls);
+        }
+      }
+    });
+    const otherClasses = Array.from(recordClassesSet).sort((a, b) => a.localeCompare(b));
+    return {
+      monClasses,
+      otherClasses,
+      allClasses: [...monClasses, ...otherClasses],
+    };
+  }, [monitorClasses, records]);
 
   // Helpers for exclusion
   const isStudentExcluded = (sessionId: string, r: ExamRecord) => {
@@ -142,20 +186,28 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
   };
 
   useEffect(() => {
-    if (monitorClassList.length > 0 && !selectedClass) {
+    if (!selectedClass) {
       try {
         const saved = localStorage.getItem('currentUser');
         if (saved) {
           const user = JSON.parse(saved);
-          if (user?.lop && monitorClasses.has(user.lop)) {
-            setSelectedClass(user.lop);
-            return;
+          if (user?.lop) {
+            const userLop = user.lop.trim();
+            if (availableClasses.allClasses.includes(userLop)) {
+              setSelectedClass(userLop);
+              return;
+            }
           }
         }
       } catch (e) {}
-      setSelectedClass(monitorClassList[0]);
+
+      if (availableClasses.monClasses.length > 0) {
+        setSelectedClass(availableClasses.monClasses[0]);
+      } else if (availableClasses.otherClasses.length > 0) {
+        setSelectedClass(availableClasses.otherClasses[0]);
+      }
     }
-  }, [monitorClassList, selectedClass, monitorClasses]);
+  }, [availableClasses, selectedClass]);
 
   const data = useMemo(() => {
     if (!selectedClass || sessions.length === 0) {
@@ -342,7 +394,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-slate-800 text-lg">{p.partnerClass}</span>
-              <span className="text-sm text-slate-500 font-medium">{p.partnerMonitor}</span>
+              <span className="text-sm text-slate-500 font-medium">LT: {p.partnerMonitor}</span>
             </div>
           </div>
           
@@ -462,11 +514,26 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
           <select
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 cursor-pointer"
           >
-            {monitorClassList.map(c => (
-              <option key={c} value={c}>{c} ({getMonitorName(c)})</option>
-            ))}
+            {availableClasses.monClasses.length > 0 && (
+              <optgroup label="Lớp có Lớp Trưởng">
+                {availableClasses.monClasses.map((c) => (
+                  <option key={c} value={c}>
+                    {c} (LT: {getMonitorName(c)})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {availableClasses.otherClasses.length > 0 && (
+              <optgroup label="Lớp chưa có Lớp Trưởng">
+                {availableClasses.otherClasses.map((c) => (
+                  <option key={c} value={c}>
+                    {c} (Chưa có LT)
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </div>
       </div>
@@ -660,11 +727,12 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {selectedDetail.session.classCounts.map((c: any, i: number) => {
-                        const hasMonitor = monitorClassList.includes(c.className);
+                        const hasMonitor = monitorClasses.has(c.className);
                         const isResponsible = c.className === selectedDetail.toClass;
                         const isPaying = c.className === selectedDetail.fromClass;
                         const effectiveCount = effectiveClassCountsForModal.get(c.className) ?? 0;
                         const excludedInClass = c.count - effectiveCount;
+                        const monName = getMonitorName(c.className);
 
                         return (
                           <tr key={i} className={isResponsible ? 'bg-emerald-50/70' : isPaying ? 'bg-rose-50/70' : 'bg-white'}>
@@ -684,9 +752,14 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                             </td>
                             <td className="px-4 py-3">
                               {hasMonitor ? (
-                                <span className="text-blue-600 text-xs font-semibold flex items-center gap-1">
-                                  <CheckCircle2 className="w-3.5 h-3.5" /> Có tham gia chia
-                                </span>
+                                <div className="flex flex-col">
+                                  <span className="text-emerald-700 text-xs font-bold flex items-center gap-1">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Có tham gia chia
+                                  </span>
+                                  <span className="text-slate-500 text-[11px] font-medium">
+                                    LT: <strong className="text-slate-700 font-bold">{monName}</strong>
+                                  </span>
+                                </div>
                               ) : (
                                 <span className="text-slate-400 text-xs italic">Không có LT / Miễn chia</span>
                               )}
@@ -694,7 +767,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                             <td className="px-4 py-3 text-right">
                               <button
                                 onClick={() => handleOpenStudentListForClass(c.className)}
-                                className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-white hover:bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md inline-flex items-center gap-1 transition-colors shadow-sm"
+                                className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-white hover:bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md inline-flex items-center gap-1 transition-colors shadow-sm cursor-pointer"
                               >
                                 <Users className="w-3 h-3" /> Xem {c.count} SV
                               </button>

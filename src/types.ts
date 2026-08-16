@@ -57,6 +57,32 @@ export interface LoginUser {
   student?: any;
 }
 
+export function isUserMonitor(user?: LoginUser | null): boolean {
+  if (!user) return false;
+  if (user.isMonitor) return true;
+  if (typeof user.role === 'string') {
+    const roles = user.role.split(',').map((r) => r.trim().toLowerCase());
+    if (roles.includes('lop_truong')) return true;
+  }
+  if (Array.isArray(user.roles)) {
+    if (user.roles.map((r) => String(r).trim().toLowerCase()).includes('lop_truong')) return true;
+  }
+  return false;
+}
+
+export function isUserAdmin(user?: LoginUser | null): boolean {
+  if (!user) return false;
+  if (user.isAdmin) return true;
+  if (typeof user.role === 'string') {
+    const roles = user.role.split(',').map((r) => r.trim().toLowerCase());
+    if (roles.includes('admin')) return true;
+  }
+  if (Array.isArray(user.roles)) {
+    if (user.roles.map((r) => String(r).trim().toLowerCase()).includes('admin')) return true;
+  }
+  return false;
+}
+
 export interface StudentProfile {
   id?: number;
   maSV: string;

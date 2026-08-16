@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { ExamRecord, LoginUser, ExamSession } from '../types';
+import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from '../types';
 import { Mail, MapPin, Users, Info, Calculator, X, DollarSign, Download } from 'lucide-react';
 import { calculateRoomPrice, formatCurrency } from '../config/pricingConfig';
 
@@ -150,7 +150,13 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
   const totalExpectedMoney = filteredEnvelopes.filter(s => s.isResponsible).reduce((acc, s) => acc + calculateRoomPrice(s.subject, s.subjectCode, s.room, s.examFormat), 0);
 
   const monitorClasses = useMemo(() => {
-    return new Set(loginUsers.filter(u => u.role === 'lop_truong' && u.lop).map(u => u.lop as string));
+    const set = new Set<string>();
+    loginUsers.forEach((u) => {
+      if (isUserMonitor(u) && u.lop && u.lop.trim()) {
+        set.add(u.lop.trim());
+      }
+    });
+    return set;
   }, [loginUsers]);
 
   
