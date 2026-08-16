@@ -178,68 +178,7 @@ export async function dispatchExamPostponed(params: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. EVENT: COURSE REGISTRATION & TUITION SYNCED (ĐKMH & Học Phí)
-// ─────────────────────────────────────────────────────────────────────────────
-export async function dispatchCourseRegistrationSynced(params: {
-  username: string;
-  courseList?: any[];
-  tuitionFee?: number;
-  totalCredits?: number;
-  semesterName?: string;
-}) {
-  try {
-    const { username, courseList = [], tuitionFee = 0, totalCredits = 0, semesterName } = params;
-
-    const sub = await prisma.telegramConfig.findUnique({
-      where: { username },
-      include: {
-        user: {
-          include: {
-            student: true,
-          },
-        },
-      },
-    });
-
-    if (!sub || !sub.isEnabled || !sub.notifyCourseRegistration) return { sent: false };
-
-    let effectiveToken: string;
-    try {
-      const resolved = await resolveEffectiveBotToken(sub.botToken);
-      effectiveToken = resolved.token;
-    } catch {
-      return { sent: false };
-    }
-
-    const studentName = sub.user?.student?.hoTen || sub.username;
-    const classCode = sub.user?.student?.maLop || 'Chưa cập nhật';
-    const formattedTuition = tuitionFee > 0 ? `${tuitionFee.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ (hoặc đã hoàn thành)';
-
-    let courseListHtml = '';
-    courseList.slice(0, 10).forEach((c, idx) => {
-      const name = c.tenMH || c.subjectName || c.name || 'Môn học';
-      const credits = c.soTinChi || c.credits || '';
-      courseListHtml += `\n${idx + 1}. <b>${name}</b> ${credits ? `(<code>${credits} TC</code>)` : ''}`;
-    });
-    if (courseList.length > 10) {
-      courseListHtml += `\n... và ${courseList.length - 10} môn học khác.`;
-    }
-
-    const messageHtml = `📚 <b>KẾT QUẢ ĐĂNG KÝ MÔN HỌC & HỌC PHÍ</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${username}</code>)\n🏫 Lớp: <b>${classCode}</b>\n🏷️ Học kỳ: <b>${semesterName || 'Học kỳ hiện tại'}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 Tổng số tín chỉ: <b>${totalCredits} TC</b> (${courseList.length} môn)\n💰 Tổng học phí tạm tính: <b>${formattedTuition}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 <b>DANH SÁCH MÔN HỌC:</b>${courseListHtml || '\n(Không có môn học)'}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Đồng bộ lúc: ${new Date().toLocaleTimeString('vi-VN')} - ${new Date().toLocaleDateString('vi-VN')}</i>`;
-
-    const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
-      threadId: sub.threadId ? Number(sub.threadId) : undefined,
-    });
-
-    return { sent: sendRes.success };
-  } catch (err) {
-    console.error('dispatchCourseRegistrationSynced error:', err);
-    return { error: err };
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 4. EVENT: CLASS ACTIVITY / ENVELOPE / SETTLEMENT (Biến Động Lớp Học)
+// 3. EVENT: CLASS ACTIVITY / ENVELOPE / SETTLEMENT (Biến Động Lớp Học)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function dispatchClassActivityAnnouncement(params: {
   classCode: string;

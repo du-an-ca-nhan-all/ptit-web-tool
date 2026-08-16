@@ -53,7 +53,6 @@ interface SubscriberItem {
   threadId?: string | null;
   isEnabled: boolean;
   notifyExamSchedule: boolean;
-  notifyCourseRegistration: boolean;
   notifyClassActivity: boolean;
   notifyQldtAnnouncements?: boolean;
   qldtCheckInterval?: number;
@@ -956,11 +955,6 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
                           {sub.notifyExamSchedule && (
                             <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[10px] font-bold">
                               Lịch Thi
-                            </span>
-                          )}
-                          {sub.notifyCourseRegistration && (
-                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold">
-                              ĐKMH
                             </span>
                           )}
                           {sub.notifyClassActivity && (

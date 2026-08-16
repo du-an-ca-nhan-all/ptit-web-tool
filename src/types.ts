@@ -125,7 +125,6 @@ export interface TelegramConfigItem {
   threadId?: string | null;
   isEnabled: boolean;
   notifyExamSchedule: boolean;
-  notifyCourseRegistration: boolean;
   notifyClassActivity: boolean;
   notifyQldtAnnouncements?: boolean;
   qldtCheckInterval?: number;

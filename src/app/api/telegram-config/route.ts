@@ -81,7 +81,6 @@ export async function GET(req: NextRequest) {
           threadId: cfg.threadId,
           isEnabled: cfg.isEnabled,
           notifyExamSchedule: cfg.notifyExamSchedule,
-          notifyCourseRegistration: cfg.notifyCourseRegistration,
           notifyClassActivity: cfg.notifyClassActivity,
           notifyQldtAnnouncements: cfg.notifyQldtAnnouncements,
           qldtCheckInterval: cfg.qldtCheckInterval,
@@ -143,7 +142,6 @@ export async function GET(req: NextRequest) {
             threadId: config.threadId,
             isEnabled: config.isEnabled,
             notifyExamSchedule: config.notifyExamSchedule,
-            notifyCourseRegistration: config.notifyCourseRegistration,
             notifyClassActivity: config.notifyClassActivity,
             notifyQldtAnnouncements: config.notifyQldtAnnouncements,
             qldtCheckInterval: config.qldtCheckInterval,
@@ -425,7 +423,6 @@ export async function POST(req: NextRequest) {
       const threadId = body.threadId ? String(body.threadId).trim() : null;
       const isEnabled = body.isEnabled !== undefined ? Boolean(body.isEnabled) : true;
       const notifyExamSchedule = body.notifyExamSchedule !== undefined ? Boolean(body.notifyExamSchedule) : true;
-      const notifyCourseRegistration = body.notifyCourseRegistration !== undefined ? Boolean(body.notifyCourseRegistration) : true;
       const notifyClassActivity = body.notifyClassActivity !== undefined ? Boolean(body.notifyClassActivity) : true;
       const notifyQldtAnnouncements = body.notifyQldtAnnouncements !== undefined ? Boolean(body.notifyQldtAnnouncements) : true;
       const qldtCheckInterval = [1, 2, 5].includes(Number(body.qldtCheckInterval)) ? Number(body.qldtCheckInterval) : 2;
@@ -468,7 +465,6 @@ export async function POST(req: NextRequest) {
           threadId,
           isEnabled,
           notifyExamSchedule,
-          notifyCourseRegistration,
           notifyClassActivity,
           notifyQldtAnnouncements,
           qldtCheckInterval,
@@ -483,7 +479,6 @@ export async function POST(req: NextRequest) {
           threadId,
           isEnabled,
           notifyExamSchedule,
-          notifyCourseRegistration,
           notifyClassActivity,
           notifyQldtAnnouncements,
           qldtCheckInterval,

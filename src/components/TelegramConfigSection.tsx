@@ -64,7 +64,6 @@ export default function TelegramConfigSection({
   const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
   const [isEnabled, setIsEnabled] = useState(true);
   const [notifyExamSchedule, setNotifyExamSchedule] = useState(true);
-  const [notifyCourseRegistration, setNotifyCourseRegistration] = useState(true);
   const [notifyClassActivity, setNotifyClassActivity] = useState(true);
   const [notifyQldtAnnouncements, setNotifyQldtAnnouncements] = useState(true);
   const [qldtCheckInterval, setQldtCheckInterval] = useState<number>(2);
@@ -131,7 +130,6 @@ export default function TelegramConfigSection({
           setThreadId(data.config.threadId || '');
           setIsEnabled(data.config.isEnabled ?? true);
           setNotifyExamSchedule(data.config.notifyExamSchedule ?? true);
-          setNotifyCourseRegistration(data.config.notifyCourseRegistration ?? true);
           setNotifyClassActivity(data.config.notifyClassActivity ?? true);
           setNotifyQldtAnnouncements(data.config.notifyQldtAnnouncements ?? true);
           setQldtCheckInterval(data.config.qldtCheckInterval ?? 2);
@@ -226,7 +224,6 @@ export default function TelegramConfigSection({
           threadId: threadId.trim() || null,
           isEnabled,
           notifyExamSchedule,
-          notifyCourseRegistration,
           notifyClassActivity,
           notifyQldtAnnouncements,
           qldtCheckInterval,
@@ -1046,21 +1043,7 @@ export default function TelegramConfigSection({
                 </div>
               </label>
 
-              {/* Option 3: Course Registration */}
-              <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={notifyCourseRegistration}
-                  onChange={(e) => setNotifyCourseRegistration(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0"
-                />
-                <div className="text-xs">
-                  <div className="font-bold text-slate-800">ĐKMH & Học Phí</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Tổng kết tín chỉ và học phí tạm tính</div>
-                </div>
-              </label>
-
-              {/* Option 4: Class Activity */}
+              {/* Option 3: Class Activity */}
               <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
                 <input
                   type="checkbox"
