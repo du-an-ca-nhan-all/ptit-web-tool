@@ -25,11 +25,28 @@ export function useHomeState() {
   const [activeTab, setActiveTab] = useState<NavigationTab>(initialState.tab);
 
   const [isMounted, setIsMounted] = useState(false);
-  const [currentUser, setCurrentUser] = useState<LoginUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<LoginUser | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('currentUser');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
-  const [monitorClass, setMonitorClass] = useState<string>(
-    initialState.monitorClass || ''
-  );
+  const [monitorClass, setMonitorClass] = useState<string>(() => {
+    if (initialState.monitorClass) return initialState.monitorClass;
+    if (typeof window === 'undefined') return '';
+    try {
+      const saved = localStorage.getItem('currentUser');
+      if (saved) {
+        const u = JSON.parse(saved);
+        return u.lop || '';
+      }
+    } catch {}
+    return '';
+  });
   const [filters, setFilters] = useState<FilterState>({
     search: initialState.search,
     classCode: initialState.classCode,
@@ -78,7 +95,23 @@ export function useHomeState() {
     return Array.from(set);
   }, [currentUser]);
 
-  const [activeRole, setActiveRole] = useState<string>('admin');
+  const [activeRole, setActiveRole] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'sinh_vien';
+    try {
+      const savedUserStr = localStorage.getItem('currentUser');
+      if (savedUserStr) {
+        const u = JSON.parse(savedUserStr);
+        if (u?.username) {
+          const savedRole = localStorage.getItem('active_role_' + u.username);
+          if (savedRole) return savedRole;
+          const rawRole = u.role || '';
+          if (rawRole.includes('admin') || u.isAdmin) return 'admin';
+          if (rawRole.includes('lop_truong') || u.isMonitor) return 'lop_truong';
+        }
+      }
+    } catch {}
+    return 'sinh_vien';
+  });
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
 
   // Sync activeRole with user selection / localStorage
@@ -86,8 +119,10 @@ export function useHomeState() {
     if (currentUser && userRoles.length > 0) {
       const savedRole = localStorage.getItem('active_role_' + currentUser.username);
       if (savedRole && userRoles.includes(savedRole)) {
-        setActiveRole(savedRole);
-      } else {
+        if (activeRole !== savedRole) {
+          setActiveRole(savedRole);
+        }
+      } else if (!userRoles.includes(activeRole)) {
         const defaultRole = userRoles.includes('admin')
           ? 'admin'
           : userRoles.includes('lop_truong')
@@ -96,7 +131,7 @@ export function useHomeState() {
         setActiveRole(defaultRole);
       }
     }
-  }, [currentUser, userRoles]);
+  }, [currentUser, userRoles, activeRole]);
 
   const hasActiveBatch = useMemo(() => examBatches.some((b) => b.isActive), [examBatches]);
   const hasExamSchedule = hasActiveBatch && ((activeBatch?.totalRecords ?? 0) > 0 || totalRecords > 0 || records.length > 0);
@@ -147,10 +182,9 @@ export function useHomeState() {
         'envelope',
         'envelope_all',
         'settlement',
-        'monitors_list',
       ];
       if (monitorAdminTabs.includes(activeTab)) {
-        setActiveTab(hasExamSchedule ? 'personal_schedule' : 'registered_courses');
+        setActiveTab('personal_schedule');
       }
     } else if (newRole === 'lop_truong') {
       const adminOnlyTabs: NavigationTab[] = [
@@ -207,6 +241,16 @@ export function useHomeState() {
       'database_backup',
     ];
     if (adminOnlyTabs.includes(tab) && !isAdmin) {
+      return;
+    }
+    const monitorOnlyTabs: NavigationTab[] = [
+      'members',
+      'monitor',
+      'envelope',
+      'envelope_all',
+      'settlement',
+    ];
+    if (monitorOnlyTabs.includes(tab) && !canAccessMonitorTools) {
       return;
     }
     setActiveTab(tab);
@@ -694,18 +738,31 @@ export function useHomeState() {
     pageSize,
   ]);
 
+  // Role-based tab protection: ensure users only stay on tabs they have permission to access
   useEffect(() => {
     if (!isMounted || !currentUser) return;
-    if (!isAdmin && activeTab === 'batches') {
-      setActiveTab('members');
+    const adminOnlyTabs: NavigationTab[] = [
+      'batches',
+      'external_accounts_admin',
+      'activity_logs',
+      'telegram_admin',
+      'user_registrations',
+      'database_backup',
+    ];
+    const monitorOnlyTabs: NavigationTab[] = [
+      'members',
+      'monitor',
+      'envelope',
+      'envelope_all',
+      'settlement',
+    ];
+
+    if (!isAdmin && adminOnlyTabs.includes(activeTab)) {
+      setActiveTab(canAccessMonitorTools ? 'members' : 'personal_schedule');
+    } else if (!canAccessMonitorTools && monitorOnlyTabs.includes(activeTab)) {
+      setActiveTab('personal_schedule');
     }
-    if (!canAccessMonitorTools && ['monitor', 'envelope', 'envelope_all', 'settlement', 'settings'].includes(activeTab)) {
-      setActiveTab('members');
-    }
-    if (!hasExamSchedule && ['schedule', 'personal_schedule', 'envelope', 'envelope_all', 'settlement'].includes(activeTab)) {
-      setActiveTab(isAdmin ? 'batches' : 'members');
-    }
-  }, [isMounted, currentUser, isAdmin, canAccessMonitorTools, hasExamSchedule, activeTab]);
+  }, [isMounted, currentUser, isAdmin, canAccessMonitorTools, activeTab]);
 
   useEffect(() => {
     setSelectedExamRoom(null);
@@ -753,9 +810,9 @@ export function useHomeState() {
 
   // Sync state to URL hash
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !isMounted) return;
     const params = new URLSearchParams();
-    if (activeTab !== 'schedule') params.set('tab', activeTab);
+    params.set('tab', activeTab);
     if (filters.search) params.set('search', filters.search);
     if (filters.classCode) params.set('classCode', filters.classCode);
     if (filters.subjectCode) params.set('subjectCode', filters.subjectCode);
@@ -775,7 +832,7 @@ export function useHomeState() {
     } else if (newHash === '' && window.location.hash !== '') {
       window.history.replaceState(null, '', window.location.pathname);
     }
-  }, [activeTab, filters, monitorClass, sortConfig, page]);
+  }, [isMounted, activeTab, filters, monitorClass, sortConfig, page]);
 
   // Sync state from URL hash on browser navigation
   useEffect(() => {

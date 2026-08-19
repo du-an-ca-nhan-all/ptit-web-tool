@@ -32,6 +32,28 @@ export interface InitialHomeState {
   sortDir: SortDirection;
 }
 
+export const VALID_NAVIGATION_TABS: NavigationTab[] = [
+  'schedule',
+  'personal_schedule',
+  'profile',
+  'registered_courses',
+  'monitor',
+  'members',
+  'envelope',
+  'envelope_all',
+  'settlement',
+  'settings',
+  'monitors_list',
+  'batches',
+  'external_accounts_admin',
+  'activity_logs',
+  'telegram_admin',
+  'user_registrations',
+  'database_backup',
+  'all_students',
+  'course_compare',
+];
+
 export const getInitialHomeState = (): InitialHomeState => {
   if (typeof window === 'undefined') {
     return {
@@ -47,9 +69,13 @@ export const getInitialHomeState = (): InitialHomeState => {
   }
   const hash = window.location.hash.replace(/^#/, '');
   const params = new URLSearchParams(hash);
+  const rawTab = params.get('tab') as NavigationTab;
+  const tab: NavigationTab = rawTab && VALID_NAVIGATION_TABS.includes(rawTab)
+    ? rawTab
+    : 'personal_schedule';
+
   return {
-    tab:
-      (params.get('tab') as NavigationTab) || 'personal_schedule',
+    tab,
     search: params.get('search') || '',
     classCode: params.get('classCode') || '',
     subjectCode: params.get('subjectCode') || '',
