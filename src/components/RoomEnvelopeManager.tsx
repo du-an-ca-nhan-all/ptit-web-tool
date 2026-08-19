@@ -38,10 +38,50 @@ export default function RoomEnvelopeManager({
   const [splitSession, setSplitSession] = useState<SessionEnvelope | null>(null);
   const [envelopeAmount, setEnvelopeAmount] = useState<string>('600000');
   const [includedClasses, setIncludedClasses] = useState<Set<string>>(new Set());
-  const [filterDate, setFilterDate] = useState<string>('');
-  const [filterResponsibleOnly, setFilterResponsibleOnly] = useState<boolean>(false);
+  const [filterDate, setFilterDate] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('date') || '';
+  });
+  const [filterResponsibleOnly, setFilterResponsibleOnly] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('responsible') === 'true';
+  });
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const [pricingVersion, setPricingVersion] = useState(0);
+
+  // Sync filters to URL query params
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    let changed = false;
+
+    if (filterDate) {
+      if (url.searchParams.get('date') !== filterDate) {
+        url.searchParams.set('date', filterDate);
+        changed = true;
+      }
+    } else if (url.searchParams.has('date')) {
+      url.searchParams.delete('date');
+      changed = true;
+    }
+
+    if (filterResponsibleOnly) {
+      if (url.searchParams.get('responsible') !== 'true') {
+        url.searchParams.set('responsible', 'true');
+        changed = true;
+      }
+    } else if (url.searchParams.has('responsible')) {
+      url.searchParams.delete('responsible');
+      changed = true;
+    }
+
+    if (changed) {
+      window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+    }
+  }, [filterDate, filterResponsibleOnly]);
 
   const effectiveIsAdmin = useMemo(() => {
     if (typeof isAdmin === 'boolean') return isAdmin;
@@ -144,7 +184,7 @@ export default function RoomEnvelopeManager({
           } else if (p0 > 12) {
             d = p0; m = p1;
           } else {
-            m = p0; d = p1; // Assume M/D/YYYY by default
+            m = p0; d = p1;
           }
         }
         let hour = 0, min = 0;
@@ -161,7 +201,7 @@ export default function RoomEnvelopeManager({
       if (timeA !== timeB) return timeA - timeB;
       return (a.room || '').localeCompare(b.room || '');
     });
-  }, [records, selectedClass]);
+  }, [records, selectedClass, sessions]);
 
   const availableDates = useMemo(() => {
     const dates = new Set(monitorEnvelopes.map(s => s.date));
@@ -172,9 +212,17 @@ export default function RoomEnvelopeManager({
     return monitorEnvelopes.filter(s => {
       if (filterDate && s.date !== filterDate) return false;
       if (filterResponsibleOnly && !s.isResponsible) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchRoom = s.room.toLowerCase().includes(q);
+        const matchSubj = s.subject.toLowerCase().includes(q);
+        const matchCode = s.subjectCode.toLowerCase().includes(q);
+        const matchClass = s.classCounts.some(c => c.className.toLowerCase().includes(q));
+        if (!matchRoom && !matchSubj && !matchCode && !matchClass) return false;
+      }
       return true;
     });
-  }, [monitorEnvelopes, filterDate, filterResponsibleOnly]);
+  }, [monitorEnvelopes, filterDate, filterResponsibleOnly, searchQuery]);
 
   const responsibleCount = filteredEnvelopes.filter(s => s.isResponsible).length;
   const totalExpectedMoney = useMemo(() => {
@@ -193,7 +241,6 @@ export default function RoomEnvelopeManager({
     return set;
   }, [loginUsers]);
 
-  
   const handleExportCSV = () => {
     const headers = [
       'STT',
@@ -249,244 +296,404 @@ export default function RoomEnvelopeManager({
 
   if (sessions.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center p-6 text-center">
         <p className="text-slate-500 font-medium">Vui lòng tải dữ liệu trước.</p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-y-auto min-h-0">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+    <div className="p-3 sm:p-4 md:p-6 lg:p-8 flex-1 flex flex-col gap-4 sm:gap-6 overflow-y-auto min-h-0 bg-[#F8FAFC]">
+      {/* Header & Class Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <Mail className="w-6 h-6 text-blue-600" />
-            {hideClassSelector ? "Phân Công Phong Bì Lớp Mình" : "Phân Công Phong Bì"}
+          <h2 className="text-lg sm:text-xl font-bold text-slate-800 flex items-center gap-2">
+            <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
+            <span>{hideClassSelector ? "Phân Công Phong Bì Lớp Mình" : "Phân Công Phong Bì"}</span>
           </h2>
-          <p className="text-sm text-slate-500 mt-1">Quản lý và theo dõi trách nhiệm phong bì phòng thi theo nguyên tắc: Lớp đông sinh viên nhất sẽ phụ trách.</p>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Quản lý và theo dõi trách nhiệm phong bì phòng thi theo nguyên tắc: Lớp đông SV nhất sẽ phụ trách.
+          </p>
         </div>
-        {!hideClassSelector && <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm w-full sm:w-auto">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Lớp:</span>
-          <select
-            className="bg-transparent text-sm font-semibold outline-none text-slate-700 w-full min-w-[120px]"
-            value={selectedClass}
-            onChange={(e) => onClassChange(e.target.value)}
-          >
-            {classes.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>}
+        {!hideClassSelector && (
+          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-xs w-full sm:w-auto">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter shrink-0">Lớp:</span>
+            <select
+              className="bg-transparent text-sm font-semibold outline-none text-slate-700 w-full min-w-[120px] cursor-pointer"
+              value={selectedClass}
+              onChange={(e) => onClassChange(e.target.value)}
+            >
+              {classes.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
-      
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between shrink-0">
-        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+      {/* Filter Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3.5 sm:p-4 flex flex-col lg:flex-row gap-3.5 items-stretch lg:items-center justify-between shrink-0">
+        <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 flex-1 items-stretch sm:items-center flex-wrap">
+          {/* Search box */}
+          <div className="relative flex-1 min-w-[180px]">
+            <input
+              type="text"
+              placeholder="Tìm phòng, môn thi, mã môn..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700"
+            />
+            <Info className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Date Selector */}
           <select 
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 min-w-[150px]"
+            className="border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 cursor-pointer"
             value={filterDate}
             onChange={(e) => setFilterDate(e.target.value)}
           >
-            <option value="">Tất cả các ngày</option>
+            <option value="">Tất cả các ngày ({availableDates.length})</option>
             {availableDates.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+
+          {/* Responsible Only Checkbox */}
+          <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-slate-700 cursor-pointer bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl transition-colors select-none">
             <input 
               type="checkbox" 
               checked={filterResponsibleOnly}
               onChange={(e) => setFilterResponsibleOnly(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-slate-300"
+              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-slate-300 cursor-pointer"
             />
-            Chỉ hiện các phòng lớp mình đi lấy PB
+            <span>Chỉ hiện phòng lớp mình đi lấy PB</span>
           </label>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
           {effectiveIsAdmin && (
             <button 
               type="button"
               onClick={() => setIsPricingModalOpen(true)}
-              className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              className="flex-1 sm:flex-none px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs active:scale-95"
               title="Tùy chỉnh định mức tiền phòng"
             >
-              <Settings className="w-4 h-4 text-indigo-600" />
-              <span>Cấu hình tiền phòng</span>
+              <Settings className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Cấu hình tiền</span>
             </button>
           )}
 
           <button 
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-slate-50 text-slate-700 justify-center cursor-pointer shadow-2xs"
+            className="flex-1 sm:flex-none px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-50 text-slate-700 cursor-pointer shadow-2xs active:scale-95"
           >
-            <Download className="w-4 h-4" /> Xuất CSV
+            <Download className="w-3.5 h-3.5" />
+            <span>Xuất CSV</span>
           </button>
         </div>
-
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
-            <MapPin className="w-6 h-6 text-blue-600" />
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 shrink-0">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100/40 border border-blue-200/70 rounded-2xl p-4 sm:p-5 flex items-center gap-3.5 shadow-2xs">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0">
+            <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
           </div>
-          <div>
-            <p className="text-sm text-blue-600 font-semibold uppercase tracking-wider">Tổng số phòng thi</p>
-            <p className="text-3xl font-bold text-blue-900">{filteredEnvelopes.length}</p>
-          </div>
-        </div>
-        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-            <Mail className="w-6 h-6 text-emerald-600" />
-          </div>
-          <div>
-            <p className="text-sm text-emerald-600 font-semibold uppercase tracking-wider">Số phòng lớp phụ trách</p>
-            <p className="text-3xl font-bold text-emerald-900">{responsibleCount}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] sm:text-xs text-blue-600 font-bold uppercase tracking-wider truncate">Tổng số phòng thi</p>
+            <p className="text-2xl sm:text-3xl font-extrabold text-blue-950 mt-0.5">{filteredEnvelopes.length}</p>
           </div>
         </div>
 
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center shrink-0">
-            <DollarSign className="w-6 h-6 text-amber-600" />
+        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/40 border border-emerald-200/70 rounded-2xl p-4 sm:p-5 flex items-center gap-3.5 shadow-2xs">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center shrink-0">
+            <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
           </div>
-          <div>
-            <p className="text-sm text-amber-600 font-semibold uppercase tracking-wider">Dự kiến bồi dưỡng</p>
-            <p className="text-2xl sm:text-3xl font-bold text-amber-900">{formatCurrency(totalExpectedMoney)}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] sm:text-xs text-emerald-600 font-bold uppercase tracking-wider truncate">Số phòng lớp phụ trách</p>
+            <p className="text-2xl sm:text-3xl font-extrabold text-emerald-950 mt-0.5">{responsibleCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-amber-50 to-amber-100/40 border border-amber-200/70 rounded-2xl p-4 sm:p-5 flex items-center gap-3.5 shadow-2xs sm:col-span-1">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-500/10 rounded-xl flex items-center justify-center shrink-0">
+            <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] sm:text-xs text-amber-700 font-bold uppercase tracking-wider truncate">Dự kiến bồi dưỡng</p>
+            <p className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-amber-950 mt-0.5 truncate">{formatCurrency(totalExpectedMoney)}</p>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-0 flex-1">
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-left border-collapse min-w-[800px]">
-            <thead className="bg-white sticky top-0 z-10 shadow-sm">
-              <tr>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-16">STT</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-48">Thời gian</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-64">Phòng & Môn</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">Cơ cấu sinh viên</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 whitespace-nowrap">Bồi dưỡng</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 w-48 text-right">Trách nhiệm</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEnvelopes.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">
-                    Không có lịch thi nào cho lớp này.
-                  </td>
-                </tr>
-              ) : (
-                filteredEnvelopes.map((session, index) => (
-                  <tr key={session.id} className={`hover:bg-slate-50 transition-colors ${index % 2 === 1 ? 'bg-slate-50/30' : ''} ${session.isResponsible ? 'bg-emerald-50/10' : ''}`}>
-                    <td className="px-6 py-4 text-sm text-slate-500 font-medium">{index + 1}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-700">{session.date}</span>
-                        <span className="text-slate-500 text-sm">{session.time}</span>
+      {/* Main Content Area: Responsive Mobile Cards + Desktop Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col overflow-hidden min-h-0 flex-1">
+        {filteredEnvelopes.length === 0 ? (
+          <div className="p-8 sm:p-12 text-center text-slate-400 font-medium flex flex-col items-center justify-center gap-2">
+            <Mail className="w-10 h-10 text-slate-300" />
+            <p className="text-sm">Không tìm thấy phòng thi nào phù hợp với bộ lọc.</p>
+          </div>
+        ) : (
+          <>
+            {/* MOBILE VIEW: Touch-optimized Card List (< 768px) */}
+            <div className="block md:hidden overflow-y-auto p-3 space-y-3 divide-y-0">
+              {filteredEnvelopes.map((session, index) => {
+                const roomPrice = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id);
+                return (
+                  <div
+                    key={session.id}
+                    className={`rounded-2xl border p-3.5 shadow-2xs flex flex-col gap-3 transition-all ${
+                      session.isResponsible 
+                        ? 'bg-emerald-50/25 border-emerald-200/80 shadow-emerald-50/50' 
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    {/* Top Row: Room & Time Badge */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-mono font-bold text-slate-400">#{index + 1}</span>
+                        <span className="inline-flex items-center font-bold text-rose-600 bg-rose-50 border border-rose-200/70 px-2.5 py-0.5 rounded-lg text-sm truncate">
+                          {session.room}
+                        </span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-rose-600 text-base">{session.room}</span>
-                        <span className="text-slate-700 font-medium text-sm mt-0.5 break-words whitespace-normal" title={session.subject}>{session.subject}</span>
-                        <span className="text-slate-400 text-xs">{session.subjectCode}</span>
+
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200/60 px-2.5 py-1 rounded-lg shrink-0">
+                        <span>{session.date}</span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-blue-700 font-bold">{session.time}</span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        {session.classCounts.map(c => (
-                          <span 
-                            key={c.className} 
-                            className={`text-xs px-2.5 py-1 rounded-md font-bold border flex gap-1.5 items-center ${
-                              c.className === selectedClass 
-                                ? 'bg-blue-100 text-blue-800 border-blue-200 shadow-sm' 
-                                : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            <span>{c.className}</span>
-                            <span className={`w-px h-3 ${c.className === selectedClass ? 'bg-blue-300' : 'bg-slate-300'}`}></span>
-                            <span>{c.count}</span>
+                    </div>
+
+                    {/* Subject Info */}
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm sm:text-base leading-snug">
+                        {session.subject}
+                      </h4>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5">
+                        Mã MH: <span className="font-semibold text-slate-700">{session.subjectCode}</span>
+                        {session.examFormat && (
+                          <span className="ml-2 font-sans font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded text-[11px]">
+                            {session.examFormat}
                           </span>
-                        ))}
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Class & Student Breakdown */}
+                    <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-2.5">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                        Cơ cấu sinh viên ({session.classCounts.reduce((sum, c) => sum + c.count, 0)} SV)
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {session.classCounts.map(c => {
+                          const isSelectedClass = c.className === selectedClass;
+                          return (
+                            <span 
+                              key={c.className} 
+                              className={`text-xs px-2 py-0.5 rounded-md font-bold border flex gap-1 items-center ${
+                                isSelectedClass 
+                                  ? 'bg-blue-100 text-blue-800 border-blue-200 shadow-2xs' 
+                                  : 'bg-white text-slate-600 border-slate-200'
+                              }`}
+                            >
+                              <span>{c.className}</span>
+                              <span className={`w-px h-2.5 ${isSelectedClass ? 'bg-blue-300' : 'bg-slate-300'}`}></span>
+                              <span className="font-extrabold">{c.count}</span>
+                            </span>
+                          );
+                        })}
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-block bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded-md text-xs border border-amber-200 whitespace-nowrap">
-                        {formatCurrency(calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id))}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {session.isResponsible ? (
-                        <div className="flex flex-col gap-2 items-end w-full">
-                          <div className="flex items-center justify-center gap-1.5 text-emerald-700 font-bold bg-emerald-100 px-3 py-1.5 rounded-lg w-full border border-emerald-200 shadow-sm">
-                            <Mail className="w-4 h-4" />
-                            Lớp mình
+                    </div>
+
+                    {/* Bottom Row: Price & Responsibility */}
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 block">ĐỊNH MỨC</span>
+                        <span className="inline-block bg-amber-50 text-amber-800 font-extrabold px-2.5 py-1 rounded-lg text-xs border border-amber-200">
+                          {formatCurrency(roomPrice)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {session.isResponsible ? (
+                          <>
+                            <div className="flex items-center gap-1 text-emerald-800 font-bold bg-emerald-100/90 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs shadow-2xs">
+                              <Mail className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Lớp mình</span>
+                            </div>
+                            <button 
+                              onClick={() => handleOpenSplit(session)}
+                              className="flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 border border-blue-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Calculator className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Chia tiền</span>
+                            </button>
+                          </>
+                        ) : (
+                          <div className="text-right">
+                            <span className="text-[10px] font-bold text-slate-400 block">PHỤ TRÁCH</span>
+                            <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 inline-block">
+                              {session.classCounts[0]?.className || 'Khác'} ({session.classCounts[0]?.count || 0} SV)
+                            </span>
                           </div>
-                          <button 
-                            onClick={() => handleOpenSplit(session)}
-                            className="flex items-center justify-center gap-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1.5 rounded w-full transition-colors"
-                          >
-                            <Calculator className="w-3.5 h-3.5" />
-                            Chia tiền
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1.5 text-slate-500 text-sm w-full">
-                          <span className="font-semibold text-slate-700">{session.classCounts[0]?.className}</span>
-                          <span className="text-xs">({session.classCounts[0]?.count} SV)</span>
-                        </div>
-                      )}
-                    </td>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* DESKTOP VIEW: Full Table (>= 768px) */}
+            <div className="hidden md:block flex-1 overflow-auto">
+              <table className="w-full text-left border-collapse min-w-[800px]">
+                <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200 shadow-2xs">
+                  <tr>
+                    <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-16">STT</th>
+                    <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-44">Thời gian</th>
+                    <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-64">Phòng & Môn</th>
+                    <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Cơ cấu sinh viên</th>
+                    <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap w-36">Bồi dưỡng</th>
+                    <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-44 text-right">Trách nhiệm</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredEnvelopes.map((session, index) => (
+                    <tr key={session.id} className={`hover:bg-slate-50/80 transition-colors ${session.isResponsible ? 'bg-emerald-50/15' : ''}`}>
+                      <td className="px-6 py-4 text-sm text-slate-400 font-semibold">{index + 1}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-800 text-sm">{session.date}</span>
+                          <span className="text-blue-600 font-bold text-xs mt-0.5">{session.time}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-rose-600 text-sm">{session.room}</span>
+                          <span className="text-slate-800 font-medium text-sm mt-0.5 break-words whitespace-normal" title={session.subject}>{session.subject}</span>
+                          <span className="text-slate-400 text-xs font-mono">{session.subjectCode}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {session.classCounts.map(c => (
+                            <span 
+                              key={c.className} 
+                              className={`text-xs px-2.5 py-0.5 rounded-md font-bold border flex gap-1.5 items-center ${
+                                c.className === selectedClass 
+                                  ? 'bg-blue-100 text-blue-800 border-blue-200 shadow-2xs' 
+                                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}
+                            >
+                              <span>{c.className}</span>
+                              <span className={`w-px h-3 ${c.className === selectedClass ? 'bg-blue-300' : 'bg-slate-300'}`}></span>
+                              <span>{c.count}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-block bg-amber-50 text-amber-800 font-bold px-2.5 py-1 rounded-md text-xs border border-amber-200 whitespace-nowrap">
+                          {formatCurrency(calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id))}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {session.isResponsible ? (
+                          <div className="flex flex-col gap-1.5 items-end w-full">
+                            <div className="flex items-center justify-center gap-1.5 text-emerald-800 font-bold bg-emerald-100 px-2.5 py-1 rounded-lg w-full border border-emerald-200 shadow-2xs text-xs">
+                              <Mail className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Lớp mình</span>
+                            </div>
+                            <button 
+                              onClick={() => handleOpenSplit(session)}
+                              className="flex items-center justify-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded-lg w-full transition-colors cursor-pointer active:scale-95"
+                            >
+                              <Calculator className="w-3.5 h-3.5" />
+                              <span>Chia tiền</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1 text-slate-500 text-xs w-full">
+                            <span className="font-semibold text-slate-700">{session.classCounts[0]?.className}</span>
+                            <span className="text-slate-400">({session.classCounts[0]?.count} SV)</span>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
+      {/* Split Modal: Chia tiền phòng thi */}
       {splitSession && (
         <div 
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-start justify-center z-50 overflow-y-auto p-3 sm:p-6"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 overflow-y-auto p-3 sm:p-6 animate-fadeIn"
           onClick={(e) => {
             if (e.target === e.currentTarget) setSplitSession(null);
           }}
         >
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl flex flex-col my-auto max-h-[85vh] sm:max-h-[90vh] border border-slate-200">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 max-w-lg w-full shadow-2xl flex flex-col my-auto max-h-[88vh] sm:max-h-[90vh] border border-slate-200">
+            <div className="flex justify-between items-center mb-3 sm:mb-4 shrink-0">
+              <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Calculator className="w-5 h-5 text-blue-600" />
-                Chia tiền phòng thi
+                <span>Chia tiền phòng thi</span>
               </h3>
-              <button onClick={() => setSplitSession(null)} className="text-slate-400 hover:text-slate-600">
+              <button 
+                onClick={() => setSplitSession(null)} 
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="bg-slate-50 p-3 rounded-xl mb-4 border border-slate-100">
-              <div className="text-sm font-semibold text-slate-700">{splitSession.room} - {splitSession.subject}</div>
-              <div className="text-xs text-slate-500">{splitSession.date} {splitSession.time}</div>
+            <div className="bg-slate-50 p-3 rounded-xl mb-3.5 border border-slate-100 shrink-0">
+              <div className="text-xs sm:text-sm font-bold text-slate-800">{splitSession.room} - {splitSession.subject}</div>
+              <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                <span>{splitSession.date}</span>
+                <span>•</span>
+                <span className="text-blue-600 font-semibold">{splitSession.time}</span>
+              </div>
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Tổng tiền phong bì (VNĐ)</label>
+            <div className="mb-3.5 shrink-0">
+              <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">Tổng tiền phong bì (VNĐ)</label>
               <input 
                 type="number" 
                 value={envelopeAmount} 
                 onChange={(e) => setEnvelopeAmount(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-medium"
-                placeholder="Ví dụ: 100000"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-sm sm:text-base outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-bold"
+                placeholder="Ví dụ: 600000"
               />
             </div>
 
-            <div className="flex-1 overflow-auto min-h-0 pr-1">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Các lớp tham gia chia (mặc định chọn các lớp có LT)</label>
+            <div className="flex-1 overflow-auto min-h-0 pr-0.5">
+              <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">
+                Các lớp tham gia chia (mặc định chọn các lớp có LT)
+              </label>
               <div className="space-y-2">
                 {splitSession.classCounts.map(c => {
                   const isChecked = includedClasses.has(c.className);
                   const hasMonitor = monitorClasses.has(c.className);
                   
                   return (
-                    <label key={c.className} className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${isChecked ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
-                      <div className="flex items-center gap-3">
+                    <label 
+                      key={c.className} 
+                      className={`flex items-center justify-between p-2.5 sm:p-3 rounded-xl border cursor-pointer transition-colors ${
+                        isChecked 
+                          ? 'bg-blue-50/80 border-blue-200 shadow-2xs' 
+                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                         <input 
                           type="checkbox"
                           checked={isChecked}
@@ -496,19 +703,23 @@ export default function RoomEnvelopeManager({
                             else newSet.delete(c.className);
                             setIncludedClasses(newSet);
                           }}
-                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                         />
-                        <div>
-                          <div className="font-semibold text-slate-700 flex items-center gap-2">
-                            {c.className} 
-                            {!hasMonitor && <span className="text-[10px] uppercase font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">Không có LT</span>}
+                        <div className="min-w-0">
+                          <div className="font-bold text-xs sm:text-sm text-slate-800 flex items-center gap-1.5 flex-wrap">
+                            <span>{c.className}</span>
+                            {!hasMonitor && (
+                              <span className="text-[10px] uppercase font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
+                                Không có LT
+                              </span>
+                            )}
                           </div>
-                          <div className="text-xs text-slate-500">{c.count} sinh viên</div>
+                          <div className="text-[11px] sm:text-xs text-slate-500">{c.count} sinh viên</div>
                         </div>
                       </div>
                       
                       {isChecked && (
-                        <div className="text-sm font-bold text-blue-700">
+                        <div className="text-xs sm:text-sm font-extrabold text-blue-700 shrink-0 ml-2">
                           {(() => {
                             const totalIncludedStudents = splitSession.classCounts
                               .filter(sc => includedClasses.has(sc.className))
@@ -526,10 +737,10 @@ export default function RoomEnvelopeManager({
               </div>
             </div>
             
-            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end shrink-0">
               <button 
                 onClick={() => setSplitSession(null)}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors cursor-pointer active:scale-95"
               >
                 Đóng
               </button>
