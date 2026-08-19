@@ -1749,17 +1749,13 @@ export default function StudentPersonalExamSchedule({
                             )}
                           </div>
 
-                          <div>
-                            {rec.isPostponed ? (
+                          {rec.isPostponed && (
+                            <div>
                               <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
                                 Hoãn Thi / Miễn Chia
                               </span>
-                            ) : (
-                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                Đã Xếp Phòng
-                              </span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Subject Name */}
