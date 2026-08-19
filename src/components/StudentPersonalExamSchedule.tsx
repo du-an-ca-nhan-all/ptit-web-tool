@@ -1590,7 +1590,7 @@ export default function StudentPersonalExamSchedule({
       {/* MODE 2: XEM THEO FILE LỊCH THI TỔNG HỢP (ĐỢT THI IMPORT)                    */}
       {/* ========================================================================= */}
       {viewSourceMode === 'FILE_TONG' && (
-        <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+        <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
           {selectedExamRoom ? (
             <ExamRoomMembers
               roomRecord={selectedExamRoom}
@@ -1603,52 +1603,298 @@ export default function StudentPersonalExamSchedule({
               canEditPostpone={canAccessMonitorTools}
             />
           ) : totalRecords === 0 && records.length === 0 ? (
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-12 text-center flex flex-col items-center justify-center animate-in fade-in duration-200">
-              <div className="w-16 h-16 bg-blue-50 border border-blue-200 rounded-3xl flex items-center justify-center text-blue-600 mb-4 shadow-sm">
-                <CalendarDays className="w-8 h-8" />
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 p-8 sm:p-12 text-center flex flex-col items-center justify-center animate-in fade-in duration-200">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-blue-50 border border-blue-200 rounded-2xl sm:rounded-3xl flex items-center justify-center text-blue-600 mb-3 sm:mb-4 shadow-sm">
+                <CalendarDays className="w-7 h-7 sm:w-8 sm:h-8" />
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Chưa Có Dữ Liệu Lịch Thi File Tổng</h3>
-              <p className="text-sm text-slate-500 max-w-md mb-6">
+              <h3 className="text-base sm:text-xl font-bold text-slate-800 mb-1.5 sm:mb-2">Chưa Có Dữ Liệu Lịch Thi File Tổng</h3>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-md mb-5 sm:mb-6 leading-relaxed">
                 Bạn không có lịch thi nào trong đợt thi này hoặc file lịch thi tổng chưa được Quản trị viên import. Bạn có thể chuyển sang tab <b>"Cổng QLDTTX"</b> ở trên để xem trực tiếp từ trường.
               </p>
               <button
                 onClick={() => loadDataFromApi(activeBatch?.code)}
                 disabled={isLoadingBatchData}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-200 flex items-center gap-2 cursor-pointer"
+                className="px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs sm:text-sm font-bold rounded-xl sm:rounded-2xl transition-all shadow-md shadow-blue-200 flex items-center gap-2 cursor-pointer"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoadingBatchData ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLoadingBatchData ? 'animate-spin' : ''}`} />
                 {isLoadingBatchData ? 'Đang tải lại...' : 'Tải lại dữ liệu đợt thi'}
               </button>
             </div>
           ) : (
             <>
-              <FilterBar
-                filters={filters}
-                onFilterChange={setFilters}
-                classes={classes}
-                subjects={subjects}
-                dates={dates}
-                totalRecords={totalRecords}
-                filteredCount={totalRecords}
-                hideClassFilter={true}
-              />
-              <DataTable
-                records={records}
-                totalRecords={totalRecords}
-                currentPage={page}
-                totalPages={totalPages}
-                itemsPerPage={pageSize}
-                onPageChange={setPage}
-                onItemsPerPageChange={setPageSize}
-                sortConfig={sortConfig}
-                onSortChange={setSortConfig}
-                onStudentClick={setConfirmStudentId}
-                onClassClick={setConfirmClassCode}
-                onRowClick={setSelectedExamRoom}
-                onTogglePostpone={handleToggleExamPostpone}
-                canEditPostpone={canAccessMonitorTools}
-                isLoading={isLoadingBatchData}
-              />
+              {/* Header Info Card for File Tổng */}
+              <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
+                  <div className="p-2.5 sm:p-3 bg-gradient-to-br from-indigo-600 to-sky-600 text-white rounded-xl sm:rounded-2xl shadow-sm shrink-0">
+                    <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm sm:text-lg font-black text-slate-800">Lịch Thi Cá Nhân (File Tổng Hợp)</h3>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        {totalRecords} môn thi
+                      </span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-1 truncate">
+                      Đợt thi: <strong className="text-slate-800">{activeBatch?.name || 'Đợt thi học kỳ'}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => loadDataFromApi(activeBatch?.code)}
+                  disabled={isLoadingBatchData}
+                  className="px-3.5 py-1.5 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl sm:rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 self-stretch sm:self-auto"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isLoadingBatchData ? 'animate-spin' : ''}`} />
+                  <span>Tải lại</span>
+                </button>
+              </div>
+
+              {/* MOBILE VIEW: Mobile Filter Bar + Mobile Cards */}
+              <div className="block md:hidden space-y-3">
+                {/* Mobile Filter Controls */}
+                <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm flex flex-col gap-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Subject Filter */}
+                    <div className="relative">
+                      <select
+                        value={filters.subject}
+                        onChange={(e) => setFilters((prev) => ({ ...prev, subject: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-6 truncate"
+                      >
+                        <option value="">Tất cả môn</option>
+                        {subjects.map((sub) => (
+                          <option key={sub.code} value={sub.code}>
+                            {sub.name} ({sub.code})
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+
+                    {/* Date Filter */}
+                    <div className="relative">
+                      <select
+                        value={filters.date}
+                        onChange={(e) => setFilters((prev) => ({ ...prev, date: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-6 truncate"
+                      >
+                        <option value="">Tất cả ngày</option>
+                        {dates.map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Search box */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={filters.search}
+                      onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+                      placeholder="Tìm môn, phòng, ngày thi..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-7 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    {filters.search && (
+                      <button
+                        onClick={() => setFilters((prev) => ({ ...prev, search: '' }))}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-md"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mobile Exam Cards List */}
+                <div className="space-y-3">
+                  {records.map((rec, index) => {
+                    return (
+                      <div
+                        key={rec.id || index}
+                        onClick={() => setSelectedExamRoom(rec)}
+                        className={`p-4 rounded-2xl bg-white border transition shadow-2xs flex flex-col gap-3 relative overflow-hidden active:scale-98 cursor-pointer ${
+                          rec.isPostponed
+                            ? 'border-amber-200 bg-amber-50/20'
+                            : 'border-slate-200 hover:border-indigo-300'
+                        }`}
+                      >
+                        {/* Top Indicator */}
+                        <div
+                          className={`absolute top-0 left-0 right-0 h-1.5 ${
+                            rec.isPostponed ? 'bg-amber-500' : 'bg-indigo-600'
+                          }`}
+                        />
+
+                        {/* Badges */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
+                              {rec.MaMH}
+                            </span>
+                            {rec.MaHTThi && (
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${getFormatBadgeColor(
+                                  rec.MaHTThi
+                                )}`}
+                              >
+                                {rec.MaHTThi}
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            {rec.isPostponed ? (
+                              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+                                Hoãn Thi / Miễn Chia
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                Đã Xếp Phòng
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Subject Name */}
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug">
+                            {rec.TenMH}
+                          </h4>
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                            Lớp: {rec.MaLop || currentUser.lop || 'Chưa cập nhật'}
+                          </div>
+                        </div>
+
+                        {/* Key Details Grid */}
+                        <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                              <CalendarDays className="w-3 h-3 text-indigo-600" /> Ngày Thi
+                            </span>
+                            <div className="font-mono font-bold text-slate-900 text-xs mt-0.5">
+                              {rec.NgayThi || 'Chưa rõ'}
+                            </div>
+                            {rec.NgayThi && (
+                              <span className="text-[10px] text-slate-500">
+                                {getDayOfWeekVietnamese(rec.NgayThi)}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-sky-600" /> Giờ Thi
+                            </span>
+                            <div className="font-mono font-bold text-slate-900 text-xs mt-0.5">
+                              {rec.GioThi || 'Chưa rõ'}
+                            </div>
+                            {rec.SoPhutThi && (
+                              <span className="text-[10px] text-slate-500 font-normal">
+                                {rec.SoPhutThi} phút
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-200/60">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                              <Building className="w-3 h-3 text-amber-600" /> Phòng Thi
+                            </span>
+                            <span className="font-mono font-black text-indigo-700 text-xs mt-0.5">
+                              {rec.MAPTHI || rec.PhongThi || 'Chưa rõ'}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-200/60">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                              <User className="w-3 h-3 text-purple-600" /> Tổ / Nhóm
+                            </span>
+                            <span className="font-mono font-bold text-slate-800 text-xs mt-0.5">
+                              Tổ {rec['To thi'] || rec.ToThi || '-'} • Nhóm {rec.NhomThi || rec.NhomHoc || '-'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Footer Link: View classmates in this room */}
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                          <span className="text-indigo-600 font-bold flex items-center gap-1">
+                            <Users className="w-3.5 h-3.5" />
+                            <span>Xem Bạn Cùng Phòng Thi</span>
+                          </span>
+
+                          <span className="text-indigo-600 font-bold flex items-center gap-0.5">
+                            Chi tiết &rarr;
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Mobile Pagination */}
+                {totalPages > 1 && (
+                  <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-2xs flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => setPage(Math.max(1, page - 1))}
+                      disabled={page <= 1}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>Trước</span>
+                    </button>
+
+                    <span className="text-xs font-bold text-slate-700 font-mono">
+                      Trang {page} / {totalPages}
+                    </span>
+
+                    <button
+                      onClick={() => setPage(Math.min(totalPages, page + 1))}
+                      disabled={page >= totalPages}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                    >
+                      <span>Sau</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* DESKTOP VIEW: Full FilterBar and DataTable */}
+              <div className="hidden md:block space-y-6">
+                <FilterBar
+                  filters={filters}
+                  onFilterChange={setFilters}
+                  classes={classes}
+                  subjects={subjects}
+                  dates={dates}
+                  totalRecords={totalRecords}
+                  filteredCount={totalRecords}
+                  hideClassFilter={true}
+                />
+                <DataTable
+                  records={records}
+                  totalRecords={totalRecords}
+                  currentPage={page}
+                  totalPages={totalPages}
+                  itemsPerPage={pageSize}
+                  onPageChange={setPage}
+                  onItemsPerPageChange={setPageSize}
+                  sortConfig={sortConfig}
+                  onSortChange={setSortConfig}
+                  onStudentClick={setConfirmStudentId}
+                  onClassClick={setConfirmClassCode}
+                  onRowClick={setSelectedExamRoom}
+                  onTogglePostpone={handleToggleExamPostpone}
+                  canEditPostpone={canAccessMonitorTools}
+                  isLoading={isLoadingBatchData}
+                />
+              </div>
             </>
           )}
         </div>
