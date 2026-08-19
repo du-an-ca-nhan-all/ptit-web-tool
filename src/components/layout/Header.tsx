@@ -77,7 +77,7 @@ export default function Header({
       case 'course_compare':
         return 'So Sánh ĐKMH';
       case 'members':
-        return 'Danh Sách Lớp';
+        return 'Danh Sách sinh viên trong Lớp';
       case 'batches':
         return 'Quản Lý Đợt Thi';
       case 'telegram_admin':
