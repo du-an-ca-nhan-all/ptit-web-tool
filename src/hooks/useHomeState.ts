@@ -818,17 +818,29 @@ export function useHomeState() {
   useEffect(() => {
     if (typeof window === 'undefined' || !isMounted) return;
     const basePath = getNavigationPath(activeTab, profileSubTab);
-    const params = new URLSearchParams();
-    if (filters.search) params.set('search', filters.search);
-    if (filters.classCode) params.set('classCode', filters.classCode);
-    if (filters.subjectCode) params.set('subjectCode', filters.subjectCode);
-    if (filters.date) params.set('date', filters.date);
-    if (monitorClass) params.set('monitorClass', monitorClass);
-    if (sortConfig && sortConfig.key && (sortConfig.key !== 'DateTime' || sortConfig.direction !== 'asc')) {
-      params.set('sortKey', sortConfig.key);
-      params.set('sortDir', sortConfig.direction);
+    const params = new URLSearchParams(window.location.search);
+
+    if (activeTab !== 'profile') {
+      if (filters.search) params.set('search', filters.search);
+      else params.delete('search');
+      if (filters.classCode) params.set('classCode', filters.classCode);
+      else params.delete('classCode');
+      if (filters.subjectCode) params.set('subjectCode', filters.subjectCode);
+      else params.delete('subjectCode');
+      if (filters.date) params.set('date', filters.date);
+      else params.delete('date');
+      if (monitorClass) params.set('monitorClass', monitorClass);
+      else params.delete('monitorClass');
+      if (sortConfig && sortConfig.key && (sortConfig.key !== 'DateTime' || sortConfig.direction !== 'asc')) {
+        params.set('sortKey', sortConfig.key);
+        params.set('sortDir', sortConfig.direction);
+      } else {
+        params.delete('sortKey');
+        params.delete('sortDir');
+      }
+      if (page > 1) params.set('page', String(page));
+      else params.delete('page');
     }
-    if (page > 1) params.set('page', String(page));
 
     const queryString = params.toString();
     const newUrl = queryString ? `${basePath}?${queryString}` : basePath;

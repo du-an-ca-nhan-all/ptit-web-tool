@@ -99,12 +99,85 @@ export default function StudentGradesView({
   const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Filters & Search
-  const [selectedSemester, setSelectedSemester] = useState<string>('ALL');
-  const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<'PROGRESSION' | 'DISTRIBUTION' | 'ADVISING' | 'SIMULATOR'>('PROGRESSION');
+  const [selectedSemester, setSelectedSemester] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'ALL';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('semester') || 'ALL';
+  });
+
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'ALL';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('grade') || 'ALL';
+  });
+
+  const [searchQuery, setSearchQuery] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('q') || params.get('search') || '';
+  });
+
+  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<'PROGRESSION' | 'DISTRIBUTION' | 'ADVISING' | 'SIMULATOR'>(() => {
+    if (typeof window === 'undefined') return 'PROGRESSION';
+    const params = new URLSearchParams(window.location.search);
+    const a = params.get('analytics')?.toUpperCase();
+    if (a === 'PROGRESSION' || a === 'DISTRIBUTION' || a === 'ADVISING' || a === 'SIMULATOR') return a;
+    return 'PROGRESSION';
+  });
+
   const [selectedCourseModal, setSelectedCourseModal] = useState<StudentCourseGrade | null>(null);
   const [copiedSummary, setCopiedSummary] = useState(false);
+
+  // Sync filters to URL query params
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    let changed = false;
+
+    if (selectedSemester !== 'ALL') {
+      if (url.searchParams.get('semester') !== selectedSemester) {
+        url.searchParams.set('semester', selectedSemester);
+        changed = true;
+      }
+    } else if (url.searchParams.has('semester')) {
+      url.searchParams.delete('semester');
+      changed = true;
+    }
+
+    if (selectedGradeFilter !== 'ALL') {
+      if (url.searchParams.get('grade') !== selectedGradeFilter) {
+        url.searchParams.set('grade', selectedGradeFilter);
+        changed = true;
+      }
+    } else if (url.searchParams.has('grade')) {
+      url.searchParams.delete('grade');
+      changed = true;
+    }
+
+    if (searchQuery) {
+      if (url.searchParams.get('q') !== searchQuery) {
+        url.searchParams.set('q', searchQuery);
+        changed = true;
+      }
+    } else if (url.searchParams.has('q')) {
+      url.searchParams.delete('q');
+      changed = true;
+    }
+
+    if (activeAnalyticsTab !== 'PROGRESSION') {
+      if (url.searchParams.get('analytics') !== activeAnalyticsTab.toLowerCase()) {
+        url.searchParams.set('analytics', activeAnalyticsTab.toLowerCase());
+        changed = true;
+      }
+    } else if (url.searchParams.has('analytics')) {
+      url.searchParams.delete('analytics');
+      changed = true;
+    }
+
+    if (changed) {
+      window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+    }
+  }, [selectedSemester, selectedGradeFilter, searchQuery, activeAnalyticsTab]);
 
   // Fetch grades from API
   const fetchGrades = useCallback(async (refresh = false) => {
