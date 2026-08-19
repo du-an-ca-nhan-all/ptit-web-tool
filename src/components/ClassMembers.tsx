@@ -499,7 +499,7 @@ export default function ClassMembers({
   };
 
   return (
-    <div className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-y-auto min-h-0 bg-slate-50 relative">
+    <div className="p-3 sm:p-4 md:p-8 flex-1 flex flex-col gap-4 sm:gap-6 w-full max-w-7xl mx-auto relative">
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -515,19 +515,19 @@ export default function ClassMembers({
       )}
 
       {/* Header Banner & Class Selector */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm shrink-0">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm shrink-0">
         <div>
           <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight">
               Quản Lý Thành Viên Lớp <span className="text-blue-600">{selectedClass}</span>
             </h2>
             {isMyClass && (
-              <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+              <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full border border-emerald-200 flex items-center gap-1">
                 <UserCheck className="w-3.5 h-3.5" /> Lớp của bạn
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500 flex items-center gap-2 flex-wrap">
+          <p className="text-xs sm:text-sm text-slate-500 flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {classMonitor ? (
               <>
                 <span className="text-slate-300">•</span>
@@ -539,7 +539,7 @@ export default function ClassMembers({
                   <button
                     type="button"
                     onClick={() => openAssignMonitorModal(classMonitor.username)}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100/80 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-amber-300"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100/80 hover:bg-amber-200 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg transition-colors cursor-pointer border border-amber-300"
                     title="Chuyển lớp trưởng sang sinh viên khác trong lớp"
                   >
                     <ArrowRightLeft className="w-3 h-3" /> Đổi Lớp Trưởng
@@ -553,7 +553,7 @@ export default function ClassMembers({
                   <button
                     type="button"
                     onClick={() => openAssignMonitorModal(null)}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-indigo-200"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg transition-colors cursor-pointer border border-indigo-200"
                     title="Chỉ định Lớp trưởng cho lớp này"
                   >
                     <Crown className="w-3 h-3 text-amber-500" /> Chỉ Định Lớp Trưởng
@@ -565,20 +565,20 @@ export default function ClassMembers({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {userOwnClass && userOwnClass !== selectedClass && (
             <button
               onClick={() => onClassChange(userOwnClass)}
-              className="px-3 py-2 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors shadow-sm whitespace-nowrap cursor-pointer"
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors shadow-2xs whitespace-nowrap cursor-pointer"
             >
               Về Lớp Của Tôi ({userOwnClass})
             </button>
           )}
 
-          <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 shadow-sm min-w-[170px]">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Lớp:</span>
+          <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-slate-200 shadow-2xs flex-1 sm:flex-initial min-w-[140px] sm:min-w-[170px]">
+            <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Lớp:</span>
             <select
-              className="bg-transparent text-sm font-bold text-slate-800 outline-none w-full cursor-pointer"
+              className="bg-transparent text-xs sm:text-sm font-bold text-slate-800 outline-none w-full cursor-pointer"
               value={selectedClass}
               onChange={(e) => onClassChange(e.target.value)}
             >
@@ -599,50 +599,50 @@ export default function ClassMembers({
                 setGlobalSearchResults([]);
                 setSelectedStudentToReceive(null);
               }}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-200 whitespace-nowrap cursor-pointer hover:scale-[1.02]"
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl transition-all shadow-md shadow-indigo-200 whitespace-nowrap cursor-pointer hover:scale-[1.02]"
               title="Tiếp nhận sinh viên chuyển biên chế vào lớp này"
             >
-              <UserPlus className="w-4 h-4" /> Tiếp Nhận SV
+              <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Tiếp Nhận SV
             </button>
           ) : (
             <span
-              className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 cursor-default"
+              className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 cursor-default"
               title={`Chỉ Lớp trưởng của lớp ${selectedClass} mới có quyền tiếp nhận và điều chuyển sinh viên`}
             >
-              Chế độ chỉ xem
+              Chỉ xem
             </span>
           )}
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 px-3.5 py-2.5 rounded-xl transition-colors shadow-sm whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 px-2.5 py-1.5 sm:px-3.5 sm:py-2.5 rounded-xl transition-colors shadow-2xs whitespace-nowrap cursor-pointer"
           >
-            <Download className="w-4 h-4 text-blue-600" /> Xuất CSV
+            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" /> Xuất CSV
           </button>
         </div>
       </div>
 
       {/* Stats Summary Cards */}
-      <div className={`grid gap-4 shrink-0 ${hasExamSchedule ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-            <Users className="w-6 h-6" />
+      <div className={`grid gap-2.5 sm:gap-4 shrink-0 ${hasExamSchedule ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3'}`}>
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3 sm:gap-4">
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+            <Users className="w-4 h-4 sm:w-6 sm:h-6" />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Sĩ Số Đang Học</p>
-            <p className="text-2xl font-black text-slate-800">
-              {stats.total} <span className="text-xs font-normal text-slate-500">Sinh viên</span>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Sĩ Số Đang Học</p>
+            <p className="text-lg sm:text-2xl font-black text-slate-800">
+              {stats.total} <span className="text-[10px] sm:text-xs font-normal text-slate-500">SV</span>
             </p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
-            <UserCheck className="w-6 h-6" />
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3 sm:gap-4">
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+            <UserCheck className="w-4 h-4 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Giới Tính</p>
-            <p className="text-sm font-bold text-slate-800">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Giới Tính</p>
+            <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">
               <span className="text-blue-600">{stats.maleCount} Nam</span> /{' '}
               <span className="text-rose-500">{stats.femaleCount} Nữ</span>
             </p>
@@ -660,60 +660,60 @@ export default function ClassMembers({
         </div>
 
         {hasExamSchedule && (
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-              <Calendar className="w-6 h-6" />
+          <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3 sm:gap-4">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+              <Calendar className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Đăng Ký Thi</p>
-              <p className="text-2xl font-black text-slate-800">
-                {stats.totalExams} <span className="text-xs font-normal text-slate-500">Lượt thi</span>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Đăng Ký Thi</p>
+              <p className="text-lg sm:text-2xl font-black text-slate-800">
+                {stats.totalExams} <span className="text-[10px] sm:text-xs font-normal text-slate-500">Lượt</span>
               </p>
             </div>
           </div>
         )}
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
-            <UserMinus className="w-6 h-6" />
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3 sm:gap-4">
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+            <UserMinus className="w-4 h-4 sm:w-6 sm:h-6" />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Biến Động Sĩ Số</p>
-            <p className="text-2xl font-black text-rose-600">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Biến Động</p>
+            <p className="text-lg sm:text-2xl font-black text-rose-600">
               {excludedStudents.length}{' '}
-              <span className="text-xs font-normal text-slate-500">Bảo lưu/Đổi lớp</span>
+              <span className="text-[10px] sm:text-xs font-normal text-slate-500">Bảo lưu</span>
             </p>
           </div>
         </div>
       </div>
 
       {/* Main Table Container */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden flex-1 min-h-[420px]">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex flex-col shrink-0 sm:flex-1">
         {/* Navigation Tabs between Active Members & Excluded List */}
-        <div className="flex items-center justify-between px-6 pt-4 border-b border-slate-100 bg-white">
-          <div className="flex items-center gap-6">
+        <div className="flex items-center justify-between px-3 sm:px-6 pt-3 sm:pt-4 border-b border-slate-100 bg-white overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-4 sm:gap-6 whitespace-nowrap">
             <button
               onClick={() => setActiveTab('ACTIVE')}
-              className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all cursor-pointer ${
                 activeTab === 'ACTIVE'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
-              <Users className="w-4 h-4" />
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               Đang Theo Học ({activeStudents.length})
             </button>
 
             <button
               onClick={() => setActiveTab('EXCLUDED')}
-              className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all cursor-pointer ${
                 activeTab === 'EXCLUDED'
                   ? 'border-rose-600 text-rose-600'
                   : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
-              <PauseCircle className="w-4 h-4" />
-              Đã Chuyển Đi / Bảo Lưu / Nghỉ Học ({excludedStudents.length})
+              <PauseCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              Bảo Lưu / Chuyển Đi ({excludedStudents.length})
             </button>
           </div>
         </div>
@@ -769,233 +769,468 @@ export default function ClassMembers({
           </div>
         </div>
 
-        {/* Member Table */}
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-100/80 text-slate-600 sticky top-0 z-10 border-b border-slate-200 shadow-sm text-xs font-bold uppercase tracking-wider">
-              <tr>
-                <th className="px-4 sm:px-6 py-3.5 w-12 text-center">STT</th>
-                <th className="px-4 sm:px-6 py-3.5">Mã SV</th>
-                <th className="px-4 sm:px-6 py-3.5">Họ và Tên</th>
-                <th className="px-4 sm:px-6 py-3.5 text-center">Phái</th>
-                <th className="px-4 sm:px-6 py-3.5">Ngày sinh</th>
-                {hasExamSchedule && <th className="px-4 sm:px-6 py-3.5 text-center">Môn thi</th>}
-                <th className="px-4 sm:px-6 py-3.5">SĐT & Ghi chú</th>
-                <th className="px-4 sm:px-6 py-3.5 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
-              {isLoadingList ? (
-                <tr>
-                  <td colSpan={hasExamSchedule ? 8 : 7} className="px-6 py-16 text-center text-slate-500 font-medium">
-                    <div className="flex flex-col items-center justify-center gap-3">
-                      <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs font-semibold text-slate-500">Đang tải danh sách thành viên lớp {selectedClass}...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredStudents.length === 0 ? (
-                <tr>
-                  <td colSpan={hasExamSchedule ? 8 : 7} className="px-6 py-12 text-center text-slate-400 font-medium">
-                    {activeTab === 'ACTIVE'
-                      ? 'Không tìm thấy thành viên nào phù hợp với bộ lọc.'
-                      : 'Không có sinh viên nào trong danh sách biến động/bảo lưu.'}
-                  </td>
-                </tr>
-              ) : (
-                filteredStudents.map((student, index) => {
-                  const isFemale =
-                    (student.PHAI || '').toLowerCase().includes('nữ') ||
-                    (student.PHAI || '').toLowerCase().includes('nu');
+        {/* Member Table View (Desktop & Mobile) */}
+        {isLoadingList ? (
+          <div className="p-12 flex flex-col items-center justify-center gap-3 text-slate-500 font-medium">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs font-semibold text-slate-500">Đang tải danh sách thành viên lớp {selectedClass}...</span>
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="p-12 text-center text-slate-400 font-medium text-xs">
+            {activeTab === 'ACTIVE'
+              ? 'Không tìm thấy thành viên nào phù hợp với bộ lọc.'
+              : 'Không có sinh viên nào trong danh sách biến động/bảo lưu.'}
+          </div>
+        ) : (
+          <>
+            {/* ========================================================================= */}
+            {/* MOBILE VIEW: Mobile Student Cards                                         */}
+            {/* ========================================================================= */}
+            <div className="block md:hidden p-3.5 space-y-3">
+              {filteredStudents.map((student, index) => {
+                const isFemale =
+                  (student.PHAI || '').toLowerCase().includes('nữ') ||
+                  (student.PHAI || '').toLowerCase().includes('nu');
 
-                  return (
-                    <tr key={student.MaSV} className="hover:bg-blue-50/40 transition-colors">
-                      <td className="px-4 sm:px-6 py-3.5 text-center text-slate-400 font-medium text-xs">
-                        {index + 1}
-                      </td>
-                      <td className="px-4 sm:px-6 py-3.5 font-mono font-bold text-blue-600">
-                        <button
-                          onClick={() => setSelectedStudentDetail(student)}
-                          className="hover:underline flex items-center gap-1 text-left cursor-pointer"
-                        >
-                          {student.MaSV}
-                        </button>
-                      </td>
-                      <td className="px-4 sm:px-6 py-3.5 font-semibold text-slate-800">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span>
-                            {student.HoLotSV}{' '}
-                            <span className="font-extrabold text-slate-900">{student.TenSV}</span>
-                          </span>
-
-                          {student.isMonitor && (
-                            <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
-                              <Crown className="w-3 h-3 text-amber-600" /> Lớp trưởng
-                            </span>
-                          )}
-
-                          {student.isTransferred && (
-                            <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200 flex items-center gap-1">
-                              <ArrowRightLeft className="w-3 h-3" /> Chuyển đến
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 sm:px-6 py-3.5 text-center">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                return (
+                  <div
+                    key={student.MaSV}
+                    className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col gap-3 relative overflow-hidden active:scale-98"
+                  >
+                    {/* Header: Avatar, Big Name & Status */}
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        <div
+                          className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 mt-0.5 ${
                             isFemale
-                              ? 'bg-rose-50 text-rose-600 border-rose-200'
-                              : 'bg-blue-50 text-blue-600 border-blue-200'
+                              ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                              : 'bg-blue-50 text-blue-600 border border-blue-100'
                           }`}
                         >
-                          {student.PHAI || 'Nam'}
+                          {student.TenSV ? student.TenSV.charAt(0) : student.HoLotSV ? student.HoLotSV.charAt(0) : 'S'}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          {/* Big Student Name */}
+                          <h3 className="text-base font-black text-slate-900 leading-snug flex items-center gap-1.5 flex-wrap">
+                            <span>
+                              {student.HoLotSV} {student.TenSV}
+                            </span>
+                            {student.isMonitor && (
+                              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1 shrink-0">
+                                <Crown className="w-3 h-3 text-amber-600 fill-amber-400" /> Lớp trưởng
+                              </span>
+                            )}
+                            {student.isTransferred && (
+                              <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200 flex items-center gap-1 shrink-0">
+                                <ArrowRightLeft className="w-3 h-3" /> Chuyển đến
+                              </span>
+                            )}
+                          </h3>
+
+                          {/* Student ID & Gender Pills */}
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStudentDetail(student)}
+                              className="font-mono text-xs font-black text-blue-700 hover:text-blue-900 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-lg cursor-pointer hover:underline"
+                            >
+                              {student.MaSV}
+                            </button>
+
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                                isFemale
+                                  ? 'bg-rose-50 text-rose-600 border-rose-200'
+                                  : 'bg-blue-50 text-blue-600 border-blue-200'
+                              }`}
+                            >
+                              {student.PHAI || 'Nam'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md shrink-0">
+                        #{index + 1}
+                      </span>
+                    </div>
+
+                    {/* 2x2 Details Grid */}
+                    <div className="grid grid-cols-2 gap-2 text-xs p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-indigo-500" /> Ngày Sinh
                         </span>
-                      </td>
-                      <td className="px-4 sm:px-6 py-3.5 text-slate-600 text-xs font-medium">
-                        {student.NgaySinhC || '—'}
-                      </td>
+                        <div className="font-mono font-bold text-slate-800 text-xs">
+                          {student.NgaySinhC || '—'}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-emerald-500" /> SĐT Liên Hệ
+                        </span>
+                        {student.phone ? (
+                          <a
+                            href={`tel:${student.phone}`}
+                            className="font-mono font-bold text-emerald-700 hover:underline text-xs"
+                          >
+                            {student.phone}
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">—</span>
+                        )}
+                      </div>
+
                       {hasExamSchedule && (
-                        <td className="px-4 sm:px-6 py-3.5 text-center">
+                        <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-200/60">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-amber-500" /> Đăng Ký Thi
+                          </span>
+                          <div className="font-bold text-slate-800 text-xs">
+                            {student.examCount || 0} môn thi
+                          </div>
+                        </div>
+                      )}
+
+                      {student.note && (
+                        <div className={`flex flex-col gap-0.5 pt-1.5 border-t border-slate-200/60 ${hasExamSchedule ? '' : 'col-span-2'}`}>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <Edit3 className="w-3 h-3 text-purple-500" /> Ghi Chú
+                          </span>
+                          <span className="text-xs text-slate-600 italic line-clamp-2">
+                            "{student.note}"
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Card Action Buttons */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 flex-wrap text-xs">
+                      {activeTab === 'ACTIVE' ? (
+                        <>
+                          {hasExamSchedule && onSelectStudentSchedule ? (
+                            <button
+                              type="button"
+                              onClick={() => onSelectStudentSchedule(student.MaSV)}
+                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Calendar className="w-3.5 h-3.5" />
+                              <span>Lịch Thi ({student.examCount || 0} môn)</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStudentDetail(student)}
+                              className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Xem Chi Tiết</span>
+                            </button>
+                          )}
+
+                          <div className="flex items-center gap-1 ml-auto">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStudentDetail(student)}
+                              className="p-1.5 text-slate-500 hover:text-blue-700 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-xl transition cursor-pointer"
+                              title="Xem thông tin chi tiết"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            {canManageClass && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData({
+                                      phone: student.phone || '',
+                                      note: student.note || '',
+                                    });
+                                    setEditingStudent(student);
+                                  }}
+                                  className="p-1.5 text-slate-600 hover:text-amber-700 bg-slate-50 hover:bg-amber-50 border border-slate-200 rounded-xl transition cursor-pointer"
+                                  title="Chỉnh sửa SĐT & ghi chú"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setStudentToExclude(student);
+                                    setExcludeType('BAO_LUU');
+                                    setExcludeReason('');
+                                    setExcludeTargetClass(classes.find((c) => c !== selectedClass) || '');
+                                  }}
+                                  className="p-1.5 text-slate-600 hover:text-rose-700 bg-slate-50 hover:bg-rose-50 border border-slate-200 rounded-xl transition cursor-pointer"
+                                  title="Điều chuyển / Bảo lưu"
+                                >
+                                  <UserMinus className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setResetPasswordStudent({
+                                    username: student.MaSV,
+                                    fullName: `${student.HoLotSV || ''} ${student.TenSV || ''}`.trim(),
+                                    lop: selectedClass,
+                                  });
+                                  setIsResetPasswordModalOpen(true);
+                                }}
+                                className="p-1.5 text-slate-600 hover:text-emerald-700 bg-slate-50 hover:bg-emerald-50 border border-slate-200 rounded-xl transition cursor-pointer"
+                                title={`Đặt lại mật khẩu cho ${student.MaSV}`}
+                              >
+                                <KeyRound className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+
+                            {onImpersonate && (
+                              <button
+                                type="button"
+                                onClick={() => onImpersonate(student.MaSV)}
+                                className="p-1.5 text-slate-600 hover:text-purple-700 bg-slate-50 hover:bg-purple-50 border border-slate-200 rounded-xl transition cursor-pointer"
+                                title={`Giả lập ${student.MaSV}`}
+                              >
+                                <UserCheck className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        canManageClass && (
+                          <button
+                            type="button"
+                            onClick={() => handleRestoreStudent(student)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition cursor-pointer"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" /> Khôi Phục Vào Lớp
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ========================================================================= */}
+            {/* DESKTOP VIEW: Full 8-Column Member Table                                  */}
+            {/* ========================================================================= */}
+            <div className="hidden md:block flex-1 overflow-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-100/80 text-slate-600 sticky top-0 z-10 border-b border-slate-200 shadow-sm text-xs font-bold uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3.5 w-12 text-center">STT</th>
+                    <th className="px-4 sm:px-6 py-3.5">Mã SV</th>
+                    <th className="px-4 sm:px-6 py-3.5">Họ và Tên</th>
+                    <th className="px-4 sm:px-6 py-3.5 text-center">Phái</th>
+                    <th className="px-4 sm:px-6 py-3.5">Ngày sinh</th>
+                    {hasExamSchedule && <th className="px-4 sm:px-6 py-3.5 text-center">Môn thi</th>}
+                    <th className="px-4 sm:px-6 py-3.5">SĐT & Ghi chú</th>
+                    <th className="px-4 sm:px-6 py-3.5 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {filteredStudents.map((student, index) => {
+                    const isFemale =
+                      (student.PHAI || '').toLowerCase().includes('nữ') ||
+                      (student.PHAI || '').toLowerCase().includes('nu');
+
+                    return (
+                      <tr key={student.MaSV} className="hover:bg-blue-50/40 transition-colors">
+                        <td className="px-4 sm:px-6 py-3.5 text-center text-slate-400 font-medium text-xs">
+                          {index + 1}
+                        </td>
+                        <td className="px-4 sm:px-6 py-3.5 font-mono font-bold text-blue-600">
                           <button
                             onClick={() => setSelectedStudentDetail(student)}
-                            className="px-2.5 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 border border-slate-200 cursor-pointer"
+                            className="hover:underline flex items-center gap-1 text-left cursor-pointer"
                           >
-                            <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                            {student.examCount || 0} môn
+                            {student.MaSV}
                           </button>
                         </td>
-                      )}
-                      <td className="px-4 sm:px-6 py-3.5">
-                        <div className="flex flex-col gap-1 max-w-[280px]">
-                          {student.phone && (
-                            <span className="text-[11px] font-mono text-slate-700 flex items-center gap-1 font-semibold">
-                              <Phone className="w-3 h-3 text-slate-400" /> {student.phone}
+                        <td className="px-4 sm:px-6 py-3.5 font-semibold text-slate-800">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span>
+                              {student.HoLotSV}{' '}
+                              <span className="font-extrabold text-slate-900">{student.TenSV}</span>
                             </span>
-                          )}
-                          {student.note ? (
-                            <span className="text-xs text-slate-600 line-clamp-1 italic" title={student.note}>
-                              "{student.note}"
-                            </span>
-                          ) : !student.phone ? (
-                            <span className="text-xs text-slate-400">—</span>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-4 sm:px-6 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {activeTab === 'ACTIVE' ? (
-                            <>
-                              <button
-                                onClick={() => setSelectedStudentDetail(student)}
-                                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                title={hasExamSchedule ? "Xem lịch thi & chi tiết" : "Xem thông tin chi tiết"}
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
 
-                              {onImpersonate && (
+                            {student.isMonitor && (
+                              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
+                                <Crown className="w-3 h-3 text-amber-600" /> Lớp trưởng
+                              </span>
+                            )}
+
+                            {student.isTransferred && (
+                              <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-200 flex items-center gap-1">
+                                <ArrowRightLeft className="w-3 h-3" /> Chuyển đến
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 sm:px-6 py-3.5 text-center">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                              isFemale
+                                ? 'bg-rose-50 text-rose-600 border-rose-200'
+                                : 'bg-blue-50 text-blue-600 border-blue-200'
+                            }`}
+                          >
+                            {student.PHAI || 'Nam'}
+                          </span>
+                        </td>
+                        <td className="px-4 sm:px-6 py-3.5 text-slate-600 text-xs font-medium">
+                          {student.NgaySinhC || '—'}
+                        </td>
+                        {hasExamSchedule && (
+                          <td className="px-4 sm:px-6 py-3.5 text-center">
+                            <button
+                              onClick={() => setSelectedStudentDetail(student)}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 border border-slate-200 cursor-pointer"
+                            >
+                              <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                              {student.examCount || 0} môn
+                            </button>
+                          </td>
+                        )}
+                        <td className="px-4 sm:px-6 py-3.5">
+                          <div className="flex flex-col gap-1 max-w-[280px]">
+                            {student.phone && (
+                              <span className="text-[11px] font-mono text-slate-700 flex items-center gap-1 font-semibold">
+                                <Phone className="w-3 h-3 text-slate-400" /> {student.phone}
+                              </span>
+                            )}
+                            {student.note ? (
+                              <span className="text-xs text-slate-600 line-clamp-1 italic" title={student.note}>
+                                "{student.note}"
+                              </span>
+                            ) : !student.phone ? (
+                              <span className="text-xs text-slate-400">—</span>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="px-4 sm:px-6 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {activeTab === 'ACTIVE' ? (
+                              <>
                                 <button
-                                  onClick={() => onImpersonate(student.MaSV)}
-                                  className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
-                                  title={`Đăng nhập với tư cách ${student.MaSV} (${student.TenSV})`}
+                                  onClick={() => setSelectedStudentDetail(student)}
+                                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                  title={hasExamSchedule ? "Xem lịch thi & chi tiết" : "Xem thông tin chi tiết"}
                                 >
-                                  <UserCheck className="w-4 h-4" />
+                                  <Eye className="w-4 h-4" />
                                 </button>
-                              )}
 
-                              {isAdmin && (
-                                <>
+                                {onImpersonate && (
                                   <button
-                                    type="button"
-                                    onClick={() => {
-                                      setResetPasswordStudent({
-                                        username: student.MaSV,
-                                        fullName: `${student.HoLotSV || ''} ${student.TenSV || ''}`.trim(),
-                                        lop: selectedClass,
-                                      });
-                                      setIsResetPasswordModalOpen(true);
-                                    }}
-                                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                                    title={`Đặt lại mật khẩu cho sinh viên ${student.MaSV}`}
+                                    onClick={() => onImpersonate(student.MaSV)}
+                                    className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                                    title={`Đăng nhập với tư cách ${student.MaSV} (${student.TenSV})`}
                                   >
-                                    <KeyRound className="w-4 h-4" />
+                                    <UserCheck className="w-4 h-4" />
                                   </button>
+                                )}
 
-                                  {student.MaSV === classMonitor?.username ? (
-                                    <span
-                                      className="p-1.5 text-amber-600 bg-amber-50 rounded-lg cursor-default"
-                                      title="Đang là Lớp Trưởng"
-                                    >
-                                      <Crown className="w-4 h-4 fill-amber-400 text-amber-600" />
-                                    </span>
-                                  ) : (
+                                {isAdmin && (
+                                  <>
                                     <button
-                                      onClick={() => openAssignMonitorModal(student.MaSV)}
-                                      className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                                      title={`Chỉ định ${student.HoLotSV} ${student.TenSV} làm Lớp Trưởng`}
+                                      type="button"
+                                      onClick={() => {
+                                        setResetPasswordStudent({
+                                          username: student.MaSV,
+                                          fullName: `${student.HoLotSV || ''} ${student.TenSV || ''}`.trim(),
+                                          lop: selectedClass,
+                                        });
+                                        setIsResetPasswordModalOpen(true);
+                                      }}
+                                      className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                      title={`Đặt lại mật khẩu cho sinh viên ${student.MaSV}`}
                                     >
-                                      <Crown className="w-4 h-4" />
+                                      <KeyRound className="w-4 h-4" />
                                     </button>
-                                  )}
-                                </>
-                              )}
 
-                              {canManageClass && (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      setFormData({
-                                        phone: student.phone || '',
-                                        note: student.note || '',
-                                      });
-                                      setEditingStudent(student);
-                                    }}
-                                    className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                                    title="Chỉnh sửa SĐT & ghi chú"
-                                  >
-                                    <Edit3 className="w-4 h-4" />
-                                  </button>
+                                    {student.MaSV === classMonitor?.username ? (
+                                      <span
+                                        className="p-1.5 text-amber-600 bg-amber-50 rounded-lg cursor-default"
+                                        title="Đang là Lớp Trưởng"
+                                      >
+                                        <Crown className="w-4 h-4 fill-amber-400 text-amber-600" />
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => openAssignMonitorModal(student.MaSV)}
+                                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                        title={`Chỉ định ${student.HoLotSV} ${student.TenSV} làm Lớp Trưởng`}
+                                      >
+                                        <Crown className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </>
+                                )}
 
-                                  {/* Button Điều chuyển / Loại khỏi lớp */}
-                                  <button
-                                    onClick={() => {
-                                      setStudentToExclude(student);
-                                      setExcludeType('BAO_LUU');
-                                      setExcludeReason('');
-                                      setExcludeTargetClass(classes.find((c) => c !== selectedClass) || '');
-                                    }}
-                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                    title="Điều chuyển / Bảo lưu / Loại khỏi lớp"
-                                  >
-                                    <UserMinus className="w-4 h-4" />
-                                  </button>
-                                </>
-                              )}
-                            </>
-                          ) : (
-                            /* Actions for Excluded Students: Restore button */
-                            canManageClass ? (
-                              <button
-                                onClick={() => handleRestoreStudent(student)}
-                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors cursor-pointer shadow-sm"
-                                title="Khôi phục lại vào danh sách lớp"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" /> Khôi Phục
-                              </button>
+                                {canManageClass && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setFormData({
+                                          phone: student.phone || '',
+                                          note: student.note || '',
+                                        });
+                                        setEditingStudent(student);
+                                      }}
+                                      className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                      title="Chỉnh sửa SĐT & ghi chú"
+                                    >
+                                      <Edit3 className="w-4 h-4" />
+                                    </button>
+
+                                    {/* Button Điều chuyển / Loại khỏi lớp */}
+                                    <button
+                                      onClick={() => {
+                                        setStudentToExclude(student);
+                                        setExcludeType('BAO_LUU');
+                                        setExcludeReason('');
+                                        setExcludeTargetClass(classes.find((c) => c !== selectedClass) || '');
+                                      }}
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                      title="Điều chuyển / Bảo lưu / Loại khỏi lớp"
+                                    >
+                                      <UserMinus className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </>
                             ) : (
-                              <span className="text-xs text-slate-400 italic">Chỉ xem</span>
-                            )
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                              /* Actions for Excluded Students: Restore button */
+                              canManageClass ? (
+                                <button
+                                  onClick={() => handleRestoreStudent(student)}
+                                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors cursor-pointer shadow-sm"
+                                  title="Khôi phục lại vào danh sách lớp"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" /> Khôi Phục
+                                </button>
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">Chỉ xem</span>
+                              )
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* MODAL 1: Tiếp Nhận Sinh Viên (Receive Student Modal) */}
@@ -1452,87 +1687,184 @@ export default function ClassMembers({
                       Không có lịch thi nào được tìm thấy cho sinh viên này.
                     </p>
                   ) : (
-                    <div className="border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-slate-100 text-slate-600 sticky top-0 border-b border-slate-200 font-semibold">
-                          <tr>
-                            <th className="px-3 py-2.5">Ngày thi</th>
-                            <th className="px-3 py-2.5">Giờ thi</th>
-                            <th className="px-3 py-2.5">Tên môn học</th>
-                            <th className="px-3 py-2.5 text-center">Phòng</th>
-                            <th className="px-3 py-2.5 text-center">Tổ/Nhóm</th>
-                            <th className="px-3 py-2.5 text-center">Trạng thái thi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {selectedStudentDetail.exams.map((ex: ExamRecord, idx: number) => (
-                            <tr key={idx} className={`hover:bg-blue-50/50 ${ex.isPostponed ? 'bg-amber-50/30' : ''}`}>
-                              <td className="px-3 py-2.5 font-bold text-slate-700">{ex.NgayThi}</td>
-                              <td className="px-3 py-2.5 text-blue-600 font-medium">{ex.GioThi}</td>
-                              <td className="px-3 py-2.5 font-bold text-slate-800">
-                                <div className="flex items-center gap-1.5">
-                                  <span className={ex.isPostponed ? 'line-through text-slate-400' : ''}>{ex.TenMH}</span>
-                                  <span className="text-[10px] text-slate-400 font-mono">({ex.MaMH})</span>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2.5 text-center font-bold text-emerald-700">{ex.MAPTHI || '—'}</td>
-                              <td className="px-3 py-2.5 text-center text-slate-500">
-                                {ex['To thi'] || ex.NhomThi || '—'}
-                              </td>
-                              <td className="px-3 py-2.5 text-center">
-                                {onTogglePostpone ? (
-                                  <button
-                                    onClick={async () => {
-                                      const nextStatus = !ex.isPostponed;
-                                      await onTogglePostpone(ex, nextStatus);
-                                      setSelectedStudentDetail((prev: any) => {
-                                        if (!prev) return prev;
-                                        return {
-                                          ...prev,
-                                          exams: prev.exams.map((e: ExamRecord) =>
-                                            (ex.id && e.id === ex.id) ||
-                                            (e.MaMH === ex.MaMH && e.MAPTHI === ex.MAPTHI && e.NgayThi === ex.NgayThi && e.GioThi === ex.GioThi)
-                                              ? { ...e, isPostponed: nextStatus }
-                                              : e
-                                          ),
-                                        };
-                                      });
-                                    }}
-                                    title={ex.isPostponed ? 'Bấm để chuyển về Dự thi' : 'Bấm để đánh dấu Hoãn thi (không chia tiền)'}
-                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
-                                      ex.isPostponed
-                                        ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 shadow-xs'
-                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300'
-                                    }`}
-                                  >
-                                    {ex.isPostponed ? '✕ Hoãn thi' : '✓ Dự thi'}
-                                  </button>
-                                ) : (
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                      ex.isPostponed
-                                        ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    }`}
-                                  >
-                                    {ex.isPostponed ? 'Hoãn thi' : 'Dự thi'}
-                                  </span>
-                                )}
-                              </td>
+                    <div className="space-y-3">
+                      {/* Mobile Exam Cards inside Modal */}
+                      <div className="block sm:hidden space-y-2 max-h-72 overflow-y-auto pr-1">
+                        {selectedStudentDetail.exams.map((ex: ExamRecord, idx: number) => (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-xl border flex flex-col gap-2 ${
+                              ex.isPostponed ? 'bg-amber-50/50 border-amber-200' : 'bg-white border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <h5 className={`text-xs font-black ${ex.isPostponed ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+                                  {ex.TenMH}
+                                </h5>
+                                <span className="font-mono text-[10px] text-blue-600 font-bold">{ex.MaMH}</span>
+                              </div>
+
+                              {onTogglePostpone ? (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const nextStatus = !ex.isPostponed;
+                                    await onTogglePostpone(ex, nextStatus);
+                                    setSelectedStudentDetail((prev: any) => {
+                                      if (!prev) return prev;
+                                      return {
+                                        ...prev,
+                                        exams: prev.exams.map((e: ExamRecord) =>
+                                          (ex.id && e.id === ex.id) ||
+                                          (e.MaMH === ex.MaMH && e.MAPTHI === ex.MAPTHI && e.NgayThi === ex.NgayThi && e.GioThi === ex.GioThi)
+                                            ? { ...e, isPostponed: nextStatus }
+                                            : e
+                                        ),
+                                      };
+                                    });
+                                  }}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer shrink-0 ${
+                                    ex.isPostponed
+                                      ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  }`}
+                                >
+                                  {ex.isPostponed ? '✕ Hoãn' : '✓ Dự thi'}
+                                </button>
+                              ) : (
+                                <span
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border shrink-0 ${
+                                    ex.isPostponed
+                                      ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  }`}
+                                >
+                                  {ex.isPostponed ? 'Hoãn' : 'Dự thi'}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5 text-[11px] p-2 bg-slate-50 rounded-lg">
+                              <div>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase">Ngày: </span>
+                                <span className="font-bold text-slate-800">{ex.NgayThi}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase">Giờ: </span>
+                                <span className="font-bold text-blue-600">{ex.GioThi}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase">Phòng: </span>
+                                <span className="font-bold text-emerald-700">{ex.MAPTHI || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase">Tổ: </span>
+                                <span className="font-bold text-slate-700">{ex['To thi'] || ex.NhomThi || '—'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop Table inside Modal */}
+                      <div className="hidden sm:block border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-slate-100 text-slate-600 sticky top-0 border-b border-slate-200 font-semibold">
+                            <tr>
+                              <th className="px-3 py-2.5">Ngày thi</th>
+                              <th className="px-3 py-2.5">Giờ thi</th>
+                              <th className="px-3 py-2.5">Tên môn học</th>
+                              <th className="px-3 py-2.5 text-center">Phòng</th>
+                              <th className="px-3 py-2.5 text-center">Tổ/Nhóm</th>
+                              <th className="px-3 py-2.5 text-center">Trạng thái thi</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {selectedStudentDetail.exams.map((ex: ExamRecord, idx: number) => (
+                              <tr key={idx} className={`hover:bg-blue-50/50 ${ex.isPostponed ? 'bg-amber-50/30' : ''}`}>
+                                <td className="px-3 py-2.5 font-bold text-slate-700">{ex.NgayThi}</td>
+                                <td className="px-3 py-2.5 text-blue-600 font-medium">{ex.GioThi}</td>
+                                <td className="px-3 py-2.5 font-bold text-slate-800">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={ex.isPostponed ? 'line-through text-slate-400' : ''}>{ex.TenMH}</span>
+                                    <span className="text-[10px] text-slate-400 font-mono">({ex.MaMH})</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5 text-center font-bold text-emerald-700">{ex.MAPTHI || '—'}</td>
+                                <td className="px-3 py-2.5 text-center text-slate-500">
+                                  {ex['To thi'] || ex.NhomThi || '—'}
+                                </td>
+                                <td className="px-3 py-2.5 text-center">
+                                  {onTogglePostpone ? (
+                                    <button
+                                      onClick={async () => {
+                                        const nextStatus = !ex.isPostponed;
+                                        await onTogglePostpone(ex, nextStatus);
+                                        setSelectedStudentDetail((prev: any) => {
+                                          if (!prev) return prev;
+                                          return {
+                                            ...prev,
+                                            exams: prev.exams.map((e: ExamRecord) =>
+                                              (ex.id && e.id === ex.id) ||
+                                              (e.MaMH === ex.MaMH && e.MAPTHI === ex.MAPTHI && e.NgayThi === ex.NgayThi && e.GioThi === ex.GioThi)
+                                                ? { ...e, isPostponed: nextStatus }
+                                                : e
+                                            ),
+                                          };
+                                        });
+                                      }}
+                                      title={ex.isPostponed ? 'Bấm để chuyển về Dự thi' : 'Bấm để đánh dấu Hoãn thi (không chia tiền)'}
+                                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                                        ex.isPostponed
+                                          ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 shadow-xs'
+                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300'
+                                      }`}
+                                    >
+                                      {ex.isPostponed ? '✕ Hoãn thi' : '✓ Dự thi'}
+                                    </button>
+                                  ) : (
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                        ex.isPostponed
+                                          ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      }`}
+                                    >
+                                      {ex.isPostponed ? 'Hoãn thi' : 'Dự thi'}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+              {onSelectStudentSchedule ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = selectedStudentDetail.MaSV;
+                    setSelectedStudentDetail(null);
+                    onSelectStudentSchedule(id);
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-blue-200 cursor-pointer"
+                >
+                  <Calendar className="w-3.5 h-3.5" /> Xem Lịch Thi Chi Tiết
+                </button>
+              ) : <div />}
+
               <button
+                type="button"
                 onClick={() => setSelectedStudentDetail(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Đóng
               </button>

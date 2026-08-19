@@ -311,6 +311,49 @@ export default function HomeMainContent({
           activeBatch={activeBatch}
           loadDataFromApi={loadDataFromApi}
         />
+      ) : activeTab === 'class_members' ? (
+        <ClassMembers
+          records={records}
+          selectedClass={monitorClass}
+          onClassChange={setMonitorClass}
+          currentUser={effectiveUser}
+          loginUsers={loginUsers}
+          hasExamSchedule={hasExamSchedule}
+          onImpersonate={canImpersonate ? handleImpersonate : undefined}
+          onTogglePostpone={handleToggleExamPostpone}
+          onReloadMonitors={fetchMonitorsData}
+          onSelectStudentSchedule={(studentId) => {
+            setSearchInput(studentId);
+            setFilters((prev) => ({ ...prev, search: studentId }));
+            handleTabChange('personal_schedule');
+          }}
+        />
+      ) : activeTab === 'schedule' ? (
+        <AllExamsSchedule
+          records={records}
+          totalRecords={totalRecords}
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+          totalPages={totalPages}
+          sortConfig={sortConfig}
+          setSortConfig={setSortConfig}
+          filters={filters}
+          setFilters={setFilters}
+          classes={classes}
+          subjects={subjects}
+          dates={dates}
+          selectedExamRoom={selectedExamRoom}
+          setSelectedExamRoom={setSelectedExamRoom}
+          setConfirmStudentId={setConfirmStudentId}
+          setConfirmClassCode={setConfirmClassCode}
+          handleToggleExamPostpone={handleToggleExamPostpone}
+          canAccessMonitorTools={canAccessMonitorTools}
+          isLoading={isLoading}
+          activeBatch={activeBatch}
+          loadDataFromApi={loadDataFromApi}
+        />
       ) : records.length === 0 && totalRecords === 0 ? (
         isAdmin ? (
           <UploadSection
@@ -339,32 +382,6 @@ export default function HomeMainContent({
             </button>
           </div>
         )
-      ) : activeTab === 'schedule' ? (
-        <AllExamsSchedule
-          records={records}
-          totalRecords={totalRecords}
-          page={page}
-          setPage={setPage}
-          pageSize={pageSize}
-          setPageSize={setPageSize}
-          totalPages={totalPages}
-          sortConfig={sortConfig}
-          setSortConfig={setSortConfig}
-          filters={filters}
-          setFilters={setFilters}
-          classes={classes}
-          subjects={subjects}
-          dates={dates}
-          selectedExamRoom={selectedExamRoom}
-          setSelectedExamRoom={setSelectedExamRoom}
-          setConfirmStudentId={setConfirmStudentId}
-          setConfirmClassCode={setConfirmClassCode}
-          handleToggleExamPostpone={handleToggleExamPostpone}
-          canAccessMonitorTools={canAccessMonitorTools}
-          isLoading={isLoading}
-          activeBatch={activeBatch}
-          loadDataFromApi={loadDataFromApi}
-        />
       ) : (
         <ClassMembers
           records={records}
