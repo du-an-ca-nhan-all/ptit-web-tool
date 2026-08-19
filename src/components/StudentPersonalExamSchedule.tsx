@@ -27,6 +27,12 @@ import {
   ExternalLink,
   X,
   FileText,
+  LayoutGrid,
+  Table as TableIcon,
+  Calendar,
+  Printer,
+  ArrowUpDown,
+  Share2,
 } from 'lucide-react';
 import { ExamRecord, LoginUser, ExamBatchItem } from '../types';
 import { FilterState } from './FilterBar';
@@ -37,6 +43,8 @@ import {
   StudentQldtExamScheduleResult,
   StudentQldtExamItem,
 } from '../lib/studentExamScheduleService';
+
+export type QldtViewLayout = 'GRID' | 'TABLE' | 'TIMELINE' | 'PRINT';
 
 interface StudentPersonalExamScheduleProps {
   currentUser: LoginUser;
@@ -104,6 +112,15 @@ function getFormatBadgeColor(formatStr: string): string {
   return 'bg-slate-100 text-slate-700 border-slate-200';
 }
 
+function getDayOfWeekVietnamese(dateIso: string): string {
+  if (!dateIso) return '';
+  const [y, m, d] = dateIso.split('-').map(Number);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return '';
+  const dateObj = new Date(y, m - 1, d);
+  const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  return days[dateObj.getDay()] || '';
+}
+
 export default function StudentPersonalExamSchedule({
   currentUser,
   onNavigateToExternalAccounts,
@@ -131,8 +148,11 @@ export default function StudentPersonalExamSchedule({
   activeBatch,
   loadDataFromApi,
 }: StudentPersonalExamScheduleProps) {
-  // Mode: 'QLDTTX' (Cổng Quản lý đào tạo từ xa) | 'FILE_TONG' (File lịch thi tổng của học viện)
+  // Source Mode: 'QLDTTX' (Cổng Quản lý đào tạo từ xa) | 'FILE_TONG' (File lịch thi tổng của học viện)
   const [viewSourceMode, setViewSourceMode] = useState<'QLDTTX' | 'FILE_TONG'>('QLDTTX');
+
+  // Layout Mode: 'GRID' | 'TABLE' | 'TIMELINE' | 'PRINT'
+  const [layoutMode, setLayoutMode] = useState<QldtViewLayout>('TABLE');
 
   // State cho chế độ QLDTTX
   const [qldtData, setQldtData] = useState<StudentQldtExamScheduleResult | null>(null);
@@ -146,8 +166,30 @@ export default function StudentPersonalExamSchedule({
   // Filter & Search cho QLDTTX
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'UPCOMING' | 'PAST'>('ALL');
+  const [formatFilter, setFormatFilter] = useState<string>('ALL');
+  const [tableSortKey, setTableSortKey] = useState<keyof StudentQldtExamItem>('ngayThi');
+  const [tableSortDirection, setTableSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Modal & Copy
   const [selectedExamModal, setSelectedExamModal] = useState<StudentQldtExamItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Load layout mode from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('qldt_exam_layout_mode');
+      if (saved && ['GRID', 'TABLE', 'TIMELINE', 'PRINT'].includes(saved)) {
+        setLayoutMode(saved as QldtViewLayout);
+      }
+    } catch {}
+  }, []);
+
+  const handleChangeLayoutMode = (mode: QldtViewLayout) => {
+    setLayoutMode(mode);
+    try {
+      localStorage.setItem('qldt_exam_layout_mode', mode);
+    } catch {}
+  };
 
   // Auto-refresh timestamp tracker (10 minutes)
   const lastFetchTimeRef = useRef<number>(Date.now());
@@ -254,10 +296,20 @@ export default function StudentPersonalExamSchedule({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Filtered QLDTTX exams
+  // Distinct exam formats
+  const distinctFormats = useMemo(() => {
+    if (!qldtData?.exams) return [];
+    const set = new Set<string>();
+    qldtData.exams.forEach((ex) => {
+      if (ex.hinhThucThi) set.add(ex.hinhThucThi);
+    });
+    return Array.from(set);
+  }, [qldtData]);
+
+  // Filtered & Sorted QLDTTX exams
   const filteredQldtExams = useMemo(() => {
     if (!qldtData || !Array.isArray(qldtData.exams)) return [];
-    return qldtData.exams.filter((ex) => {
+    let list = qldtData.exams.filter((ex) => {
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -271,17 +323,84 @@ export default function StudentPersonalExamSchedule({
       if (statusFilter === 'UPCOMING') matchStatus = ex.daysUntil >= 0;
       else if (statusFilter === 'PAST') matchStatus = ex.daysUntil < 0;
 
-      return matchSearch && matchStatus;
+      let matchFormat = true;
+      if (formatFilter !== 'ALL') matchFormat = ex.hinhThucThi === formatFilter;
+
+      return matchSearch && matchStatus && matchFormat;
     });
-  }, [qldtData, searchQuery, statusFilter]);
+
+    // Sort list for Table view
+    list = [...list].sort((a, b) => {
+      let valA: any = a[tableSortKey];
+      let valB: any = b[tableSortKey];
+
+      if (tableSortKey === 'ngayThi') {
+        valA = a.dateIso || a.ngayThi;
+        valB = b.dateIso || b.ngayThi;
+      }
+
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+
+      if (valA < valB) return tableSortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return tableSortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [qldtData, searchQuery, statusFilter, formatFilter, tableSortKey, tableSortDirection]);
+
+  // Grouped by Date for Timeline view
+  const timelineGroups = useMemo(() => {
+    const map: {
+      [date: string]: {
+        dateStr: string;
+        dateIso: string;
+        dayOfWeek: string;
+        daysUntil: number;
+        items: StudentQldtExamItem[];
+      };
+    } = {};
+
+    filteredQldtExams.forEach((ex) => {
+      const key = ex.ngayThi || 'Chưa xếp ngày';
+      if (!map[key]) {
+        map[key] = {
+          dateStr: key,
+          dateIso: ex.dateIso,
+          dayOfWeek: getDayOfWeekVietnamese(ex.dateIso),
+          daysUntil: ex.daysUntil,
+          items: [],
+        };
+      }
+      map[key].items.push(ex);
+    });
+
+    // Sort items within each day by start time
+    Object.values(map).forEach((group) => {
+      group.items.sort((a, b) => a.gioBatDau.localeCompare(b.gioBatDau));
+    });
+
+    return Object.values(map).sort((a, b) => (a.dateIso || '').localeCompare(b.dateIso || ''));
+  }, [filteredQldtExams]);
+
+  // Handle Sort Table
+  const handleSortTable = (key: keyof StudentQldtExamItem) => {
+    if (tableSortKey === key) {
+      setTableSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setTableSortKey(key);
+      setTableSortDirection('asc');
+    }
+  };
 
   // Export CSV QLDTTX
   const handleExportQldtCSV = () => {
     if (!qldtData || !qldtData.exams || qldtData.exams.length === 0) return;
     let csv = '\uFEFF';
-    csv += 'STT,Mã Môn,Tên Môn Học,Ngày Thi,Giờ Thi,Thời Lượng,Hình Thức Thi,Phòng Thi,Cơ Sở,SBD,Tổ Thi,Nhóm Thi,Địa Điểm Thi,Ghi Chú\n';
+    csv += 'STT,Mã Môn,Tên Môn Học,Ngày Thi,Giờ Thi,Thời Lượng,Hình Thức Thi,Phòng Thi,Cơ Sở,SBD / Tổ Thi,Nhóm Thi,Địa Điểm Thi,Ghi Chú\n';
     qldtData.exams.forEach((ex) => {
-      csv += `"${ex.stt}","${ex.maMon}","${ex.tenMon}","${ex.ngayThi}","${ex.gioBatDau}","${ex.soPhut}","${ex.hinhThucThi}","${ex.maPhong}","${ex.maCoSo}","${ex.toThi}","${ex.toThi}","${ex.nhomThi}","${ex.diaDiemThi.replace(/"/g, '""')}","${ex.ghiChu}"\n`;
+      csv += `"${ex.stt}","${ex.maMon}","${ex.tenMon}","${ex.ngayThi}","${ex.gioBatDau}","${ex.soPhut}","${ex.hinhThucThi}","${ex.maPhong}","${ex.maCoSo}","${ex.toThi}","${ex.nhomThi}","${ex.diaDiemThi.replace(/"/g, '""')}","${ex.ghiChu}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -293,17 +412,22 @@ export default function StudentPersonalExamSchedule({
     URL.revokeObjectURL(url);
   };
 
+  // Trigger browser print
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-200">
       {/* Top Source Mode Switcher Bar */}
-      <div className="bg-white rounded-3xl p-3 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-sky-50 text-sky-600 rounded-2xl border border-sky-100">
+      <div className="bg-white rounded-3xl p-3 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 print:hidden">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2.5 bg-gradient-to-br from-indigo-600 to-sky-600 text-white rounded-2xl shadow-sm">
             <CalendarDays className="w-5 h-5" />
           </div>
           <div>
             <h2 className="text-sm font-black text-slate-800">Lịch Thi Cá Nhân</h2>
-            <p className="text-[11px] text-slate-500">Lựa chọn nguồn dữ liệu tra cứu lịch thi của sinh viên</p>
+            <p className="text-[11px] text-slate-500">Tra cứu lịch thi trực tuyến từ Cổng QLDTTX hoặc File Tổng Hợp</p>
           </div>
         </div>
 
@@ -359,7 +483,7 @@ export default function StudentPersonalExamSchedule({
       {viewSourceMode === 'QLDTTX' && (
         <div className="flex flex-col gap-6 animate-in fade-in duration-200">
           {/* Header Card for QLDTTX */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
             <div className="flex items-center gap-3.5">
               <div className="p-3 bg-gradient-to-br from-indigo-600 to-sky-600 text-white rounded-2xl shadow-md shadow-indigo-500/20">
                 <CalendarCheck className="w-6 h-6" />
@@ -460,7 +584,7 @@ export default function StudentPersonalExamSchedule({
           {/* Sync Toast Feedback */}
           {syncFeedback && (
             <div
-              className={`p-4 rounded-3xl border text-xs font-semibold flex items-center justify-between gap-3 animate-in fade-in duration-200 shadow-xs ${
+              className={`p-4 rounded-3xl border text-xs font-semibold flex items-center justify-between gap-3 animate-in fade-in duration-200 shadow-xs print:hidden ${
                 syncFeedback.type === 'success'
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                   : 'bg-rose-50 border-rose-200 text-rose-800'
@@ -482,7 +606,7 @@ export default function StudentPersonalExamSchedule({
 
           {/* Unlinked Account Notice Banner */}
           {!qldtData?.hasLinkedAccount && errorType === 'NOT_CONFIGURED' && (
-            <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-300 rounded-3xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+            <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-300 rounded-3xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs print:hidden">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-sm shrink-0">
                   <Lock className="w-6 h-6" />
@@ -508,52 +632,131 @@ export default function StudentPersonalExamSchedule({
             </div>
           )}
 
-          {/* Filter & Search Toolbar */}
+          {/* Multi-Layout View Toolbar (Table, Grid, Timeline, Print) */}
           {qldtData?.exams && qldtData.exams.length > 0 && (
-            <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-              <div className="flex items-center gap-2 overflow-x-auto">
+            <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 print:hidden">
+              {/* Left: View Layout Toggles (Dạng Bảng, Dạng Thẻ, Lộ Trình, In Ấn) */}
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200/80 overflow-x-auto">
                 <button
-                  onClick={() => setStatusFilter('ALL')}
-                  className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                    statusFilter === 'ALL'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  onClick={() => handleChangeLayoutMode('TABLE')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    layoutMode === 'TABLE'
+                      ? 'bg-white text-indigo-600 shadow-sm font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                   }`}
+                  title="Xem lịch thi dưới dạng Bảng dữ liệu chi tiết (Table View)"
                 >
-                  Tất Cả ({qldtData.exams.length})
+                  <TableIcon className="w-3.5 h-3.5" />
+                  <span>Dạng Bảng</span>
                 </button>
+
                 <button
-                  onClick={() => setStatusFilter('UPCOMING')}
-                  className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    statusFilter === 'UPCOMING'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  onClick={() => handleChangeLayoutMode('GRID')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    layoutMode === 'GRID'
+                      ? 'bg-white text-indigo-600 shadow-sm font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                   }`}
+                  title="Xem lịch thi dưới dạng Thẻ lưới trực quan (Card Grid View)"
                 >
-                  <Timer className="w-3.5 h-3.5" />
-                  <span>Sắp Diễn Ra ({qldtData.upcomingExams.length})</span>
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Dạng Thẻ</span>
                 </button>
+
                 <button
-                  onClick={() => setStatusFilter('PAST')}
-                  className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                    statusFilter === 'PAST'
-                      ? 'bg-slate-700 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  onClick={() => handleChangeLayoutMode('TIMELINE')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    layoutMode === 'TIMELINE'
+                      ? 'bg-white text-indigo-600 shadow-sm font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                   }`}
+                  title="Xem lịch thi gom nhóm theo Dòng thời gian / Từng ngày thi (Timeline View)"
                 >
-                  Đã Thi Xong ({qldtData.pastExams.length})
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Lộ Trình / Ngày Thi</span>
+                </button>
+
+                <button
+                  onClick={() => handleChangeLayoutMode('PRINT')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    layoutMode === 'PRINT'
+                      ? 'bg-white text-indigo-600 shadow-sm font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                  title="Xem mẫu Phiếu Báo Dự Thi chuẩn để in PDF hoặc giấy A4 (Print View)"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Phiếu Báo Dự Thi</span>
                 </button>
               </div>
 
-              <div className="relative min-w-[240px]">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm môn, phòng, hình thức thi..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-9 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              {/* Right: Filters and Search */}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {/* Status Filter */}
+                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-200">
+                  <button
+                    onClick={() => setStatusFilter('ALL')}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                      statusFilter === 'ALL'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Tất Cả ({qldtData.exams.length})
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('UPCOMING')}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      statusFilter === 'UPCOMING'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Timer className="w-3 h-3" />
+                    <span>Sắp Diễn Ra ({qldtData.upcomingExams.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('PAST')}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                      statusFilter === 'PAST'
+                        ? 'bg-slate-700 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Đã Thi ({qldtData.pastExams.length})
+                  </button>
+                </div>
+
+                {/* Format Filter */}
+                {distinctFormats.length > 1 && (
+                  <div className="relative">
+                    <select
+                      value={formatFilter}
+                      onChange={(e) => setFormatFilter(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-7"
+                    >
+                      <option value="ALL">Mọi hình thức thi</option>
+                      {distinctFormats.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                )}
+
+                {/* Search box */}
+                <div className="relative min-w-[200px] flex-1 sm:flex-initial">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Tìm môn, phòng thi..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                </div>
               </div>
             </div>
           )}
@@ -589,12 +792,186 @@ export default function StudentPersonalExamSchedule({
               </div>
               <h4 className="text-base font-black text-slate-800">Không Có Môn Thi Nào</h4>
               <p className="text-xs text-slate-500 max-w-md">
-                {searchQuery
-                  ? 'Không tìm thấy môn thi phù hợp với từ khóa tìm kiếm.'
+                {searchQuery || formatFilter !== 'ALL'
+                  ? 'Không tìm thấy môn thi phù hợp với bộ lọc tìm kiếm.'
                   : 'Bạn không có môn thi nào trong học kỳ này hoặc nhà trường chưa công bố lịch thi.'}
               </p>
             </div>
-          ) : (
+          ) : layoutMode === 'TABLE' ? (
+            /* ========================================================================= */
+            /* 1. DẠNG BẢNG CHI TIẾT (TABLE VIEW)                                        */
+            /* ========================================================================= */
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-150">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider select-none">
+                      <th
+                        onClick={() => handleSortTable('stt')}
+                        className="py-3 px-4 text-center cursor-pointer hover:bg-slate-100 transition"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>STT</span>
+                          {tableSortKey === 'stt' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSortTable('maMon')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Mã Môn</span>
+                          {tableSortKey === 'maMon' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSortTable('tenMon')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition min-w-[200px]"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Tên Môn Học</span>
+                          {tableSortKey === 'tenMon' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSortTable('ngayThi')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Ngày Thi & Giờ</span>
+                          {tableSortKey === 'ngayThi' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSortTable('hinhThucThi')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Hình Thức Thi</span>
+                          {tableSortKey === 'hinhThucThi' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSortTable('maPhong')}
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Phòng Thi</span>
+                          {tableSortKey === 'maPhong' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                        </div>
+                      </th>
+                      <th className="py-3 px-4">Tổ / SBD</th>
+                      <th className="py-3 px-4 min-w-[220px]">Địa Điểm Thi</th>
+                      <th className="py-3 px-4 text-center">Trạng Thái</th>
+                      <th className="py-3 px-4 text-right">Chi Tiết</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {filteredQldtExams.map((exam, index) => {
+                      const isUpcoming = exam.daysUntil >= 0;
+                      const isToday = exam.daysUntil === 0;
+
+                      return (
+                        <tr
+                          key={exam.id}
+                          onClick={() => setSelectedExamModal(exam)}
+                          className={`hover:bg-indigo-50/40 transition cursor-pointer ${
+                            isToday ? 'bg-rose-50/30' : index % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'
+                          }`}
+                        >
+                          <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-500">
+                            {exam.stt}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="font-mono font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md text-[11px]">
+                              {exam.maMon}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="font-bold text-slate-900 block">{exam.tenMon}</span>
+                            <span className="text-[11px] text-slate-400 font-normal">{exam.kyThi}</span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-mono font-bold text-slate-900 flex items-center gap-1.5">
+                              <CalendarDays className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                              <span>{exam.ngayThi}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3 text-sky-600 shrink-0" />
+                              <span>{exam.gioBatDau}</span>
+                              {exam.soPhut && <span className="text-slate-400 font-normal">({exam.soPhut})</span>}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border inline-block ${getFormatBadgeColor(
+                                exam.hinhThucThi
+                              )}`}
+                            >
+                              {exam.hinhThucThi}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="font-mono font-black text-indigo-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                              {exam.maPhong || 'Chưa rõ'}
+                            </span>
+                            {exam.maCoSo && (
+                              <span className="block text-[10px] text-slate-400 font-mono mt-0.5">{exam.maCoSo}</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono">
+                            <div className="text-slate-900 font-bold">Tổ {exam.toThi || '-'}</div>
+                            {exam.nhomThi && (
+                              <div className="text-[10px] text-slate-500">Nhóm {exam.nhomThi}</div>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {exam.diaDiemThi ? (
+                              <div className="flex items-start gap-1 text-[11px] text-slate-600 max-w-xs">
+                                <MapPin className="w-3 h-3 text-rose-500 shrink-0 mt-0.5" />
+                                <span className="line-clamp-2">{exam.diaDiemThi}</span>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">Theo thông báo cơ sở</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {isToday ? (
+                              <span className="text-[10px] font-black text-white bg-rose-600 px-2 py-0.5 rounded-full animate-pulse">
+                                HÔM NAY THI
+                              </span>
+                            ) : isUpcoming ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                Còn {exam.daysUntil} ngày
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                                Đã thi xong
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedExamModal(exam);
+                              }}
+                              className="text-indigo-600 hover:text-indigo-800 font-bold text-[11px] hover:underline cursor-pointer"
+                            >
+                              Chi tiết
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : layoutMode === 'GRID' ? (
+            /* ========================================================================= */
+            /* 2. DẠNG THẺ LƯỚI (CARD GRID VIEW)                                         */
+            /* ========================================================================= */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredQldtExams.map((exam) => {
                 const isUpcoming = exam.daysUntil >= 0;
@@ -711,11 +1088,251 @@ export default function StudentPersonalExamSchedule({
                 );
               })}
             </div>
+          ) : layoutMode === 'TIMELINE' ? (
+            /* ========================================================================= */
+            /* 3. DẠNG LỘ TRÌNH / DÒNG THỜI GIAN THEO NGÀY (TIMELINE VIEW)               */
+            /* ========================================================================= */
+            <div className="space-y-6">
+              {timelineGroups.map((group) => {
+                const isGroupUpcoming = group.daysUntil >= 0;
+                const isGroupToday = group.daysUntil === 0;
+
+                return (
+                  <div
+                    key={group.dateStr}
+                    className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm relative overflow-hidden"
+                  >
+                    {/* Header ngày thi */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`p-3 rounded-2xl font-black text-center min-w-[55px] ${
+                            isGroupToday
+                              ? 'bg-rose-500 text-white shadow-md shadow-rose-200'
+                              : isGroupUpcoming
+                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          <div className="text-[10px] uppercase">{group.dayOfWeek || 'NGÀY'}</div>
+                          <div className="text-base font-mono">{group.dateStr.split('/')[0]}</div>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-base font-black text-slate-900">
+                              {group.dayOfWeek ? `${group.dayOfWeek}, ` : ''}Ngày {group.dateStr}
+                            </h4>
+                            {isGroupToday ? (
+                              <span className="text-[10px] font-black text-white bg-rose-600 px-2 py-0.5 rounded-full animate-pulse">
+                                HÔM NAY THI
+                              </span>
+                            ) : isGroupUpcoming ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                Còn {group.daysUntil} ngày
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                                Đã kết thúc
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Gồm <b>{group.items.length} môn thi</b> diễn ra trong ngày này
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Timeline items list */}
+                    <div className="mt-5 space-y-4 relative before:absolute before:inset-0 before:left-4 before:w-0.5 before:bg-slate-200/80 before:hidden sm:before:block">
+                      {group.items.map((exam, idx) => (
+                        <div
+                          key={exam.id}
+                          onClick={() => setSelectedExamModal(exam)}
+                          className="sm:pl-10 relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50/70 hover:bg-indigo-50/50 border border-slate-200/70 hover:border-indigo-200 transition cursor-pointer group"
+                        >
+                          {/* Timeline dot */}
+                          <div className="hidden sm:flex absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-2 border-indigo-600 shadow-xs items-center justify-center group-hover:scale-125 transition-transform" />
+
+                          <div className="flex items-start sm:items-center gap-3 min-w-0">
+                            <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-center font-mono shrink-0">
+                              <span className="text-xs font-black text-indigo-700 block">{exam.gioBatDau}</span>
+                              <span className="text-[10px] text-slate-400 block">{exam.soPhut}</span>
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                                  {exam.maMon}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${getFormatBadgeColor(
+                                    exam.hinhThucThi
+                                  )}`}
+                                >
+                                  {exam.hinhThucThi}
+                                </span>
+                              </div>
+                              <h5 className="text-sm font-black text-slate-900 mt-1 truncate group-hover:text-indigo-600 transition">
+                                {exam.tenMon}
+                              </h5>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                                <span className="font-mono font-bold text-slate-700">Phòng: {exam.maPhong || 'Chưa rõ'}</span>
+                                <span>•</span>
+                                <span>Tổ {exam.toThi || '-'}</span>
+                                {exam.diaDiemThi && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate max-w-xs">{exam.diaDiemThi}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            <span className="text-xs font-bold text-indigo-600 group-hover:translate-x-1 transition-transform">
+                              Xem chi tiết &rarr;
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* ========================================================================= */
+            /* 4. DẠNG PHIẾU BÁO DỰ THI CHUẨN IN ẤN (PRINT VIEW)                         */
+            /* ========================================================================= */
+            <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-sm flex flex-col gap-6 text-slate-900">
+              {/* Print Action Toolbar */}
+              <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-200 print:hidden">
+                <div>
+                  <h4 className="text-sm font-black text-slate-800">Phiếu Báo Dự Thi Cá Nhân (Mẫu In Chuẩn)</h4>
+                  <p className="text-xs text-slate-500">Định dạng A4 phù hợp để in giấy hoặc xuất file PDF lưu trữ</p>
+                </div>
+                <button
+                  onClick={handlePrint}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition shadow-md shadow-indigo-200 flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>In Phiếu / Lưu PDF</span>
+                </button>
+              </div>
+
+              {/* Printable Document Content */}
+              <div className="border border-slate-300 rounded-2xl p-6 sm:p-8 space-y-6">
+                {/* Header Tiêu Ngữ */}
+                <div className="flex flex-col sm:flex-row justify-between items-center text-center gap-4 pb-4 border-b border-slate-300">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                      HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG
+                    </div>
+                    <div className="text-xs font-black uppercase text-indigo-700 mt-0.5">
+                      TRUNG TÂM ĐÀO TẠO ĐẠI HỌC TỪ XA
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                    <div className="text-xs font-bold text-slate-600 underline mt-0.5">Độc lập - Tự do - Hạnh phúc</div>
+                  </div>
+                </div>
+
+                {/* Tiêu đề phiếu */}
+                <div className="text-center space-y-1">
+                  <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight text-slate-900">
+                    PHIẾU BÁO LỊCH THI HỌC KỲ
+                  </h2>
+                  <p className="text-xs font-bold text-indigo-700 uppercase">
+                    {qldtData?.semesterName || 'HỌC KỲ THI'}
+                  </p>
+                </div>
+
+                {/* Thông tin sinh viên */}
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-slate-500 font-medium">Họ và tên:</span>{' '}
+                    <strong className="text-slate-900 font-bold uppercase">{currentUser.fullName || currentUser.username}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Mã số sinh viên (MSSV):</span>{' '}
+                    <strong className="text-slate-900 font-mono font-bold">{currentUser.username}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Lớp sinh viên:</span>{' '}
+                    <strong className="text-slate-900 font-bold">{currentUser.lop || 'Chưa cập nhật'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Tổng số môn thi:</span>{' '}
+                    <strong className="text-indigo-700 font-bold">{filteredQldtExams.length} môn</strong>
+                  </div>
+                </div>
+
+                {/* Bảng lịch thi in ấn */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left border-collapse border border-slate-300">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-800 font-bold text-center border-b border-slate-300">
+                        <th className="border border-slate-300 p-2 w-10">STT</th>
+                        <th className="border border-slate-300 p-2 w-24">Mã Môn</th>
+                        <th className="border border-slate-300 p-2 text-left">Tên Môn Học</th>
+                        <th className="border border-slate-300 p-2 w-24">Ngày Thi</th>
+                        <th className="border border-slate-300 p-2 w-20">Giờ Thi</th>
+                        <th className="border border-slate-300 p-2 w-24">Hình Thức</th>
+                        <th className="border border-slate-300 p-2 w-20">Phòng Thi</th>
+                        <th className="border border-slate-300 p-2 w-20">Tổ / SBD</th>
+                        <th className="border border-slate-300 p-2 text-left">Địa Điểm Thi</th>
+                        <th className="border border-slate-300 p-2 w-20">Ký Nộp</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredQldtExams.map((exam, idx) => (
+                        <tr key={exam.id} className="border-b border-slate-300">
+                          <td className="border border-slate-300 p-2 text-center font-mono">{idx + 1}</td>
+                          <td className="border border-slate-300 p-2 text-center font-mono font-bold">{exam.maMon}</td>
+                          <td className="border border-slate-300 p-2 font-bold">{exam.tenMon}</td>
+                          <td className="border border-slate-300 p-2 text-center font-mono">{exam.ngayThi}</td>
+                          <td className="border border-slate-300 p-2 text-center font-mono">{exam.gioBatDau}</td>
+                          <td className="border border-slate-300 p-2 text-center">{exam.hinhThucThi}</td>
+                          <td className="border border-slate-300 p-2 text-center font-mono font-bold">{exam.maPhong}</td>
+                          <td className="border border-slate-300 p-2 text-center font-mono">Tổ {exam.toThi || '-'}</td>
+                          <td className="border border-slate-300 p-2 text-[11px] leading-tight">{exam.diaDiemThi || '-'}</td>
+                          <td className="border border-slate-300 p-2 text-center"></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Footer Chữ Ký */}
+                <div className="grid grid-cols-2 gap-6 pt-6 text-center text-xs">
+                  <div>
+                    <div className="font-bold uppercase text-slate-600">Thí Sinh Dự Thi</div>
+                    <div className="text-[10px] text-slate-400 italic">(Ký và ghi rõ họ tên)</div>
+                    <div className="h-16" />
+                    <div className="font-bold">{currentUser.fullName || currentUser.username}</div>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] text-slate-500 italic mb-1">
+                      Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}
+                    </div>
+                    <div className="font-bold uppercase text-slate-800">Cán Bộ Lập Bảng</div>
+                    <div className="text-[10px] text-slate-400 italic">(Ký, đóng dấu xác nhận)</div>
+                    <div className="h-16" />
+                    <div className="font-bold">HỆ THỐNG PTIT EDUSYNC</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Modal Chi Tiết Ca Thi QLDTTX */}
           {selectedExamModal && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print:hidden">
               <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 sm:p-7 relative max-h-[90vh] overflow-y-auto">
                 <button
                   onClick={() => setSelectedExamModal(null)}
