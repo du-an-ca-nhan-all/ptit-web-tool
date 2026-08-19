@@ -92,8 +92,10 @@ export default function Header({
         return 'Bù Trừ Thanh Toán';
       case 'profile':
         return 'Hồ Sơ Cá Nhân';
+      case 'all_students':
+        return 'Toàn Bộ Sinh Viên';
       default:
-        return 'Công Cụ Lớp Trưởng';
+        return 'WIP';
     }
   };
 
