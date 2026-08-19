@@ -151,40 +151,86 @@ export default function StudentPersonalExamSchedule({
   loadDataFromApi,
 }: StudentPersonalExamScheduleProps) {
   // Source Mode: 'QLDTTX' (Cổng Quản lý đào tạo từ xa) | 'FILE_TONG' (File lịch thi tổng của học viện)
-  const [viewSourceMode, setViewSourceMode] = useState<'QLDTTX' | 'FILE_TONG'>('QLDTTX');
+  const [viewSourceMode, setViewSourceMode] = useState<'QLDTTX' | 'FILE_TONG'>(() => {
+    if (typeof window === 'undefined') return 'QLDTTX';
+    const params = new URLSearchParams(window.location.search);
+    const s = params.get('source')?.toLowerCase();
+    if (s === 'file' || s === 'file_tong' || s === 'batch') return 'FILE_TONG';
+    return 'QLDTTX';
+  });
 
   // Layout Mode: 'GRID' | 'TABLE' | 'TIMELINE' | 'PRINT'
-  const [layoutMode, setLayoutMode] = useState<QldtViewLayout>('TABLE');
+  const [layoutMode, setLayoutMode] = useState<QldtViewLayout>(() => {
+    if (typeof window === 'undefined') return 'TABLE';
+    const params = new URLSearchParams(window.location.search);
+    const l = params.get('layout')?.toUpperCase();
+    if (l === 'GRID' || l === 'TABLE' || l === 'TIMELINE' || l === 'PRINT') return l as QldtViewLayout;
+    try {
+      const saved = localStorage.getItem('qldt_exam_layout_mode');
+      if (saved && ['GRID', 'TABLE', 'TIMELINE', 'PRINT'].includes(saved)) {
+        return saved as QldtViewLayout;
+      }
+    } catch {}
+    return 'TABLE';
+  });
 
   // State cho chế độ QLDTTX
   const [qldtData, setQldtData] = useState<StudentQldtExamScheduleResult | null>(null);
   const [isLoadingQldt, setIsLoadingQldt] = useState(true);
   const [isRefreshingQldt, setIsRefreshingQldt] = useState(false);
-  const [selectedSemester, setSelectedSemester] = useState<number | undefined>(undefined);
+  const [selectedSemester, setSelectedSemester] = useState<number | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    const params = new URLSearchParams(window.location.search);
+    const sem = params.get('semester') || params.get('semesterId');
+    if (sem && !isNaN(Number(sem))) return Number(sem);
+    return undefined;
+  });
   const [errorType, setErrorType] = useState<'NOT_CONFIGURED' | 'INVALID_CREDENTIALS' | 'SERVER_ERROR' | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Filter & Search cho QLDTTX
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'UPCOMING' | 'PAST'>('ALL');
-  const [formatFilter, setFormatFilter] = useState<string>('ALL');
-  const [tableSortKey, setTableSortKey] = useState<keyof StudentQldtExamItem>('ngayThi');
-  const [tableSortDirection, setTableSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [searchQuery, setSearchQuery] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('q') || params.get('search') || '';
+  });
+
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'UPCOMING' | 'PAST'>(() => {
+    if (typeof window === 'undefined') return 'ALL';
+    const params = new URLSearchParams(window.location.search);
+    const st = params.get('status')?.toUpperCase();
+    if (st === 'UPCOMING' || st === 'PAST' || st === 'ALL') return st;
+    return 'ALL';
+  });
+
+  const [formatFilter, setFormatFilter] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'ALL';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('format') || 'ALL';
+  });
+
+  const [tableSortKey, setTableSortKey] = useState<keyof StudentQldtExamItem>(() => {
+    if (typeof window === 'undefined') return 'ngayThi';
+    const params = new URLSearchParams(window.location.search);
+    const k = params.get('sortKey') as keyof StudentQldtExamItem;
+    if (k && ['ngayThi', 'gioThi', 'tenMon', 'maMon', 'maPhong', 'hinhThucThi'].includes(k as string)) {
+      return k;
+    }
+    return 'ngayThi';
+  });
+
+  const [tableSortDirection, setTableSortDirection] = useState<'asc' | 'desc'>(() => {
+    if (typeof window === 'undefined') return 'asc';
+    const params = new URLSearchParams(window.location.search);
+    const dir = params.get('sortDir')?.toLowerCase();
+    if (dir === 'desc' || dir === 'asc') return dir;
+    return 'asc';
+  });
 
   // Modal & Copy
   const [selectedExamModal, setSelectedExamModal] = useState<StudentQldtExamItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  // Load layout mode from localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('qldt_exam_layout_mode');
-      if (saved && ['GRID', 'TABLE', 'TIMELINE', 'PRINT'].includes(saved)) {
-        setLayoutMode(saved as QldtViewLayout);
-      }
-    } catch {}
-  }, []);
 
   const handleChangeLayoutMode = (mode: QldtViewLayout) => {
     setLayoutMode(mode);
@@ -192,6 +238,97 @@ export default function StudentPersonalExamSchedule({
       localStorage.setItem('qldt_exam_layout_mode', mode);
     } catch {}
   };
+
+  // Sync QLDTTX filters and view modes to URL query parameters
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    let changed = false;
+
+    if (viewSourceMode === 'FILE_TONG') {
+      if (url.searchParams.get('source') !== 'file') {
+        url.searchParams.set('source', 'file');
+        changed = true;
+      }
+    } else if (url.searchParams.has('source')) {
+      url.searchParams.delete('source');
+      changed = true;
+    }
+
+    if (layoutMode !== 'TABLE') {
+      if (url.searchParams.get('layout') !== layoutMode.toLowerCase()) {
+        url.searchParams.set('layout', layoutMode.toLowerCase());
+        changed = true;
+      }
+    } else if (url.searchParams.has('layout')) {
+      url.searchParams.delete('layout');
+      changed = true;
+    }
+
+    if (statusFilter !== 'ALL') {
+      if (url.searchParams.get('status') !== statusFilter.toLowerCase()) {
+        url.searchParams.set('status', statusFilter.toLowerCase());
+        changed = true;
+      }
+    } else if (url.searchParams.has('status')) {
+      url.searchParams.delete('status');
+      changed = true;
+    }
+
+    if (formatFilter !== 'ALL') {
+      if (url.searchParams.get('format') !== formatFilter) {
+        url.searchParams.set('format', formatFilter);
+        changed = true;
+      }
+    } else if (url.searchParams.has('format')) {
+      url.searchParams.delete('format');
+      changed = true;
+    }
+
+    if (selectedSemester) {
+      if (url.searchParams.get('semester') !== String(selectedSemester)) {
+        url.searchParams.set('semester', String(selectedSemester));
+        changed = true;
+      }
+    } else if (url.searchParams.has('semester')) {
+      url.searchParams.delete('semester');
+      changed = true;
+    }
+
+    if (searchQuery) {
+      if (url.searchParams.get('q') !== searchQuery) {
+        url.searchParams.set('q', searchQuery);
+        changed = true;
+      }
+    } else if (url.searchParams.has('q')) {
+      url.searchParams.delete('q');
+      changed = true;
+    }
+
+    if (tableSortKey !== 'ngayThi') {
+      if (url.searchParams.get('sortKey') !== String(tableSortKey)) {
+        url.searchParams.set('sortKey', String(tableSortKey));
+        changed = true;
+      }
+    } else if (url.searchParams.has('sortKey')) {
+      url.searchParams.delete('sortKey');
+      changed = true;
+    }
+
+    if (tableSortDirection !== 'asc') {
+      if (url.searchParams.get('sortDir') !== tableSortDirection) {
+        url.searchParams.set('sortDir', tableSortDirection);
+        changed = true;
+      }
+    } else if (url.searchParams.has('sortDir')) {
+      url.searchParams.delete('sortDir');
+      changed = true;
+    }
+
+    if (changed) {
+      window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+    }
+  }, [viewSourceMode, layoutMode, statusFilter, formatFilter, selectedSemester, searchQuery, tableSortKey, tableSortDirection]);
 
   // Auto-refresh timestamp tracker (10 minutes)
   const lastFetchTimeRef = useRef<number>(Date.now());

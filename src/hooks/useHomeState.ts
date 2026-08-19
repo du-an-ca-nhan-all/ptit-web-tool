@@ -820,7 +820,7 @@ export function useHomeState() {
     const basePath = getNavigationPath(activeTab, profileSubTab);
     const params = new URLSearchParams(window.location.search);
 
-    if (activeTab !== 'profile') {
+    if (activeTab !== 'profile' && activeTab !== 'personal_schedule') {
       if (filters.search) params.set('search', filters.search);
       else params.delete('search');
       if (filters.classCode) params.set('classCode', filters.classCode);
