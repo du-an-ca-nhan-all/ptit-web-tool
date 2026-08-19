@@ -455,10 +455,38 @@ export default function StudentTimetableCalendar({
     return days;
   }, [currentDate, eventsByDate]);
 
+  const todayIso = formatIso(new Date());
+
   // Events of the selected day
   const selectedDayEvents = useMemo(() => {
     return eventsByDate.get(selectedDay) || [];
   }, [selectedDay, eventsByDate]);
+
+  // Jump to next class helper for mobile empty state
+  const handleJumpToNextClass = useCallback(() => {
+    const futureEvents = allEvents
+      .filter((ev) => ev.date >= selectedDay && ev.date !== selectedDay)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (futureEvents.length > 0) {
+      const nextDate = futureEvents[0].date;
+      setSelectedDay(nextDate);
+      setCurrentDate(new Date(nextDate));
+    } else {
+      const upcomingFromToday = allEvents
+        .filter((ev) => ev.date >= todayIso)
+        .sort((a, b) => a.date.localeCompare(b.date));
+      if (upcomingFromToday.length > 0) {
+        const nextDate = upcomingFromToday[0].date;
+        setSelectedDay(nextDate);
+        setCurrentDate(new Date(nextDate));
+      } else if (allEvents.length > 0) {
+        const firstDate = allEvents[0].date;
+        setSelectedDay(firstDate);
+        setCurrentDate(new Date(firstDate));
+      }
+    }
+  }, [allEvents, selectedDay, todayIso]);
 
   // Copy link
   const handleCopyLink = (link: string) => {
@@ -466,8 +494,6 @@ export default function StudentTimetableCalendar({
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
   };
-
-  const todayIso = formatIso(new Date());
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
@@ -616,7 +642,7 @@ export default function StudentTimetableCalendar({
           {onNavigateToExternalAccounts && (
             <button
               onClick={onNavigateToExternalAccounts}
-              className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-2xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
+              className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
             >
               <span>Liên Kết QLĐT Ngay</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -626,12 +652,12 @@ export default function StudentTimetableCalendar({
       )}
 
       {/* Subject Filter & Navigation Controls */}
-      <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        {/* Date Navigator */}
-        <div className="flex items-center gap-2">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+        {/* Date Navigator (Visible on Desktop / MD+) */}
+        <div className="hidden md:flex items-center gap-2">
           <button
             onClick={handlePrev}
-            className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+            className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition cursor-pointer"
             title="Thời gian trước"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -639,20 +665,20 @@ export default function StudentTimetableCalendar({
 
           <button
             onClick={handleToday}
-            className="px-3.5 py-1.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+            className="px-3.5 py-1.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold active:scale-95 transition cursor-pointer"
           >
             Hôm Nay
           </button>
 
           <button
             onClick={handleNext}
-            className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+            className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition cursor-pointer"
             title="Thời gian tiếp theo"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
 
-          <div className="text-base font-black text-slate-800 ml-2 font-mono">
+          <div className="text-sm sm:text-base font-black text-slate-800 ml-2 font-mono">
             {viewMode === 'MONTH' && (
               <span>
                 Tháng {currentDate.getMonth() + 1}, {currentDate.getFullYear()}
@@ -671,13 +697,13 @@ export default function StudentTimetableCalendar({
           </div>
         </div>
 
-        {/* Filter by Subject & Search */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="relative min-w-[180px]">
+        {/* Filter by Subject & Search (Responsive for both Mobile & Desktop) */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full md:w-auto">
+          <div className="relative flex-1 md:flex-initial md:min-w-[200px]">
             <select
               value={selectedSubjectFilter}
               onChange={(e) => setSelectedSubjectFilter(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2 text-xs font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-8"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-8"
             >
               <option value="ALL">Tất Cả Môn Học ({data?.uniqueSubjectsCount || 0})</option>
               {data?.subjects.map((sub) => (
@@ -689,13 +715,13 @@ export default function StudentTimetableCalendar({
             <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
-          <div className="relative min-w-[160px]">
+          <div className="relative flex-1 md:flex-initial md:min-w-[170px]">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm môn, phòng..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-8 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl pl-8 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           </div>
@@ -704,21 +730,21 @@ export default function StudentTimetableCalendar({
 
       {/* Main Calendar View Area */}
       {isLoading ? (
-        <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-3 text-slate-400 min-h-[400px]">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-8 sm:p-12 border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-3 text-slate-400 min-h-[300px] sm:min-h-[400px]">
           <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
           <span className="text-xs font-bold text-slate-600">Đang tải lịch học và thời khóa biểu...</span>
         </div>
       ) : errorType === 'NOT_CONFIGURED' ? (
-        <div className="bg-white rounded-3xl p-8 sm:p-12 border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center gap-6 max-w-2xl mx-auto my-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="w-16 h-16 rounded-3xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shadow-inner">
-            <Lock className="w-8 h-8" />
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-12 border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center gap-5 sm:gap-6 max-w-2xl mx-auto my-2 sm:my-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl sm:rounded-3xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shadow-inner">
+            <Lock className="w-7 h-7 sm:w-8 sm:h-8" />
           </div>
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
               <span>Yêu Cầu Cấu Hình Cổng QLDTTX (PTTC1)</span>
             </div>
-            <h3 className="text-xl font-black text-slate-800 tracking-tight">
+            <h3 className="text-base sm:text-xl font-black text-slate-800 tracking-tight">
               Chưa Cấu Hình Tài Khoản Đào Tạo Từ Xa
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
@@ -726,7 +752,7 @@ export default function StudentTimetableCalendar({
             </p>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-xs text-slate-600 text-left w-full space-y-2">
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 text-xs text-slate-600 text-left w-full space-y-2">
             <div className="font-bold text-slate-800 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-indigo-600" />
               <span>Quyền lợi sau khi kết nối tài khoản QLDTTX:</span>
@@ -741,7 +767,7 @@ export default function StudentTimetableCalendar({
           {onNavigateToExternalAccounts && (
             <button
               onClick={onNavigateToExternalAccounts}
-              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-2xl text-xs font-bold transition shadow-lg shadow-indigo-600/30 flex items-center gap-2 cursor-pointer active:scale-98"
+              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
             >
               <Globe className="w-4 h-4" />
               <span>Đến Cấu Hình Tài Khoản QLDTTX Ngay</span>
@@ -750,16 +776,16 @@ export default function StudentTimetableCalendar({
           )}
         </div>
       ) : errorType === 'INVALID_CREDENTIALS' ? (
-        <div className="bg-white rounded-3xl p-8 sm:p-12 border border-rose-200 shadow-sm flex flex-col items-center justify-center text-center gap-6 max-w-2xl mx-auto my-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="w-16 h-16 rounded-3xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-inner">
-            <ShieldAlert className="w-8 h-8" />
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-12 border border-rose-200 shadow-sm flex flex-col items-center justify-center text-center gap-5 sm:gap-6 max-w-2xl mx-auto my-2 sm:my-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl sm:rounded-3xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-inner">
+            <ShieldAlert className="w-7 h-7 sm:w-8 sm:h-8" />
           </div>
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
               <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
               <span>Lỗi Xác Thực Tài Khoản QLDTTX</span>
             </div>
-            <h3 className="text-xl font-black text-slate-800 tracking-tight">
+            <h3 className="text-base sm:text-xl font-black text-slate-800 tracking-tight">
               Tài Khoản Hoặc Mật Khẩu Không Chính Xác
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
@@ -767,7 +793,7 @@ export default function StudentTimetableCalendar({
             </p>
           </div>
 
-          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-800 text-left w-full space-y-1.5">
+          <div className="bg-rose-50 border border-rose-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 text-xs text-rose-800 text-left w-full space-y-1.5">
             <div className="font-bold flex items-center gap-1.5">
               <Info className="w-4 h-4 text-rose-600" />
               <span>Nguyên nhân có thể do:</span>
@@ -779,11 +805,11 @@ export default function StudentTimetableCalendar({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap justify-center">
+          <div className="flex items-center gap-3 flex-wrap justify-center w-full">
             {onNavigateToExternalAccounts && (
               <button
                 onClick={onNavigateToExternalAccounts}
-                className="px-6 py-3 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white rounded-2xl text-xs font-bold transition shadow-lg shadow-rose-600/30 flex items-center gap-2 cursor-pointer active:scale-98"
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
               >
                 <Edit3 className="w-4 h-4" />
                 <span>Cập Nhật Lại Mật Khẩu QLDTTX</span>
@@ -793,7 +819,7 @@ export default function StudentTimetableCalendar({
             <button
               onClick={() => fetchTimetable(true)}
               disabled={isRefreshing}
-              className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl sm:rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>Thử Lại</span>
@@ -801,22 +827,22 @@ export default function StudentTimetableCalendar({
           </div>
         </div>
       ) : error ? (
-        <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm text-center flex flex-col items-center justify-center gap-3">
-          <AlertCircle className="w-10 h-10 text-rose-500" />
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-rose-200 shadow-sm text-center flex flex-col items-center justify-center gap-3">
+          <AlertCircle className="w-9 h-9 text-rose-500" />
           <h3 className="text-sm font-bold text-slate-800">Không thể tải lịch học</h3>
           <p className="text-xs text-slate-500 max-w-md">{error}</p>
           <button
             onClick={() => fetchTimetable(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-2xl text-xs font-bold transition shadow-sm cursor-pointer"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition shadow-sm cursor-pointer"
           >
             Thử lại
           </button>
         </div>
       ) : allEvents.length === 0 ? (
-        <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center flex flex-col items-center justify-center gap-4">
-          <CalendarIcon className="w-12 h-12 text-slate-300" />
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-8 sm:p-12 border border-slate-200 shadow-sm text-center flex flex-col items-center justify-center gap-4">
+          <CalendarIcon className="w-10 h-10 sm:w-12 sm:h-12 text-slate-300" />
           <div>
-            <h3 className="text-base font-bold text-slate-800">Chưa có dữ liệu thời khóa biểu cho học kỳ này</h3>
+            <h3 className="text-sm sm:text-base font-bold text-slate-800">Chưa có dữ liệu thời khóa biểu cho học kỳ này</h3>
             <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
               Hệ thống chưa tìm thấy lịch học của bạn. Nếu bạn vừa đăng ký môn học hoặc liên kết tài khoản QLDTTX, vui lòng bấm &quot;Làm Mới Từ QLĐT&quot;.
             </p>
@@ -824,7 +850,7 @@ export default function StudentTimetableCalendar({
           <button
             onClick={() => fetchTimetable(true)}
             disabled={isRefreshing}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition shadow-md shadow-indigo-600/20 flex items-center gap-2 cursor-pointer"
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition shadow-md shadow-indigo-600/20 flex items-center gap-2 cursor-pointer"
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Đồng Bộ Lịch Học Ngay</span>
@@ -834,265 +860,592 @@ export default function StudentTimetableCalendar({
         <>
           {/* VIEW 1: MONTH CALENDAR */}
           {viewMode === 'MONTH' && (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Month Grid (3 cols on desktop) */}
-              <div className="lg:col-span-3 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                {/* Weekday header */}
-                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80 text-center text-xs font-bold text-slate-600 py-3">
-                  {WEEKDAYS.map((wd) => (
-                    <div key={wd.num} className={wd.num === 8 ? 'text-rose-600' : ''}>
-                      <span className="hidden sm:inline">{wd.label}</span>
-                      <span className="sm:hidden">{wd.short}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Calendar Days Cells */}
-                <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-100">
-                  {monthGridDays.map((dayItem) => {
-                    const hasEvents = dayItem.events.length > 0;
-                    const isToday = dayItem.isToday;
-                    const isSelected = dayItem.dateStr === selectedDay;
-
-                    return (
-                      <div
-                        key={dayItem.dateStr}
-                        onClick={() => setSelectedDay(dayItem.dateStr)}
-                        className={`min-h-[100px] sm:min-h-[120px] p-2 flex flex-col justify-between transition-colors cursor-pointer relative ${
-                          !dayItem.isCurrentMonth
-                            ? 'bg-slate-50/40 text-slate-300'
-                            : isSelected
-                            ? 'bg-indigo-50/50 ring-2 ring-indigo-500/50 inset-0 z-10'
-                            : 'hover:bg-slate-50/80 text-slate-800'
-                        }`}
-                      >
-                        {/* Day Number & Header */}
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`text-xs font-mono font-bold w-6 h-6 rounded-full flex items-center justify-center ${
-                              isToday
-                                ? 'bg-rose-500 text-white shadow-xs'
-                                : isSelected
-                                ? 'bg-indigo-600 text-white'
-                                : ''
-                            }`}
-                          >
-                            {dayItem.date.getDate()}
-                          </span>
-
-                          {hasEvents && (
-                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded-md">
-                              {dayItem.events.length} ca
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Events list in cell */}
-                        <div className="flex flex-col gap-1 mt-1.5 overflow-hidden">
-                          {dayItem.events.slice(0, 2).map((ev) => {
-                            const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
-                            return (
-                              <button
-                                key={ev.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedEventModal(ev);
-                                }}
-                                className={`text-left text-[11px] p-1 rounded-lg border font-medium truncate flex items-center gap-1 transition ${pal.pill} ${pal.hover}`}
-                                title={`${ev.subjectName} (${ev.startTime} - ${ev.endTime}) - ${ev.room}`}
-                              >
-                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${pal.dot}`} />
-                                <span className="font-mono text-[10px] font-bold shrink-0">{ev.startTime}</span>
-                                <span className="truncate">{ev.subjectName}</span>
-                              </button>
-                            );
-                          })}
-
-                          {dayItem.events.length > 2 && (
-                            <div className="text-[10px] font-bold text-slate-400 pl-1">
-                              +{dayItem.events.length - 2} ca học khác...
-                            </div>
-                          )}
-                        </div>
+            <>
+              {/* DESKTOP CALENDAR VIEW (hidden on mobile, visible on md+) */}
+              <div className="hidden md:grid md:grid-cols-1 lg:grid-cols-4 gap-6">
+                {/* Month Grid (3 cols on desktop) */}
+                <div className="lg:col-span-3 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                  {/* Weekday header */}
+                  <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80 text-center text-xs font-bold text-slate-600 py-3">
+                    {WEEKDAYS.map((wd) => (
+                      <div key={wd.num} className={wd.num === 8 ? 'text-rose-600' : ''}>
+                        <span>{wd.label}</span>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Side Details Panel for Selected Day */}
-              <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                      <Clock className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
-                        Lịch Học Ngày
-                      </h3>
-                      <div className="text-xs font-bold text-indigo-600 font-mono">
-                        {new Date(selectedDay).toLocaleDateString('vi-VN', {
-                          weekday: 'long',
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })}
-                      </div>
-                    </div>
+                    ))}
                   </div>
 
-                  {selectedDay === todayIso && (
-                    <span className="px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-bold rounded-full animate-pulse">
-                      Hôm nay
-                    </span>
-                  )}
-                </div>
+                  {/* Calendar Days Cells */}
+                  <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-100">
+                    {monthGridDays.map((dayItem) => {
+                      const hasEvents = dayItem.events.length > 0;
+                      const isToday = dayItem.isToday;
+                      const isSelected = dayItem.dateStr === selectedDay;
 
-                {/* Session cards for the day */}
-                {selectedDayEvents.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
-                    <CalendarCheck className="w-8 h-8 text-slate-300" />
-                    <p className="text-xs font-medium text-slate-500">Không có lịch học vào ngày này</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3 overflow-y-auto max-h-[500px] pr-1">
-                    {selectedDayEvents.map((ev) => {
-                      const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
                       return (
                         <div
-                          key={ev.id}
-                          className={`p-3.5 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-4 flex flex-col gap-2 shadow-2xs`}
+                          key={dayItem.dateStr}
+                          onClick={() => setSelectedDay(dayItem.dateStr)}
+                          className={`min-h-[110px] p-2 flex flex-col justify-between transition-colors cursor-pointer relative ${
+                            !dayItem.isCurrentMonth
+                              ? 'bg-slate-50/40 text-slate-300'
+                              : isSelected
+                              ? 'bg-indigo-50/50 ring-2 ring-indigo-500/50 inset-0 z-10'
+                              : 'hover:bg-slate-50/80 text-slate-800'
+                          }`}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="text-xs font-black leading-tight">
-                              {ev.subjectName}
+                          {/* Day Number & Header */}
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`text-xs font-mono font-bold w-6 h-6 rounded-full flex items-center justify-center ${
+                                isToday
+                                  ? 'bg-rose-500 text-white shadow-xs'
+                                  : isSelected
+                                  ? 'bg-indigo-600 text-white'
+                                  : ''
+                              }`}
+                            >
+                              {dayItem.date.getDate()}
                             </span>
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-white/80 border border-slate-200 shrink-0">
-                              {ev.subjectCode}
-                            </span>
+
+                            {hasEvents && (
+                              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded-md">
+                                {dayItem.events.length} ca
+                              </span>
+                            )}
                           </div>
 
-                          <div className="flex flex-col gap-1 text-[11px] opacity-90">
-                            <div className="flex items-center gap-1.5 font-bold">
-                              <Clock className="w-3.5 h-3.5 shrink-0 text-indigo-600" />
-                              <span className="font-mono">{ev.startTime} - {ev.endTime}</span>
-                              <span className="text-[10px] font-normal">({ev.periodStr})</span>
-                            </div>
+                          {/* Events list in cell */}
+                          <div className="flex flex-col gap-1 mt-1.5 overflow-hidden">
+                            {dayItem.events.slice(0, 2).map((ev) => {
+                              const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                              return (
+                                <button
+                                  key={ev.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedEventModal(ev);
+                                  }}
+                                  className={`text-left text-[11px] p-1 rounded-lg border font-medium truncate flex items-center gap-1 transition ${pal.pill} ${pal.hover}`}
+                                  title={`${ev.subjectName} (${ev.startTime} - ${ev.endTime}) - ${ev.room}`}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${pal.dot}`} />
+                                  <span className="font-mono text-[10px] font-bold shrink-0">{ev.startTime}</span>
+                                  <span className="truncate">{ev.subjectName}</span>
+                                </button>
+                              );
+                            })}
 
-                            <div className="flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-                              <span className="font-semibold">{ev.room}</span>
-                              {ev.group && <span>• Tổ: {ev.group}</span>}
-                            </div>
-
-                            {ev.lecturer && (
-                              <div className="flex items-center gap-1.5 text-slate-600">
-                                <User className="w-3.5 h-3.5 shrink-0" />
-                                <span>GV: {ev.lecturer}</span>
+                            {dayItem.events.length > 2 && (
+                              <div className="text-[10px] font-bold text-slate-400 pl-1">
+                                +{dayItem.events.length - 2} ca học khác...
                               </div>
-                            )}
-
-                            {ev.onlineLink && (
-                              <a
-                                href={ev.onlineLink}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-sky-600 hover:underline"
-                              >
-                                <Video className="w-3.5 h-3.5" />
-                                <span>Vào Lớp Học Online</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
                             )}
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                )}
+                </div>
+
+                {/* Side Details Panel for Selected Day */}
+                <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col gap-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                          Lịch Học Ngày
+                        </h3>
+                        <div className="text-xs font-bold text-indigo-600 font-mono">
+                          {new Date(selectedDay).toLocaleDateString('vi-VN', {
+                            weekday: 'long',
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedDay === todayIso && (
+                      <span className="px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-bold rounded-full animate-pulse">
+                        Hôm nay
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Session cards for the day */}
+                  {selectedDayEvents.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+                      <CalendarCheck className="w-8 h-8 text-slate-300" />
+                      <p className="text-xs font-medium text-slate-500">Không có lịch học vào ngày này</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3 overflow-y-auto max-h-[500px] pr-1">
+                      {selectedDayEvents.map((ev) => {
+                        const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                        return (
+                          <div
+                            key={ev.id}
+                            className={`p-3.5 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-4 flex flex-col gap-2 shadow-2xs`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-xs font-black leading-tight">
+                                {ev.subjectName}
+                              </span>
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-white/80 border border-slate-200 shrink-0">
+                                {ev.subjectCode}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-col gap-1 text-[11px] opacity-90">
+                              <div className="flex items-center gap-1.5 font-bold">
+                                <Clock className="w-3.5 h-3.5 shrink-0 text-indigo-600" />
+                                <span className="font-mono">{ev.startTime} - {ev.endTime}</span>
+                                <span className="text-[10px] font-normal">({ev.periodStr})</span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+                                <span className="font-semibold">{ev.room}</span>
+                                {ev.group && <span>• Tổ: {ev.group}</span>}
+                              </div>
+
+                              {ev.lecturer && (
+                                <div className="flex items-center gap-1.5 text-slate-600">
+                                  <User className="w-3.5 h-3.5 shrink-0" />
+                                  <span>GV: {ev.lecturer}</span>
+                                </div>
+                              )}
+
+                              {ev.onlineLink && (
+                                <a
+                                  href={ev.onlineLink}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-sky-600 hover:underline"
+                                >
+                                  <Video className="w-3.5 h-3.5" />
+                                  <span>Vào Lớp Học Online</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+
+              {/* MOBILE CALENDAR VIEW (Dedicated Touch Experience, visible on < md) */}
+              <div className="block md:hidden space-y-3.5">
+                {/* 1. Mobile Compact Month Picker Card */}
+                <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs">
+                  {/* Month header */}
+                  <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-100">
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDays className="w-4 h-4 text-indigo-600" />
+                      <span className="font-black text-xs text-slate-800">
+                        Tháng {currentDate.getMonth() + 1}/{currentDate.getFullYear()}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={handlePrev}
+                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition"
+                        title="Tháng trước"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={handleToday}
+                        className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-bold active:scale-95 transition"
+                      >
+                        Hôm nay
+                      </button>
+                      <button
+                        onClick={handleNext}
+                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition"
+                        title="Tháng sau"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 7-column weekday headers */}
+                  <div className="grid grid-cols-7 text-center text-[11px] font-bold text-slate-500 py-1">
+                    {WEEKDAYS.map((wd) => (
+                      <div key={wd.num} className={wd.num === 8 ? 'text-rose-500' : ''}>
+                        {wd.short}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 7-column date grid */}
+                  <div className="grid grid-cols-7 gap-y-1 gap-x-0.5 text-center mt-1">
+                    {monthGridDays.map((dayItem) => {
+                      const hasEvents = dayItem.events.length > 0;
+                      const isToday = dayItem.isToday;
+                      const isSelected = dayItem.dateStr === selectedDay;
+
+                      return (
+                        <button
+                          key={dayItem.dateStr}
+                          onClick={() => setSelectedDay(dayItem.dateStr)}
+                          className={`h-10 rounded-xl flex flex-col items-center justify-center relative transition-all active:scale-95 cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                              : isToday
+                              ? 'border border-rose-500 bg-rose-50/70 text-rose-700 font-bold'
+                              : !dayItem.isCurrentMonth
+                              ? 'text-slate-300'
+                              : 'text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="text-xs font-mono font-bold leading-none">
+                            {dayItem.date.getDate()}
+                          </span>
+
+                          {/* Event dots under the date number */}
+                          {hasEvents && (
+                            <div className="flex items-center gap-0.5 mt-1">
+                              {dayItem.events.slice(0, 3).map((ev, idx) => {
+                                const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                                return (
+                                  <span
+                                    key={idx}
+                                    className={`w-1.5 h-1.5 rounded-full ${
+                                      isSelected ? 'bg-white' : pal.dot
+                                    }`}
+                                  />
+                                );
+                              })}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Month Footer info pill */}
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                      <span>Có ca học</span>
+                      <span className="text-slate-300">•</span>
+                      <span className="w-2 h-2 rounded-full border border-rose-500 bg-rose-100" />
+                      <span>Hôm nay</span>
+                    </div>
+
+                    <span className="font-bold text-slate-700">
+                      {monthGridDays.reduce((acc, d) => (d.isCurrentMonth ? acc + d.events.length : acc), 0)} ca / tháng
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Mobile Daily Schedule Timeline for Selected Day */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col gap-3">
+                  {/* Header of selected day */}
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Lịch Học Ngày
+                        </div>
+                        <h3 className="text-xs font-black text-slate-800 font-mono">
+                          {new Date(selectedDay).toLocaleDateString('vi-VN', {
+                            weekday: 'long',
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {selectedDay === todayIso && (
+                        <span className="px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-bold rounded-full animate-pulse">
+                          Hôm nay
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold rounded-full font-mono">
+                        {selectedDayEvents.length} ca
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Sessions list on mobile */}
+                  {selectedDayEvents.length === 0 ? (
+                    <div className="py-6 px-4 text-center rounded-xl bg-slate-50 border border-dashed border-slate-200 flex flex-col items-center justify-center gap-2.5">
+                      <CalendarCheck className="w-7 h-7 text-slate-300" />
+                      <p className="text-xs font-medium text-slate-500">
+                        Không có lịch học vào ngày này
+                      </p>
+                      <button
+                        onClick={handleJumpToNextClass}
+                        className="mt-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                      >
+                        <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
+                        <span>Xem Ca Học Gần Nhất</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2.5">
+                      {selectedDayEvents.map((ev) => {
+                        const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                        return (
+                          <div
+                            key={ev.id}
+                            onClick={() => setSelectedEventModal(ev)}
+                            className={`p-3.5 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-4 flex flex-col gap-2.5 shadow-2xs active:scale-98 transition cursor-pointer`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h4 className="text-xs font-black text-slate-900 leading-snug">
+                                  {ev.subjectName}
+                                </h4>
+                                <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-600 font-mono">
+                                  <span>Mã: {ev.subjectCode}</span>
+                                  {ev.group && <span>• Tổ: {ev.group}</span>}
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white/90 border border-slate-200 shrink-0 text-slate-700">
+                                Chi tiết
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] pt-2 border-t border-slate-200/60">
+                              <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                                <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                <span className="font-mono">{ev.startTime} - {ev.endTime}</span>
+                                <span className="text-[10px] text-slate-500 font-normal">({ev.periodStr})</span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 text-slate-700">
+                                <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                <span className="font-semibold">{ev.room}</span>
+                              </div>
+
+                              {ev.lecturer && (
+                                <div className="flex items-center gap-1.5 text-slate-600">
+                                  <User className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                  <span>GV: {ev.lecturer}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {ev.onlineLink && (
+                              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                                <a
+                                  href={ev.onlineLink}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex-1 py-1.5 px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                                >
+                                  <Video className="w-3.5 h-3.5" />
+                                  <span>Vào Lớp Học Online</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopyLink(ev.onlineLink!);
+                                  }}
+                                  className="p-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-xl text-xs transition cursor-pointer"
+                                  title="Sao chép link phòng học"
+                                >
+                                  {copiedLink ? <CheckCheck className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
           )}
 
           {/* VIEW 2: WEEK CALENDAR */}
           {viewMode === 'WEEK' && (
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-              {weekDays.map((dayItem) => {
-                const isToday = dayItem.isToday;
-                return (
-                  <div
-                    key={dayItem.dateStr}
-                    className={`bg-white rounded-3xl p-4 border flex flex-col gap-3 shadow-sm min-h-[300px] ${
-                      isToday ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-slate-200'
-                    }`}
-                  >
-                    {/* Week Column Header */}
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                      <div>
-                        <div className={`text-xs font-black ${isToday ? 'text-indigo-600' : 'text-slate-700'}`}>
-                          {dayItem.weekday}
+            <>
+              {/* Desktop 7-col week grid */}
+              <div className="hidden md:grid md:grid-cols-7 gap-4">
+                {weekDays.map((dayItem) => {
+                  const isToday = dayItem.isToday;
+                  return (
+                    <div
+                      key={dayItem.dateStr}
+                      className={`bg-white rounded-3xl p-4 border flex flex-col gap-3 shadow-sm min-h-[300px] ${
+                        isToday ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-slate-200'
+                      }`}
+                    >
+                      {/* Week Column Header */}
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                        <div>
+                          <div className={`text-xs font-black ${isToday ? 'text-indigo-600' : 'text-slate-700'}`}>
+                            {dayItem.weekday}
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-mono">
+                            {dayItem.dayNum}/{dayItem.date.getMonth() + 1}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-400 font-mono">
-                          {dayItem.dayNum}/{dayItem.date.getMonth() + 1}
-                        </div>
+
+                        {isToday && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" title="Hôm nay" />
+                        )}
                       </div>
 
-                      {isToday && (
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" title="Hôm nay" />
+                      {/* Events inside this day */}
+                      {dayItem.events.length === 0 ? (
+                        <div className="flex-1 flex items-center justify-center text-[11px] text-slate-300 italic">
+                          Không có ca học
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2.5">
+                          {dayItem.events.map((ev) => {
+                            const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                            return (
+                              <div
+                                key={ev.id}
+                                onClick={() => setSelectedEventModal(ev)}
+                                className={`p-3 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-3 flex flex-col gap-1.5 transition cursor-pointer hover:shadow-xs`}
+                              >
+                                <div className="text-xs font-bold leading-tight line-clamp-2">
+                                  {ev.subjectName}
+                                </div>
+
+                                <div className="flex items-center gap-1 font-mono text-[10px] font-bold text-slate-700">
+                                  <Clock className="w-3 h-3 text-indigo-600" />
+                                  <span>{ev.startTime} - {ev.endTime}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1 text-[10px] text-slate-600 truncate">
+                                  <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                                  <span className="truncate">{ev.room}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
+                  );
+                })}
+              </div>
 
-                    {/* Events inside this day */}
-                    {dayItem.events.length === 0 ? (
-                      <div className="flex-1 flex items-center justify-center text-[11px] text-slate-300 italic">
-                        Không có ca học
+              {/* Mobile stacked 7-day cards */}
+              <div className="block md:hidden space-y-2.5">
+                {weekDays.map((dayItem) => {
+                  const isToday = dayItem.isToday;
+                  const hasEvents = dayItem.events.length > 0;
+
+                  return (
+                    <div
+                      key={dayItem.dateStr}
+                      className={`bg-white rounded-2xl p-3.5 border transition-all ${
+                        isToday
+                          ? 'border-indigo-400 bg-indigo-50/20 ring-2 ring-indigo-500/20 shadow-xs'
+                          : 'border-slate-200 shadow-2xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-black ${isToday ? 'text-indigo-600' : 'text-slate-800'}`}>
+                            {dayItem.weekday}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {dayItem.dayNum}/{dayItem.date.getMonth() + 1}/{dayItem.date.getFullYear()}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {isToday && (
+                            <span className="px-2 py-0.2 bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-bold rounded-full">
+                              Hôm nay
+                            </span>
+                          )}
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              hasEvents
+                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                : 'bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            {hasEvents ? `${dayItem.events.length} ca` : 'Trống'}
+                          </span>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="flex flex-col gap-2.5">
-                        {dayItem.events.map((ev) => {
-                          const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
-                          return (
-                            <div
-                              key={ev.id}
-                              onClick={() => setSelectedEventModal(ev)}
-                              className={`p-3 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-3 flex flex-col gap-1.5 transition cursor-pointer hover:shadow-xs`}
-                            >
-                              <div className="text-xs font-bold leading-tight line-clamp-2">
-                                {ev.subjectName}
-                              </div>
 
-                              <div className="flex items-center gap-1 font-mono text-[10px] font-bold text-slate-700">
-                                <Clock className="w-3 h-3 text-indigo-600" />
-                                <span>{ev.startTime} - {ev.endTime}</span>
-                              </div>
+                      {hasEvents ? (
+                        <div className="mt-2.5 flex flex-col gap-2">
+                          {dayItem.events.map((ev) => {
+                            const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                            return (
+                              <div
+                                key={ev.id}
+                                onClick={() => setSelectedEventModal(ev)}
+                                className={`p-3 rounded-xl border ${pal.bg} ${pal.accentBorder} border-l-4 flex flex-col gap-1.5 active:scale-98 transition cursor-pointer`}
+                              >
+                                <div className="flex items-start justify-between gap-1.5">
+                                  <h4 className="text-xs font-black text-slate-900 leading-snug">
+                                    {ev.subjectName}
+                                  </h4>
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-white/80 border border-slate-200 shrink-0">
+                                    {ev.subjectCode}
+                                  </span>
+                                </div>
 
-                              <div className="flex items-center gap-1 text-[10px] text-slate-600 truncate">
-                                <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
-                                <span className="truncate">{ev.room}</span>
+                                <div className="flex items-center gap-3 text-[11px] font-mono text-slate-700">
+                                  <div className="flex items-center gap-1 font-bold">
+                                    <Clock className="w-3 h-3 text-indigo-600" />
+                                    <span>{ev.startTime} - {ev.endTime}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 truncate text-slate-600">
+                                    <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                                    <span className="truncate">{ev.room}</span>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="pt-2 text-center text-[11px] text-slate-400 italic">
+                          Không có ca học
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           {/* VIEW 3: AGENDA / FULL SEMESTER TIMELINE */}
           {viewMode === 'AGENDA' && (
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col gap-6">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col gap-4 sm:gap-6">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                <h3 className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-2">
                   <ListFilter className="w-4 h-4 text-indigo-600" />
-                  Danh Sách Toàn Bộ Buổi Học Trong Kỳ ({filteredEvents.length} ca học)
+                  <span>Danh Sách Lịch Học ({filteredEvents.length} ca học)</span>
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {filteredEvents.map((ev) => {
                   const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
                   const isToday = ev.date === todayIso;
@@ -1101,11 +1454,11 @@ export default function StudentTimetableCalendar({
                     <div
                       key={ev.id}
                       onClick={() => setSelectedEventModal(ev)}
-                      className={`p-4 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-4 flex flex-col justify-between gap-3 shadow-2xs hover:shadow-sm transition cursor-pointer`}
+                      className={`p-3.5 sm:p-4 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-4 flex flex-col justify-between gap-2.5 sm:gap-3 shadow-2xs hover:shadow-sm active:scale-98 transition cursor-pointer`}
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <span className="text-xs font-mono font-bold text-indigo-600 bg-white/90 px-2 py-0.5 rounded-lg border border-slate-200">
+                          <span className="text-[11px] sm:text-xs font-mono font-bold text-indigo-600 bg-white/90 px-2 py-0.5 rounded-lg border border-slate-200">
                             {ev.dayOfWeekStr}, {new Date(ev.date).toLocaleDateString('vi-VN')}
                           </span>
                           {isToday && (
