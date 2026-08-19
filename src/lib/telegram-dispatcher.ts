@@ -1009,6 +1009,26 @@ export async function getStudentAllSemesterSessions(username: string): Promise<a
       }
 
       if (Array.isArray(fetched.rawList) && fetched.rawList.length > 0) {
+        // Lưu vào DB StudentTimetableRecord
+        await prisma.studentTimetableRecord
+          .upsert({
+            where: { username },
+            create: {
+              username,
+              rawData: JSON.stringify(fetched),
+              semesterId: fetched.currentSemester || null,
+              totalEvents: fetched.rawList.length,
+              lastPulledAt: new Date(),
+            },
+            update: {
+              rawData: JSON.stringify(fetched),
+              semesterId: fetched.currentSemester || null,
+              totalEvents: fetched.rawList.length,
+              lastPulledAt: new Date(),
+            },
+          })
+          .catch(() => {});
+
         return fetched.rawList;
       }
     }
@@ -1016,7 +1036,30 @@ export async function getStudentAllSemesterSessions(username: string): Promise<a
     console.warn(`[getStudentAllSemesterSessions] Không thể gọi API TKB QLDTTX cho ${username}:`, apiErr?.message || apiErr);
   }
 
-  // 2. Fallback sang bảng CourseRegistration trong CSDL
+  // 2. Fallback sang bảng StudentTimetableRecord trong CSDL
+  try {
+    const cachedRecord = await prisma.studentTimetableRecord.findUnique({
+      where: { username },
+    });
+
+    if (cachedRecord && cachedRecord.rawData) {
+      const parsed = JSON.parse(cachedRecord.rawData);
+      const list =
+        parsed?.rawList ||
+        parsed?.data?.ds_thoi_khoa_bieu ||
+        parsed?.data?.ds_tkb_tuan ||
+        parsed?.data?.ds_kqdkmh ||
+        parsed?.ds_kqdkmh ||
+        [];
+      if (Array.isArray(list) && list.length > 0) {
+        return list;
+      }
+    }
+  } catch (dbErr: any) {
+    console.error(`[getStudentAllSemesterSessions] Lỗi truy vấn DB StudentTimetableRecord cho ${username}:`, dbErr);
+  }
+
+  // 3. Fallback sang bảng CourseRegistration trong CSDL
   try {
     const dbCourseReg = await prisma.courseRegistration.findFirst({
       where: { username },

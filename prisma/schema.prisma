@@ -29,6 +29,9 @@ model User {
   // Quan hệ 1-1 với StudentGradeRecord
   gradeRecord      StudentGradeRecord?
   
+  // Quan hệ 1-1 với StudentTimetableRecord
+  timetableRecord  StudentTimetableRecord?
+  
   // Quan hệ 1-N với ActivityLog
   activityLogs     ActivityLog[]
   
@@ -362,5 +365,27 @@ model StudentGradeRecord {
   @@index([gpa4])
   @@index([classification])
 }
+
+// 17. Bảng StudentTimetableRecord: Lưu trữ thời khóa biểu & lịch học cá nhân theo từng sinh viên
+model StudentTimetableRecord {
+  id              Int       @id @default(autoincrement())
+  username        String    @unique // Mã sinh viên (User.username)
+  user            User?     @relation(fields: [username], references: [username], onDelete: Cascade)
+  
+  // Dữ liệu JSON thô đầy đủ từ QLDTTX (rawList, weeks, currentSemester, etc.)
+  rawData         String    // JSON string chứa toàn bộ danh sách TKB
+  semesterId      Int?      // Học kỳ lưu trữ nếu có (ví dụ: 20261)
+  semesterName    String?   // Tên học kỳ (ví dụ: "Học kỳ 1 Năm học 2025-2026")
+  totalSubjects   Int?      @default(0) // Tổng số môn học
+  totalEvents     Int?      @default(0) // Tổng số buổi học
+  
+  lastPulledAt    DateTime? @default(now()) // Thời điểm kéo dữ liệu từ QLDTTX
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([username])
+  @@index([semesterId])
+}
+
 
 

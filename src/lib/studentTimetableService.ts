@@ -51,6 +51,7 @@ export interface StudentTimetableCalendarResult {
   isConfigured: boolean;
   hasLinkedAccount: boolean;
   isLiveSync: boolean;
+  isCachedDb?: boolean;
   lastSyncAt: string | null;
   totalCredits?: number;
   tuitionFee?: number;
@@ -62,6 +63,8 @@ export interface StudentTimetableCalendarResult {
   errorType?: 'NOT_CONFIGURED' | 'INVALID_CREDENTIALS' | 'SERVER_ERROR';
   error?: string;
 }
+
+export const TIMETABLE_AUTO_REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
 const PERIOD_TIMES: Record<number, { start: string; end: string; startMin: number }> = {
   1: { start: '07:00', end: '07:50', startMin: 7 * 60 },
@@ -104,173 +107,20 @@ function getColorIndexForSubject(subjectCode: string, colorMap: Map<string, numb
 }
 
 /**
- * Lấy dữ liệu Thời Khóa Biểu học kỳ và chuẩn hóa thành danh sách Calendar Events
+ * Xây dựng đối tượng kết quả Thời Khóa Biểu từ danh sách rawList
  */
-export async function getStudentTimetableCalendar(
-  username: string,
-  options?: { forceRefresh?: boolean; semesterId?: number }
-): Promise<StudentTimetableCalendarResult> {
-  const cleanUsername = username.trim().toUpperCase();
-  let rawList: any[] = [];
-  let isLiveSync = false;
-  let hasLinkedAccount = false;
-  let lastSyncAt: string | null = null;
-  let currentSemester = options?.semesterId || 20261;
-
-  // 1. Kiểm tra tài khoản ExternalAccount QLDTTX
-  const extAccount = await prisma.externalAccount.findFirst({
-    where: {
-      username: cleanUsername,
-      systemKey: 'QLDTTX_PTTC1',
-    },
-  });
-
-  const isConfigured = !!(extAccount && (extAccount.token || extAccount.extPassword));
-  hasLinkedAccount = isConfigured;
-
-  // Nếu CHƯA CẤU HÌNH tài khoản QLDTTX -> Chặn truy cập và trả về errorType NOT_CONFIGURED
-  if (!isConfigured) {
-    return {
-      success: false,
-      username: cleanUsername,
-      semesterId: currentSemester,
-      semesterName: `Học kỳ ${String(currentSemester).slice(-1)} Năm học ${String(currentSemester).slice(0, 4)}`,
-      isConfigured: false,
-      hasLinkedAccount: false,
-      isLiveSync: false,
-      lastSyncAt: null,
-      totalEvents: 0,
-      uniqueSubjectsCount: 0,
-      subjects: [],
-      events: [],
-      upcomingEvents: [],
-      errorType: 'NOT_CONFIGURED',
-      error: 'Chưa cấu hình tài khoản Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX PTTC1). Vui lòng cấu hình tài khoản để xem Thời Khóa Biểu & Lịch Học Cá Nhân.',
-    };
+export function buildTimetableResultFromRawData(
+  cleanUsername: string,
+  rawList: any[],
+  currentSemester: number,
+  options: {
+    isConfigured: boolean;
+    isLiveSync: boolean;
+    isCachedDb: boolean;
+    lastSyncAt: string | null;
+    semesterName?: string;
   }
-
-  if (extAccount?.lastSyncAt) {
-    lastSyncAt = extAccount.lastSyncAt.toISOString();
-  }
-
-  // 2. Thử lấy live từ QLDTTX
-  let authErrorDetected = false;
-  let authErrorMessage = '';
-
-  try {
-    const fetched = await fetchStudentTimetableFromQLDTTX({
-      username: extAccount!.extUsername || cleanUsername,
-      password: extAccount!.extPassword || undefined,
-      token: extAccount!.token,
-      idHocKy: options?.semesterId || null,
-    });
-
-    if (fetched.currentSemester) {
-      currentSemester = fetched.currentSemester;
-    }
-
-    if (Array.isArray(fetched.rawList) && fetched.rawList.length > 0) {
-      rawList = fetched.rawList;
-      isLiveSync = true;
-
-      // Cập nhật trạng thái kết nối CONNECTED thành công
-      await prisma.externalAccount
-        .update({
-          where: { id: extAccount!.id },
-          data: {
-            ...(fetched.newToken ? { token: fetched.newToken } : {}),
-            lastSyncAt: new Date(),
-            status: 'CONNECTED',
-            syncMessage: 'Đồng bộ TKB thành công từ QLDTTX.',
-          },
-        })
-        .catch(() => {});
-    }
-  } catch (err: any) {
-    const errMsg = (err?.message || '').toLowerCase();
-    console.warn(`[getStudentTimetableCalendar] Lỗi kết nối QLDTTX cho ${cleanUsername}:`, err?.message);
-
-    // Kiểm tra lỗi xác thực: sai username/password, token hết hạn, 401, 403
-    if (
-      errMsg.includes('401') ||
-      errMsg.includes('403') ||
-      errMsg.includes('không thành công') ||
-      errMsg.includes('mật khẩu') ||
-      errMsg.includes('tài khoản') ||
-      errMsg.includes('đăng nhập') ||
-      errMsg.includes('unauthorized') ||
-      errMsg.includes('forbidden') ||
-      errMsg.includes('không đúng') ||
-      errMsg.includes('user không tồn tại')
-    ) {
-      authErrorDetected = true;
-      authErrorMessage = err.message || 'Tài khoản hoặc mật khẩu QLDTTX không chính xác.';
-
-      // Cập nhật trạng thái ERROR trong DB
-      await prisma.externalAccount
-        .update({
-          where: { id: extAccount!.id },
-          data: {
-            status: 'ERROR',
-            syncMessage: 'Đăng nhập thất bại: Tài khoản hoặc mật khẩu không chính xác.',
-          },
-        })
-        .catch(() => {});
-    }
-  }
-
-  // Nếu SAI USERNAME / PASSWORD -> Chặn truy cập và trả về errorType INVALID_CREDENTIALS
-  if (authErrorDetected || extAccount?.status === 'ERROR') {
-    return {
-      success: false,
-      username: cleanUsername,
-      semesterId: currentSemester,
-      semesterName: `Học kỳ ${String(currentSemester).slice(-1)} Năm học ${String(currentSemester).slice(0, 4)}`,
-      isConfigured: true,
-      hasLinkedAccount: true,
-      isLiveSync: false,
-      lastSyncAt,
-      totalEvents: 0,
-      uniqueSubjectsCount: 0,
-      subjects: [],
-      events: [],
-      upcomingEvents: [],
-      errorType: 'INVALID_CREDENTIALS',
-      error: authErrorMessage || 'Tài khoản hoặc mật khẩu Cổng Quản Lý Đào Tạo Từ Xa (PTTC1) không chính xác hoặc đã bị đổi. Vui lòng kiểm tra và cập nhật lại thông tin đăng nhập.',
-    };
-  }
-
-  // 3. Fallback sang dữ liệu đã lưu trong bảng CourseRegistration nếu không có lỗi xác thực
-  if (rawList.length === 0) {
-    try {
-      const dbCourseReg = await prisma.courseRegistration.findFirst({
-        where: { username: cleanUsername },
-        orderBy: { updatedAt: 'desc' },
-      });
-
-      if (dbCourseReg && dbCourseReg.data) {
-        const parsed = JSON.parse(dbCourseReg.data);
-        const list =
-          parsed?.data?.ds_thoi_khoa_bieu ||
-          parsed?.data?.ds_tkb_tuan ||
-          parsed?.data?.ds_kqdkmh ||
-          parsed?.ds_kqdkmh ||
-          parsed?.data ||
-          [];
-
-        if (Array.isArray(list) && list.length > 0) {
-          rawList = list;
-          if (dbCourseReg.updatedAt) {
-            lastSyncAt = dbCourseReg.updatedAt.toISOString();
-          }
-        }
-      }
-    } catch (dbErr) {
-      console.error(`[getStudentTimetableCalendar] Lỗi đọc DB CourseRegistration:`, dbErr);
-    }
-  }
-
-  // 4. Trích xuất tất cả các buổi học thành Calendar Events
+): StudentTimetableCalendarResult {
   const events: TimetableCalendarEvent[] = [];
   const subjectMap = new Map<string, TimetableSubjectSummary>();
   const colorMap = new Map<string, number>();
@@ -579,15 +429,20 @@ export async function getStudentTimetableCalendar(
   const calculatedCredits = subjects.reduce((sum, s) => sum + (s.credits || 0), 0);
   const calculatedTuitionFee = subjects.reduce((sum, s) => sum + (s.tuitionFee || 0), 0);
 
+  const semesterName =
+    options.semesterName ||
+    `Học kỳ ${String(currentSemester).slice(-1)} Năm học ${String(currentSemester).slice(0, 4)}`;
+
   return {
     success: true,
     username: cleanUsername,
     semesterId: currentSemester,
-    semesterName: `Học kỳ ${String(currentSemester).slice(-1)} Năm học ${String(currentSemester).slice(0, 4)}`,
-    isConfigured,
-    hasLinkedAccount,
-    isLiveSync,
-    lastSyncAt,
+    semesterName,
+    isConfigured: options.isConfigured,
+    hasLinkedAccount: options.isConfigured,
+    isLiveSync: options.isLiveSync,
+    isCachedDb: options.isCachedDb,
+    lastSyncAt: options.lastSyncAt,
     totalCredits: calculatedCredits,
     tuitionFee: calculatedTuitionFee,
     totalEvents: events.length,
@@ -597,3 +452,290 @@ export async function getStudentTimetableCalendar(
     upcomingEvents,
   };
 }
+
+/**
+ * Lấy dữ liệu Thời Khóa Biểu học kỳ:
+ * 1. Đọc từ CSDL bảng StudentTimetableRecord nếu đã lưu và còn hạn (< 10 phút)
+ * 2. Tự động pull lại từ cổng QLDTTX nếu chưa lưu, quá 10 phút, hoặc người dùng yêu cầu forceRefresh
+ * 3. Lưu trữ lại vào CSDL sau khi pull thành công
+ */
+export async function getStudentTimetableCalendar(
+  username: string,
+  options?: { forceRefresh?: boolean; semesterId?: number }
+): Promise<StudentTimetableCalendarResult> {
+  const cleanUsername = username.trim().toUpperCase();
+  let currentSemester = options?.semesterId || 20261;
+
+  // 1. Kiểm tra tài khoản ExternalAccount QLDTTX
+  const extAccount = await prisma.externalAccount.findFirst({
+    where: {
+      username: cleanUsername,
+      systemKey: 'QLDTTX_PTTC1',
+    },
+  });
+
+  const isConfigured = !!(extAccount && (extAccount.token || extAccount.extPassword));
+
+  // Nếu CHƯA CẤU HÌNH tài khoản QLDTTX -> Chặn truy cập và trả về errorType NOT_CONFIGURED
+  if (!isConfigured) {
+    return {
+      success: false,
+      username: cleanUsername,
+      semesterId: currentSemester,
+      semesterName: `Học kỳ ${String(currentSemester).slice(-1)} Năm học ${String(currentSemester).slice(0, 4)}`,
+      isConfigured: false,
+      hasLinkedAccount: false,
+      isLiveSync: false,
+      isCachedDb: false,
+      lastSyncAt: null,
+      totalEvents: 0,
+      uniqueSubjectsCount: 0,
+      subjects: [],
+      events: [],
+      upcomingEvents: [],
+      errorType: 'NOT_CONFIGURED',
+      error: 'Chưa cấu hình tài khoản Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX PTTC1). Vui lòng cấu hình tài khoản để xem Thời Khóa Biểu & Lịch Học Cá Nhân.',
+    };
+  }
+
+  // 2. Kiểm tra dữ liệu đã lưu trong bảng StudentTimetableRecord trong DB
+  let cachedRecord: any = null;
+  try {
+    cachedRecord = await prisma.studentTimetableRecord.findUnique({
+      where: { username: cleanUsername },
+    });
+  } catch (err) {
+    console.warn('[getStudentTimetableCalendar] Lỗi đọc DB StudentTimetableRecord:', err);
+  }
+
+  const lastPulled = cachedRecord?.lastPulledAt || cachedRecord?.updatedAt;
+  const ageMs = lastPulled ? Date.now() - new Date(lastPulled).getTime() : Infinity;
+  const isCacheFresh = cachedRecord && cachedRecord.rawData && ageMs < TIMETABLE_AUTO_REFRESH_INTERVAL_MS;
+
+  // Nếu KHÔNG yêu cầu forceRefresh và cache còn hạn (< 10 phút) -> Trả về dữ liệu từ CSDL ngay
+  if (!options?.forceRefresh && isCacheFresh) {
+    try {
+      const parsed = JSON.parse(cachedRecord.rawData);
+      const rawList =
+        parsed?.rawList ||
+        parsed?.data?.ds_thoi_khoa_bieu ||
+        parsed?.data?.ds_tkb_tuan ||
+        parsed?.data?.ds_kqdkmh ||
+        parsed?.ds_kqdkmh ||
+        (Array.isArray(parsed) ? parsed : []) ||
+        [];
+
+      if (Array.isArray(rawList) && rawList.length > 0) {
+        const semId = cachedRecord.semesterId || parsed.currentSemester || currentSemester;
+        return buildTimetableResultFromRawData(cleanUsername, rawList, semId, {
+          isConfigured: true,
+          isLiveSync: false,
+          isCachedDb: true,
+          lastSyncAt: lastPulled ? new Date(lastPulled).toISOString() : null,
+          semesterName: cachedRecord.semesterName || undefined,
+        });
+      }
+    } catch (parseErr) {
+      console.warn('[getStudentTimetableCalendar] Parse rawData từ cache lỗi:', parseErr);
+    }
+  }
+
+  // 3. Tiến hành kéo mới từ QLDTTX (khi forceRefresh = true, lần đầu chưa có trong DB, hoặc sau 10 phút)
+  let authErrorDetected = false;
+  let authErrorMessage = '';
+  let fetched: any = null;
+
+  try {
+    fetched = await fetchStudentTimetableFromQLDTTX({
+      username: extAccount!.extUsername || cleanUsername,
+      password: extAccount!.extPassword || undefined,
+      token: extAccount!.token,
+      idHocKy: options?.semesterId || null,
+    });
+
+    if (fetched.currentSemester) {
+      currentSemester = fetched.currentSemester;
+    }
+
+    if (Array.isArray(fetched.rawList) && fetched.rawList.length > 0) {
+      // Cập nhật trạng thái CONNECTED và token mới nếu có
+      await prisma.externalAccount
+        .update({
+          where: { id: extAccount!.id },
+          data: {
+            ...(fetched.newToken ? { token: fetched.newToken } : {}),
+            lastSyncAt: new Date(),
+            status: 'CONNECTED',
+            syncMessage: 'Đồng bộ TKB thành công từ QLDTTX.',
+          },
+        })
+        .catch(() => {});
+
+      const resultObj = buildTimetableResultFromRawData(cleanUsername, fetched.rawList, currentSemester, {
+        isConfigured: true,
+        isLiveSync: true,
+        isCachedDb: false,
+        lastSyncAt: new Date().toISOString(),
+      });
+
+      // 4. Lưu / Persist vào DB bảng StudentTimetableRecord
+      try {
+        await prisma.studentTimetableRecord.upsert({
+          where: { username: cleanUsername },
+          create: {
+            username: cleanUsername,
+            rawData: JSON.stringify(fetched),
+            semesterId: currentSemester,
+            semesterName: resultObj.semesterName,
+            totalSubjects: resultObj.uniqueSubjectsCount,
+            totalEvents: resultObj.totalEvents,
+            lastPulledAt: new Date(),
+          },
+          update: {
+            rawData: JSON.stringify(fetched),
+            semesterId: currentSemester,
+            semesterName: resultObj.semesterName,
+            totalSubjects: resultObj.uniqueSubjectsCount,
+            totalEvents: resultObj.totalEvents,
+            lastPulledAt: new Date(),
+          },
+        });
+      } catch (saveErr) {
+        console.error('[getStudentTimetableCalendar] Lưu StudentTimetableRecord thất bại:', saveErr);
+      }
+
+      return resultObj;
+    }
+  } catch (err: any) {
+    const errMsg = (err?.message || '').toLowerCase();
+    console.warn(`[getStudentTimetableCalendar] Lỗi kết nối QLDTTX cho ${cleanUsername}:`, err?.message);
+
+    if (
+      errMsg.includes('401') ||
+      errMsg.includes('403') ||
+      errMsg.includes('không thành công') ||
+      errMsg.includes('mật khẩu') ||
+      errMsg.includes('tài khoản') ||
+      errMsg.includes('đăng nhập') ||
+      errMsg.includes('unauthorized') ||
+      errMsg.includes('forbidden') ||
+      errMsg.includes('không đúng') ||
+      errMsg.includes('user không tồn tại')
+    ) {
+      authErrorDetected = true;
+      authErrorMessage = err.message || 'Tài khoản hoặc mật khẩu QLDTTX không chính xác.';
+
+      await prisma.externalAccount
+        .update({
+          where: { id: extAccount!.id },
+          data: {
+            status: 'ERROR',
+            syncMessage: 'Đăng nhập thất bại: Tài khoản hoặc mật khẩu không chính xác.',
+          },
+        })
+        .catch(() => {});
+    }
+  }
+
+  // Nếu SAI USERNAME / PASSWORD -> Chặn truy cập và trả về errorType INVALID_CREDENTIALS
+  if (authErrorDetected || extAccount?.status === 'ERROR') {
+    return {
+      success: false,
+      username: cleanUsername,
+      semesterId: currentSemester,
+      semesterName: `Học kỳ ${String(currentSemester).slice(-1)} Năm học ${String(currentSemester).slice(0, 4)}`,
+      isConfigured: true,
+      hasLinkedAccount: true,
+      isLiveSync: false,
+      isCachedDb: false,
+      lastSyncAt: extAccount?.lastSyncAt ? extAccount.lastSyncAt.toISOString() : null,
+      totalEvents: 0,
+      uniqueSubjectsCount: 0,
+      subjects: [],
+      events: [],
+      upcomingEvents: [],
+      errorType: 'INVALID_CREDENTIALS',
+      error:
+        authErrorMessage ||
+        'Tài khoản hoặc mật khẩu Cổng Quản Lý Đào Tạo Từ Xa (PTTC1) không chính xác hoặc đã bị đổi. Vui lòng kiểm tra và cập nhật lại thông tin đăng nhập.',
+    };
+  }
+
+  // Fallback 1: Trả về dữ liệu từ bảng StudentTimetableRecord đã lưu trước đó nếu có (khi mạng QLDTTX gặp sự cố)
+  if (cachedRecord && cachedRecord.rawData) {
+    try {
+      const parsed = JSON.parse(cachedRecord.rawData);
+      const rawList =
+        parsed?.rawList ||
+        parsed?.data?.ds_thoi_khoa_bieu ||
+        parsed?.data?.ds_tkb_tuan ||
+        parsed?.data?.ds_kqdkmh ||
+        parsed?.ds_kqdkmh ||
+        (Array.isArray(parsed) ? parsed : []) ||
+        [];
+
+      if (Array.isArray(rawList) && rawList.length > 0) {
+        const semId = cachedRecord.semesterId || parsed.currentSemester || currentSemester;
+        return buildTimetableResultFromRawData(cleanUsername, rawList, semId, {
+          isConfigured: true,
+          isLiveSync: false,
+          isCachedDb: true,
+          lastSyncAt: lastPulled ? new Date(lastPulled).toISOString() : null,
+          semesterName: cachedRecord.semesterName || undefined,
+        });
+      }
+    } catch (dbErr) {
+      console.error('[getStudentTimetableCalendar] Fallback StudentTimetableRecord lỗi:', dbErr);
+    }
+  }
+
+  // Fallback 2: Fallback sang CourseRegistration
+  try {
+    const dbCourseReg = await prisma.courseRegistration.findFirst({
+      where: { username: cleanUsername },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (dbCourseReg && dbCourseReg.data) {
+      const parsed = JSON.parse(dbCourseReg.data);
+      const list =
+        parsed?.data?.ds_thoi_khoa_bieu ||
+        parsed?.data?.ds_tkb_tuan ||
+        parsed?.data?.ds_kqdkmh ||
+        parsed?.ds_kqdkmh ||
+        parsed?.data ||
+        [];
+
+      if (Array.isArray(list) && list.length > 0) {
+        return buildTimetableResultFromRawData(cleanUsername, list, currentSemester, {
+          isConfigured: true,
+          isLiveSync: false,
+          isCachedDb: true,
+          lastSyncAt: dbCourseReg.updatedAt ? dbCourseReg.updatedAt.toISOString() : null,
+        });
+      }
+    }
+  } catch (dbErr) {
+    console.error('[getStudentTimetableCalendar] Fallback CourseRegistration lỗi:', dbErr);
+  }
+
+  return {
+    success: true,
+    username: cleanUsername,
+    semesterId: currentSemester,
+    semesterName: `Học kỳ ${String(currentSemester).slice(-1)} Năm học ${String(currentSemester).slice(0, 4)}`,
+    isConfigured: true,
+    hasLinkedAccount: true,
+    isLiveSync: false,
+    isCachedDb: false,
+    lastSyncAt: null,
+    totalCredits: 0,
+    tuitionFee: 0,
+    totalEvents: 0,
+    uniqueSubjectsCount: 0,
+    subjects: [],
+    events: [],
+    upcomingEvents: [],
+  };
+}
+

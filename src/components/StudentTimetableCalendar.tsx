@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -6,6 +6,7 @@ import {
   Clock,
   MapPin,
   RefreshCw,
+  Zap,
   BookOpen,
   Layers,
   Sparkles,
@@ -139,6 +140,34 @@ function formatIso(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function formatSyncDateTime(isoString?: string | null): string {
+  if (!isoString) return 'Chưa đồng bộ';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return isoString;
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`;
+}
+
+function getRelativeSyncTime(isoString?: string | null): string {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diffSec < 10) return 'vừa xong';
+  if (diffSec < 60) return `${diffSec} giây trước`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} phút trước`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} giờ trước`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay} ngày trước`;
+}
+
 export default function StudentTimetableCalendar({
   currentUser,
   onNavigateToExternalAccounts,
@@ -148,6 +177,7 @@ export default function StudentTimetableCalendar({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<'NOT_CONFIGURED' | 'INVALID_CREDENTIALS' | 'SERVER_ERROR' | null>(null);
+  const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Calendar View Mode: 'MONTH' | 'WEEK' | 'AGENDA'
   const [viewMode, setViewMode] = useState<'MONTH' | 'WEEK' | 'AGENDA'>('MONTH');
@@ -160,6 +190,9 @@ export default function StudentTimetableCalendar({
   const [selectedEventModal, setSelectedEventModal] = useState<TimetableCalendarEvent | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // Track the timestamp of the last fetch to automatically re-pull if returning after 10 minutes
+  const lastFetchTimeRef = useRef<number>(Date.now());
+
   // Fetch timetable from API
   const fetchTimetable = useCallback(async (refresh = false) => {
     if (refresh) setIsRefreshing(true);
@@ -170,9 +203,20 @@ export default function StudentTimetableCalendar({
     try {
       const res = await fetch(`/api/student/timetable${refresh ? '?refresh=true' : ''}`);
       const json = await res.json();
+      lastFetchTimeRef.current = Date.now();
+
       if (res.ok && json.success) {
         setData(json);
         setErrorType(null);
+
+        if (refresh) {
+          const syncTimeFormatted = formatSyncDateTime(json.lastSyncAt || new Date().toISOString());
+          setSyncFeedback({
+            type: 'success',
+            message: `Đồng bộ thành công thời khóa biểu mới nhất từ QLDTTX (lúc ${syncTimeFormatted})!`,
+          });
+          setTimeout(() => setSyncFeedback(null), 6000);
+        }
 
         // Auto jump calendar date to nearest active session if current month has no events
         if (json.events && json.events.length > 0) {
@@ -193,10 +237,22 @@ export default function StudentTimetableCalendar({
         if (json.username) {
           setData(json);
         }
+        if (refresh) {
+          setSyncFeedback({
+            type: 'error',
+            message: json.error || 'Đồng bộ từ cổng QLDTTX thất bại. Vui lòng kiểm tra lại tài khoản.',
+          });
+        }
       }
     } catch (err: any) {
       setErrorType('SERVER_ERROR');
       setError('Lỗi kết nối máy chủ khi lấy dữ liệu thời khóa biểu');
+      if (refresh) {
+        setSyncFeedback({
+          type: 'error',
+          message: 'Lỗi kết nối máy chủ khi đồng bộ thời khóa biểu từ QLDTTX.',
+        });
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -205,6 +261,41 @@ export default function StudentTimetableCalendar({
 
   useEffect(() => {
     fetchTimetable();
+  }, [fetchTimetable]);
+
+  // Tự động kiểm tra và pull lại nếu người dùng quay lại tab/vào lại sau 10 phút (10 * 60 * 1000 ms)
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        const elapsed = Date.now() - lastFetchTimeRef.current;
+        if (elapsed >= 10 * 60 * 1000) {
+          lastFetchTimeRef.current = Date.now();
+          fetchTimetable(false);
+        }
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleFocusOrVisibility);
+
+    function handleFocusOrVisibility() {
+      handleVisibilityOrFocus();
+    }
+
+    // Interval định kỳ mỗi 10 phút kiểm tra làm mới nền nếu tab vẫn đang mở
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - lastFetchTimeRef.current;
+      if (elapsed >= 10 * 60 * 1000) {
+        lastFetchTimeRef.current = Date.now();
+        fetchTimetable(false);
+      }
+    }, 60 * 1000);
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleFocusOrVisibility);
+      clearInterval(intervalId);
+    };
   }, [fetchTimetable]);
 
   // Filtered Events
@@ -389,7 +480,12 @@ export default function StudentTimetableCalendar({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-black text-slate-800">Thời Khóa Biểu & Lịch Học Cá Nhân</h2>
-              {data?.isLiveSync ? (
+              {data?.isCachedDb ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
+                  Đã Lưu Trong CSDL
+                </span>
+              ) : data?.isLiveSync ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   Đồng bộ Trực Tuyến QLĐT
@@ -397,26 +493,45 @@ export default function StudentTimetableCalendar({
               ) : (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
                   <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
-                  Dữ Liệu Học Kỳ Đã Lưu
+                  Dữ Liệu Đã Lưu
+                </span>
+              )}
+
+              {/* Last Update Badge */}
+              {data?.lastSyncAt && (
+                <span
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200"
+                  title="Thời điểm kéo dữ liệu từ Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX). Hệ thống tự động làm mới khi vào lại sau 10 phút."
+                >
+                  <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>Lần kéo cuối:</span>
+                  <strong className="font-mono text-slate-900">{formatSyncDateTime(data.lastSyncAt)}</strong>
+                  {getRelativeSyncTime(data.lastSyncAt) && (
+                    <span className="text-[10px] text-slate-500 font-normal">({getRelativeSyncTime(data.lastSyncAt)})</span>
+                  )}
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {data?.semesterName || 'Học kỳ 1 Năm học 2025-2026'} • Tổng cộng <b>{data?.uniqueSubjectsCount || 0} môn học</b> ({data?.totalEvents || 0} buổi học trong kỳ)
+            <p className="text-xs text-slate-500 mt-1">
+              Cổng đào tạo: <strong className="text-indigo-600 font-mono">https://qldttx.pttc1.edu.vn/</strong> • {data?.semesterName || 'Học kỳ 1 Năm học 2025-2026'} • Tổng cộng <b>{data?.uniqueSubjectsCount || 0} môn học</b> ({data?.totalEvents || 0} buổi học trong kỳ)
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Refresh button */}
+          {/* Active Pull button from QLDTTX */}
           <button
             onClick={() => fetchTimetable(true)}
             disabled={isRefreshing || isLoading}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            title="Đồng bộ lại thời khóa biểu mới nhất từ cổng QLDTTX"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+            title="Chủ động kéo lại thời khóa biểu mới nhất từ cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-600' : 'text-slate-600'}`} />
-            <span>{isRefreshing ? 'Đang đồng bộ...' : 'Làm Mới Từ QLĐT'}</span>
+            {isRefreshing ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+            ) : (
+              <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
+            )}
+            <span>{isRefreshing ? 'Đang kéo TKB...' : 'Kéo Lại Từ QLDTTX'}</span>
           </button>
 
           {/* View mode toggle */}
@@ -457,6 +572,33 @@ export default function StudentTimetableCalendar({
           </div>
         </div>
       </div>
+
+      {/* Sync Toast Feedback Banner */}
+      {syncFeedback && (
+        <div
+          className={`p-4 rounded-3xl border text-xs font-semibold flex items-center justify-between gap-3 animate-in fade-in duration-200 shadow-xs ${
+            syncFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {syncFeedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{syncFeedback.message}</span>
+          </div>
+          <button
+            onClick={() => setSyncFeedback(null)}
+            className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
 
       {/* Unlinked Account Notice Banner */}
       {!data?.hasLinkedAccount && (
