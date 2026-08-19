@@ -24,6 +24,8 @@ import {
   Users,
   Timer,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   X,
   FileText,
@@ -1659,8 +1661,8 @@ export default function StudentPersonalExamSchedule({
                     {/* Subject Filter */}
                     <div className="relative">
                       <select
-                        value={filters.subject}
-                        onChange={(e) => setFilters((prev) => ({ ...prev, subject: e.target.value }))}
+                        value={filters.subjectCode}
+                        onChange={(e) => setFilters((prev) => ({ ...prev, subjectCode: e.target.value }))}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-6 truncate"
                       >
                         <option value="">Tất cả môn</option>

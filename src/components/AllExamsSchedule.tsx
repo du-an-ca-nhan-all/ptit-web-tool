@@ -121,7 +121,7 @@ export default function AllExamsSchedule({
     );
   }
 
-  const isFilterActive = Boolean(filters.class || filters.subject || filters.date || filters.search);
+  const isFilterActive = Boolean(filters.classCode || filters.subjectCode || filters.date || filters.search);
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
@@ -165,8 +165,8 @@ export default function AllExamsSchedule({
             {/* Class filter */}
             <div className="relative">
               <select
-                value={filters.class}
-                onChange={(e) => setFilters((prev) => ({ ...prev, class: e.target.value }))}
+                value={filters.classCode}
+                onChange={(e) => setFilters((prev) => ({ ...prev, classCode: e.target.value }))}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[11px] font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-5 truncate"
               >
                 <option value="">Tất cả lớp</option>
@@ -182,8 +182,8 @@ export default function AllExamsSchedule({
             {/* Subject filter */}
             <div className="relative">
               <select
-                value={filters.subject}
-                onChange={(e) => setFilters((prev) => ({ ...prev, subject: e.target.value }))}
+                value={filters.subjectCode}
+                onChange={(e) => setFilters((prev) => ({ ...prev, subjectCode: e.target.value }))}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[11px] font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-5 truncate"
               >
                 <option value="">Tất cả môn</option>
@@ -237,7 +237,7 @@ export default function AllExamsSchedule({
 
             {isFilterActive && (
               <button
-                onClick={() => setFilters({ class: '', subject: '', date: '', search: '' })}
+                onClick={() => setFilters({ classCode: '', subjectCode: '', date: '', search: '' })}
                 className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-[11px] font-bold shrink-0 transition cursor-pointer"
               >
                 Xóa lọc
