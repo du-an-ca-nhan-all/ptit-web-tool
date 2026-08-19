@@ -40,6 +40,7 @@ import {
 import TelegramConfigSection from './TelegramConfigSection';
 import StudentTimetableCalendar from './StudentTimetableCalendar';
 import StudentGradesView from './StudentGradesView';
+import { ProfileSubTab } from '../types/navigation';
 
 interface UserProfileScreenProps {
   currentUser: LoginUser & { student?: any };
@@ -50,6 +51,8 @@ interface UserProfileScreenProps {
   userRoles?: string[];
   activeRole?: string;
   onSelectRole?: (role: string) => void;
+  activeSubTab?: ProfileSubTab;
+  onSubTabChange?: (subTab: ProfileSubTab) => void;
 }
 
 export default function UserProfileScreen({
@@ -61,9 +64,17 @@ export default function UserProfileScreen({
   userRoles = [],
   activeRole,
   onSelectRole,
+  activeSubTab: activeSubTabProp,
+  onSubTabChange,
 }: UserProfileScreenProps) {
   const student = currentUser?.student || {};
-  const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'SCHEDULE' | 'GRADES' | 'EXTERNAL_ACCOUNTS' | 'TELEGRAM' | 'EXAMS' | 'SECURITY'>('OVERVIEW');
+  const [internalSubTab, setInternalSubTab] = useState<ProfileSubTab>(activeSubTabProp || 'OVERVIEW');
+  const activeSubTab = activeSubTabProp !== undefined ? activeSubTabProp : internalSubTab;
+
+  const setActiveSubTab = (subTab: ProfileSubTab) => {
+    setInternalSubTab(subTab);
+    onSubTabChange?.(subTab);
+  };
 
   // Edit personal profile state
   const [isEditing, setIsEditing] = useState(false);

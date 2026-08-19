@@ -25,7 +25,7 @@ import AllStudentsList from '../AllStudentsList';
 import StudentPersonalExamSchedule from '../StudentPersonalExamSchedule';
 import AllExamsSchedule from '../AllExamsSchedule';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
-import { NavigationTab } from '../../types/navigation';
+import { NavigationTab, ProfileSubTab } from '../../types/navigation';
 import { buildSessions } from '../../utils/dataModel';
 
 interface HomeMainContentProps {
@@ -83,6 +83,8 @@ interface HomeMainContentProps {
   setPageSize: (size: number) => void;
   totalRecords: number;
   totalPages: number;
+  profileSubTab?: ProfileSubTab;
+  setProfileSubTab?: (subTab: ProfileSubTab) => void;
 }
 
 export default function HomeMainContent({
@@ -136,6 +138,8 @@ export default function HomeMainContent({
   setPageSize,
   totalRecords,
   totalPages,
+  profileSubTab,
+  setProfileSubTab,
 }: HomeMainContentProps) {
   return (
     <section className="flex-1 flex flex-col min-h-0 overflow-y-auto">
@@ -153,6 +157,8 @@ export default function HomeMainContent({
           userRoles={userRoles}
           activeRole={activeRole}
           onSelectRole={handleSelectRole}
+          activeSubTab={profileSubTab}
+          onSubTabChange={setProfileSubTab}
           onProfileUpdated={(updatedUser) => {
             setCurrentUser(updatedUser);
             localStorage.setItem('currentUser', JSON.stringify(updatedUser));

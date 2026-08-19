@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { FilterState } from '../components/FilterBar';
 import { SortKey, SortDirection } from '../components/DataTable';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
-import { NavigationTab, getInitialHomeState } from '../types/navigation';
+import { NavigationTab, ProfileSubTab, getInitialHomeState, getNavigationPath } from '../types/navigation';
 import { buildSessions } from '../utils/dataModel';
 import { fetchPricingFromBackend } from '../config/pricingConfig';
 
@@ -23,6 +23,7 @@ export function useHomeState() {
 
   const initialState = useMemo(getInitialHomeState, []);
   const [activeTab, setActiveTab] = useState<NavigationTab>(initialState.tab);
+  const [profileSubTab, setProfileSubTab] = useState<ProfileSubTab>(initialState.profileSubTab || 'OVERVIEW');
 
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState<LoginUser | null>(() => {
@@ -231,7 +232,7 @@ export function useHomeState() {
   const [isRevertingImpersonate, setIsRevertingImpersonate] = useState(false);
   const [impersonateError, setImpersonateError] = useState('');
 
-  const handleTabChange = (tab: NavigationTab) => {
+  const handleTabChange = (tab: NavigationTab, subTab?: ProfileSubTab) => {
     const adminOnlyTabs: NavigationTab[] = [
       'batches',
       'external_accounts_admin',
@@ -254,6 +255,11 @@ export function useHomeState() {
       return;
     }
     setActiveTab(tab);
+    if (tab === 'profile') {
+      if (subTab) {
+        setProfileSubTab(subTab);
+      }
+    }
     setIsMobileMenuOpen(false);
   };
 
@@ -808,11 +814,11 @@ export function useHomeState() {
     return () => clearTimeout(timeoutId);
   }, [searchInput]);
 
-  // Sync state to URL search parameters (e.g. /?tab=personal_schedule) without #
+  // Sync state to hierarchical URL path (e.g. /profile/PersonalSchedule, /admin/batches)
   useEffect(() => {
     if (typeof window === 'undefined' || !isMounted) return;
+    const basePath = getNavigationPath(activeTab, profileSubTab);
     const params = new URLSearchParams();
-    params.set('tab', activeTab);
     if (filters.search) params.set('search', filters.search);
     if (filters.classCode) params.set('classCode', filters.classCode);
     if (filters.subjectCode) params.set('subjectCode', filters.subjectCode);
@@ -825,20 +831,23 @@ export function useHomeState() {
     if (page > 1) params.set('page', String(page));
 
     const queryString = params.toString();
-    const newUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
-    const currentQuery = window.location.search.replace(/^\?/, '');
+    const newUrl = queryString ? `${basePath}?${queryString}` : basePath;
+    const currentFullUrl = window.location.pathname + (window.location.search ? window.location.search : '');
 
-    if (currentQuery !== queryString || window.location.hash !== '') {
+    if (currentFullUrl !== newUrl || window.location.hash !== '') {
       window.history.replaceState(null, '', newUrl);
     }
-  }, [isMounted, activeTab, filters, monitorClass, sortConfig, page]);
+  }, [isMounted, activeTab, profileSubTab, filters, monitorClass, sortConfig, page]);
 
-  // Sync state from URL search params on browser navigation (back/forward)
+  // Sync state from URL on browser navigation (back/forward)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleLocationChange = () => {
       const state = getInitialHomeState();
       setActiveTab(state.tab);
+      if (state.profileSubTab) {
+        setProfileSubTab(state.profileSubTab);
+      }
       setFilters((prev) => ({
         ...prev,
         search: state.search,
@@ -851,11 +860,7 @@ export function useHomeState() {
       setSortConfig({ key: state.sortKey, direction: state.sortDir });
     };
     window.addEventListener('popstate', handleLocationChange);
-    window.addEventListener('hashchange', handleLocationChange);
-    return () => {
-      window.removeEventListener('popstate', handleLocationChange);
-      window.removeEventListener('hashchange', handleLocationChange);
-    };
+    return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
 
   // Filter dropdown options
@@ -940,6 +945,8 @@ export function useHomeState() {
     totalPages,
     activeTab,
     setActiveTab,
+    profileSubTab,
+    setProfileSubTab,
     isMounted,
     currentUser,
     setCurrentUser,

@@ -153,6 +153,8 @@ export default function Home() {
           setPageSize={state.setPageSize}
           totalRecords={state.totalRecords}
           totalPages={state.totalPages}
+          profileSubTab={state.profileSubTab}
+          setProfileSubTab={state.setProfileSubTab}
         />
       </main>
 
