@@ -32,6 +32,9 @@ model User {
   // Quan hệ 1-1 với StudentTimetableRecord
   timetableRecord  StudentTimetableRecord?
   
+  // Quan hệ 1-1 với StudentQldtExamRecord
+  qldtExamRecord   StudentQldtExamRecord?
+  
   // Quan hệ 1-N với ActivityLog
   activityLogs     ActivityLog[]
   
@@ -386,6 +389,27 @@ model StudentTimetableRecord {
   @@index([username])
   @@index([semesterId])
 }
+
+// 18. Bảng StudentQldtExamRecord: Lưu trữ lịch thi cá nhân từ Cổng QLDTTX theo từng sinh viên
+model StudentQldtExamRecord {
+  id              Int       @id @default(autoincrement())
+  username        String    @unique // Mã sinh viên (User.username)
+  user            User?     @relation(fields: [username], references: [username], onDelete: Cascade)
+  
+  // Dữ liệu JSON thô đầy đủ từ QLDTTX (semesters, ds_lich_thi, etc.)
+  rawData         String    // JSON string chứa danh sách lịch thi và học kỳ từ QLDTTX
+  semesterId      Int?      // Học kỳ lưu trữ nếu có (ví dụ: 20251)
+  semesterName    String?   // Tên học kỳ (ví dụ: "Học kỳ 1 Năm học 2025-2026")
+  totalExams      Int?      @default(0) // Tổng số môn thi
+  
+  lastPulledAt    DateTime? @default(now()) // Thời điểm kéo dữ liệu từ QLDTTX
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([username])
+  @@index([semesterId])
+}
+
 
 
 

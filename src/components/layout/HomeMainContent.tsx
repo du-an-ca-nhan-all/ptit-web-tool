@@ -22,6 +22,7 @@ import AdminTelegramBotManager from '../AdminTelegramBotManager';
 import AdminRegistrationManager from '../AdminRegistrationManager';
 import DatabaseBackupManager from '../DatabaseBackupManager';
 import AllStudentsList from '../AllStudentsList';
+import StudentPersonalExamSchedule from '../StudentPersonalExamSchedule';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
 import { NavigationTab } from '../../types/navigation';
 import { buildSessions } from '../../utils/dataModel';
@@ -263,7 +264,7 @@ export default function HomeMainContent({
           onTogglePostpone={handleToggleExamPostpone}
           isAdmin={isAdmin}
         />
-      ) : !hasActiveBatch && (activeTab === 'schedule' || activeTab === 'personal_schedule') ? (
+      ) : !hasActiveBatch && activeTab === 'schedule' ? (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto my-auto animate-in fade-in duration-300">
           <div className="w-16 h-16 bg-amber-50 border border-amber-200 rounded-3xl flex items-center justify-center text-amber-600 mb-4 shadow-sm">
             <Power className="w-8 h-8" />
@@ -281,67 +282,34 @@ export default function HomeMainContent({
             </button>
           )}
         </div>
-      ) : activeTab === 'personal_schedule' ? (
-        selectedExamRoom ? (
-          <ExamRoomMembers
-            roomRecord={selectedExamRoom}
-            allRecords={records}
-            batchCode={activeBatch?.code}
-            onBack={() => setSelectedExamRoom(null)}
-            onStudentClick={setConfirmStudentId}
-            onClassClick={setConfirmClassCode}
-            onTogglePostpone={handleToggleExamPostpone}
-            canEditPostpone={canAccessMonitorTools}
-          />
-        ) : totalRecords === 0 && records.length === 0 ? (
-          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center flex flex-col items-center justify-center animate-in fade-in duration-200">
-            <div className="w-16 h-16 bg-blue-50 border border-blue-200 rounded-3xl flex items-center justify-center text-blue-600 mb-4 shadow-sm">
-              <CalendarDays className="w-8 h-8" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Chưa Có Lịch Thi</h3>
-            <p className="text-sm text-slate-500 max-w-md mb-6">
-              Bạn không có lịch thi nào trong đợt thi này hoặc dữ liệu lịch thi chưa được cập nhật.
-            </p>
-            <button
-              onClick={() => loadDataFromApi(activeBatch?.code)}
-              disabled={isLoading}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-200 flex items-center gap-2 cursor-pointer"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Đang tải lại...' : 'Tải lại dữ liệu'}
-            </button>
-          </div>
-        ) : (
-          <>
-            <FilterBar
-              filters={filters}
-              onFilterChange={setFilters}
-              classes={classes}
-              subjects={subjects}
-              dates={dates}
-              totalRecords={totalRecords}
-              filteredCount={totalRecords}
-              hideClassFilter={true}
-            />
-            <DataTable
-              records={records}
-              totalRecords={totalRecords}
-              currentPage={page}
-              totalPages={totalPages}
-              itemsPerPage={pageSize}
-              onPageChange={setPage}
-              onItemsPerPageChange={setPageSize}
-              sortConfig={sortConfig}
-              onSortChange={setSortConfig}
-              onStudentClick={setConfirmStudentId}
-              onClassClick={setConfirmClassCode}
-              onRowClick={setSelectedExamRoom}
-              onTogglePostpone={handleToggleExamPostpone}
-              canEditPostpone={canAccessMonitorTools}
-              isLoading={isLoading}
-            />
-          </>
-        )
+      ) : activeTab === 'personal_schedule' && effectiveUser ? (
+        <StudentPersonalExamSchedule
+          currentUser={effectiveUser}
+          onNavigateToExternalAccounts={() => handleTabChange('profile')}
+          records={records}
+          totalRecords={totalRecords}
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+          totalPages={totalPages}
+          sortConfig={sortConfig}
+          setSortConfig={setSortConfig}
+          filters={filters}
+          setFilters={setFilters}
+          classes={classes}
+          subjects={subjects}
+          dates={dates}
+          selectedExamRoom={selectedExamRoom}
+          setSelectedExamRoom={setSelectedExamRoom}
+          setConfirmStudentId={setConfirmStudentId}
+          setConfirmClassCode={setConfirmClassCode}
+          handleToggleExamPostpone={handleToggleExamPostpone}
+          canAccessMonitorTools={canAccessMonitorTools}
+          isLoadingBatchData={isLoading}
+          activeBatch={activeBatch}
+          loadDataFromApi={loadDataFromApi}
+        />
       ) : records.length === 0 && totalRecords === 0 ? (
         isAdmin ? (
           <UploadSection
