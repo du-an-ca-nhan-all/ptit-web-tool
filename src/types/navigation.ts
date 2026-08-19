@@ -67,21 +67,23 @@ export const getInitialHomeState = (): InitialHomeState => {
       sortDir: 'asc',
     };
   }
-  const hash = window.location.hash.replace(/^#/, '');
-  const params = new URLSearchParams(hash);
-  const rawTab = params.get('tab') as NavigationTab;
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const getParam = (key: string) => searchParams.get(key) || hashParams.get(key) || '';
+
+  const rawTab = (searchParams.get('tab') || hashParams.get('tab')) as NavigationTab;
   const tab: NavigationTab = rawTab && VALID_NAVIGATION_TABS.includes(rawTab)
     ? rawTab
     : 'personal_schedule';
 
   return {
     tab,
-    search: params.get('search') || '',
-    classCode: params.get('classCode') || '',
-    subjectCode: params.get('subjectCode') || '',
-    date: params.get('date') || '',
-    monitorClass: params.get('monitorClass') || '',
-    sortKey: (params.get('sortKey') as SortKey) || 'DateTime',
-    sortDir: (params.get('sortDir') as SortDirection) || 'asc',
+    search: getParam('search'),
+    classCode: getParam('classCode'),
+    subjectCode: getParam('subjectCode'),
+    date: getParam('date'),
+    monitorClass: getParam('monitorClass'),
+    sortKey: (getParam('sortKey') as SortKey) || 'DateTime',
+    sortDir: (getParam('sortDir') as SortDirection) || 'asc',
   };
 };

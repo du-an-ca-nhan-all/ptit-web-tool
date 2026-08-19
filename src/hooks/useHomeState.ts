@@ -311,9 +311,9 @@ export function useHomeState() {
         setLoginUsers(monitorsRes.users);
       }
 
-      const initialHash = getInitialHomeState();
-      const currentTab = initialHash.tab;
-      const initialMonitorClass = initialHash.monitorClass || initialHash.classCode || user?.lop || '';
+      const initialUrlState = getInitialHomeState();
+      const currentTab = initialUrlState.tab;
+      const initialMonitorClass = initialUrlState.monitorClass || initialUrlState.classCode || user?.lop || '';
       const batchCode = active?.code;
 
       // Fast fetch filter metadata if active batch exists
@@ -343,9 +343,9 @@ export function useHomeState() {
           batchCode,
           maSV: user.username,
         });
-        if (initialHash.search) params.set('search', initialHash.search);
-        if (initialHash.subjectCode) params.set('subjectCode', initialHash.subjectCode);
-        if (initialHash.date) params.set('date', initialHash.date);
+        if (initialUrlState.search) params.set('search', initialUrlState.search);
+        if (initialUrlState.subjectCode) params.set('subjectCode', initialUrlState.subjectCode);
+        if (initialUrlState.date) params.set('date', initialUrlState.date);
 
         const recordsRes = await fetch(`/api/exam-records?${params.toString()}`);
         if (recordsRes.ok) {
@@ -362,10 +362,10 @@ export function useHomeState() {
           limit: String(pageSize),
           batchCode,
         });
-        if (initialHash.classCode) params.set('classCode', initialHash.classCode);
-        if (initialHash.subjectCode) params.set('subjectCode', initialHash.subjectCode);
-        if (initialHash.date) params.set('date', initialHash.date);
-        if (initialHash.search) params.set('search', initialHash.search);
+        if (initialUrlState.classCode) params.set('classCode', initialUrlState.classCode);
+        if (initialUrlState.subjectCode) params.set('subjectCode', initialUrlState.subjectCode);
+        if (initialUrlState.date) params.set('date', initialUrlState.date);
+        if (initialUrlState.search) params.set('search', initialUrlState.search);
 
         const recordsRes = await fetch(`/api/exam-records?${params.toString()}`);
         if (recordsRes.ok) {
@@ -808,7 +808,7 @@ export function useHomeState() {
     return () => clearTimeout(timeoutId);
   }, [searchInput]);
 
-  // Sync state to URL hash
+  // Sync state to URL search parameters (e.g. /?tab=personal_schedule) without #
   useEffect(() => {
     if (typeof window === 'undefined' || !isMounted) return;
     const params = new URLSearchParams();
@@ -818,26 +818,25 @@ export function useHomeState() {
     if (filters.subjectCode) params.set('subjectCode', filters.subjectCode);
     if (filters.date) params.set('date', filters.date);
     if (monitorClass) params.set('monitorClass', monitorClass);
-    if (sortConfig && sortConfig.key) {
+    if (sortConfig && sortConfig.key && (sortConfig.key !== 'DateTime' || sortConfig.direction !== 'asc')) {
       params.set('sortKey', sortConfig.key);
       params.set('sortDir', sortConfig.direction);
     }
     if (page > 1) params.set('page', String(page));
 
-    const newHash = params.toString();
-    const newUrl = newHash ? `#${newHash}` : window.location.pathname;
+    const queryString = params.toString();
+    const newUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
+    const currentQuery = window.location.search.replace(/^\?/, '');
 
-    if (window.location.hash !== `#${newHash}` && newHash !== '') {
+    if (currentQuery !== queryString || window.location.hash !== '') {
       window.history.replaceState(null, '', newUrl);
-    } else if (newHash === '' && window.location.hash !== '') {
-      window.history.replaceState(null, '', window.location.pathname);
     }
   }, [isMounted, activeTab, filters, monitorClass, sortConfig, page]);
 
-  // Sync state from URL hash on browser navigation
+  // Sync state from URL search params on browser navigation (back/forward)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const handleHashChange = () => {
+    const handleLocationChange = () => {
       const state = getInitialHomeState();
       setActiveTab(state.tab);
       setFilters((prev) => ({
@@ -851,8 +850,12 @@ export function useHomeState() {
       setMonitorClass(state.monitorClass);
       setSortConfig({ key: state.sortKey, direction: state.sortDir });
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
   }, []);
 
   // Filter dropdown options
