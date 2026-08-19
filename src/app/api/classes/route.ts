@@ -18,6 +18,12 @@ export async function GET(req: NextRequest) {
 
     // 2. Find monitors
     const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { role: { contains: 'lop_truong', mode: 'insensitive' } },
+          { role: { contains: 'admin', mode: 'insensitive' } },
+        ],
+      },
       include: { student: true },
     });
 

@@ -22,8 +22,10 @@ import {
   HelpCircle,
   Check,
   Layers,
-  Sparkles
+  Sparkles,
+  KeyRound,
 } from 'lucide-react';
+import AdminResetPasswordModal from './AdminResetPasswordModal';
 
 interface ClassMembersProps {
   records: ExamRecord[];
@@ -32,6 +34,10 @@ interface ClassMembersProps {
   currentUser?: LoginUser | null;
   loginUsers?: LoginUser[];
   onSelectStudentSchedule?: (studentId: string) => void;
+  hasExamSchedule?: boolean;
+  onImpersonate?: (username: string) => void;
+  onTogglePostpone?: (record: ExamRecord, newStatus: boolean) => Promise<void> | void;
+  onReloadMonitors?: () => void;
 }
 
 interface StudentExtraInfo {
@@ -46,6 +52,10 @@ export default function ClassMembers({
   currentUser,
   loginUsers = [],
   onSelectStudentSchedule,
+  hasExamSchedule = false,
+  onImpersonate,
+  onTogglePostpone,
+  onReloadMonitors,
 }: ClassMembersProps) {
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<'ALL' | 'NAM' | 'NU'>('ALL');
@@ -56,6 +66,14 @@ export default function ClassMembers({
 
   // Edit modal state
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
+
+  // Assign / Transfer Monitor Modal State (Admin Only)
+  const [isAssignMonitorModalOpen, setIsAssignMonitorModalOpen] = useState(false);
+  const [selectedCandidateMaSV, setSelectedCandidateMaSV] = useState<string>('');
+  const [candidateSearchQuery, setCandidateSearchQuery] = useState<string>('');
+  const [assignReason, setAssignReason] = useState<string>('');
+  const [isSubmittingMonitor, setIsSubmittingMonitor] = useState<boolean>(false);
+  const [monitorModalError, setMonitorModalError] = useState<string>('');
 
   // Receive Transfer Student Modal
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
@@ -129,14 +147,94 @@ export default function ClassMembers({
     }
   }, [classes, selectedClass, currentUser, onClassChange]);
 
+  const isAdmin = Boolean(
+    currentUser?.isAdmin ||
+    currentUser?.activeRole === 'admin' ||
+    (currentUser?.role === 'admin' && !currentUser?.activeRole)
+  );
+
   // Class monitor for the current selected class
   const classMonitor = useMemo(() => {
-    return loginUsers.find((u) => u.lop === selectedClass && u.role === 'lop_truong') || null;
+    return (
+      loginUsers.find(
+        (u) =>
+          u.lop === selectedClass &&
+          (u.role === 'lop_truong' || (u.role && u.role.includes('lop_truong')) || u.isMonitor)
+      ) || null
+    );
   }, [loginUsers, selectedClass]);
 
   const userOwnClass = currentUser?.lop;
   const isMyClass = userOwnClass && userOwnClass === selectedClass;
-  const canManageClass = currentUser?.role === 'admin' || (currentUser?.role === 'lop_truong' && isMyClass);
+  const canManageClass = isAdmin || (!!currentUser?.isMonitor && isMyClass);
+
+  const candidateList = useMemo(() => {
+    if (!candidateSearchQuery.trim()) return activeStudents;
+    const q = candidateSearchQuery.trim().toLowerCase();
+    return activeStudents.filter(
+      (s) =>
+        s.MaSV.toLowerCase().includes(q) ||
+        `${s.HoLotSV} ${s.TenSV}`.toLowerCase().includes(q) ||
+        (s.phone && s.phone.includes(q))
+    );
+  }, [activeStudents, candidateSearchQuery]);
+
+  // Admin Reset Password Modal state
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [resetPasswordStudent, setResetPasswordStudent] = useState({ username: '', fullName: '', lop: '' });
+
+  const openAssignMonitorModal = (preselectedMaSV?: string | null) => {
+    setSelectedCandidateMaSV(preselectedMaSV || '');
+    setCandidateSearchQuery('');
+    setAssignReason('');
+    setMonitorModalError('');
+    setIsAssignMonitorModalOpen(true);
+  };
+
+  const handleAssignMonitor = async (action: 'ASSIGN' | 'TRANSFER' | 'REMOVE') => {
+    if ((action === 'ASSIGN' || action === 'TRANSFER') && !selectedCandidateMaSV) {
+      setMonitorModalError('Vui lòng chọn một sinh viên để chỉ định làm Lớp trưởng.');
+      return;
+    }
+
+    setIsSubmittingMonitor(true);
+    setMonitorModalError('');
+
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch('/api/monitors', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action,
+          classCode: selectedClass,
+          newMonitorMaSV: selectedCandidateMaSV,
+          fromMaSV: classMonitor?.username,
+          reason: assignReason.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(data.message || 'Cập nhật Lớp trưởng thành công!');
+        setIsAssignMonitorModalOpen(false);
+        if (onReloadMonitors) {
+          onReloadMonitors();
+        }
+      } else {
+        setMonitorModalError(data.error || 'Có lỗi xảy ra khi cập nhật Lớp trưởng.');
+      }
+    } catch (err: any) {
+      setMonitorModalError('Lỗi kết nối máy chủ khi cập nhật Lớp trưởng.');
+    } finally {
+      setIsSubmittingMonitor(false);
+    }
+  };
 
   // Search Global Student database
   useEffect(() => {
@@ -360,7 +458,18 @@ export default function ClassMembers({
   // Export CSV
   const handleExportCSV = () => {
     if (filteredStudents.length === 0) return;
-    const headers = ['STT', 'Mã SV', 'Họ lót', 'Tên', 'Giới tính', 'Ngày sinh', 'SĐT', 'Ghi chú', 'Số môn thi'].join(',');
+    const headers = [
+      'STT',
+      'Mã SV',
+      'Họ lót',
+      'Tên',
+      'Giới tính',
+      'Ngày sinh',
+      'SĐT',
+      'Ghi chú',
+      ...(hasExamSchedule ? ['Số môn thi'] : []),
+    ].join(',');
+
     const rows = filteredStudents
       .map((s, index) =>
         [
@@ -372,7 +481,7 @@ export default function ClassMembers({
           s.NgaySinhC,
           s.phone || '',
           s.note || '',
-          s.examCount || 0,
+          ...(hasExamSchedule ? [s.examCount || 0] : []),
         ]
           .map((val) => `"${val || ''}"`)
           .join(',')
@@ -419,15 +528,38 @@ export default function ClassMembers({
             )}
           </div>
           <p className="text-sm text-slate-500 flex items-center gap-2 flex-wrap">
-            <span>Tiếp nhận sinh viên chuyển biên chế, quản lý bảo lưu, chuyển lớp và lịch thi</span>
-            {classMonitor && (
+            {classMonitor ? (
               <>
                 <span className="text-slate-300">•</span>
-                <span className="inline-flex items-center gap-1 font-semibold text-slate-700">
-                  <Crown className="w-3.5 h-3.5 text-amber-500" />
+                <span className="inline-flex items-center gap-1 font-semibold text-slate-700 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200 text-xs">
+                  <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
                   LT: {classMonitor.fullName || classMonitor.username}
                 </span>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => openAssignMonitorModal(classMonitor.username)}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100/80 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-amber-300"
+                    title="Chuyển lớp trưởng sang sinh viên khác trong lớp"
+                  >
+                    <ArrowRightLeft className="w-3 h-3" /> Đổi Lớp Trưởng
+                  </button>
+                )}
               </>
+            ) : (
+              isAdmin && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <button
+                    type="button"
+                    onClick={() => openAssignMonitorModal(null)}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-indigo-200"
+                    title="Chỉ định Lớp trưởng cho lớp này"
+                  >
+                    <Crown className="w-3 h-3 text-amber-500" /> Chỉ Định Lớp Trưởng
+                  </button>
+                </>
+              )
             )}
           </p>
         </div>
@@ -491,7 +623,7 @@ export default function ClassMembers({
       </div>
 
       {/* Stats Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
+      <div className={`grid gap-4 shrink-0 ${hasExamSchedule ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
             <Users className="w-6 h-6" />
@@ -527,17 +659,19 @@ export default function ClassMembers({
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-            <Calendar className="w-6 h-6" />
+        {hasExamSchedule && (
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Đăng Ký Thi</p>
+              <p className="text-2xl font-black text-slate-800">
+                {stats.totalExams} <span className="text-xs font-normal text-slate-500">Lượt thi</span>
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Đăng Ký Thi</p>
-            <p className="text-2xl font-black text-slate-800">
-              {stats.totalExams} <span className="text-xs font-normal text-slate-500">Lượt thi</span>
-            </p>
-          </div>
-        </div>
+        )}
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
@@ -645,15 +779,24 @@ export default function ClassMembers({
                 <th className="px-4 sm:px-6 py-3.5">Họ và Tên</th>
                 <th className="px-4 sm:px-6 py-3.5 text-center">Phái</th>
                 <th className="px-4 sm:px-6 py-3.5">Ngày sinh</th>
-                <th className="px-4 sm:px-6 py-3.5 text-center">Môn thi</th>
+                {hasExamSchedule && <th className="px-4 sm:px-6 py-3.5 text-center">Môn thi</th>}
                 <th className="px-4 sm:px-6 py-3.5">SĐT & Ghi chú</th>
                 <th className="px-4 sm:px-6 py-3.5 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {filteredStudents.length === 0 ? (
+              {isLoadingList ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={hasExamSchedule ? 8 : 7} className="px-6 py-16 text-center text-slate-500 font-medium">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs font-semibold text-slate-500">Đang tải danh sách thành viên lớp {selectedClass}...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={hasExamSchedule ? 8 : 7} className="px-6 py-12 text-center text-slate-400 font-medium">
                     {activeTab === 'ACTIVE'
                       ? 'Không tìm thấy thành viên nào phù hợp với bộ lọc.'
                       : 'Không có sinh viên nào trong danh sách biến động/bảo lưu.'}
@@ -712,15 +855,17 @@ export default function ClassMembers({
                       <td className="px-4 sm:px-6 py-3.5 text-slate-600 text-xs font-medium">
                         {student.NgaySinhC || '—'}
                       </td>
-                      <td className="px-4 sm:px-6 py-3.5 text-center">
-                        <button
-                          onClick={() => setSelectedStudentDetail(student)}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 border border-slate-200 cursor-pointer"
-                        >
-                          <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                          {student.examCount || 0} môn
-                        </button>
-                      </td>
+                      {hasExamSchedule && (
+                        <td className="px-4 sm:px-6 py-3.5 text-center">
+                          <button
+                            onClick={() => setSelectedStudentDetail(student)}
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 border border-slate-200 cursor-pointer"
+                          >
+                            <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                            {student.examCount || 0} môn
+                          </button>
+                        </td>
+                      )}
                       <td className="px-4 sm:px-6 py-3.5">
                         <div className="flex flex-col gap-1 max-w-[280px]">
                           {student.phone && (
@@ -744,10 +889,57 @@ export default function ClassMembers({
                               <button
                                 onClick={() => setSelectedStudentDetail(student)}
                                 className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                title="Xem lịch thi & chi tiết"
+                                title={hasExamSchedule ? "Xem lịch thi & chi tiết" : "Xem thông tin chi tiết"}
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
+
+                              {onImpersonate && (
+                                <button
+                                  onClick={() => onImpersonate(student.MaSV)}
+                                  className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                                  title={`Đăng nhập với tư cách ${student.MaSV} (${student.TenSV})`}
+                                >
+                                  <UserCheck className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {isAdmin && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setResetPasswordStudent({
+                                        username: student.MaSV,
+                                        fullName: `${student.HoLotSV || ''} ${student.TenSV || ''}`.trim(),
+                                        lop: selectedClass,
+                                      });
+                                      setIsResetPasswordModalOpen(true);
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                    title={`Đặt lại mật khẩu cho sinh viên ${student.MaSV}`}
+                                  >
+                                    <KeyRound className="w-4 h-4" />
+                                  </button>
+
+                                  {student.MaSV === classMonitor?.username ? (
+                                    <span
+                                      className="p-1.5 text-amber-600 bg-amber-50 rounded-lg cursor-default"
+                                      title="Đang là Lớp Trưởng"
+                                    >
+                                      <Crown className="w-4 h-4 fill-amber-400 text-amber-600" />
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => openAssignMonitorModal(student.MaSV)}
+                                      className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                      title={`Chỉ định ${student.HoLotSV} ${student.TenSV} làm Lớp Trưởng`}
+                                    >
+                                      <Crown className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </>
+                              )}
 
                               {canManageClass && (
                                 <>
@@ -912,8 +1104,12 @@ export default function ClassMembers({
                           </div>
                           <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
                             <span>Lớp hiện tại: <strong className="text-slate-700">{st.maLop}</strong></span>
-                            <span>•</span>
-                            <span>{st.examCount || 0} môn thi</span>
+                            {hasExamSchedule && (
+                              <>
+                                <span>•</span>
+                                <span>{st.examCount || 0} môn thi</span>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -1241,50 +1437,96 @@ export default function ClassMembers({
                 )}
               </div>
 
-              {/* Exam Schedule Section */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-bold text-slate-800 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-blue-600" />
-                    Lịch Thi Đã Đăng Ký ({selectedStudentDetail.exams?.length || 0} môn)
-                  </h4>
-                </div>
-
-                {!selectedStudentDetail.exams || selectedStudentDetail.exams.length === 0 ? (
-                  <p className="text-slate-400 italic text-xs py-4 text-center border border-dashed rounded-xl">
-                    Không có lịch thi nào được tìm thấy cho sinh viên này.
-                  </p>
-                ) : (
-                  <div className="border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-100 text-slate-600 sticky top-0 border-b border-slate-200 font-semibold">
-                        <tr>
-                          <th className="px-3 py-2.5">Ngày thi</th>
-                          <th className="px-3 py-2.5">Giờ thi</th>
-                          <th className="px-3 py-2.5">Tên môn học</th>
-                          <th className="px-3 py-2.5 text-center">Phòng</th>
-                          <th className="px-3 py-2.5 text-center">Tổ/Nhóm</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {selectedStudentDetail.exams.map((ex: ExamRecord, idx: number) => (
-                          <tr key={idx} className="hover:bg-blue-50/50">
-                            <td className="px-3 py-2.5 font-bold text-slate-700">{ex.NgayThi}</td>
-                            <td className="px-3 py-2.5 text-blue-600 font-medium">{ex.GioThi}</td>
-                            <td className="px-3 py-2.5 font-bold text-slate-800">
-                              {ex.TenMH} <span className="text-[10px] text-slate-400 font-mono">({ex.MaMH})</span>
-                            </td>
-                            <td className="px-3 py-2.5 text-center font-bold text-emerald-700">{ex.MAPTHI || '—'}</td>
-                            <td className="px-3 py-2.5 text-center text-slate-500">
-                              {ex['To thi'] || ex.NhomThi || '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {/* Exam Schedule Section (Only when exam schedule is active) */}
+              {hasExamSchedule && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-blue-600" />
+                      Lịch Thi Đã Đăng Ký ({selectedStudentDetail.exams?.length || 0} môn)
+                    </h4>
                   </div>
-                )}
-              </div>
+
+                  {!selectedStudentDetail.exams || selectedStudentDetail.exams.length === 0 ? (
+                    <p className="text-slate-400 italic text-xs py-4 text-center border border-dashed rounded-xl">
+                      Không có lịch thi nào được tìm thấy cho sinh viên này.
+                    </p>
+                  ) : (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-100 text-slate-600 sticky top-0 border-b border-slate-200 font-semibold">
+                          <tr>
+                            <th className="px-3 py-2.5">Ngày thi</th>
+                            <th className="px-3 py-2.5">Giờ thi</th>
+                            <th className="px-3 py-2.5">Tên môn học</th>
+                            <th className="px-3 py-2.5 text-center">Phòng</th>
+                            <th className="px-3 py-2.5 text-center">Tổ/Nhóm</th>
+                            <th className="px-3 py-2.5 text-center">Trạng thái thi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedStudentDetail.exams.map((ex: ExamRecord, idx: number) => (
+                            <tr key={idx} className={`hover:bg-blue-50/50 ${ex.isPostponed ? 'bg-amber-50/30' : ''}`}>
+                              <td className="px-3 py-2.5 font-bold text-slate-700">{ex.NgayThi}</td>
+                              <td className="px-3 py-2.5 text-blue-600 font-medium">{ex.GioThi}</td>
+                              <td className="px-3 py-2.5 font-bold text-slate-800">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={ex.isPostponed ? 'line-through text-slate-400' : ''}>{ex.TenMH}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">({ex.MaMH})</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2.5 text-center font-bold text-emerald-700">{ex.MAPTHI || '—'}</td>
+                              <td className="px-3 py-2.5 text-center text-slate-500">
+                                {ex['To thi'] || ex.NhomThi || '—'}
+                              </td>
+                              <td className="px-3 py-2.5 text-center">
+                                {onTogglePostpone ? (
+                                  <button
+                                    onClick={async () => {
+                                      const nextStatus = !ex.isPostponed;
+                                      await onTogglePostpone(ex, nextStatus);
+                                      setSelectedStudentDetail((prev: any) => {
+                                        if (!prev) return prev;
+                                        return {
+                                          ...prev,
+                                          exams: prev.exams.map((e: ExamRecord) =>
+                                            (ex.id && e.id === ex.id) ||
+                                            (e.MaMH === ex.MaMH && e.MAPTHI === ex.MAPTHI && e.NgayThi === ex.NgayThi && e.GioThi === ex.GioThi)
+                                              ? { ...e, isPostponed: nextStatus }
+                                              : e
+                                          ),
+                                        };
+                                      });
+                                    }}
+                                    title={ex.isPostponed ? 'Bấm để chuyển về Dự thi' : 'Bấm để đánh dấu Hoãn thi (không chia tiền)'}
+                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                                      ex.isPostponed
+                                        ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 shadow-xs'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300'
+                                    }`}
+                                  >
+                                    {ex.isPostponed ? '✕ Hoãn thi' : '✓ Dự thi'}
+                                  </button>
+                                ) : (
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                      ex.isPostponed
+                                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    }`}
+                                  >
+                                    {ex.isPostponed ? 'Hoãn thi' : 'Dự thi'}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
@@ -1379,6 +1621,238 @@ export default function ClassMembers({
           </div>
         </div>
       )}
+
+      {/* MODAL: CHỈ ĐỊNH / CHUYỂN ĐỔI LỚP TRƯỞNG (ADMIN ONLY) */}
+      {isAssignMonitorModalOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSubmittingMonitor) setIsAssignMonitorModalOpen(false);
+          }}
+        >
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-amber-600 via-amber-700 to-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-amber-200 border border-white/20">
+                  <Crown className="w-5 h-5 fill-amber-300" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base">
+                    {classMonitor ? 'Chuyển Đổi Lớp Trưởng' : 'Chỉ Định Lớp Trưởng'}
+                  </h3>
+                  <p className="text-xs text-amber-100/80">
+                    Lớp <span className="font-bold underline">{selectedClass}</span> • Quyền Quản trị viên
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => !isSubmittingMonitor && setIsAssignMonitorModalOpen(false)}
+                disabled={isSubmittingMonitor}
+                className="p-1.5 hover:bg-white/10 rounded-xl text-white/80 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-5 min-h-0">
+              {/* Error feedback */}
+              {monitorModalError && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-2.5 text-rose-900 text-xs font-bold animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{monitorModalError}</span>
+                </div>
+              )}
+
+              {/* Current Monitor Card */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Lớp Trưởng Hiện Tại:
+                </span>
+                {classMonitor ? (
+                  <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        <Crown className="w-4 h-4 fill-amber-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-slate-800">
+                          {classMonitor.fullName || classMonitor.username}
+                        </div>
+                        <div className="text-xs font-mono text-slate-500">
+                          Mã SV: <span className="font-bold text-slate-700">{classMonitor.username}</span>
+                          {classMonitor.phoneNumber && ` • SĐT: ${classMonitor.phoneNumber}`}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAssignMonitor('REMOVE')}
+                      disabled={isSubmittingMonitor}
+                      className="px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                      title="Hủy vai trò Lớp trưởng của sinh viên này mà không chỉ định người mới"
+                    >
+                      Hủy vai trò
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-500 italic bg-white p-3 rounded-xl border border-dashed border-slate-300 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-slate-400" />
+                    Lớp này hiện chưa có Lớp trưởng được chỉ định.
+                  </div>
+                )}
+              </div>
+
+              {/* Candidate Selection */}
+              <div className="flex flex-col gap-2 flex-1 min-h-0">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Chọn Sinh Viên Làm Lớp Trưởng Mới:
+                  </label>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    {activeStudents.length} thành viên trong lớp
+                  </span>
+                </div>
+
+                {/* Candidate search filter */}
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo Họ tên hoặc Mã SV trong lớp..."
+                    value={candidateSearchQuery}
+                    onChange={(e) => setCandidateSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+
+                {/* Candidates List */}
+                <div className="border border-slate-200 rounded-2xl overflow-y-auto max-h-56 divide-y divide-slate-100 bg-white">
+                  {candidateList.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-slate-400">
+                      Không tìm thấy sinh viên phù hợp trong lớp.
+                    </div>
+                  ) : (
+                    candidateList.map((st) => {
+                      const isCurrent = classMonitor?.username === st.MaSV;
+                      const isSelected = selectedCandidateMaSV === st.MaSV;
+                      return (
+                        <div
+                          key={st.MaSV}
+                          onClick={() => !isCurrent && setSelectedCandidateMaSV(st.MaSV)}
+                          className={`p-3 flex items-center justify-between transition-colors cursor-pointer ${
+                            isCurrent
+                              ? 'bg-amber-50/40 opacity-70 cursor-not-allowed'
+                              : isSelected
+                              ? 'bg-amber-50 border-l-4 border-amber-500'
+                              : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                                isSelected ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              {isSelected ? <Check className="w-4 h-4" /> : st.TenSV.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                {st.HoLotSV} {st.TenSV}
+                                {isCurrent && (
+                                  <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-semibold">
+                                    Đang là LT
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] font-mono text-slate-500">
+                                {st.MaSV} {st.phone ? `• ${st.phone}` : ''}
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={isCurrent}
+                            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                              isSelected
+                                ? 'bg-amber-600 text-white shadow-xs'
+                                : isCurrent
+                                ? 'text-slate-400 bg-transparent'
+                                : 'bg-slate-100 text-slate-700 hover:bg-amber-100 hover:text-amber-800'
+                            }`}
+                          >
+                            {isSelected ? 'Đã Chọn' : isCurrent ? 'Hiện tại' : 'Chọn'}
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Optional Reason */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Lý do chỉ định / chuyển giao (tùy chọn):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Bổ nhiệm đầu kỳ, thay đổi theo đề xuất của lớp..."
+                  value={assignReason}
+                  onChange={(e) => setAssignReason(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAssignMonitorModalOpen(false)}
+                disabled={isSubmittingMonitor}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Đóng
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleAssignMonitor(classMonitor ? 'TRANSFER' : 'ASSIGN')}
+                disabled={isSubmittingMonitor || !selectedCandidateMaSV || selectedCandidateMaSV === classMonitor?.username}
+                className="px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-md shadow-amber-600/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingMonitor ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Đang xử lý...</span>
+                  </>
+                ) : (
+                  <>
+                    <Crown className="w-4 h-4" />
+                    <span>
+                      {classMonitor ? 'Xác Nhận Chuyển Lớp Trưởng' : 'Xác Nhận Chỉ Định Lớp Trưởng'}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Reset Password Modal */}
+      <AdminResetPasswordModal
+        isOpen={isResetPasswordModalOpen}
+        onClose={() => setIsResetPasswordModalOpen(false)}
+        initialUsername={resetPasswordStudent.username}
+        initialFullName={resetPasswordStudent.fullName}
+        initialClass={resetPasswordStudent.lop}
+        onSuccess={() => {
+          showToast(`Đã cập nhật mật khẩu cho ${resetPasswordStudent.username}!`);
+        }}
+      />
     </div>
   );
 }

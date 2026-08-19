@@ -4,21 +4,36 @@ import Papa from 'papaparse';
 import { parse as parseYaml } from 'yaml';
 import { prisma } from './prisma';
 
+import { syncPostgresSequences } from './backupService';
+
 export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ success: boolean; message: string; counts?: any }> {
   try {
+    const existingStudentCount = await prisma.student.count().catch(() => 0);
+    const existingUserCount = await prisma.user.count().catch(() => 0);
+    const existingExamCount = await prisma.examRecord.count().catch(() => 0);
+    const existingBatchCount = await prisma.examBatch.count().catch(() => 0);
+
     const meta = await prisma.systemMeta.findUnique({
       where: { key: 'initial_seeded' },
-    });
+    }).catch(() => null);
 
-    if (meta && !force) {
-      const studentCount = await prisma.student.count();
-      const userCount = await prisma.user.count();
-      const examCount = await prisma.examRecord.count();
-      const batchCount = await prisma.examBatch.count();
+    if ((meta || existingStudentCount > 0) && !force) {
+      if (!meta && existingStudentCount > 0) {
+        await prisma.systemMeta.upsert({
+          where: { key: 'initial_seeded' },
+          update: { value: new Date().toISOString() },
+          create: { key: 'initial_seeded', value: new Date().toISOString() },
+        }).catch(() => {});
+      }
       return {
         success: true,
         message: 'Database already seeded',
-        counts: { students: studentCount, users: userCount, examRecords: examCount, examBatches: batchCount },
+        counts: {
+          students: existingStudentCount,
+          users: existingUserCount,
+          examRecords: existingExamCount,
+          examBatches: existingBatchCount,
+        },
       };
     }
 
@@ -29,6 +44,9 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
     const classConfigPath = path.join(publicDir, 'class_config.yaml');
     const includedMap = new Map<string, string>();
     const excludedSet = new Set<string>();
+    const classConfigExcludedList: { maSV: string; classCode: string }[] = [];
+    const classConfigIncludedList: { maSV: string; classCode: string }[] = [];
+    const monitorPhonesMap = new Map<string, string>();
 
     if (fs.existsSync(classConfigPath)) {
       const classConfigText = fs.readFileSync(classConfigPath, 'utf8');
@@ -36,11 +54,26 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
       if (classConfig && Array.isArray(classConfig.classes)) {
         for (const cls of classConfig.classes) {
           if (!cls.classCode) continue;
+          if (cls.monitorPhone) {
+            monitorPhonesMap.set(cls.classCode, String(cls.monitorPhone).trim());
+          }
           if (Array.isArray(cls.includedStudents)) {
-            cls.includedStudents.forEach((id: string) => includedMap.set(id, cls.classCode));
+            cls.includedStudents.forEach((id: string) => {
+              const cleanId = String(id).trim().toUpperCase();
+              includedMap.set(cleanId, cls.classCode);
+              includedMap.set(cleanId + '_TX', cls.classCode);
+              includedMap.set(cleanId.replace(/_TX$/i, ''), cls.classCode);
+              classConfigIncludedList.push({ maSV: cleanId, classCode: cls.classCode });
+            });
           }
           if (Array.isArray(cls.excludedStudents)) {
-            cls.excludedStudents.forEach((id: string) => excludedSet.add(id));
+            cls.excludedStudents.forEach((id: string) => {
+              const cleanId = String(id).trim().toUpperCase();
+              excludedSet.add(cleanId);
+              excludedSet.add(cleanId + '_TX');
+              excludedSet.add(cleanId.replace(/_TX$/i, ''),);
+              classConfigExcludedList.push({ maSV: cleanId, classCode: cls.classCode });
+            });
           }
         }
       }
@@ -72,13 +105,25 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
 
           if (fs.existsSync(mainFile)) {
             const mainContent = fs.readFileSync(mainFile, 'utf8');
-            await prisma.courseRegistration.deleteMany({
-              where: { classCode: folder, type: 'main' },
-            });
-            await prisma.courseRegistration.create({
-              data: {
+            let mainUsername = 'LOP_TRUONG';
+            try {
+              const parsed = JSON.parse(mainContent);
+              if (parsed.username) mainUsername = parsed.username.toUpperCase();
+            } catch (e) {}
+
+            await prisma.courseRegistration.upsert({
+              where: {
+                classCode_username: {
+                  classCode: folder,
+                  username: mainUsername,
+                },
+              },
+              create: {
                 classCode: folder,
-                type: 'main',
+                username: mainUsername,
+                data: mainContent,
+              },
+              update: {
                 data: mainContent,
               },
             });
@@ -88,16 +133,23 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
             const subContent = fs.readFileSync(subFile, 'utf8');
             try {
               const subList = JSON.parse(subContent);
-              await prisma.courseRegistration.deleteMany({
-                where: { classCode: folder, type: 'sub' },
-              });
               if (Array.isArray(subList)) {
                 for (const subItem of subList) {
-                  await prisma.courseRegistration.create({
-                    data: {
+                  const subUser = (subItem.username || '').toUpperCase();
+                  if (!subUser) continue;
+                  await prisma.courseRegistration.upsert({
+                    where: {
+                      classCode_username: {
+                        classCode: folder,
+                        username: subUser,
+                      },
+                    },
+                    create: {
                       classCode: folder,
-                      type: 'sub',
-                      username: subItem.username || null,
+                      username: subUser,
+                      data: JSON.stringify(subItem),
+                    },
+                    update: {
                       data: JSON.stringify(subItem),
                     },
                   });
@@ -203,6 +255,14 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
           soPhutThi: row.SoPhutThi ? String(row.SoPhutThi).trim() : null,
           maDotThi: batchCode,
           tenDotThi: batchName,
+          isPostponed:
+            row.isPostponed === true ||
+            row.isPostponed === 'true' ||
+            row.isPostponed === '1' ||
+            row.HoanThi === 'true' ||
+            row.KhongThi === 'true' ||
+            row['Hoãn thi'] === 'true' ||
+            false,
         });
       });
 
@@ -236,6 +296,60 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         }
       });
 
+      // Add excluded students from class_config.yaml not in CSV
+      classConfigExcludedList.forEach(({ maSV, classCode }) => {
+        const hasExisting = studentsMap.has(maSV) || studentsMap.has(maSV + '_TX');
+        if (!hasExisting) {
+          studentsMap.set(maSV, {
+            maSV,
+            hoLot: '',
+            ten: maSV,
+            hoTen: maSV,
+            gioiTinh: 'Nam',
+            ngaySinh: null,
+            maLop: classCode,
+            trangThai: 'BAO_LUU',
+            soDienThoai: null,
+            ghiChu: '[Bảo lưu/Nghỉ học]',
+          });
+        }
+      });
+
+      // Add included students from class_config.yaml not in CSV
+      classConfigIncludedList.forEach(({ maSV, classCode }) => {
+        const hasExisting = studentsMap.has(maSV) || studentsMap.has(maSV + '_TX');
+        if (!hasExisting) {
+          studentsMap.set(maSV, {
+            maSV,
+            hoLot: '',
+            ten: maSV,
+            hoTen: maSV,
+            gioiTinh: 'Nam',
+            ngaySinh: null,
+            maLop: classCode,
+            trangThai: 'DANG_HOC',
+            soDienThoai: null,
+            ghiChu: '[Tiếp nhận vào lớp]',
+          });
+        }
+      });
+
+      // Apply monitor phones from class_config.yaml if monitor has no phone
+      monitorPhonesMap.forEach((phone, classCode) => {
+        // Find monitor user for this class
+        loginUsersMap.forEach((u, username) => {
+          const isMon = Array.isArray(u.role)
+            ? u.role.includes('lop_truong')
+            : String(u.role || '').includes('lop_truong');
+          if (isMon && u.lop === classCode) {
+            const studentEntry = studentsMap.get(username);
+            if (studentEntry && !studentEntry.soDienThoai) {
+              studentEntry.soDienThoai = phone;
+            }
+          }
+        });
+      });
+
       // Clear existing records if force
       if (force) {
         await prisma.examRecord.deleteMany();
@@ -260,6 +374,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         const chunk = studentArray.slice(i, i + studentChunkSize);
         await prisma.student.createMany({
           data: chunk,
+          skipDuplicates: true,
         });
         studentCount += chunk.length;
       }
@@ -283,6 +398,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         const chunk = userList.slice(i, i + studentChunkSize);
         await prisma.user.createMany({
           data: chunk,
+          skipDuplicates: true,
         });
         userCount += chunk.length;
       }
@@ -293,10 +409,14 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
         const chunk = examRecordsList.slice(i, i + examChunkSize);
         await prisma.examRecord.createMany({
           data: chunk,
+          skipDuplicates: true,
         });
         examCount += chunk.length;
       }
     }
+
+    // Đồng bộ lại Sequence trên PostgreSQL
+    await syncPostgresSequences().catch(() => {});
 
     // Set initial_seeded in SystemMeta
     await prisma.systemMeta.upsert({

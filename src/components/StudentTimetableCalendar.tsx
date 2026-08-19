@@ -1,0 +1,1124 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  MapPin,
+  RefreshCw,
+  BookOpen,
+  Layers,
+  Sparkles,
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  Video,
+  User,
+  Users,
+  Search,
+  Filter,
+  CalendarDays,
+  CalendarRange,
+  ListFilter,
+  ArrowRight,
+  CheckCheck,
+  Copy,
+  Info,
+  CalendarCheck,
+  Moon,
+  Sun,
+  Flame,
+  X,
+  Lock,
+  ShieldAlert,
+  AlertTriangle,
+  Edit3,
+  Globe,
+} from 'lucide-react';
+import { LoginUser } from '../types';
+import {
+  TimetableCalendarEvent,
+  TimetableSubjectSummary,
+  StudentTimetableCalendarResult,
+} from '../lib/studentTimetableService';
+
+interface StudentTimetableCalendarProps {
+  currentUser: LoginUser;
+  onNavigateToExternalAccounts?: () => void;
+}
+
+const SUBJECT_COLOR_PALETTES = [
+  {
+    bg: 'bg-indigo-50 border-indigo-200 text-indigo-800',
+    pill: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    badge: 'bg-indigo-600 text-white',
+    dot: 'bg-indigo-500',
+    accentBorder: 'border-l-indigo-500',
+    hover: 'hover:bg-indigo-100/70',
+  },
+  {
+    bg: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+    pill: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    badge: 'bg-emerald-600 text-white',
+    dot: 'bg-emerald-500',
+    accentBorder: 'border-l-emerald-500',
+    hover: 'hover:bg-emerald-100/70',
+  },
+  {
+    bg: 'bg-sky-50 border-sky-200 text-sky-800',
+    pill: 'bg-sky-100 text-sky-800 border-sky-200',
+    badge: 'bg-sky-600 text-white',
+    dot: 'bg-sky-500',
+    accentBorder: 'border-l-sky-500',
+    hover: 'hover:bg-sky-100/70',
+  },
+  {
+    bg: 'bg-amber-50 border-amber-200 text-amber-800',
+    pill: 'bg-amber-100 text-amber-800 border-amber-200',
+    badge: 'bg-amber-600 text-white',
+    dot: 'bg-amber-500',
+    accentBorder: 'border-l-amber-500',
+    hover: 'hover:bg-amber-100/70',
+  },
+  {
+    bg: 'bg-purple-50 border-purple-200 text-purple-800',
+    pill: 'bg-purple-100 text-purple-800 border-purple-200',
+    badge: 'bg-purple-600 text-white',
+    dot: 'bg-purple-500',
+    accentBorder: 'border-l-purple-500',
+    hover: 'hover:bg-purple-100/70',
+  },
+  {
+    bg: 'bg-rose-50 border-rose-200 text-rose-800',
+    pill: 'bg-rose-100 text-rose-800 border-rose-200',
+    badge: 'bg-rose-600 text-white',
+    dot: 'bg-rose-500',
+    accentBorder: 'border-l-rose-500',
+    hover: 'hover:bg-rose-100/70',
+  },
+  {
+    bg: 'bg-teal-50 border-teal-200 text-teal-800',
+    pill: 'bg-teal-100 text-teal-800 border-teal-200',
+    badge: 'bg-teal-600 text-white',
+    dot: 'bg-teal-500',
+    accentBorder: 'border-l-teal-500',
+    hover: 'hover:bg-teal-100/70',
+  },
+  {
+    bg: 'bg-orange-50 border-orange-200 text-orange-800',
+    pill: 'bg-orange-100 text-orange-800 border-orange-200',
+    badge: 'bg-orange-600 text-white',
+    dot: 'bg-orange-500',
+    accentBorder: 'border-l-orange-500',
+    hover: 'hover:bg-orange-100/70',
+  },
+  {
+    bg: 'bg-cyan-50 border-cyan-200 text-cyan-800',
+    pill: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    badge: 'bg-cyan-600 text-white',
+    dot: 'bg-cyan-500',
+    accentBorder: 'border-l-cyan-500',
+    hover: 'hover:bg-cyan-100/70',
+  },
+];
+
+const WEEKDAYS = [
+  { num: 2, label: 'Thứ 2', short: 'T2' },
+  { num: 3, label: 'Thứ 3', short: 'T3' },
+  { num: 4, label: 'Thứ 4', short: 'T4' },
+  { num: 5, label: 'Thứ 5', short: 'T5' },
+  { num: 6, label: 'Thứ 6', short: 'T6' },
+  { num: 7, label: 'Thứ 7', short: 'T7' },
+  { num: 8, label: 'Chủ Nhật', short: 'CN' },
+];
+
+function formatIso(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export default function StudentTimetableCalendar({
+  currentUser,
+  onNavigateToExternalAccounts,
+}: StudentTimetableCalendarProps) {
+  const [data, setData] = useState<StudentTimetableCalendarResult | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<'NOT_CONFIGURED' | 'INVALID_CREDENTIALS' | 'SERVER_ERROR' | null>(null);
+
+  // Calendar View Mode: 'MONTH' | 'WEEK' | 'AGENDA'
+  const [viewMode, setViewMode] = useState<'MONTH' | 'WEEK' | 'AGENDA'>('MONTH');
+
+  // Active Date (Default: Today)
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [selectedDay, setSelectedDay] = useState<string>(formatIso(new Date()));
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedEventModal, setSelectedEventModal] = useState<TimetableCalendarEvent | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Fetch timetable from API
+  const fetchTimetable = useCallback(async (refresh = false) => {
+    if (refresh) setIsRefreshing(true);
+    else setIsLoading(true);
+    setError(null);
+    setErrorType(null);
+
+    try {
+      const res = await fetch(`/api/student/timetable${refresh ? '?refresh=true' : ''}`);
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setData(json);
+        setErrorType(null);
+
+        // Auto jump calendar date to nearest active session if current month has no events
+        if (json.events && json.events.length > 0) {
+          const todayIso = formatIso(new Date());
+          const hasTodayOrFuture = json.events.some((e: any) => e.date >= todayIso);
+          if (!hasTodayOrFuture && json.events[0]?.date) {
+            const firstDate = new Date(json.events[0].date);
+            if (!isNaN(firstDate.getTime())) {
+              setCurrentDate(firstDate);
+              setSelectedDay(json.events[0].date);
+            }
+          }
+        }
+      } else {
+        const type = json.errorType || (res.status === 401 ? 'INVALID_CREDENTIALS' : 'SERVER_ERROR');
+        setErrorType(type);
+        setError(json.error || 'Không thể tải lịch học cá nhân');
+        if (json.username) {
+          setData(json);
+        }
+      }
+    } catch (err: any) {
+      setErrorType('SERVER_ERROR');
+      setError('Lỗi kết nối máy chủ khi lấy dữ liệu thời khóa biểu');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTimetable();
+  }, [fetchTimetable]);
+
+  // Filtered Events
+  const allEvents = useMemo(() => data?.events || [], [data]);
+
+  const filteredEvents = useMemo(() => {
+    return allEvents.filter((ev) => {
+      const matchSubject = selectedSubjectFilter === 'ALL' || ev.subjectCode === selectedSubjectFilter;
+      const query = searchQuery.toLowerCase().trim();
+      const matchQuery =
+        !query ||
+        ev.subjectName.toLowerCase().includes(query) ||
+        ev.subjectCode.toLowerCase().includes(query) ||
+        ev.room.toLowerCase().includes(query) ||
+        (ev.lecturer && ev.lecturer.toLowerCase().includes(query));
+      return matchSubject && matchQuery;
+    });
+  }, [allEvents, selectedSubjectFilter, searchQuery]);
+
+  // Map events by Date (YYYY-MM-DD)
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, TimetableCalendarEvent[]>();
+    for (const ev of filteredEvents) {
+      if (!map.has(ev.date)) {
+        map.set(ev.date, []);
+      }
+      map.get(ev.date)!.push(ev);
+    }
+    return map;
+  }, [filteredEvents]);
+
+  // Calendar Navigation
+  const handlePrev = () => {
+    if (viewMode === 'MONTH') {
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    } else if (viewMode === 'WEEK') {
+      const prevWeek = new Date(currentDate);
+      prevWeek.setDate(prevWeek.getDate() - 7);
+      setCurrentDate(prevWeek);
+    }
+  };
+
+  const handleNext = () => {
+    if (viewMode === 'MONTH') {
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    } else if (viewMode === 'WEEK') {
+      const nextWeek = new Date(currentDate);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      setCurrentDate(nextWeek);
+    }
+  };
+
+  const handleToday = () => {
+    const today = new Date();
+    setCurrentDate(today);
+    setSelectedDay(formatIso(today));
+  };
+
+  // Month grid generation
+  const monthGridDays = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+
+    // Monday-based offset (0 = Mon, 6 = Sun)
+    let startDayOfWeek = firstDayOfMonth.getDay() - 1;
+    if (startDayOfWeek === -1) startDayOfWeek = 6; // Sunday
+
+    const days: {
+      date: Date;
+      dateStr: string;
+      isCurrentMonth: boolean;
+      isToday: boolean;
+      isSelected: boolean;
+      events: TimetableCalendarEvent[];
+    }[] = [];
+
+    // Preceding days from previous month
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const d = new Date(year, month, -i);
+      const iso = formatIso(d);
+      days.push({
+        date: d,
+        dateStr: iso,
+        isCurrentMonth: false,
+        isToday: iso === formatIso(new Date()),
+        isSelected: iso === selectedDay,
+        events: eventsByDate.get(iso) || [],
+      });
+    }
+
+    // Current month days
+    for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
+      const d = new Date(year, month, i);
+      const iso = formatIso(d);
+      days.push({
+        date: d,
+        dateStr: iso,
+        isCurrentMonth: true,
+        isToday: iso === formatIso(new Date()),
+        isSelected: iso === selectedDay,
+        events: eventsByDate.get(iso) || [],
+      });
+    }
+
+    // Trailing days to fill standard 35 or 42 cells
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let i = 1; i <= remaining; i++) {
+      const d = new Date(year, month + 1, i);
+      const iso = formatIso(d);
+      days.push({
+        date: d,
+        dateStr: iso,
+        isCurrentMonth: false,
+        isToday: iso === formatIso(new Date()),
+        isSelected: iso === selectedDay,
+        events: eventsByDate.get(iso) || [],
+      });
+    }
+
+    return days;
+  }, [currentDate, selectedDay, eventsByDate]);
+
+  // Week grid generation
+  const weekDays = useMemo(() => {
+    const cur = new Date(currentDate);
+    let dayOfWeek = cur.getDay() - 1;
+    if (dayOfWeek === -1) dayOfWeek = 6;
+
+    const monday = new Date(cur);
+    monday.setDate(cur.getDate() - dayOfWeek);
+
+    const days: {
+      date: Date;
+      dateStr: string;
+      weekday: string;
+      dayNum: number;
+      isToday: boolean;
+      events: TimetableCalendarEvent[];
+    }[] = [];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const iso = formatIso(d);
+      days.push({
+        date: d,
+        dateStr: iso,
+        weekday: WEEKDAYS[i].label,
+        dayNum: d.getDate(),
+        isToday: iso === formatIso(new Date()),
+        events: eventsByDate.get(iso) || [],
+      });
+    }
+    return days;
+  }, [currentDate, eventsByDate]);
+
+  // Events of the selected day
+  const selectedDayEvents = useMemo(() => {
+    return eventsByDate.get(selectedDay) || [];
+  }, [selectedDay, eventsByDate]);
+
+  // Copy link
+  const handleCopyLink = (link: string) => {
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const todayIso = formatIso(new Date());
+
+  return (
+    <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+      {/* Top Banner / Quick Header */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-gradient-to-br from-indigo-500 to-sky-600 text-white rounded-2xl shadow-md shadow-indigo-500/20">
+            <CalendarIcon className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-lg font-black text-slate-800">Thời Khóa Biểu & Lịch Học Cá Nhân</h2>
+              {data?.isLiveSync ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Đồng bộ Trực Tuyến QLĐT
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
+                  Dữ Liệu Học Kỳ Đã Lưu
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {data?.semesterName || 'Học kỳ 1 Năm học 2025-2026'} • Tổng cộng <b>{data?.uniqueSubjectsCount || 0} môn học</b> ({data?.totalEvents || 0} buổi học trong kỳ)
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Refresh button */}
+          <button
+            onClick={() => fetchTimetable(true)}
+            disabled={isRefreshing || isLoading}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            title="Đồng bộ lại thời khóa biểu mới nhất từ cổng QLDTTX"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-600' : 'text-slate-600'}`} />
+            <span>{isRefreshing ? 'Đang đồng bộ...' : 'Làm Mới Từ QLĐT'}</span>
+          </button>
+
+          {/* View mode toggle */}
+          <div className="bg-slate-100 p-1 rounded-2xl flex items-center gap-1 border border-slate-200">
+            <button
+              onClick={() => setViewMode('MONTH')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'MONTH'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>Tháng</span>
+            </button>
+            <button
+              onClick={() => setViewMode('WEEK')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'WEEK'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <CalendarRange className="w-3.5 h-3.5" />
+              <span>Tuần</span>
+            </button>
+            <button
+              onClick={() => setViewMode('AGENDA')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'AGENDA'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ListFilter className="w-3.5 h-3.5" />
+              <span>Danh Sách</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Unlinked Account Notice Banner */}
+      {!data?.hasLinkedAccount && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-300 rounded-3xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-amber-500 text-white rounded-2xl shadow-sm shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-amber-900">
+                Chưa liên kết tài khoản Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)
+              </h4>
+              <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                Liên kết tài khoản QLDTTX để hệ thống tự động cập nhật thời khóa biểu, phòng học và thông báo nhắc lịch học ca tối qua Telegram.
+              </p>
+            </div>
+          </div>
+          {onNavigateToExternalAccounts && (
+            <button
+              onClick={onNavigateToExternalAccounts}
+              className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-2xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <span>Liên Kết QLĐT Ngay</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Subject Filter & Navigation Controls */}
+      <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        {/* Date Navigator */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrev}
+            className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+            title="Thời gian trước"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={handleToday}
+            className="px-3.5 py-1.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+          >
+            Hôm Nay
+          </button>
+
+          <button
+            onClick={handleNext}
+            className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+            title="Thời gian tiếp theo"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+
+          <div className="text-base font-black text-slate-800 ml-2 font-mono">
+            {viewMode === 'MONTH' && (
+              <span>
+                Tháng {currentDate.getMonth() + 1}, {currentDate.getFullYear()}
+              </span>
+            )}
+            {viewMode === 'WEEK' && (
+              <span>
+                Tuần {weekDays[0]?.dayNum}/{weekDays[0]?.date.getMonth() + 1} - {weekDays[6]?.dayNum}/{weekDays[6]?.date.getMonth() + 1}, {currentDate.getFullYear()}
+              </span>
+            )}
+            {viewMode === 'AGENDA' && (
+              <span>
+                Toàn Bộ Lịch Học ({data?.semesterName || 'Học kỳ 1'})
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Filter by Subject & Search */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="relative min-w-[180px]">
+            <select
+              value={selectedSubjectFilter}
+              onChange={(e) => setSelectedSubjectFilter(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2 text-xs font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-8"
+            >
+              <option value="ALL">Tất Cả Môn Học ({data?.uniqueSubjectsCount || 0})</option>
+              {data?.subjects.map((sub) => (
+                <option key={sub.subjectCode} value={sub.subjectCode}>
+                  {sub.subjectName} ({sub.subjectCode})
+                </option>
+              ))}
+            </select>
+            <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          <div className="relative min-w-[160px]">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm môn, phòng..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-8 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Calendar View Area */}
+      {isLoading ? (
+        <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-3 text-slate-400 min-h-[400px]">
+          <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-bold text-slate-600">Đang tải lịch học và thời khóa biểu...</span>
+        </div>
+      ) : errorType === 'NOT_CONFIGURED' ? (
+        <div className="bg-white rounded-3xl p-8 sm:p-12 border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center gap-6 max-w-2xl mx-auto my-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-16 h-16 rounded-3xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shadow-inner">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+              <span>Yêu Cầu Cấu Hình Cổng QLDTTX (PTTC1)</span>
+            </div>
+            <h3 className="text-xl font-black text-slate-800 tracking-tight">
+              Chưa Cấu Hình Tài Khoản Đào Tạo Từ Xa
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
+              Để xem được <b>Thời Khóa Biểu & Lịch Học Cá Nhân</b> được cập nhật chính xác từ trường, bạn cần cấu hình thông tin đăng nhập tại Cổng Quản Lý Đào Tạo Từ Xa (<span className="font-mono text-indigo-600">https://qldttx.pttc1.edu.vn/</span>).
+            </p>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-xs text-slate-600 text-left w-full space-y-2">
+            <div className="font-bold text-slate-800 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              <span>Quyền lợi sau khi kết nối tài khoản QLDTTX:</span>
+            </div>
+            <ul className="space-y-1.5 list-disc list-inside text-slate-600 text-[11px]">
+              <li>Tự động tải lịch học, phòng học và giảng viên học kỳ hiện tại</li>
+              <li>Hiển thị lịch trực quan theo dạng Tháng, Tuần và Lịch biểu chi tiết</li>
+              <li>Nhận thông báo nhắc lịch học ca tối qua Kênh/Nhóm Telegram cá nhân</li>
+            </ul>
+          </div>
+
+          {onNavigateToExternalAccounts && (
+            <button
+              onClick={onNavigateToExternalAccounts}
+              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-2xl text-xs font-bold transition shadow-lg shadow-indigo-600/30 flex items-center gap-2 cursor-pointer active:scale-98"
+            >
+              <Globe className="w-4 h-4" />
+              <span>Đến Cấu Hình Tài Khoản QLDTTX Ngay</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      ) : errorType === 'INVALID_CREDENTIALS' ? (
+        <div className="bg-white rounded-3xl p-8 sm:p-12 border border-rose-200 shadow-sm flex flex-col items-center justify-center text-center gap-6 max-w-2xl mx-auto my-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-16 h-16 rounded-3xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-inner">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+              <span>Lỗi Xác Thực Tài Khoản QLDTTX</span>
+            </div>
+            <h3 className="text-xl font-black text-slate-800 tracking-tight">
+              Tài Khoản Hoặc Mật Khẩu Không Chính Xác
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
+              Hệ thống không thể kết nối tới Cổng Quản Lý Đào Tạo Từ Xa (<span className="font-mono text-rose-600">https://qldttx.pttc1.edu.vn/</span>) do thông tin đăng nhập sai hoặc mật khẩu đã bị thay đổi.
+            </p>
+          </div>
+
+          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-800 text-left w-full space-y-1.5">
+            <div className="font-bold flex items-center gap-1.5">
+              <Info className="w-4 h-4 text-rose-600" />
+              <span>Nguyên nhân có thể do:</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-rose-700 space-y-1">
+              • Bạn vừa đổi mật khẩu trên cổng QLDTTX nhưng chưa cập nhật tại đây.<br />
+              • Mã sinh viên hoặc mật khẩu nhập chưa chính xác.<br />
+              • Phiên đăng nhập (Token) của trường đã hết hạn.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap justify-center">
+            {onNavigateToExternalAccounts && (
+              <button
+                onClick={onNavigateToExternalAccounts}
+                className="px-6 py-3 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white rounded-2xl text-xs font-bold transition shadow-lg shadow-rose-600/30 flex items-center gap-2 cursor-pointer active:scale-98"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Cập Nhật Lại Mật Khẩu QLDTTX</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={() => fetchTimetable(true)}
+              disabled={isRefreshing}
+              className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>Thử Lại</span>
+            </button>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm text-center flex flex-col items-center justify-center gap-3">
+          <AlertCircle className="w-10 h-10 text-rose-500" />
+          <h3 className="text-sm font-bold text-slate-800">Không thể tải lịch học</h3>
+          <p className="text-xs text-slate-500 max-w-md">{error}</p>
+          <button
+            onClick={() => fetchTimetable(true)}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-2xl text-xs font-bold transition shadow-sm cursor-pointer"
+          >
+            Thử lại
+          </button>
+        </div>
+      ) : allEvents.length === 0 ? (
+        <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm text-center flex flex-col items-center justify-center gap-4">
+          <CalendarIcon className="w-12 h-12 text-slate-300" />
+          <div>
+            <h3 className="text-base font-bold text-slate-800">Chưa có dữ liệu thời khóa biểu cho học kỳ này</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              Hệ thống chưa tìm thấy lịch học của bạn. Nếu bạn vừa đăng ký môn học hoặc liên kết tài khoản QLDTTX, vui lòng bấm &quot;Làm Mới Từ QLĐT&quot;.
+            </p>
+          </div>
+          <button
+            onClick={() => fetchTimetable(true)}
+            disabled={isRefreshing}
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition shadow-md shadow-indigo-600/20 flex items-center gap-2 cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>Đồng Bộ Lịch Học Ngay</span>
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* VIEW 1: MONTH CALENDAR */}
+          {viewMode === 'MONTH' && (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Month Grid (3 cols on desktop) */}
+              <div className="lg:col-span-3 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                {/* Weekday header */}
+                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80 text-center text-xs font-bold text-slate-600 py-3">
+                  {WEEKDAYS.map((wd) => (
+                    <div key={wd.num} className={wd.num === 8 ? 'text-rose-600' : ''}>
+                      <span className="hidden sm:inline">{wd.label}</span>
+                      <span className="sm:hidden">{wd.short}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar Days Cells */}
+                <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-100">
+                  {monthGridDays.map((dayItem) => {
+                    const hasEvents = dayItem.events.length > 0;
+                    const isToday = dayItem.isToday;
+                    const isSelected = dayItem.dateStr === selectedDay;
+
+                    return (
+                      <div
+                        key={dayItem.dateStr}
+                        onClick={() => setSelectedDay(dayItem.dateStr)}
+                        className={`min-h-[100px] sm:min-h-[120px] p-2 flex flex-col justify-between transition-colors cursor-pointer relative ${
+                          !dayItem.isCurrentMonth
+                            ? 'bg-slate-50/40 text-slate-300'
+                            : isSelected
+                            ? 'bg-indigo-50/50 ring-2 ring-indigo-500/50 inset-0 z-10'
+                            : 'hover:bg-slate-50/80 text-slate-800'
+                        }`}
+                      >
+                        {/* Day Number & Header */}
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-xs font-mono font-bold w-6 h-6 rounded-full flex items-center justify-center ${
+                              isToday
+                                ? 'bg-rose-500 text-white shadow-xs'
+                                : isSelected
+                                ? 'bg-indigo-600 text-white'
+                                : ''
+                            }`}
+                          >
+                            {dayItem.date.getDate()}
+                          </span>
+
+                          {hasEvents && (
+                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded-md">
+                              {dayItem.events.length} ca
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Events list in cell */}
+                        <div className="flex flex-col gap-1 mt-1.5 overflow-hidden">
+                          {dayItem.events.slice(0, 2).map((ev) => {
+                            const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                            return (
+                              <button
+                                key={ev.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedEventModal(ev);
+                                }}
+                                className={`text-left text-[11px] p-1 rounded-lg border font-medium truncate flex items-center gap-1 transition ${pal.pill} ${pal.hover}`}
+                                title={`${ev.subjectName} (${ev.startTime} - ${ev.endTime}) - ${ev.room}`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${pal.dot}`} />
+                                <span className="font-mono text-[10px] font-bold shrink-0">{ev.startTime}</span>
+                                <span className="truncate">{ev.subjectName}</span>
+                              </button>
+                            );
+                          })}
+
+                          {dayItem.events.length > 2 && (
+                            <div className="text-[10px] font-bold text-slate-400 pl-1">
+                              +{dayItem.events.length - 2} ca học khác...
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Side Details Panel for Selected Day */}
+              <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                        Lịch Học Ngày
+                      </h3>
+                      <div className="text-xs font-bold text-indigo-600 font-mono">
+                        {new Date(selectedDay).toLocaleDateString('vi-VN', {
+                          weekday: 'long',
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedDay === todayIso && (
+                    <span className="px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-bold rounded-full animate-pulse">
+                      Hôm nay
+                    </span>
+                  )}
+                </div>
+
+                {/* Session cards for the day */}
+                {selectedDayEvents.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+                    <CalendarCheck className="w-8 h-8 text-slate-300" />
+                    <p className="text-xs font-medium text-slate-500">Không có lịch học vào ngày này</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 overflow-y-auto max-h-[500px] pr-1">
+                    {selectedDayEvents.map((ev) => {
+                      const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                      return (
+                        <div
+                          key={ev.id}
+                          className={`p-3.5 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-4 flex flex-col gap-2 shadow-2xs`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs font-black leading-tight">
+                              {ev.subjectName}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-white/80 border border-slate-200 shrink-0">
+                              {ev.subjectCode}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col gap-1 text-[11px] opacity-90">
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <Clock className="w-3.5 h-3.5 shrink-0 text-indigo-600" />
+                              <span className="font-mono">{ev.startTime} - {ev.endTime}</span>
+                              <span className="text-[10px] font-normal">({ev.periodStr})</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+                              <span className="font-semibold">{ev.room}</span>
+                              {ev.group && <span>• Tổ: {ev.group}</span>}
+                            </div>
+
+                            {ev.lecturer && (
+                              <div className="flex items-center gap-1.5 text-slate-600">
+                                <User className="w-3.5 h-3.5 shrink-0" />
+                                <span>GV: {ev.lecturer}</span>
+                              </div>
+                            )}
+
+                            {ev.onlineLink && (
+                              <a
+                                href={ev.onlineLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-sky-600 hover:underline"
+                              >
+                                <Video className="w-3.5 h-3.5" />
+                                <span>Vào Lớp Học Online</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* VIEW 2: WEEK CALENDAR */}
+          {viewMode === 'WEEK' && (
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+              {weekDays.map((dayItem) => {
+                const isToday = dayItem.isToday;
+                return (
+                  <div
+                    key={dayItem.dateStr}
+                    className={`bg-white rounded-3xl p-4 border flex flex-col gap-3 shadow-sm min-h-[300px] ${
+                      isToday ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-slate-200'
+                    }`}
+                  >
+                    {/* Week Column Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                      <div>
+                        <div className={`text-xs font-black ${isToday ? 'text-indigo-600' : 'text-slate-700'}`}>
+                          {dayItem.weekday}
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-mono">
+                          {dayItem.dayNum}/{dayItem.date.getMonth() + 1}
+                        </div>
+                      </div>
+
+                      {isToday && (
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" title="Hôm nay" />
+                      )}
+                    </div>
+
+                    {/* Events inside this day */}
+                    {dayItem.events.length === 0 ? (
+                      <div className="flex-1 flex items-center justify-center text-[11px] text-slate-300 italic">
+                        Không có ca học
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2.5">
+                        {dayItem.events.map((ev) => {
+                          const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                          return (
+                            <div
+                              key={ev.id}
+                              onClick={() => setSelectedEventModal(ev)}
+                              className={`p-3 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-3 flex flex-col gap-1.5 transition cursor-pointer hover:shadow-xs`}
+                            >
+                              <div className="text-xs font-bold leading-tight line-clamp-2">
+                                {ev.subjectName}
+                              </div>
+
+                              <div className="flex items-center gap-1 font-mono text-[10px] font-bold text-slate-700">
+                                <Clock className="w-3 h-3 text-indigo-600" />
+                                <span>{ev.startTime} - {ev.endTime}</span>
+                              </div>
+
+                              <div className="flex items-center gap-1 text-[10px] text-slate-600 truncate">
+                                <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                                <span className="truncate">{ev.room}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* VIEW 3: AGENDA / FULL SEMESTER TIMELINE */}
+          {viewMode === 'AGENDA' && (
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col gap-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                  <ListFilter className="w-4 h-4 text-indigo-600" />
+                  Danh Sách Toàn Bộ Buổi Học Trong Kỳ ({filteredEvents.length} ca học)
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredEvents.map((ev) => {
+                  const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                  const isToday = ev.date === todayIso;
+
+                  return (
+                    <div
+                      key={ev.id}
+                      onClick={() => setSelectedEventModal(ev)}
+                      className={`p-4 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-4 flex flex-col justify-between gap-3 shadow-2xs hover:shadow-sm transition cursor-pointer`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="text-xs font-mono font-bold text-indigo-600 bg-white/90 px-2 py-0.5 rounded-lg border border-slate-200">
+                            {ev.dayOfWeekStr}, {new Date(ev.date).toLocaleDateString('vi-VN')}
+                          </span>
+                          {isToday && (
+                            <span className="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-bold rounded-full">
+                              Hôm nay
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="text-xs font-black text-slate-800 leading-snug">
+                          {ev.subjectName}
+                        </h4>
+                        <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                          Mã: {ev.subjectCode} • Nhóm: {ev.group}
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/60 flex flex-col gap-1 text-[11px] text-slate-700">
+                        <div className="flex items-center gap-1.5 font-bold font-mono">
+                          <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          <span>{ev.startTime} - {ev.endTime} ({ev.periodStr})</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          <span className="truncate">{ev.room}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* SESSION DETAILS MODAL */}
+      {selectedEventModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative overflow-hidden animate-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setSelectedEventModal(null)}
+              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider font-mono">
+                  {selectedEventModal.subjectCode} • Tổ {selectedEventModal.group}
+                </span>
+                <h3 className="text-base font-black text-slate-800 leading-tight">
+                  {selectedEventModal.subjectName}
+                </h3>
+              </div>
+            </div>
+
+            <div className="space-y-3 bg-slate-50 rounded-2xl p-4 border border-slate-200 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5 text-indigo-600" /> Ngày học:
+                </span>
+                <span className="font-bold text-slate-800 font-mono">
+                  {selectedEventModal.dayOfWeekStr}, {new Date(selectedEventModal.date).toLocaleDateString('vi-VN')}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-indigo-600" /> Giờ học:
+                </span>
+                <span className="font-bold text-slate-800 font-mono">
+                  {selectedEventModal.startTime} - {selectedEventModal.endTime} ({selectedEventModal.periodStr})
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-rose-500" /> Phòng học:
+                </span>
+                <span className="font-bold text-slate-800">
+                  {selectedEventModal.room}
+                </span>
+              </div>
+
+              {selectedEventModal.lecturer && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-slate-600" /> Giảng viên:
+                  </span>
+                  <span className="font-bold text-slate-800">
+                    {selectedEventModal.lecturer}
+                  </span>
+                </div>
+              )}
+
+              {selectedEventModal.classCode && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-slate-600" /> Lớp học phần:
+                  </span>
+                  <span className="font-bold text-slate-800 font-mono">
+                    {selectedEventModal.classCode}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {selectedEventModal.onlineLink && (
+              <div className="mt-4 p-3 bg-sky-50 border border-sky-200 rounded-2xl flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Video className="w-4 h-4 text-sky-600 shrink-0" />
+                  <span className="text-xs font-bold text-sky-900 truncate">
+                    {selectedEventModal.onlineLink}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => handleCopyLink(selectedEventModal.onlineLink!)}
+                    className="p-1.5 bg-white border border-sky-200 text-sky-700 hover:bg-sky-100 rounded-xl text-xs transition cursor-pointer"
+                    title="Sao chép link"
+                  >
+                    {copiedLink ? <CheckCheck className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  <a
+                    href={selectedEventModal.onlineLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1"
+                  >
+                    <span>Vào học</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={() => setSelectedEventModal(null)}
+                className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

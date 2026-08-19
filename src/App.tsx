@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { CalendarDays, Crown, ArrowLeftRight, LogOut, LayoutDashboard, Calendar, Users, FileText, Search, Download, Wrench, ChevronDown, ChevronRight, GraduationCap, Mail, Settings, User, BookOpen, Menu, X, DollarSign } from 'lucide-react';
+import { CalendarDays, Crown, ArrowLeftRight, LogOut, LayoutDashboard, Calendar, Users, FileText, Search, Download, Wrench, ChevronDown, ChevronRight, GraduationCap, Mail, Settings, User, BookOpen, Menu, X, DollarSign, RefreshCw } from 'lucide-react';
 import Papa from 'papaparse';
 import { parse as parseYaml } from 'yaml';
 import UploadSection from './components/UploadSection';
@@ -14,7 +14,7 @@ import ExamRoomMembers from './components/ExamRoomMembers';
 import MonitorsList from './components/MonitorsList';
 import CourseCompare from './components/CourseCompare';
 import SettlementManager from './components/SettlementManager';
-import { ExamRecord, LoginUser, ExamSession } from './types';
+import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from './types';
 import { buildSessions } from './utils/dataModel';
 
 const getInitialState = () => {
@@ -71,7 +71,8 @@ export default function App() {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const isMonitor = currentUser?.role === 'lop_truong';
+  const isAdmin = Boolean(currentUser?.isAdmin || currentUser?.role === 'admin' || currentUser?.activeRole === 'admin');
+  const isMonitor = Boolean(isUserMonitor(currentUser) || isAdmin);
 
   const [courseCompareData, setCourseCompareData] = useState<{main: any, subAccount: any, allSubAccounts?: any[]} | null>(null);
   const [showCourseCompare, setShowCourseCompare] = useState(false);
@@ -362,8 +363,8 @@ export default function App() {
       <aside className={`fixed md:relative inset-y-0 left-0 z-50 w-64 bg-[#0F172A] flex flex-col shrink-0 transition-transform duration-300 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">S</div>
-            <h1 className="text-white font-semibold text-lg tracking-tight">S-Exam Portal</h1>
+            <div className="w-8 h-8 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-lg flex items-center justify-center text-white font-black text-lg">P</div>
+            <h1 className="text-white font-bold text-base tracking-tight">PTIT EduSync</h1>
           </div>
 
           <button 
@@ -477,7 +478,7 @@ export default function App() {
               {activeTab === 'schedule' ? 'Lịch Thi Tổng' : activeTab === 'personal_schedule' ? 'Lịch Thi Cá Nhân' : activeTab === 'monitors_list' ? 'Danh Sách Lớp Trưởng' : activeTab === 'course_compare' ? 'So Sánh ĐKMH' : activeTab === 'members' ? 'Danh Sách Lớp' : activeTab === 'envelope' ? 'Phân Công Phong Bì Lớp Mình' : activeTab === 'envelope_all' ? 'Phân Công Phong Bì Lớp Trưởng' : activeTab === 'settlement' ? 'Bù Trừ Thanh Toán' : 'Công Cụ Lớp Trưởng'}
             </h2>
             
-            {records.length > 0 && (activeTab === 'schedule' || activeTab === 'personal_schedule') && (
+            {((activeTab === 'schedule' && records.length > 0) || (activeTab === 'personal_schedule' && baseRecords.length > 0)) && (
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                   <Search className="w-4 h-4" />
@@ -519,9 +520,76 @@ export default function App() {
             <div className="flex-1 flex items-center justify-center">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
+          ) : activeTab === 'personal_schedule' ? (
+            selectedExamRoom ? (
+              <ExamRoomMembers 
+                roomRecord={selectedExamRoom}
+                allRecords={records}
+                onBack={() => setSelectedExamRoom(null)}
+                onStudentClick={setConfirmStudentId}
+                onClassClick={setConfirmClassCode}
+              />
+            ) : baseRecords.length === 0 ? (
+              <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center flex flex-col items-center justify-center animate-in fade-in duration-200">
+                <div className="w-16 h-16 bg-blue-50 border border-blue-200 rounded-3xl flex items-center justify-center text-blue-600 mb-4 shadow-sm">
+                  <Calendar className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Chưa Có Lịch Thi</h3>
+                <p className="text-sm text-slate-500 max-w-md mb-6">
+                  Bạn không có lịch thi nào trong đợt thi này hoặc dữ liệu lịch thi chưa được cập nhật.
+                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-200 flex items-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Tải lại dữ liệu
+                </button>
+              </div>
+            ) : (
+              <>
+                <FilterBar
+                  filters={filters}
+                  onFilterChange={setFilters}
+                  classes={classes}
+                  subjects={subjects}
+                  dates={dates}
+                  totalRecords={baseRecords.length}
+                  filteredCount={filteredRecords.length}
+                  hideClassFilter={true}
+                />
+                <DataTable 
+                  records={filteredRecords} 
+                  sortConfig={sortConfig} 
+                  onSortChange={setSortConfig} 
+                  onStudentClick={setConfirmStudentId}
+                  onClassClick={setConfirmClassCode}
+                  onRowClick={setSelectedExamRoom}
+                />
+              </>
+            )
           ) : records.length === 0 ? (
-            <UploadSection onDataLoaded={setRecords} />
-          ) : (activeTab === 'schedule' || activeTab === 'personal_schedule') ? (
+            currentUser?.role === 'admin' ? (
+              <UploadSection onDataLoaded={setRecords} />
+            ) : (
+              <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center flex flex-col items-center justify-center animate-in fade-in duration-200">
+                <div className="w-16 h-16 bg-blue-50 border border-blue-200 rounded-3xl flex items-center justify-center text-blue-600 mb-4 shadow-sm">
+                  <Calendar className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Chưa Có Dữ Liệu Lịch Thi</h3>
+                <p className="text-sm text-slate-500 max-w-md mb-6">
+                  Hiện tại chưa có dữ liệu lịch thi cho đợt thi này. Vui lòng thử tải lại hoặc quay lại sau.
+                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-200 flex items-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Tải lại dữ liệu
+                </button>
+              </div>
+            )
+          ) : activeTab === 'schedule' ? (
             selectedExamRoom ? (
               <ExamRoomMembers 
                 roomRecord={selectedExamRoom}
@@ -540,7 +608,7 @@ export default function App() {
                   dates={dates}
                   totalRecords={baseRecords.length}
                   filteredCount={filteredRecords.length}
-                  hideClassFilter={activeTab === 'personal_schedule'}
+                  hideClassFilter={false}
                 />
                 <DataTable 
                   records={filteredRecords} 
@@ -566,18 +634,21 @@ export default function App() {
               onClassChange={setMonitorClass}
               loginUsers={loginUsers}
               hideClassSelector={true}
+              isAdmin={isAdmin}
             />
           ) : activeTab === 'envelope_all' ? (
             <AllMonitorsEnvelopes
               records={records}
               sessions={sessions}
               loginUsers={loginUsers}
+              isAdmin={isAdmin}
             />
           ) : activeTab === 'settlement' ? (
             <SettlementManager
               records={records}
               sessions={sessions}
               loginUsers={loginUsers}
+              isAdmin={isAdmin}
             />
           ) : activeTab === 'monitors_list' ? (
             <MonitorsList 

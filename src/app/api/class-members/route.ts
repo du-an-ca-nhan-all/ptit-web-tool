@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
+import { logActivity } from '@/src/lib/activityLog';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -101,6 +102,7 @@ export async function GET(req: NextRequest) {
           SoPhutThi: r.soPhutThi || '',
           MaDotThi: r.maDotThi || '',
           TenDotThi: r.tenDotThi || '',
+          isPostponed: Boolean(r.isPostponed),
         })),
       };
     });
@@ -216,6 +218,18 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    await logActivity({
+      req,
+      userId: authUser.id,
+      username: authUser.username,
+      userRole: authUser.role,
+      action: 'UPDATE_STUDENT_INFO',
+      targetType: 'STUDENT',
+      targetId: cleanMaSV,
+      description: `Cập nhật thông tin sinh viên ${cleanMaSV} (${saved.hoTen || ''}) thuộc lớp ${cleanLop}`,
+      metadata: { cleanMaSV, cleanLop, phone, note, trangThai },
+    });
+
     return NextResponse.json({ success: true, student: saved });
   } catch (error: any) {
     console.error('Class members POST error:', error);
@@ -263,6 +277,18 @@ export async function DELETE(req: NextRequest) {
       where: {
         username: cleanMaSV,
       },
+    });
+
+    await logActivity({
+      req,
+      userId: authUser.id,
+      username: authUser.username,
+      userRole: authUser.role,
+      action: 'DELETE_STUDENT',
+      targetType: 'STUDENT',
+      targetId: cleanMaSV,
+      description: `Đã xóa sinh viên ${cleanMaSV} khỏi lớp ${targetClass || ''}`,
+      metadata: { cleanMaSV, targetClass },
     });
 
     return NextResponse.json({ success: true, message: 'Đã xóa sinh viên khỏi danh sách' });

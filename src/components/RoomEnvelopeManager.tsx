@@ -1,7 +1,8 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { ExamRecord, LoginUser, ExamSession } from '../types';
-import { Mail, MapPin, Users, Info, Calculator, X, DollarSign, Download } from 'lucide-react';
+import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from '../types';
+import { Mail, MapPin, Users, Info, Calculator, X, DollarSign, Download, Settings } from 'lucide-react';
 import { calculateRoomPrice, formatCurrency } from '../config/pricingConfig';
+import PricingConfigModal from './PricingConfigModal';
 
 interface SessionEnvelope {
   id: string;
@@ -16,21 +17,50 @@ interface SessionEnvelope {
 }
 
 interface RoomEnvelopeManagerProps {
-  sessions: ExamSession[];
-
+  sessions?: ExamSession[];
   records: ExamRecord[];
   selectedClass: string;
   onClassChange: (cls: string) => void;
   loginUsers?: LoginUser[];
-hideClassSelector?: boolean;
+  hideClassSelector?: boolean;
+  isAdmin?: boolean;
 }
 
-export default function RoomEnvelopeManager({ sessions = [], records, selectedClass, onClassChange, loginUsers = [], hideClassSelector = false }: RoomEnvelopeManagerProps) {
+export default function RoomEnvelopeManager({
+  sessions = [],
+  records,
+  selectedClass,
+  onClassChange,
+  loginUsers = [],
+  hideClassSelector = false,
+  isAdmin,
+}: RoomEnvelopeManagerProps) {
   const [splitSession, setSplitSession] = useState<SessionEnvelope | null>(null);
-  const [envelopeAmount, setEnvelopeAmount] = useState<string>('100000');
+  const [envelopeAmount, setEnvelopeAmount] = useState<string>('600000');
   const [includedClasses, setIncludedClasses] = useState<Set<string>>(new Set());
   const [filterDate, setFilterDate] = useState<string>('');
   const [filterResponsibleOnly, setFilterResponsibleOnly] = useState<boolean>(false);
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  const [pricingVersion, setPricingVersion] = useState(0);
+
+  const effectiveIsAdmin = useMemo(() => {
+    if (typeof isAdmin === 'boolean') return isAdmin;
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('currentUser') : null;
+      if (!saved) return false;
+      const u = JSON.parse(saved);
+      return Boolean(u?.isAdmin || u?.role === 'admin' || u?.activeRole === 'admin');
+    } catch {
+      return false;
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    const handler = () => setPricingVersion((v) => v + 1);
+    window.addEventListener('pricing_config_changed', handler);
+    return () => window.removeEventListener('pricing_config_changed', handler);
+  }, []);
+
   const classes = useMemo(() => {
     const cls = new Set(records.map((r) => r.MaLop).filter(Boolean));
     return Array.from(cls).sort();
@@ -73,8 +103,10 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
           });
         }
         const session = sessionMap.get(key)!;
-        const className = r.MaLop || 'Khác';
-        session.counts.set(className, (session.counts.get(className) || 0) + 1);
+        if (!r.isPostponed) {
+          const className = r.MaLop || 'Khác';
+          session.counts.set(className, (session.counts.get(className) || 0) + 1);
+        }
       }
     });
 
@@ -145,10 +177,20 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
   }, [monitorEnvelopes, filterDate, filterResponsibleOnly]);
 
   const responsibleCount = filteredEnvelopes.filter(s => s.isResponsible).length;
-  const totalExpectedMoney = filteredEnvelopes.filter(s => s.isResponsible).reduce((acc, s) => acc + calculateRoomPrice(s.subject, s.subjectCode, s.room, s.examFormat), 0);
+  const totalExpectedMoney = useMemo(() => {
+    return filteredEnvelopes
+      .filter(s => s.isResponsible)
+      .reduce((acc, s) => acc + calculateRoomPrice(s.subject, s.subjectCode, s.room, s.examFormat, s.id), 0);
+  }, [filteredEnvelopes, pricingVersion]);
 
   const monitorClasses = useMemo(() => {
-    return new Set(loginUsers.filter(u => u.role === 'lop_truong' && u.lop).map(u => u.lop as string));
+    const set = new Set<string>();
+    loginUsers.forEach((u) => {
+      if (isUserMonitor(u) && u.lop && u.lop.trim()) {
+        set.add(u.lop.trim());
+      }
+    });
+    return set;
   }, [loginUsers]);
 
   
@@ -167,7 +209,7 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
     
     const rows = filteredEnvelopes.map((session, index) => {
       const studentStructure = session.classCounts.map(c => `${c.className} (${c.count})`).join(', ');
-      const money = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat);
+      const money = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id);
       const isResponsibleStr = session.isResponsible ? 'Lớp mình' : `${session.classCounts[0]?.className || ''} (${session.classCounts[0]?.count || 0} SV)`;
       return [
         index + 1,
@@ -194,6 +236,8 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
 
   const handleOpenSplit = (session: SessionEnvelope) => {
     setSplitSession(session);
+    const calculatedPrice = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id);
+    setEnvelopeAmount(String(calculatedPrice));
     const initialIncluded = new Set<string>();
     session.classCounts.forEach(c => {
       if (monitorClasses.has(c.className)) {
@@ -255,12 +299,26 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
           </label>
         </div>
 
-        <button 
-          onClick={handleExportCSV}
-          className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-slate-50 text-slate-700 w-full md:w-auto justify-center"
-        >
-          <Download className="w-4 h-4" /> Xuất CSV
-        </button>
+        <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+          {effectiveIsAdmin && (
+            <button 
+              type="button"
+              onClick={() => setIsPricingModalOpen(true)}
+              className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              title="Tùy chỉnh định mức tiền phòng"
+            >
+              <Settings className="w-4 h-4 text-indigo-600" />
+              <span>Cấu hình tiền phòng</span>
+            </button>
+          )}
+
+          <button 
+            onClick={handleExportCSV}
+            className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold flex items-center gap-2 hover:bg-slate-50 text-slate-700 justify-center cursor-pointer shadow-2xs"
+          >
+            <Download className="w-4 h-4" /> Xuất CSV
+          </button>
+        </div>
 
       </div>
 
@@ -352,7 +410,7 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-block bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded-md text-xs border border-amber-200 whitespace-nowrap">
-                        {formatCurrency(calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat))}
+                        {formatCurrency(calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id))}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -471,7 +529,7 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
             <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
               <button 
                 onClick={() => setSplitSession(null)}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors"
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors cursor-pointer"
               >
                 Đóng
               </button>
@@ -479,6 +537,12 @@ export default function RoomEnvelopeManager({ sessions = [], records, selectedCl
           </div>
         </div>
       )}
+
+      <PricingConfigModal
+        isOpen={isPricingModalOpen && effectiveIsAdmin}
+        onClose={() => setIsPricingModalOpen(false)}
+        isAdmin={effectiveIsAdmin}
+      />
     </div>
   );
 }

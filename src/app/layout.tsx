@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'S-Exam Portal - Cổng Thông Tin & Quản Lý Lịch Thi',
-  description: 'Hệ thống tra cứu lịch thi, quản lý thành viên lớp, phong bì thi và bù trừ thanh toán',
+  title: 'PTIT EduSync - Cổng Tiện Ích Sinh Viên & Đồng Bộ Học Vụ PTIT',
+  description: 'Hệ thống tiện ích sinh viên, tra cứu lịch thi, đối chiếu đăng ký môn học và công cụ lớp trưởng PTIT',
 };
 
 export default function RootLayout({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { verifyPassword, createAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
+import { verifyPassword, createAuthToken, checkIsAdmin, checkIsMonitor, getUserRoles } from '@/src/lib/auth';
+import { logActivity } from '@/src/lib/activityLog';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,11 +24,35 @@ export async function POST(req: NextRequest) {
     });
 
     if (user) {
+      if (!user.passwordHash || user.passwordHash.trim() === '') {
+        return NextResponse.json(
+          { error: 'Tài khoản chưa được kích hoạt mật khẩu. Vui lòng bấm "Đăng Ký Tài Khoản" để tạo mật khẩu và gửi yêu cầu kích hoạt.' },
+          { status: 401 }
+        );
+      }
+
       const isValid = await verifyPassword(password, user.passwordHash, user.username);
       if (!isValid) {
+        await logActivity({
+          req,
+          userId: user.id,
+          username: user.username,
+          userRole: user.role,
+          action: 'LOGIN_FAILED',
+          targetType: 'AUTH',
+          targetId: user.username,
+          description: `Đăng nhập thất bại cho tài khoản ${user.username}: Sai mật khẩu`,
+        });
         return NextResponse.json(
           { error: 'Tài khoản hoặc mật khẩu không chính xác' },
           { status: 401 }
+        );
+      }
+
+      if (!user.isActive) {
+        return NextResponse.json(
+          { error: 'Tài khoản của bạn đang bị tạm khoá. Vui lòng liên hệ Quản trị viên.' },
+          { status: 403 }
         );
       }
 
@@ -39,17 +64,30 @@ export async function POST(req: NextRequest) {
 
       const isAdmin = checkIsAdmin(user.role);
       const isMonitor = checkIsMonitor(user.role);
+      const roles = getUserRoles(user.role);
 
       const authPayload = {
         id: user.id,
         username: user.username,
         role: user.role,
+        roles,
         isAdmin,
         isMonitor,
         fullName: user.student?.hoTen || user.student?.ten || user.username,
         phoneNumber: user.student?.soDienThoai || null,
         lop: user.student?.maLop || null,
       };
+
+      await logActivity({
+        req,
+        userId: user.id,
+        username: user.username,
+        userRole: user.role,
+        action: 'LOGIN',
+        targetType: 'AUTH',
+        targetId: user.username,
+        description: `Người dùng ${user.username} (${authPayload.fullName}) đăng nhập thành công`,
+      });
 
       const token = await createAuthToken(authPayload);
       const response = NextResponse.json({
@@ -69,52 +107,26 @@ export async function POST(req: NextRequest) {
       return response;
     }
 
-    // 2. Fallback: If user account not created yet, check if student exists
+    // 2. Check if student exists in Student database
     const student = await prisma.student.findUnique({
       where: { maSV: normalizedUsername },
     });
 
     if (student) {
-      if (password.trim().toUpperCase() === normalizedUsername) {
-        user = await prisma.user.create({
-          data: {
-            username: normalizedUsername,
-            passwordHash: '',
-            role: 'sinh_vien',
-            lastLogin: new Date(),
-          },
-          include: { student: true },
-        });
-
-        const authPayload = {
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          isAdmin: false,
-          isMonitor: false,
-          fullName: student.hoTen || student.ten || user.username,
-          phoneNumber: student.soDienThoai || null,
-          lop: student.maLop || null,
-        };
-
-        const token = await createAuthToken(authPayload);
-        const response = NextResponse.json({
-          success: true,
-          user: authPayload,
-          token,
-        });
-
-        response.cookies.set('auth_token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60,
-          path: '/',
-        });
-
-        return response;
-      }
+      return NextResponse.json(
+        { error: 'Tài khoản sinh viên chưa được đăng ký mật khẩu. Vui lòng bấm "Đăng Ký Tài Khoản" để khởi tạo.' },
+        { status: 401 }
+      );
     }
+
+    await logActivity({
+      req,
+      username: normalizedUsername,
+      action: 'LOGIN_FAILED',
+      targetType: 'AUTH',
+      targetId: normalizedUsername,
+      description: `Đăng nhập thất bại: Không tìm thấy tài khoản hoặc sinh viên ${normalizedUsername}`,
+    });
 
     return NextResponse.json(
       { error: 'Tài khoản hoặc mật khẩu không chính xác' },

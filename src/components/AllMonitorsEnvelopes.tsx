@@ -1,19 +1,47 @@
-import React, { useMemo, useState } from 'react';
-import { ExamRecord, LoginUser, ExamSession } from '../types';
-import { Mail, Search, MapPin, DollarSign } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from '../types';
+import { Mail, Search, MapPin, DollarSign, Settings } from 'lucide-react';
 import { calculateRoomPrice, formatCurrency } from '../config/pricingConfig';
+import PricingConfigModal from './PricingConfigModal';
 
 interface AllMonitorsEnvelopesProps {
-  sessions: ExamSession[];
-  records: ExamRecord[];
+  sessions?: ExamSession[];
+  records?: ExamRecord[];
   loginUsers?: LoginUser[];
+  isAdmin?: boolean;
 }
 
-export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [] }: AllMonitorsEnvelopesProps) {
+export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [], isAdmin }: AllMonitorsEnvelopesProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  const [pricingVersion, setPricingVersion] = useState(0);
+
+  const effectiveIsAdmin = useMemo(() => {
+    if (typeof isAdmin === 'boolean') return isAdmin;
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('currentUser') : null;
+      if (!saved) return false;
+      const u = JSON.parse(saved);
+      return Boolean(u?.isAdmin || u?.role === 'admin' || u?.activeRole === 'admin');
+    } catch {
+      return false;
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    const handler = () => setPricingVersion((v) => v + 1);
+    window.addEventListener('pricing_config_changed', handler);
+    return () => window.removeEventListener('pricing_config_changed', handler);
+  }, []);
 
   const monitorClasses = useMemo<Set<string>>(() => {
-    return new Set(loginUsers.filter(u => u.role === 'lop_truong' && u.lop).map(u => u.lop as string));
+    const set = new Set<string>();
+    loginUsers.forEach((u) => {
+      if (isUserMonitor(u) && u.lop && u.lop.trim()) {
+        set.add(u.lop.trim());
+      }
+    });
+    return set;
   }, [loginUsers]);
 
   // Compute responsible classes for each session
@@ -39,8 +67,11 @@ export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [] }:
   }, [enhancedSessions, searchTerm]);
 
   const totalExpectedMoney = useMemo(() => {
-    return displayedSessions.reduce((sum, s) => sum + calculateRoomPrice(s.subject, s.subjectCode, s.room, s.examFormat), 0);
-  }, [displayedSessions]);
+    return displayedSessions.reduce(
+      (sum, s) => sum + calculateRoomPrice(s.subject, s.subjectCode, s.room, s.examFormat, s.id),
+      0
+    );
+  }, [displayedSessions, pricingVersion]);
 
   return (
     <div className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-y-auto min-h-0 bg-slate-50">
@@ -55,15 +86,29 @@ export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [] }:
           </p>
         </div>
         
-        <div className="relative shrink-0">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Tìm môn, phòng, lớp, tên LT..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-72 pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        <div className="flex items-center gap-2 flex-wrap">
+          {effectiveIsAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsPricingModalOpen(true)}
+              className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              title="Tùy chỉnh định mức giá tiền phòng"
+            >
+              <Settings className="w-4 h-4 text-indigo-600" />
+              <span>Cấu hình tiền phòng</span>
+            </button>
+          )}
+
+          <div className="relative shrink-0">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Tìm môn, phòng, lớp, tên LT..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full sm:w-64 pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            />
+          </div>
         </div>
       </div>
 
@@ -149,14 +194,20 @@ export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [] }:
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-block bg-amber-50 text-amber-700 font-bold px-2.5 py-1 rounded-md text-xs border border-amber-200 whitespace-nowrap">
-                        {formatCurrency(calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat))}
+                        {formatCurrency(calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id))}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-2">
                         {session.responsibleClasses.map(cls => {
                           const isMonitorClass = monitorClasses.has(cls);
-                          const user = loginUsers.find(u => u.lop === cls);
+                          const cleanCls = cls.trim().toUpperCase();
+                          const monitorUser = loginUsers.find(
+                            (u) =>
+                              isUserMonitor(u) &&
+                              u.lop &&
+                              u.lop.trim().toUpperCase() === cleanCls
+                          );
                           
                           if (isMonitorClass) {
                             return (
@@ -165,9 +216,9 @@ export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [] }:
                                   <Mail className="w-3.5 h-3.5" />
                                   <span>{cls}</span>
                                 </div>
-                                {user && (
+                                {monitorUser && (
                                   <span className="text-xs text-emerald-600 font-medium opacity-90 pl-5">
-                                    {user.fullName}
+                                    LT: {monitorUser.fullName || monitorUser.username}
                                   </span>
                                 )}
                               </div>
@@ -190,6 +241,12 @@ export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [] }:
           </table>
         </div>
       </div>
+
+      <PricingConfigModal
+        isOpen={isPricingModalOpen && effectiveIsAdmin}
+        onClose={() => setIsPricingModalOpen(false)}
+        isAdmin={effectiveIsAdmin}
+      />
     </div>
   );
 }

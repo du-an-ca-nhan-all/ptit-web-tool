@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Papa from 'papaparse';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
+import { logActivity } from '@/src/lib/activityLog';
+import { dispatchExamScheduleUpdated, dispatchExamBatchImportedToAdmin } from '@/src/lib/telegram-dispatcher';
 
 // POST /api/exam-batches/import
 // Upload CSV exam schedule specifically for an Exam Batch
@@ -112,6 +114,14 @@ export async function POST(req: NextRequest) {
         soPhutThi: row.SoPhutThi ? String(row.SoPhutThi).trim() : null,
         maDotThi: cleanBatchCode,
         tenDotThi: batch.name,
+        isPostponed:
+          row.isPostponed === true ||
+          row.isPostponed === 'true' ||
+          row.isPostponed === '1' ||
+          row.HoanThi === 'true' ||
+          row.KhongThi === 'true' ||
+          row['Hoãn thi'] === 'true' ||
+          false,
       });
     });
 
@@ -156,8 +166,38 @@ export async function POST(req: NextRequest) {
       const chunk = examRecordsList.slice(i, i + chunkSize);
       await prisma.examRecord.createMany({
         data: chunk,
+        skipDuplicates: true,
       });
     }
+
+    await logActivity({
+      req,
+      userId: authUser.id,
+      username: authUser.username,
+      userRole: authUser.role,
+      action: 'IMPORT_BATCH_FILE',
+      targetType: 'EXAM_BATCH',
+      targetId: cleanBatchCode,
+      description: `Nhập ${examRecordsList.length} bản ghi lịch thi từ file "${file.name}" vào đợt thi "${batch.name}" (Chế độ: ${mode})`,
+      metadata: { fileName: file.name, batchCode: cleanBatchCode, mode, totalRecords: examRecordsList.length, totalStudents: studentArray.length },
+    });
+
+    // Asynchronously dispatch Telegram notifications to registered students
+    dispatchExamScheduleUpdated({
+      usernames: studentArray.map((s) => s.maSV),
+      batchCode: cleanBatchCode,
+      batchName: batch.name,
+      totalRecords: examRecordsList.length,
+    }).catch((err) => console.error('Dispatch exam schedule updated error:', err));
+
+    // Asynchronously dispatch Telegram notification to Admin
+    dispatchExamBatchImportedToAdmin({
+      batchCode: cleanBatchCode,
+      batchName: batch.name,
+      adminUsername: authUser.username,
+      totalRecords: examRecordsList.length,
+      totalStudents: studentArray.length,
+    }).catch((err) => console.error('Dispatch exam batch import to admin error:', err));
 
     return NextResponse.json({
       success: true,

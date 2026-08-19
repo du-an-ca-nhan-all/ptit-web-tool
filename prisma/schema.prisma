@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DATABASE_DIRECT_URL")
 }
 
 // 1. Bảng User: Chuyên lưu thông tin đăng nhập và xác thực (Username là Mã sinh viên)
@@ -17,10 +18,22 @@ model User {
   lastLogin    DateTime?
   
   // Quan hệ 1-1 với thông tin sinh viên tương ứng
-  student      Student?  @relation(fields: [username], references: [maSV], onDelete: Cascade)
+  student          Student?          @relation(fields: [username], references: [maSV], onDelete: Cascade)
   
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  // Quan hệ 1-N với ExternalAccount
+  externalAccounts ExternalAccount[]
+  
+  // Quan hệ 1-1 với TelegramConfig
+  telegramConfig   TelegramConfig?
+  
+  // Quan hệ 1-1 với StudentGradeRecord
+  gradeRecord      StudentGradeRecord?
+  
+  // Quan hệ 1-N với ActivityLog
+  activityLogs     ActivityLog[]
+  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([username])
   @@index([role])
@@ -99,25 +112,32 @@ model ExamRecord {
   soPhutThi  String?    // Thời lượng thi (phút)
   maDotThi   String?    // Mã đợt thi
   tenDotThi  String?    // Tên đợt thi
+  isPostponed Boolean   @default(false) // Đánh dấu không thi môn này hoặc hoãn thi (không tính chia tiền)
   createdAt  DateTime   @default(now())
 
+  @@unique([maSV, batchCode, nhomThi, mapThi, maMH, tenMH, maHTThi, nhomHoc, toThi], map: "ExamRecord_composite_unique")
   @@index([maSV])
   @@index([batchCode])
   @@index([maMH])
   @@index([ngayThi])
   @@index([mapThi])
+  @@index([isPostponed])
 }
 
-// 5. Bảng CourseRegistration: Lưu dữ liệu so sánh đăng ký môn học
+// 5. Bảng CourseRegistration: Lưu dữ liệu môn học đã đăng ký & so sánh ĐKMH
 model CourseRegistration {
-  id        Int      @id @default(autoincrement())
-  classCode String
-  type      String   // 'main' (lớp trưởng) hoặc 'sub' (sinh viên)
-  username  String?
-  data      String   // Dữ liệu JSON chi tiết môn học đã đăng ký
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int       @id @default(autoincrement())
+  classCode    String    // Mã lớp (Ví dụ: D25TXCN11-K)
+  username     String    // Mã sinh viên (MaSV)
+  data         String    // Dữ liệu JSON chi tiết kết quả ĐKMH từ cổng trường (ds_kqdkmh)
+  totalCourses Int?      @default(0) // Tổng số môn đã đăng ký
+  totalCredits Int?      @default(0) // Tổng số tín chỉ
+  tuitionFee   Int?      @default(0) // Tổng học phí tạm tính (VNĐ)
+  lastPulledAt DateTime? @default(now()) // Thời điểm kéo dữ liệu từ QLDTTX
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
+  @@unique([classCode, username])
   @@index([classCode])
   @@index([username])
 }
@@ -129,3 +149,218 @@ model SystemMeta {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+// 7. Bảng ExternalAccount: Lưu trữ tài khoản và mật khẩu cấu hình cho các hệ thống khác (ví dụ https://qldttx.pttc1.edu.vn/)
+model ExternalAccount {
+  id          Int       @id @default(autoincrement())
+  username    String    // Mã sinh viên (User.username)
+  user        User      @relation(fields: [username], references: [username], onDelete: Cascade)
+  
+  systemKey   String    // Mã định danh hệ thống (Ví dụ: "QLDTTX_PTTC1")
+  systemName  String    // Tên hệ thống (Ví dụ: "Cổng Quản Lý Đào Tạo Từ Xa PTTC1")
+  systemUrl   String    // URL hệ thống (Ví dụ: "https://qldttx.pttc1.edu.vn/")
+  
+  extUsername String    // Tên đăng nhập hệ thống ngoài (Mã SV)
+  extPassword String    // Mật khẩu hệ thống ngoài
+  token       String?   // Access token được cấp từ cổng QLDTTX (Bearer access_token)
+  
+  status      String    @default("CONNECTED") // 'CONNECTED' | 'DISCONNECTED' | 'ERROR'
+  lastSyncAt  DateTime?
+  syncMessage String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([username, systemKey])
+  @@index([username])
+  @@index([systemKey])
+}
+
+// 8. Bảng ActivityLog: Lưu vết và ghi nhật ký toàn bộ hành động trên hệ thống
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     // User ID thực hiện hành động
+  username    String?  // Username/Mã SV thực hiện
+  userRole    String?  // Vai trò của user tại thời điểm thao tác
+  action      String   // Mã hành động: "LOGIN", "LOGOUT", "CHANGE_PASSWORD", "IMPERSONATE", "REVERT_IMPERSONATE", "TRANSFER_STUDENT", "UPDATE_STUDENT", "CREATE_BATCH", "UPDATE_BATCH", "DELETE_BATCH", "IMPORT_BATCH", "IMPORT_EXAM_SCHEDULE", "SAVE_EXTERNAL_ACCOUNT", "TEST_EXTERNAL_ACCOUNT", "PULL_EXTERNAL_ACCOUNT", "DELETE_EXTERNAL_ACCOUNT", "SYNC_COURSE_REGISTRATION", "SYNC_CLASS_REGISTRATION", "DELETE_COURSE_REGISTRATION"
+  targetType  String?  // Loại đối tượng: "AUTH", "STUDENT", "USER", "EXAM_BATCH", "EXAM_RECORD", "COURSE_REGISTRATION", "EXTERNAL_ACCOUNT"
+  targetId    String?  // Định danh đối tượng (Mã SV, Mã đợt thi, Tên hệ thống...)
+  description String   // Diễn giải chi tiết hành động
+  metadata    String?  // Thông tin bổ sung dạng JSON (param, old/new values, IP, agent...)
+  ipAddress   String?  // Địa chỉ IP
+  userAgent   String?  // Trình duyệt / thiết bị
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [username], references: [username], onDelete: SetNull)
+
+  @@index([username])
+  @@index([action])
+  @@index([targetType])
+  @@index([createdAt])
+}
+
+// 9. Bảng TelegramConfig: Lưu cấu hình thông báo Telegram cho từng tài khoản
+model TelegramConfig {
+  id                      Int       @id @default(autoincrement())
+  username                String    @unique // Mã sinh viên / Username
+  user                    User      @relation(fields: [username], references: [username], onDelete: Cascade)
+  
+  botToken                String?   // Token Bot riêng tùy chọn (để trống nếu dùng Bot Hệ Thống)
+  chatId                  String    // ID cuộc trò chuyện / Nhóm / Kênh (ví dụ: 123456789 hoặc -100123456789)
+  threadId                String?   // ID topic/thread trong nhóm (message_thread_id) nếu có
+  
+  isEnabled               Boolean   @default(true) // Bật/Tắt gửi thông báo
+  notifyExamSchedule      Boolean   @default(true) // Nhận thông báo khi có lịch thi / đổi lịch thi
+  notifyClassActivity     Boolean   @default(true) // Nhận thông báo biến động lớp / quyết toán
+  notifyQldtAnnouncements Boolean   @default(true) // Nhận thông báo mới từ cổng QLDTTX (/#/xemthongbao)
+  qldtCheckInterval       Int       @default(2)    // Tần suất kiểm tra (1, 2, hoặc 5 tiếng)
+  lastQldtCheckedAt       DateTime? // Thời điểm kiểm tra thông báo QLDTTX gần nhất
+  notifyClassSchedule     Boolean   @default(true) // Nhận thông báo lịch học (Sáng 7h-10h & trước giờ học)
+  classReminderBefore     Int       @default(30)   // Nhắc trước giờ học (30 phút, 60 phút, hoặc 0 = cả hai)
+  
+  lastTestedAt            DateTime? // Lần cuối gửi tin nhắn test
+  lastTestStatus          String?   // 'SUCCESS' | 'FAILED'
+  lastTestError           String?   // Thông báo lỗi nếu gửi test thất bại
+  botUsername             String?   // Username của bot sau khi test thành công (ví dụ: PTIT_Notify_bot)
+  botFirstName            String?   // Tên hiển thị của bot (ví dụ: PTIT Notification Bot)
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([username])
+  @@index([isEnabled])
+}
+
+// 10. Bảng GlobalConfig: Cấu hình chung toàn hệ thống (Lưu trữ dạng key-value JSON mở rộng)
+model GlobalConfig {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique // Khóa định danh cấu hình (Ví dụ: "telegram_bot", "mail_smtp", "app_general")
+  value       String   // Giá trị cấu hình định dạng JSON string
+  description String?  // Ghi chú / mô tả mục đích cấu hình
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
+}
+
+// 11. Bảng ExamReminderLog: Nhật ký nhắc lịch thi tự động để tránh gửi trùng
+model ExamReminderLog {
+  id           Int      @id @default(autoincrement())
+  username     String   // Mã SV
+  examRecordId Int      // ID bản ghi ExamRecord
+  reminderType String   // '1_DAY_BEFORE' (Nhắc trước 1 ngày) | 'SAME_DAY_MORNING' (Nhắc 7h sáng hôm thi)
+  targetDate   String   // Ngày thi (DD/MM/YYYY)
+  sentAt       DateTime @default(now())
+
+  @@unique([username, examRecordId, reminderType])
+  @@index([username])
+  @@index([targetDate])
+  @@index([reminderType])
+}
+
+// 12. Bảng QldtAnnouncementLog: Nhật ký lưu các thông báo từ QLDTTX đã gửi để tránh gửi lặp
+model QldtAnnouncementLog {
+  id             Int      @id @default(autoincrement())
+  username       String   // Mã SV
+  announcementId String   // ID / Mã thông báo QLDTTX
+  title          String?  // Tiêu đề thông báo
+  publishDate    String?  // Ngày đăng thông báo
+  sentAt         DateTime @default(now())
+
+  @@unique([username, announcementId])
+  @@index([username])
+  @@index([announcementId])
+}
+
+// 13. Bảng ClassScheduleReminderLog: Nhật ký nhắc lịch học tự động để tránh gửi trùng
+model ClassScheduleReminderLog {
+  id           Int      @id @default(autoincrement())
+  username     String   // Mã SV
+  courseCode   String   // Mã môn học hoặc ID tổ học
+  reminderType String   // 'MORNING_DAILY_SUMMARY' | 'BEFORE_CLASS_30M' | 'BEFORE_CLASS_60M'
+  targetDate   String   // Ngày học (DD/MM/YYYY)
+  sessionInfo  String?  // Ca học (tiết học, phòng học)
+  sentAt       DateTime @default(now())
+
+  @@unique([username, courseCode, reminderType, targetDate])
+  @@index([username])
+  @@index([targetDate])
+  @@index([reminderType])
+}
+
+// 14. Bảng RegistrationRequest: Quản lý các yêu cầu đăng ký tài khoản chờ Admin xét duyệt
+model RegistrationRequest {
+  id           Int       @id @default(autoincrement())
+  username     String    // Mã sinh viên hoặc tên tài khoản (viết hoa)
+  fullName     String?   // Họ và tên
+  email        String?   // Email liên hệ
+  phoneNumber  String?   // Số điện thoại
+  lop          String?   // Mã lớp (Ví dụ: D25TXCN11-K)
+  passwordHash String    // Mật khẩu đã mã hoá bcrypt
+  status       String    @default("PENDING") // 'PENDING' | 'APPROVED' | 'REJECTED'
+  note         String?   // Ghi chú của người đăng ký hoặc lý do từ chối
+  reviewedBy   String?   // Username admin đã xử lý
+  reviewedAt   DateTime? // Thời điểm xử lý
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([username])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// 15. Bảng ExamRoom: Quản lý thông tin phòng thi và định mức tiền phòng tùy chỉnh
+model ExamRoom {
+  id          Int      @id @default(autoincrement())
+  roomKey     String   @unique // Khóa định danh duy nhất (ví dụ: "101-A2|15/06/2026|08:00|Toán Rời Rạc")
+  mapThi      String   // Mã phòng thi (MAPTHI, ví dụ "101-A2", "ZOOM-01")
+  maMH        String?  // Mã môn học
+  tenMH       String?  // Tên môn học
+  ngayThi     String?  // Ngày thi (DD/MM/YYYY)
+  gioThi      String?  // Giờ thi (HH:mm)
+  maHTThi     String?  // Hình thức thi (TN, TL, TH, VD...)
+  batchCode   String?  // Mã đợt thi nếu có
+  customPrice Int      // Giá tiền phòng tùy chỉnh (VNĐ)
+  note        String?  // Ghi chú phòng thi
+  updatedBy   String?  // Username người cập nhật (Admin / Lớp trưởng)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([roomKey])
+  @@index([mapThi])
+  @@index([batchCode])
+  @@index([ngayThi])
+}
+
+// 16. Bảng StudentGradeRecord: Lưu trữ bảng điểm, điểm thành phần & kết quả học tập theo từng sinh viên
+model StudentGradeRecord {
+  id              Int       @id @default(autoincrement())
+  username        String    @unique // Mã sinh viên (User.username)
+  user            User?     @relation(fields: [username], references: [username], onDelete: Cascade)
+  
+  // Dữ liệu JSON thô đầy đủ từ QLDTTX (semesters, components, etc.)
+  rawData         String    // JSON string chứa toàn bộ danh sách điểm và thành phần
+  
+  // Các chỉ số tổng hợp nhanh để query / hiển thị / thống kê
+  gpa10           Float?    // Điểm TB tích lũy hệ 10
+  gpa4            Float?    // Điểm TB tích lũy hệ 4
+  creditsAcc      Int?      @default(0) // Số tín chỉ tích lũy
+  creditsPassed   Int?      @default(0) // Số tín chỉ đạt
+  creditsReg      Int?      @default(0) // Tổng số tín chỉ đã đăng ký
+  classification  String?   // Xếp loại học lực (Xuất sắc, Giỏi, Khá, Trung bình...)
+  totalSubjects   Int?      @default(0) // Tổng số môn học
+  totalPassed     Int?      @default(0) // Số môn đạt
+  totalFailed     Int?      @default(0) // Số môn chưa đạt
+  totalInProgress Int?      @default(0) // Số môn đang học
+  
+  lastPulledAt    DateTime? @default(now()) // Thời điểm kéo dữ liệu từ QLDTTX
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([username])
+  @@index([gpa4])
+  @@index([classification])
+}
+
+

@@ -12,11 +12,27 @@ export interface AuthUser {
   id: number;
   username: string;
   role: string;
+  roles?: string[];
+  activeRole?: string;
   isAdmin: boolean;
   isMonitor: boolean;
   fullName?: string | null;
   phoneNumber?: string | null;
   lop?: string | null;
+  impersonatedBy?: string | null;
+}
+
+export function getUserRoles(role?: string | null): string[] {
+  const list = new Set<string>();
+  if (role) {
+    role.split(',').forEach((r) => {
+      const clean = r.trim().toLowerCase();
+      if (clean) list.add(clean);
+    });
+  }
+  // Every user is also a student
+  list.add('sinh_vien');
+  return Array.from(list);
 }
 
 export function checkIsAdmin(role?: string | null): boolean {
@@ -37,17 +53,10 @@ export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
 }
 
-export async function verifyPassword(password: string, storedHash: string, username: string): Promise<boolean> {
+export async function verifyPassword(password: string, storedHash: string, username?: string): Promise<boolean> {
   const cleanPass = String(password).trim();
-  const cleanUser = String(username).trim();
-
-  // Allow username as password for standard student logins
-  if (cleanPass.toUpperCase() === cleanUser.toUpperCase()) {
-    return true;
-  }
-
-  if (!storedHash) {
-    return cleanPass.toUpperCase() === cleanUser.toUpperCase();
+  if (!storedHash || storedHash.trim() === '') {
+    return false;
   }
 
   // SHA512 hash check (length 128 characters)
@@ -69,11 +78,13 @@ export async function createAuthToken(user: AuthUser): Promise<string> {
     id: user.id,
     username: user.username,
     role: user.role,
+    roles: user.roles || getUserRoles(user.role),
     isAdmin: user.isAdmin,
     isMonitor: user.isMonitor,
     fullName: user.fullName,
     phoneNumber: user.phoneNumber,
     lop: user.lop,
+    impersonatedBy: user.impersonatedBy || null,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -89,11 +100,13 @@ export async function verifyAuthToken(token: string): Promise<AuthUser | null> {
       id: p.id,
       username: p.username,
       role: p.role,
+      roles: p.roles || getUserRoles(p.role),
       isAdmin: p.isAdmin !== undefined ? p.isAdmin : checkIsAdmin(p.role),
       isMonitor: p.isMonitor !== undefined ? p.isMonitor : checkIsMonitor(p.role),
       fullName: p.fullName,
       phoneNumber: p.phoneNumber,
       lop: p.lop,
+      impersonatedBy: p.impersonatedBy || null,
     };
   } catch (err) {
     return null;
@@ -119,18 +132,25 @@ export async function getCurrentUserFromCookie(): Promise<AuthUser | null> {
 
     const isAdmin = checkIsAdmin(user.role);
     const isMonitor = checkIsMonitor(user.role);
+    const roles = getUserRoles(user.role);
 
     return {
       id: user.id,
       username: user.username,
       role: user.role,
+      roles,
       isAdmin,
       isMonitor,
       fullName: user.student?.hoTen || user.student?.ten || user.username,
       phoneNumber: user.student?.soDienThoai || null,
       lop: user.student?.maLop || null,
+      impersonatedBy: payload.impersonatedBy || null,
     };
   } catch (err) {
     return null;
   }
+}
+
+export async function getAuthUser(req?: any): Promise<AuthUser | null> {
+  return getCurrentUserFromCookie();
 }

@@ -1,4 +1,5 @@
 export interface ExamRecord {
+  id?: number;
   MaSV: string;
   HoLotSV: string;
   TenSV: string;
@@ -11,6 +12,7 @@ export interface ExamRecord {
   MaHTThi: string;
   NhomHoc: string;
   'To thi': string;
+  ToThi?: string;
   MaLop: string;
   NgayThi: string;
   GioThi: string;
@@ -18,6 +20,7 @@ export interface ExamRecord {
   MaDotThi: string;
   TenDotThi: string;
   batchCode?: string;
+  isPostponed?: boolean; // true nếu không thi môn này hoặc hoãn thi (không chia tiền đầu người)
   [key: string]: any;
 }
 
@@ -42,13 +45,42 @@ export interface LoginUser {
   id?: number;
   username: string; // Mã sinh viên
   role?: string;    // 'admin' | 'lop_truong' | 'admin,lop_truong' | 'sinh_vien'
+  roles?: string[];  // Danh sách các vai trò user sở hữu: ['admin', 'lop_truong', 'sinh_vien']
+  activeRole?: string; // Vai trò hiện đang kích hoạt sử dụng
   isAdmin?: boolean;
   isMonitor?: boolean;
   password_hash?: string;
   fullName?: string; // Lấy từ Student.hoTen
   phoneNumber?: string; // Lấy từ Student.soDienThoai
   lop?: string;      // Lấy từ Student.maLop
+  impersonatedBy?: string | null; // Admin gốc đang giả lập tài khoản này
   student?: any;
+}
+
+export function isUserMonitor(user?: LoginUser | null): boolean {
+  if (!user) return false;
+  if (user.isMonitor) return true;
+  if (typeof user.role === 'string') {
+    const roles = user.role.split(',').map((r) => r.trim().toLowerCase());
+    if (roles.includes('lop_truong')) return true;
+  }
+  if (Array.isArray(user.roles)) {
+    if (user.roles.map((r) => String(r).trim().toLowerCase()).includes('lop_truong')) return true;
+  }
+  return false;
+}
+
+export function isUserAdmin(user?: LoginUser | null): boolean {
+  if (!user) return false;
+  if (user.isAdmin) return true;
+  if (typeof user.role === 'string') {
+    const roles = user.role.split(',').map((r) => r.trim().toLowerCase());
+    if (roles.includes('admin')) return true;
+  }
+  if (Array.isArray(user.roles)) {
+    if (user.roles.map((r) => String(r).trim().toLowerCase()).includes('admin')) return true;
+  }
+  return false;
 }
 
 export interface StudentProfile {
@@ -81,4 +113,65 @@ export interface ExamSession {
   classCounts: SessionClassCount[];
   totalStudents: number;
   records: ExamRecord[];
+}
+
+export interface ExternalAccountItem {
+  id?: number;
+  username: string;
+  systemKey: string;
+  systemName: string;
+  systemUrl: string;
+  extUsername: string;
+  extPassword?: string;
+  token?: string | null;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
+  lastSyncAt?: string | null;
+  syncMessage?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export const AVAILABLE_EXTERNAL_SYSTEMS = [
+  {
+    key: 'QLDTTX_PTTC1',
+    name: 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
+    url: 'https://qldttx.pttc1.edu.vn/',
+    description: 'Hệ thống quản lý đào tạo trực tuyến / từ xa của Học viện Bưu chính Viễn thông Cơ sở 1.',
+    placeholderUser: 'Nhập mã sinh viên (Ví dụ: K25DTCN402)',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    iconKey: 'GraduationCap',
+  },
+];
+
+export interface TelegramConfigItem {
+  id?: number;
+  username: string;
+  botToken?: string | null;
+  chatId: string;
+  threadId?: string | null;
+  isEnabled: boolean;
+  notifyExamSchedule: boolean;
+  notifyClassActivity: boolean;
+  notifyQldtAnnouncements?: boolean;
+  qldtCheckInterval?: number;
+  lastQldtCheckedAt?: string | null;
+  notifyClassSchedule?: boolean;
+  classReminderBefore?: number;
+  lastTestedAt?: string | null;
+  lastTestStatus?: 'SUCCESS' | 'FAILED' | null;
+  lastTestError?: string | null;
+  botUsername?: string | null;
+  botFirstName?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SystemTelegramBotInfo {
+  isConfigured: boolean;
+  botUsername?: string | null;
+  botFirstName?: string | null;
+  botUrl?: string | null;
+  addToGroupUrl?: string | null;
+  addToChannelUrl?: string | null;
+  updatedAt?: string | null;
 }
