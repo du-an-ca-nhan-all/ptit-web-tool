@@ -112,24 +112,24 @@ export default function AllMonitorsEnvelopes({ sessions = [], loginUsers = [], i
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 shrink-0">
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-center gap-3.5 shadow-2xs">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0">
-            <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 shrink-0">
+        <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 md:p-5 flex flex-col sm:flex-row items-center gap-1 sm:gap-3.5 shadow-2xs text-center sm:text-left">
+          <div className="w-6 h-6 sm:w-11 sm:h-11 bg-blue-500/10 rounded-md sm:rounded-xl flex items-center justify-center shrink-0">
+            <MapPin className="w-3 h-3 sm:w-5 sm:h-5 text-blue-600" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider truncate">Tổng số phòng thi</p>
-            <p className="text-2xl sm:text-3xl font-extrabold text-slate-800 mt-0.5">{displayedSessions.length}</p>
+            <p className="text-[9px] sm:text-xs text-slate-500 font-bold uppercase tracking-tight sm:tracking-wider truncate">Tổng phòng</p>
+            <p className="text-sm sm:text-2xl md:text-3xl font-extrabold text-slate-800 mt-0.5 leading-none">{displayedSessions.length}</p>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-amber-50 to-amber-100/40 border border-amber-200/70 rounded-2xl p-4 sm:p-5 flex items-center gap-3.5 shadow-2xs">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-500/10 rounded-xl flex items-center justify-center shrink-0">
-            <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600" />
+        <div className="bg-gradient-to-br from-amber-50 to-amber-100/40 border border-amber-200/70 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 md:p-5 flex flex-col sm:flex-row items-center gap-1 sm:gap-3.5 shadow-2xs text-center sm:text-left">
+          <div className="w-6 h-6 sm:w-11 sm:h-11 bg-amber-500/10 rounded-md sm:rounded-xl flex items-center justify-center shrink-0">
+            <DollarSign className="w-3 h-3 sm:w-5 sm:h-5 text-amber-600" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] sm:text-xs text-amber-700 font-bold uppercase tracking-wider truncate">Tổng quỹ dự kiến (tất cả LT)</p>
-            <p className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-amber-950 mt-0.5 truncate">{formatCurrency(totalExpectedMoney)}</p>
+            <p className="text-[9px] sm:text-xs text-amber-700 font-bold uppercase tracking-tight sm:tracking-wider truncate">Tổng quỹ (Tất cả LT)</p>
+            <p className="text-[11px] sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-amber-950 mt-0.5 leading-none truncate">{formatCurrency(totalExpectedMoney)}</p>
           </div>
         </div>
       </div>
