@@ -418,31 +418,31 @@ export default function StudentPersonalExamSchedule({
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
       {/* Top Source Mode Switcher Bar */}
-      <div className="bg-white rounded-3xl p-3 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 print:hidden">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-4 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 print:hidden">
         <div className="flex items-center gap-2.5">
-          <div className="p-2.5 bg-gradient-to-br from-indigo-600 to-sky-600 text-white rounded-2xl shadow-sm">
-            <CalendarDays className="w-5 h-5" />
+          <div className="p-2 sm:p-2.5 bg-gradient-to-br from-indigo-600 to-sky-600 text-white rounded-xl sm:rounded-2xl shadow-sm shrink-0">
+            <CalendarDays className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <h2 className="text-sm font-black text-slate-800">Lịch Thi Cá Nhân</h2>
-            <p className="text-[11px] text-slate-500">Tra cứu lịch thi trực tuyến từ Cổng QLDTTX hoặc File Tổng Hợp</p>
+          <div className="min-w-0">
+            <h2 className="text-xs sm:text-sm font-black text-slate-800">Lịch Thi Cá Nhân</h2>
+            <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Tra cứu lịch thi trực tuyến từ Cổng QLDTTX hoặc File Tổng Hợp</p>
           </div>
         </div>
 
         {/* Segmented Control Buttons */}
-        <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center gap-1.5 border border-slate-200">
+        <div className="bg-slate-100 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl flex items-center gap-1 sm:gap-1.5 border border-slate-200">
           <button
             onClick={() => setViewSourceMode('QLDTTX')}
-            className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 sm:flex-initial px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               viewSourceMode === 'QLDTTX'
                 ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
-            <span>Cổng QLDTTX (Trực Tuyến)</span>
+            <span>Cổng QLDTTX</span>
             {qldtData?.totalExams !== undefined && qldtData.totalExams > 0 && (
               <span
                 className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
@@ -456,14 +456,14 @@ export default function StudentPersonalExamSchedule({
 
           <button
             onClick={() => setViewSourceMode('FILE_TONG')}
-            className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 sm:flex-initial px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               viewSourceMode === 'FILE_TONG'
                 ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
             }`}
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>File Lịch Thi Tổng Hợp</span>
+            <span>File Tổng Hợp</span>
             {totalRecords > 0 && (
               <span
                 className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
@@ -481,41 +481,41 @@ export default function StudentPersonalExamSchedule({
       {/* MODE 1: XEM THEO CỔNG QLDTTX                                               */}
       {/* ========================================================================= */}
       {viewSourceMode === 'QLDTTX' && (
-        <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+        <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
           {/* Header Card for QLDTTX */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
-            <div className="flex items-center gap-3.5">
-              <div className="p-3 bg-gradient-to-br from-indigo-600 to-sky-600 text-white rounded-2xl shadow-md shadow-indigo-500/20">
-                <CalendarCheck className="w-6 h-6" />
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden">
+            <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
+              <div className="p-2.5 sm:p-3 bg-gradient-to-br from-indigo-600 to-sky-600 text-white rounded-xl sm:rounded-2xl shadow-md shadow-indigo-500/20 shrink-0 mt-0.5 sm:mt-0">
+                <CalendarCheck className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-lg font-black text-slate-800">Lịch Thi Cá Nhân (Cổng QLDTTX)</h3>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <h3 className="text-sm sm:text-lg font-black text-slate-800">Lịch Thi Cá Nhân (Cổng QLDTTX)</h3>
                   {qldtData?.isCachedDb ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
-                      Đã Lưu Trong CSDL
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600" />
+                      Đã Lưu CSDL
                     </span>
                   ) : qldtData?.isLiveSync ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Đồng bộ Trực Tuyến QLĐT
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Trực Tuyến
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
-                      Dữ Liệu Đã Lưu
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                      <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-500" />
+                      Đã Lưu
                     </span>
                   )}
 
                   {/* Last pull time */}
                   {qldtData?.lastSyncAt && (
                     <span
-                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200"
-                      title="Thời điểm kéo dữ liệu từ Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX). Tự động cập nhật lại khi vào lại sau 10 phút."
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200"
+                      title="Thời điểm kéo dữ liệu từ Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)."
                     >
-                      <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                      <span>Lần kéo cuối:</span>
+                      <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600 shrink-0" />
+                      <span className="hidden sm:inline">Lần kéo cuối:</span>
                       <strong className="font-mono text-slate-900">{formatSyncDateTime(qldtData.lastSyncAt)}</strong>
                       {getRelativeSyncTime(qldtData.lastSyncAt) && (
                         <span className="text-[10px] text-slate-500 font-normal">({getRelativeSyncTime(qldtData.lastSyncAt)})</span>
@@ -523,16 +523,16 @@ export default function StudentPersonalExamSchedule({
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Cổng đào tạo: <strong className="text-indigo-600 font-mono">https://qldttx.pttc1.edu.vn/</strong> • {qldtData?.semesterName || 'Học kỳ thi'} • Tổng cộng <b>{qldtData?.totalExams || 0} môn thi</b>
+                <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-relaxed">
+                  Cổng: <strong className="text-indigo-600 font-mono">qldttx.pttc1.edu.vn</strong> • {qldtData?.semesterName || 'Học kỳ thi'} • <b>{qldtData?.totalExams || 0} môn thi</b>
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5">
               {/* Semester Selector */}
               {qldtData?.semesters && qldtData.semesters.length > 0 && (
-                <div className="relative min-w-[200px]">
+                <div className="relative flex-1 sm:flex-initial sm:min-w-[180px]">
                   <select
                     value={selectedSemester || qldtData.semesterId}
                     onChange={(e) => {
@@ -540,7 +540,7 @@ export default function StudentPersonalExamSchedule({
                       setSelectedSemester(newSem);
                       fetchQldtExams(false, newSem);
                     }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2 text-xs font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-8"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-8"
                   >
                     {qldtData.semesters.map((s) => (
                       <option key={s.hocKy} value={s.hocKy}>
@@ -552,39 +552,41 @@ export default function StudentPersonalExamSchedule({
                 </div>
               )}
 
-              {/* Active Pull button from QLDTTX */}
-              <button
-                onClick={() => fetchQldtExams(true, selectedSemester)}
-                disabled={isRefreshingQldt || isLoadingQldt}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
-                title="Chủ động kéo lại lịch thi mới nhất từ cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)"
-              >
-                {isRefreshingQldt ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
-                ) : (
-                  <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
-                )}
-                <span>{isRefreshingQldt ? 'Đang kéo lịch thi...' : 'Kéo Lại Từ QLDTTX'}</span>
-              </button>
-
-              {/* Export CSV */}
-              {qldtData?.exams && qldtData.exams.length > 0 && (
+              <div className="flex items-center gap-2">
+                {/* Active Pull button from QLDTTX */}
                 <button
-                  onClick={handleExportQldtCSV}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition flex items-center gap-1.5 cursor-pointer"
-                  title="Xuất danh sách lịch thi ra file CSV"
+                  onClick={() => fetchQldtExams(true, selectedSemester)}
+                  disabled={isRefreshingQldt || isLoadingQldt}
+                  className="flex-1 sm:flex-initial px-3.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
+                  title="Chủ động kéo lại lịch thi mới nhất từ cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)"
                 >
-                  <FileText className="w-3.5 h-3.5 text-slate-600" />
-                  <span>Xuất CSV</span>
+                  {isRefreshingQldt ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                  ) : (
+                    <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
+                  )}
+                  <span>{isRefreshingQldt ? 'Đang kéo...' : 'Kéo Lại QLDTTX'}</span>
                 </button>
-              )}
+
+                {/* Export CSV */}
+                {qldtData?.exams && qldtData.exams.length > 0 && (
+                  <button
+                    onClick={handleExportQldtCSV}
+                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl transition flex items-center justify-center gap-1 cursor-pointer shrink-0"
+                    title="Xuất danh sách lịch thi ra file CSV"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-slate-600" />
+                    <span>CSV</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Sync Toast Feedback */}
           {syncFeedback && (
             <div
-              className={`p-4 rounded-3xl border text-xs font-semibold flex items-center justify-between gap-3 animate-in fade-in duration-200 shadow-xs print:hidden ${
+              className={`p-3 sm:p-4 rounded-2xl sm:rounded-3xl border text-xs font-semibold flex items-center justify-between gap-3 animate-in fade-in duration-200 shadow-xs print:hidden ${
                 syncFeedback.type === 'success'
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                   : 'bg-rose-50 border-rose-200 text-rose-800'
@@ -606,16 +608,16 @@ export default function StudentPersonalExamSchedule({
 
           {/* Unlinked Account Notice Banner */}
           {!qldtData?.hasLinkedAccount && errorType === 'NOT_CONFIGURED' && (
-            <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-300 rounded-3xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs print:hidden">
+            <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-300 rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 shadow-xs print:hidden">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-sm shrink-0">
-                  <Lock className="w-6 h-6" />
+                <div className="p-2.5 sm:p-3 bg-amber-500 text-white rounded-xl sm:rounded-2xl shadow-sm shrink-0">
+                  <Lock className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-amber-900">
+                  <h4 className="text-xs sm:text-sm font-bold text-amber-900">
                     Chưa liên kết tài khoản Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)
                   </h4>
-                  <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                  <p className="text-[11px] sm:text-xs text-amber-800 mt-0.5 leading-relaxed">
                     Liên kết tài khoản QLDTTX để xem lịch thi chính thức từ trường, bao gồm phòng thi, số báo danh, địa điểm thi và hình thức thi.
                   </p>
                 </div>
@@ -623,7 +625,7 @@ export default function StudentPersonalExamSchedule({
               {onNavigateToExternalAccounts && (
                 <button
                   onClick={onNavigateToExternalAccounts}
-                  className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-2xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
+                  className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer shrink-0 w-full sm:w-auto"
                 >
                   <span>Liên Kết QLĐT Ngay</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -634,12 +636,12 @@ export default function StudentPersonalExamSchedule({
 
           {/* Multi-Layout View Toolbar (Table, Grid, Timeline, Print) */}
           {qldtData?.exams && qldtData.exams.length > 0 && (
-            <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 print:hidden">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-4 border border-slate-200 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4 print:hidden">
               {/* Left: View Layout Toggles (Dạng Bảng, Dạng Thẻ, Lộ Trình, In Ấn) */}
-              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200/80 overflow-x-auto">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl sm:rounded-2xl border border-slate-200/80 overflow-x-auto no-scrollbar shrink-0">
                 <button
                   onClick={() => handleChangeLayoutMode('TABLE')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     layoutMode === 'TABLE'
                       ? 'bg-white text-indigo-600 shadow-sm font-black'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -652,7 +654,7 @@ export default function StudentPersonalExamSchedule({
 
                 <button
                   onClick={() => handleChangeLayoutMode('GRID')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     layoutMode === 'GRID'
                       ? 'bg-white text-indigo-600 shadow-sm font-black'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -665,7 +667,7 @@ export default function StudentPersonalExamSchedule({
 
                 <button
                   onClick={() => handleChangeLayoutMode('TIMELINE')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     layoutMode === 'TIMELINE'
                       ? 'bg-white text-indigo-600 shadow-sm font-black'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -678,7 +680,7 @@ export default function StudentPersonalExamSchedule({
 
                 <button
                   onClick={() => handleChangeLayoutMode('PRINT')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     layoutMode === 'PRINT'
                       ? 'bg-white text-indigo-600 shadow-sm font-black'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -691,12 +693,12 @@ export default function StudentPersonalExamSchedule({
               </div>
 
               {/* Right: Filters and Search */}
-              <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 flex-wrap">
                 {/* Status Filter */}
-                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-200">
+                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl sm:rounded-2xl border border-slate-200 overflow-x-auto no-scrollbar">
                   <button
                     onClick={() => setStatusFilter('ALL')}
-                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                       statusFilter === 'ALL'
                         ? 'bg-indigo-600 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
@@ -706,18 +708,18 @@ export default function StudentPersonalExamSchedule({
                   </button>
                   <button
                     onClick={() => setStatusFilter('UPCOMING')}
-                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    className={`px-2.5 py-1 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                       statusFilter === 'UPCOMING'
                         ? 'bg-emerald-600 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Timer className="w-3 h-3" />
-                    <span>Sắp Diễn Ra ({qldtData.upcomingExams.length})</span>
+                    <span>Sắp Thi ({qldtData.upcomingExams.length})</span>
                   </button>
                   <button
                     onClick={() => setStatusFilter('PAST')}
-                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                       statusFilter === 'PAST'
                         ? 'bg-slate-700 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
@@ -727,35 +729,37 @@ export default function StudentPersonalExamSchedule({
                   </button>
                 </div>
 
-                {/* Format Filter */}
-                {distinctFormats.length > 1 && (
-                  <div className="relative">
-                    <select
-                      value={formatFilter}
-                      onChange={(e) => setFormatFilter(e.target.value)}
-                      className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-7"
-                    >
-                      <option value="ALL">Mọi hình thức thi</option>
-                      {distinctFormats.map((f) => (
-                        <option key={f} value={f}>
-                          {f}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
-                )}
+                <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+                  {/* Format Filter */}
+                  {distinctFormats.length > 1 && (
+                    <div className="relative flex-1 sm:flex-initial">
+                      <select
+                        value={formatFilter}
+                        onChange={(e) => setFormatFilter(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-7"
+                      >
+                        <option value="ALL">Mọi hình thức</option>
+                        {distinctFormats.map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  )}
 
-                {/* Search box */}
-                <div className="relative min-w-[200px] flex-1 sm:flex-initial">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Tìm môn, phòng thi..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  {/* Search box */}
+                  <div className="relative flex-1 sm:flex-initial sm:min-w-[170px]">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Tìm môn, phòng..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -801,178 +805,317 @@ export default function StudentPersonalExamSchedule({
             /* ========================================================================= */
             /* 1. DẠNG BẢNG CHI TIẾT (TABLE VIEW)                                        */
             /* ========================================================================= */
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-150">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider select-none">
-                      <th
-                        onClick={() => handleSortTable('stt')}
-                        className="py-3 px-4 text-center cursor-pointer hover:bg-slate-100 transition"
-                      >
-                        <div className="flex items-center justify-center gap-1">
-                          <span>STT</span>
-                          {tableSortKey === 'stt' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSortTable('maMon')}
-                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Mã Môn</span>
-                          {tableSortKey === 'maMon' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSortTable('tenMon')}
-                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition min-w-[200px]"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Tên Môn Học</span>
-                          {tableSortKey === 'tenMon' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSortTable('ngayThi')}
-                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Ngày Thi & Giờ</span>
-                          {tableSortKey === 'ngayThi' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSortTable('hinhThucThi')}
-                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Hình Thức Thi</span>
-                          {tableSortKey === 'hinhThucThi' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSortTable('maPhong')}
-                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Phòng Thi</span>
-                          {tableSortKey === 'maPhong' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
-                        </div>
-                      </th>
-                      <th className="py-3 px-4">Tổ / SBD</th>
-                      <th className="py-3 px-4 min-w-[220px]">Địa Điểm Thi</th>
-                      <th className="py-3 px-4 text-center">Trạng Thái</th>
-                      <th className="py-3 px-4 text-right">Chi Tiết</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs">
-                    {filteredQldtExams.map((exam, index) => {
-                      const isUpcoming = exam.daysUntil >= 0;
-                      const isToday = exam.daysUntil === 0;
+            <div className="flex flex-col gap-3 animate-in fade-in duration-150">
+              {/* MOBILE VIEW: Touch-friendly Mobile Exam Cards */}
+              <div className="block md:hidden space-y-3">
+                {filteredQldtExams.map((exam) => {
+                  const isUpcoming = exam.daysUntil >= 0;
+                  const isToday = exam.daysUntil === 0;
 
-                      return (
-                        <tr
-                          key={exam.id}
-                          onClick={() => setSelectedExamModal(exam)}
-                          className={`hover:bg-indigo-50/40 transition cursor-pointer ${
-                            isToday ? 'bg-rose-50/30' : index % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'
-                          }`}
+                  return (
+                    <div
+                      key={exam.id}
+                      onClick={() => setSelectedExamModal(exam)}
+                      className={`p-4 rounded-2xl bg-white border transition shadow-2xs flex flex-col gap-3 relative overflow-hidden active:scale-98 cursor-pointer ${
+                        isToday
+                          ? 'border-rose-400 ring-2 ring-rose-400/20'
+                          : isUpcoming
+                          ? 'border-indigo-200 hover:border-indigo-300'
+                          : 'border-slate-200'
+                      }`}
+                    >
+                      {/* Top Bar Indicator */}
+                      <div
+                        className={`absolute top-0 left-0 right-0 h-1.5 ${
+                          isToday ? 'bg-rose-500' : isUpcoming ? 'bg-indigo-600' : 'bg-slate-300'
+                        }`}
+                      />
+
+                      {/* Header: Badges & Countdown */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
+                            {exam.maMon}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${getFormatBadgeColor(
+                              exam.hinhThucThi
+                            )}`}
+                          >
+                            {exam.hinhThucThi}
+                          </span>
+                        </div>
+
+                        <div>
+                          {isToday ? (
+                            <span className="text-[10px] font-black text-white bg-rose-600 px-2 py-0.5 rounded-full animate-pulse">
+                              HÔM NAY THI
+                            </span>
+                          ) : isUpcoming ? (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                              Còn {exam.daysUntil} ngày
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                              Đã thi xong
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Subject Name */}
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug">
+                          {exam.tenMon}
+                        </h4>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          {exam.kyThi} {exam.dotThi ? `• ${exam.dotThi}` : ''}
+                        </div>
+                      </div>
+
+                      {/* Key Details Grid */}
+                      <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <CalendarDays className="w-3 h-3 text-indigo-600" /> Ngày Thi
+                          </span>
+                          <div className="font-mono font-bold text-slate-900 text-xs mt-0.5">
+                            {exam.ngayThi || 'Chưa công bố'}
+                          </div>
+                          {exam.ngayThi && (
+                            <span className="text-[10px] text-slate-500">
+                              {getDayOfWeekVietnamese(exam.ngayThi)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-sky-600" /> Giờ Thi
+                          </span>
+                          <div className="font-mono font-bold text-slate-900 text-xs mt-0.5">
+                            {exam.gioBatDau || 'Chưa rõ'}
+                          </div>
+                          {exam.soPhut && (
+                            <span className="text-[10px] text-slate-500 font-normal">
+                              Thời lượng: {exam.soPhut}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-200/60">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <Building className="w-3 h-3 text-amber-600" /> Phòng Thi
+                          </span>
+                          <span className="font-mono font-black text-indigo-700 text-xs mt-0.5">
+                            {exam.maPhong || 'Chưa rõ'}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 pt-1.5 border-t border-slate-200/60">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <User className="w-3 h-3 text-purple-600" /> SBD / Tổ
+                          </span>
+                          <span className="font-mono font-bold text-slate-800 text-xs mt-0.5">
+                            Tổ {exam.toThi || '-'} {exam.nhomThi ? `(Nhóm ${exam.nhomThi})` : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Location & Action */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-[11px]">
+                        {exam.diaDiemThi ? (
+                          <div className="flex items-center gap-1 text-slate-600 truncate flex-1">
+                            <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                            <span className="truncate">{exam.diaDiemThi}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic text-[10px]">Theo thông báo cơ sở</span>
+                        )}
+
+                        <span className="text-indigo-600 font-bold shrink-0 flex items-center gap-0.5">
+                          Chi tiết &rarr;
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* DESKTOP VIEW: Full 10-Column Data Table */}
+              <div className="hidden md:block bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider select-none">
+                        <th
+                          onClick={() => handleSortTable('stt')}
+                          className="py-3 px-4 text-center cursor-pointer hover:bg-slate-100 transition"
                         >
-                          <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-500">
-                            {exam.stt}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="font-mono font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md text-[11px]">
-                              {exam.maMon}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="font-bold text-slate-900 block">{exam.tenMon}</span>
-                            <span className="text-[11px] text-slate-400 font-normal">{exam.kyThi}</span>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="font-mono font-bold text-slate-900 flex items-center gap-1.5">
-                              <CalendarDays className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                              <span>{exam.ngayThi}</span>
-                            </div>
-                            <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
-                              <Clock className="w-3 h-3 text-sky-600 shrink-0" />
-                              <span>{exam.gioBatDau}</span>
-                              {exam.soPhut && <span className="text-slate-400 font-normal">({exam.soPhut})</span>}
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span
-                              className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border inline-block ${getFormatBadgeColor(
-                                exam.hinhThucThi
-                              )}`}
-                            >
-                              {exam.hinhThucThi}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="font-mono font-black text-indigo-700 bg-slate-100 px-2 py-0.5 rounded-md">
-                              {exam.maPhong || 'Chưa rõ'}
-                            </span>
-                            {exam.maCoSo && (
-                              <span className="block text-[10px] text-slate-400 font-mono mt-0.5">{exam.maCoSo}</span>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 font-mono">
-                            <div className="text-slate-900 font-bold">Tổ {exam.toThi || '-'}</div>
-                            {exam.nhomThi && (
-                              <div className="text-[10px] text-slate-500">Nhóm {exam.nhomThi}</div>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            {exam.diaDiemThi ? (
-                              <div className="flex items-start gap-1 text-[11px] text-slate-600 max-w-xs">
-                                <MapPin className="w-3 h-3 text-rose-500 shrink-0 mt-0.5" />
-                                <span className="line-clamp-2">{exam.diaDiemThi}</span>
+                          <div className="flex items-center justify-center gap-1">
+                            <span>STT</span>
+                            {tableSortKey === 'stt' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handleSortTable('maMon')}
+                          className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Mã Môn</span>
+                            {tableSortKey === 'maMon' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handleSortTable('tenMon')}
+                          className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition min-w-[200px]"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Tên Môn Học</span>
+                            {tableSortKey === 'tenMon' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handleSortTable('ngayThi')}
+                          className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Ngày Thi & Giờ</span>
+                            {tableSortKey === 'ngayThi' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handleSortTable('hinhThucThi')}
+                          className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Hình Thức Thi</span>
+                            {tableSortKey === 'hinhThucThi' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handleSortTable('maPhong')}
+                          className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Phòng Thi</span>
+                            {tableSortKey === 'maPhong' && <ArrowUpDown className="w-3 h-3 text-indigo-600" />}
+                          </div>
+                        </th>
+                        <th className="py-3 px-4">Tổ / SBD</th>
+                        <th className="py-3 px-4 min-w-[220px]">Địa Điểm Thi</th>
+                        <th className="py-3 px-4 text-center">Trạng Thái</th>
+                        <th className="py-3 px-4 text-right">Chi Tiết</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {filteredQldtExams.map((exam, index) => {
+                        const isUpcoming = exam.daysUntil >= 0;
+                        const isToday = exam.daysUntil === 0;
+
+                        return (
+                          <tr
+                            key={exam.id}
+                            onClick={() => setSelectedExamModal(exam)}
+                            className={`hover:bg-indigo-50/40 transition cursor-pointer ${
+                              isToday ? 'bg-rose-50/30' : index % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'
+                            }`}
+                          >
+                            <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-500">
+                              {exam.stt}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-mono font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md text-[11px]">
+                                {exam.maMon}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-bold text-slate-900 block">{exam.tenMon}</span>
+                              <span className="text-[11px] text-slate-400 font-normal">{exam.kyThi}</span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-mono font-bold text-slate-900 flex items-center gap-1.5">
+                                <CalendarDays className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                <span>{exam.ngayThi}</span>
                               </div>
-                            ) : (
-                              <span className="text-[11px] text-slate-400 italic">Theo thông báo cơ sở</span>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            {isToday ? (
-                              <span className="text-[10px] font-black text-white bg-rose-600 px-2 py-0.5 rounded-full animate-pulse">
-                                HÔM NAY THI
+                              <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                                <Clock className="w-3 h-3 text-sky-600 shrink-0" />
+                                <span>{exam.gioBatDau}</span>
+                                {exam.soPhut && <span className="text-slate-400 font-normal">({exam.soPhut})</span>}
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border inline-block ${getFormatBadgeColor(
+                                  exam.hinhThucThi
+                                )}`}
+                              >
+                                {exam.hinhThucThi}
                               </span>
-                            ) : isUpcoming ? (
-                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                Còn {exam.daysUntil} ngày
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-mono font-black text-indigo-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                                {exam.maPhong || 'Chưa rõ'}
                               </span>
-                            ) : (
-                              <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                                Đã thi xong
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 text-right">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedExamModal(exam);
-                              }}
-                              className="text-indigo-600 hover:text-indigo-800 font-bold text-[11px] hover:underline cursor-pointer"
-                            >
-                              Chi tiết
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                              {exam.maCoSo && (
+                                <span className="block text-[10px] text-slate-400 font-mono mt-0.5">{exam.maCoSo}</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono">
+                              <div className="text-slate-900 font-bold">Tổ {exam.toThi || '-'}</div>
+                              {exam.nhomThi && (
+                                <div className="text-[10px] text-slate-500">Nhóm {exam.nhomThi}</div>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              {exam.diaDiemThi ? (
+                                <div className="flex items-start gap-1 text-[11px] text-slate-600 max-w-xs">
+                                  <MapPin className="w-3 h-3 text-rose-500 shrink-0 mt-0.5" />
+                                  <span className="line-clamp-2">{exam.diaDiemThi}</span>
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-slate-400 italic">Theo thông báo cơ sở</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {isToday ? (
+                                <span className="text-[10px] font-black text-white bg-rose-600 px-2 py-0.5 rounded-full animate-pulse">
+                                  HÔM NAY THI
+                                </span>
+                              ) : isUpcoming ? (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                  Còn {exam.daysUntil} ngày
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                                  Đã thi xong
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedExamModal(exam);
+                                }}
+                                className="text-indigo-600 hover:text-indigo-800 font-bold text-[11px] hover:underline cursor-pointer"
+                              >
+                                Chi tiết
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           ) : layoutMode === 'GRID' ? (
             /* ========================================================================= */
             /* 2. DẠNG THẺ LƯỚI (CARD GRID VIEW)                                         */
             /* ========================================================================= */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {filteredQldtExams.map((exam) => {
                 const isUpcoming = exam.daysUntil >= 0;
                 const isToday = exam.daysUntil === 0;
@@ -981,7 +1124,7 @@ export default function StudentPersonalExamSchedule({
                   <div
                     key={exam.id}
                     onClick={() => setSelectedExamModal(exam)}
-                    className="bg-white rounded-3xl p-5 border border-slate-200 hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between gap-4 cursor-pointer group relative overflow-hidden"
+                    className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-slate-200 hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between gap-3 sm:gap-4 cursor-pointer group relative overflow-hidden active:scale-98"
                   >
                     {/* Top status indicator bar */}
                     <div
@@ -996,13 +1139,13 @@ export default function StudentPersonalExamSchedule({
 
                     <div>
                       {/* Top Badges */}
-                      <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5">
-                        <span className="font-mono text-[11px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
+                      <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5 pt-0.5">
+                        <span className="font-mono text-[10px] sm:text-[11px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 sm:px-2.5 py-0.5 rounded-full">
                           {exam.maMon}
                         </span>
 
                         <span
-                          className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${getFormatBadgeColor(
+                          className={`text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full border ${getFormatBadgeColor(
                             exam.hinhThucThi
                           )}`}
                         >
@@ -1025,53 +1168,53 @@ export default function StudentPersonalExamSchedule({
                       </div>
 
                       {/* Subject Name */}
-                      <h4 className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2 leading-snug">
                         {exam.tenMon}
                       </h4>
 
                       {/* Date & Time Info */}
-                      <div className="mt-3.5 bg-slate-50 rounded-2xl p-3 border border-slate-100 flex flex-col gap-2">
+                      <div className="mt-3 bg-slate-50 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-slate-100 flex flex-col gap-1.5 sm:gap-2">
                         <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5 text-slate-600">
+                          <div className="flex items-center gap-1.5 text-slate-600 text-[11px] sm:text-xs">
                             <CalendarDays className="w-3.5 h-3.5 text-indigo-600" />
                             <span>Ngày thi:</span>
                           </div>
-                          <strong className="text-slate-900 font-mono">{exam.ngayThi || 'Chưa công bố'}</strong>
+                          <strong className="text-slate-900 font-mono text-xs">{exam.ngayThi || 'Chưa công bố'}</strong>
                         </div>
 
                         <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5 text-slate-600">
+                          <div className="flex items-center gap-1.5 text-slate-600 text-[11px] sm:text-xs">
                             <Clock className="w-3.5 h-3.5 text-sky-600" />
                             <span>Giờ bắt đầu:</span>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <strong className="text-slate-900 font-mono">{exam.gioBatDau || 'Chưa rõ'}</strong>
+                            <strong className="text-slate-900 font-mono text-xs">{exam.gioBatDau || 'Chưa rõ'}</strong>
                             {exam.soPhut && <span className="text-[10px] text-slate-500 font-normal">({exam.soPhut})</span>}
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5 text-slate-600">
+                          <div className="flex items-center gap-1.5 text-slate-600 text-[11px] sm:text-xs">
                             <Building className="w-3.5 h-3.5 text-amber-600" />
                             <span>Phòng thi:</span>
                           </div>
-                          <strong className="text-indigo-700 font-mono">{exam.maPhong || 'Chưa xếp phòng'}</strong>
+                          <strong className="text-indigo-700 font-mono text-xs">{exam.maPhong || 'Chưa xếp phòng'}</strong>
                         </div>
 
                         {exam.toThi && (
                           <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5 text-slate-600">
+                            <div className="flex items-center gap-1.5 text-slate-600 text-[11px] sm:text-xs">
                               <User className="w-3.5 h-3.5 text-purple-600" />
-                              <span>SBD / Tổ thi:</span>
+                              <span>SBD / Tổ:</span>
                             </div>
-                            <strong className="text-slate-900 font-mono">Tổ {exam.toThi} {exam.nhomThi ? `(Nhóm ${exam.nhomThi})` : ''}</strong>
+                            <strong className="text-slate-900 font-mono text-xs">Tổ {exam.toThi} {exam.nhomThi ? `(Nhóm ${exam.nhomThi})` : ''}</strong>
                           </div>
                         )}
                       </div>
 
                       {/* Location Preview */}
                       {exam.diaDiemThi && (
-                        <div className="mt-2.5 flex items-start gap-1.5 text-[11px] text-slate-500 line-clamp-2">
+                        <div className="mt-2 flex items-start gap-1.5 text-[11px] text-slate-500 line-clamp-2">
                           <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
                           <span>{exam.diaDiemThi}</span>
                         </div>
@@ -1079,9 +1222,9 @@ export default function StudentPersonalExamSchedule({
                     </div>
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400 font-medium">{exam.kyThi}</span>
-                      <span className="text-indigo-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                        Xem chi tiết &rarr;
+                      <span className="text-slate-400 font-medium truncate">{exam.kyThi}</span>
+                      <span className="text-indigo-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 shrink-0">
+                        Chi tiết &rarr;
                       </span>
                     </div>
                   </div>
@@ -1092,7 +1235,7 @@ export default function StudentPersonalExamSchedule({
             /* ========================================================================= */
             /* 3. DẠNG LỘ TRÌNH / DÒNG THỜI GIAN THEO NGÀY (TIMELINE VIEW)               */
             /* ========================================================================= */
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {timelineGroups.map((group) => {
                 const isGroupUpcoming = group.daysUntil >= 0;
                 const isGroupToday = group.daysUntil === 0;
@@ -1100,13 +1243,13 @@ export default function StudentPersonalExamSchedule({
                 return (
                   <div
                     key={group.dateStr}
-                    className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm relative overflow-hidden"
+                    className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm relative overflow-hidden"
                   >
                     {/* Header ngày thi */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-slate-100">
                       <div className="flex items-center gap-3">
                         <div
-                          className={`p-3 rounded-2xl font-black text-center min-w-[55px] ${
+                          className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl font-black text-center min-w-[50px] sm:min-w-[55px] ${
                             isGroupToday
                               ? 'bg-rose-500 text-white shadow-md shadow-rose-200'
                               : isGroupUpcoming
@@ -1115,12 +1258,12 @@ export default function StudentPersonalExamSchedule({
                           }`}
                         >
                           <div className="text-[10px] uppercase">{group.dayOfWeek || 'NGÀY'}</div>
-                          <div className="text-base font-mono">{group.dateStr.split('/')[0]}</div>
+                          <div className="text-sm sm:text-base font-mono">{group.dateStr.split('/')[0]}</div>
                         </div>
 
                         <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-base font-black text-slate-900">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-sm sm:text-base font-black text-slate-900">
                               {group.dayOfWeek ? `${group.dayOfWeek}, ` : ''}Ngày {group.dateStr}
                             </h4>
                             {isGroupToday ? (
@@ -1137,7 +1280,7 @@ export default function StudentPersonalExamSchedule({
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-slate-500 mt-0.5">
+                          <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
                             Gồm <b>{group.items.length} môn thi</b> diễn ra trong ngày này
                           </p>
                         </div>
@@ -1145,24 +1288,24 @@ export default function StudentPersonalExamSchedule({
                     </div>
 
                     {/* Timeline items list */}
-                    <div className="mt-5 space-y-4 relative before:absolute before:inset-0 before:left-4 before:w-0.5 before:bg-slate-200/80 before:hidden sm:before:block">
-                      {group.items.map((exam, idx) => (
+                    <div className="mt-3 sm:mt-5 space-y-3 sm:space-y-4 relative before:absolute before:inset-0 before:left-4 before:w-0.5 before:bg-slate-200/80 before:hidden sm:before:block">
+                      {group.items.map((exam) => (
                         <div
                           key={exam.id}
                           onClick={() => setSelectedExamModal(exam)}
-                          className="sm:pl-10 relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50/70 hover:bg-indigo-50/50 border border-slate-200/70 hover:border-indigo-200 transition cursor-pointer group"
+                          className="sm:pl-10 relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50/70 hover:bg-indigo-50/50 border border-slate-200/70 hover:border-indigo-200 transition cursor-pointer group active:scale-98"
                         >
                           {/* Timeline dot */}
                           <div className="hidden sm:flex absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-2 border-indigo-600 shadow-xs items-center justify-center group-hover:scale-125 transition-transform" />
 
-                          <div className="flex items-start sm:items-center gap-3 min-w-0">
-                            <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-center font-mono shrink-0">
+                          <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0">
+                            <div className="p-2 sm:p-2.5 bg-white rounded-xl border border-slate-200 text-center font-mono shrink-0">
                               <span className="text-xs font-black text-indigo-700 block">{exam.gioBatDau}</span>
                               <span className="text-[10px] text-slate-400 block">{exam.soPhut}</span>
                             </div>
 
                             <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-mono text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
                                   {exam.maMon}
                                 </span>
@@ -1174,10 +1317,10 @@ export default function StudentPersonalExamSchedule({
                                   {exam.hinhThucThi}
                                 </span>
                               </div>
-                              <h5 className="text-sm font-black text-slate-900 mt-1 truncate group-hover:text-indigo-600 transition">
+                              <h5 className="text-xs sm:text-sm font-black text-slate-900 mt-1 truncate group-hover:text-indigo-600 transition">
                                 {exam.tenMon}
                               </h5>
-                              <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                              <div className="text-[11px] text-slate-500 flex items-center gap-1.5 sm:gap-2 mt-0.5 flex-wrap">
                                 <span className="font-mono font-bold text-slate-700">Phòng: {exam.maPhong || 'Chưa rõ'}</span>
                                 <span>•</span>
                                 <span>Tổ {exam.toThi || '-'}</span>
@@ -1193,7 +1336,7 @@ export default function StudentPersonalExamSchedule({
 
                           <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                             <span className="text-xs font-bold text-indigo-600 group-hover:translate-x-1 transition-transform">
-                              Xem chi tiết &rarr;
+                              Chi tiết &rarr;
                             </span>
                           </div>
                         </div>
@@ -1207,20 +1350,25 @@ export default function StudentPersonalExamSchedule({
             /* ========================================================================= */
             /* 4. DẠNG PHIẾU BÁO DỰ THI CHUẨN IN ẤN (PRINT VIEW)                         */
             /* ========================================================================= */
-            <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-sm flex flex-col gap-6 text-slate-900">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-10 border border-slate-200 shadow-sm flex flex-col gap-4 sm:gap-6 text-slate-900">
               {/* Print Action Toolbar */}
-              <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-200 print:hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-slate-200 print:hidden">
                 <div>
-                  <h4 className="text-sm font-black text-slate-800">Phiếu Báo Dự Thi Cá Nhân (Mẫu In Chuẩn)</h4>
-                  <p className="text-xs text-slate-500">Định dạng A4 phù hợp để in giấy hoặc xuất file PDF lưu trữ</p>
+                  <h4 className="text-xs sm:text-sm font-black text-slate-800">Phiếu Báo Dự Thi Cá Nhân (Mẫu In Chuẩn)</h4>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Định dạng A4 phù hợp để in giấy hoặc xuất file PDF lưu trữ</p>
                 </div>
                 <button
                   onClick={handlePrint}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition shadow-md shadow-indigo-200 flex items-center gap-2 cursor-pointer"
+                  className="px-4 sm:px-5 py-2 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
                 >
                   <Printer className="w-4 h-4" />
                   <span>In Phiếu / Lưu PDF</span>
                 </button>
+              </div>
+
+              {/* Mobile scroll hint */}
+              <div className="block sm:hidden text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                💡 <span className="font-bold">Mẹo trên Mobile:</span> Vuốt ngang bảng bên dưới để xem toàn bộ thông tin hoặc nhấn <b>"In Phiếu / Lưu PDF"</b>.
               </div>
 
               {/* Printable Document Content */}
@@ -1332,21 +1480,21 @@ export default function StudentPersonalExamSchedule({
 
           {/* Modal Chi Tiết Ca Thi QLDTTX */}
           {selectedExamModal && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print:hidden">
-              <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 sm:p-7 relative max-h-[90vh] overflow-y-auto">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 print:hidden">
+              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-4 sm:p-7 relative max-h-[88vh] overflow-y-auto">
                 <button
                   onClick={() => setSelectedExamModal(null)}
-                  className="absolute top-5 right-5 p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
+                  className="absolute top-4 sm:top-5 right-4 sm:right-5 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
 
-                <div className="flex items-center gap-2.5 mb-3">
-                  <span className="font-mono text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
+                <div className="flex items-center gap-2 mb-2.5 sm:mb-3">
+                  <span className="font-mono text-[11px] sm:text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full">
                     {selectedExamModal.maMon}
                   </span>
                   <span
-                    className={`text-xs font-bold px-3 py-1 rounded-full border ${getFormatBadgeColor(
+                    className={`text-[11px] sm:text-xs font-bold px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border ${getFormatBadgeColor(
                       selectedExamModal.hinhThucThi
                     )}`}
                   >
@@ -1354,7 +1502,7 @@ export default function StudentPersonalExamSchedule({
                   </span>
                 </div>
 
-                <h3 className="text-xl font-black text-slate-900 mb-4">{selectedExamModal.tenMon}</h3>
+                <h3 className="text-base sm:text-xl font-black text-slate-900 mb-3 sm:mb-4 leading-snug">{selectedExamModal.tenMon}</h3>
 
                 <div className="space-y-3 bg-slate-50 rounded-2xl p-4 border border-slate-200/80 text-xs">
                   <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
