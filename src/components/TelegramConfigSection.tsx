@@ -486,34 +486,34 @@ export default function TelegramConfigSection({
     !isCustomBot ? systemBot?.botUsername : (config?.botUsername || 'CustomBot');
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4 sm:gap-6">
       {/* Header Banner */}
-      <div className="bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 rounded-3xl p-6 sm:p-8 text-white shadow-lg shadow-sky-500/10 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 text-white shadow-lg shadow-sky-500/10 relative overflow-hidden">
         <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute right-6 top-6 text-white/20">
+        <div className="absolute right-6 top-6 text-white/20 hidden sm:block">
           <Send className="w-24 h-24 stroke-[1.2]" />
         </div>
 
         <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full text-xs font-bold text-white mb-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full text-xs font-bold text-white mb-2 sm:mb-3">
             <Send className="w-3.5 h-3.5" />
             <span>Telegram Bot Notifications</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black mb-2 tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-black mb-1.5 sm:mb-2 tracking-tight">
             Thông Báo Tức Thì Qua Telegram
           </h2>
           <p className="text-xs sm:text-sm text-sky-100 leading-relaxed">
             Nhận thông báo lịch thi, phòng thi, môn thi mới, kết quả đăng ký môn học và các thông tin học vụ quan trọng trực tiếp qua tài khoản cá nhân hoặc Group/Channel lớp trên Telegram.
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="mt-3.5 sm:mt-4 flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => setShowGuide(!showGuide)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-white/20"
+              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-white/20 active:scale-95"
             >
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>{showGuide ? 'Ẩn Hướng Dẫn' : 'Xem Hướng Dẫn Cài Đặt'}</span>
+              <span>{showGuide ? 'Ẩn Hướng Dẫn' : 'Xem Hướng Dẫn'}</span>
               {showGuide ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
 
@@ -523,26 +523,26 @@ export default function TelegramConfigSection({
                   <button
                     type="button"
                     onClick={() => onNavigateTab('telegram_admin')}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-indigo-400/40 shadow-sm"
+                    className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-indigo-400/40 shadow-xs active:scale-95"
                   >
                     <Bot className="w-3.5 h-3.5 text-indigo-200" />
-                    <span>Màn Hình Quản Trị Bot Toàn Cục ➜</span>
+                    <span>Quản Trị Bot ➜</span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setIsAdminPanelOpen(!isAdminPanelOpen)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-400/25 hover:bg-amber-400/35 text-amber-100 rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-amber-300/30"
+                    className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-amber-400/25 hover:bg-amber-400/35 text-amber-100 rounded-xl sm:rounded-2xl text-xs font-bold transition-all cursor-pointer backdrop-blur-md border border-amber-300/30 active:scale-95"
                   >
                     <Settings className="w-3.5 h-3.5 text-amber-300" />
-                    <span>{isAdminPanelOpen ? 'Đóng Quản Trị Bot Hệ Thống' : 'Cấu Hình Bot Toàn Trường (Admin)'}</span>
+                    <span>{isAdminPanelOpen ? 'Đóng Quản Trị' : 'Cấu Hình Bot Toàn Trường'}</span>
                   </button>
                 )}
               </>
             )}
 
             {isConnected && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/25 border border-emerald-300/40 text-emerald-100 rounded-2xl text-xs font-bold">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/25 border border-emerald-300/40 text-emerald-100 rounded-xl sm:rounded-2xl text-xs font-bold">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
                 <span>Đã kết nối ({isCustomBot ? 'Bot Riêng' : 'Bot Hệ Thống'})</span>
                 {activeBotUsername && <span className="opacity-90">(@{activeBotUsername})</span>}
@@ -554,24 +554,24 @@ export default function TelegramConfigSection({
 
       {/* ADMIN GLOBAL BOT CONFIGURATION PANEL */}
       {isAdmin && isAdminPanelOpen && (
-        <div className="bg-gradient-to-br from-amber-500/10 via-amber-50 to-orange-50 border-2 border-amber-300 rounded-3xl p-6 sm:p-8 shadow-sm animate-in slide-in-from-top-3 duration-200">
-          <div className="flex items-center justify-between border-b border-amber-200 pb-4 mb-5">
+        <div className="bg-gradient-to-br from-amber-500/10 via-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs animate-in slide-in-from-top-3 duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-3.5 sm:pb-4 mb-4 sm:mb-5">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-amber-500 text-white rounded-2xl shadow-sm shadow-amber-300">
-                <ShieldCheck className="w-6 h-6" />
+              <div className="p-2 sm:p-2.5 bg-amber-500 text-white rounded-xl sm:rounded-2xl shadow-xs shadow-amber-300 shrink-0">
+                <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div>
-                <h3 className="text-base font-black text-slate-900">
+                <h3 className="text-sm sm:text-base font-black text-slate-900">
                   Cấu Hình Bot Telegram Hệ Thống (Toàn Trường)
                 </h3>
-                <p className="text-xs text-slate-600">
-                  Dành riêng cho Quản trị viên: Lưu vào bảng cấu hình <code className="font-mono text-indigo-700 font-bold">GlobalConfig</code>. Toàn bộ sinh viên có thể dùng bot này mà không cần tự tạo bot.
+                <p className="text-[11px] sm:text-xs text-slate-600">
+                  Dành riêng cho Quản trị viên: Toàn bộ sinh viên có thể dùng bot này mà không cần tự tạo bot.
                 </p>
               </div>
             </div>
 
             {systemBot?.isConfigured && (
-              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5">
+              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5 self-start sm:self-auto">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Đang Hoạt Động (@{systemBot.botUsername})</span>
               </span>
@@ -579,20 +579,20 @@ export default function TelegramConfigSection({
           </div>
 
           {systemBotMsg && (
-            <div className="mb-4 p-3.5 bg-emerald-100 border border-emerald-300 rounded-2xl text-emerald-900 text-xs font-bold flex items-center gap-2">
+            <div className="mb-4 p-3.5 bg-emerald-100 border border-emerald-300 rounded-xl sm:rounded-2xl text-emerald-900 text-xs font-bold flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
               <span>{systemBotMsg}</span>
             </div>
           )}
 
           {systemBotError && (
-            <div className="mb-4 p-3.5 bg-rose-100 border border-rose-300 rounded-2xl text-rose-900 text-xs font-bold flex items-center gap-2">
+            <div className="mb-4 p-3.5 bg-rose-100 border border-rose-300 rounded-xl sm:rounded-2xl text-rose-900 text-xs font-bold flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
               <span>{systemBotError}</span>
             </div>
           )}
 
-          <form onSubmit={handleSaveSystemBot} className="flex flex-col gap-4">
+          <form onSubmit={handleSaveSystemBot} className="flex flex-col gap-3.5 sm:gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-800 mb-1.5">
                 System Bot API Token
@@ -602,7 +602,7 @@ export default function TelegramConfigSection({
                 value={adminSystemToken}
                 onChange={(e) => setAdminSystemToken(e.target.value)}
                 placeholder="Nhập Token của Bot hệ thống (ví dụ: 123456789:ABCdef...)"
-                className="w-full bg-white border border-amber-300 rounded-2xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                className="w-full bg-white border border-amber-300 rounded-xl sm:rounded-2xl px-4 py-2.5 text-base sm:text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
                 required
               />
               <p className="text-[11px] text-slate-500 mt-1">
@@ -614,7 +614,7 @@ export default function TelegramConfigSection({
               <button
                 type="submit"
                 disabled={isSavingSystemBot}
-                className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl text-xs font-bold transition-all shadow-sm shadow-amber-300 cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl sm:rounded-2xl text-xs font-bold transition-all shadow-xs shadow-amber-300 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
               >
                 {isSavingSystemBot ? (
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -630,29 +630,29 @@ export default function TelegramConfigSection({
 
       {/* Quick Setup Guide Accordion */}
       {showGuide && (
-        <div className="bg-slate-50 border border-sky-200 rounded-3xl p-6 shadow-sm animate-in fade-in duration-200">
-          <div className="flex items-center gap-2 mb-4 text-sky-800 font-black text-sm">
+        <div className="bg-slate-50 border border-sky-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 mb-3.5 sm:mb-4 text-sky-800 font-black text-xs sm:text-sm">
             <Sparkles className="w-4 h-4 text-sky-600" />
             <span>Hướng Dẫn Sử Dụng Bot Telegram Trong 3 Bước</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col gap-1.5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 text-xs">
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 flex flex-col gap-1.5">
               <div className="flex items-center gap-2 font-bold text-slate-800">
-                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px]">1</span>
+                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px] shrink-0">1</span>
                 <span>Thêm Bot Vào Kênh / Chat Riêng</span>
               </div>
-              <p className="text-slate-600 leading-relaxed">
+              <p className="text-slate-600 leading-relaxed text-[11px] sm:text-xs">
                 Nếu dùng <strong>Bot Hệ Thống</strong>, chỉ cần bấm nút <em>"Mở Bot & Nhấn Start"</em> hoặc <em>"Thêm Bot vào Nhóm"</em>. Nếu dùng Bot Riêng, tạo bot qua @BotFather và dán token.
               </p>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col gap-1.5">
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 flex flex-col gap-1.5">
               <div className="flex items-center gap-2 font-bold text-slate-800">
-                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px]">2</span>
+                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px] shrink-0">2</span>
                 <span>Lấy Chat ID Nhận Tin</span>
               </div>
-              <p className="text-slate-600 leading-relaxed">
+              <p className="text-slate-600 leading-relaxed text-[11px] sm:text-xs">
                 Chat với{' '}
                 <a
                   href="https://t.me/userinfobot"
@@ -666,13 +666,13 @@ export default function TelegramConfigSection({
               </p>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col gap-1.5">
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 flex flex-col gap-1.5">
               <div className="flex items-center gap-2 font-bold text-slate-800">
-                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px]">3</span>
+                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px] shrink-0">3</span>
                 <span>Chọn Topic & Lưu</span>
               </div>
-              <p className="text-slate-600 leading-relaxed">
-                Nếu nhóm có bật <em>Forum Topics</em>, bấm nút <strong>"Quét / Chọn Topic"</strong> để chọn chủ đề nhận thông báo. <em>(Lưu ý: Do hạn chế của Telegram API, hệ thống chỉ quét được các topic có tin nhắn gần đây nên có thể quét thiếu topic; bạn có thể nhắn 1 tin vào topic để quét lại hoặc tự nhập ID)</em>, sau đó bấm <strong>"Gửi Thử Tin Nhắn"</strong> để kiểm tra.
+              <p className="text-slate-600 leading-relaxed text-[11px] sm:text-xs">
+                Nếu nhóm có bật <em>Forum Topics</em>, bấm nút <strong>"Quét Topic"</strong> để chọn chủ đề nhận thông báo, sau đó bấm <strong>"Gửi Thử Tin Nhắn"</strong> để kiểm tra.
               </p>
             </div>
           </div>
@@ -681,15 +681,15 @@ export default function TelegramConfigSection({
 
       {/* Feedback Alerts */}
       {successMsg && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2.5 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+        <div className="p-3.5 sm:p-4 bg-emerald-50 border border-emerald-200 rounded-xl sm:rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2.5 animate-in fade-in shadow-2xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs font-bold flex items-center gap-2.5 animate-in fade-in">
-          <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+        <div className="p-3.5 sm:p-4 bg-rose-50 border border-rose-200 rounded-xl sm:rounded-2xl text-rose-800 text-xs font-bold flex items-center gap-2.5 animate-in fade-in shadow-2xs">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
@@ -697,7 +697,7 @@ export default function TelegramConfigSection({
       {/* Test Status Banner */}
       {testResult && (
         <div
-          className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-medium ${
+          className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-medium shadow-2xs ${
             testResult.success
               ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
               : 'bg-rose-50/80 border-rose-200 text-rose-900'
@@ -705,15 +705,15 @@ export default function TelegramConfigSection({
         >
           <div className="flex items-start sm:items-center gap-2.5">
             {testResult.success ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5 sm:mt-0" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5 sm:mt-0" />
             ) : (
-              <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5 sm:mt-0" />
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5 sm:mt-0" />
             )}
             <div>
-              <div className="font-bold text-sm">
+              <div className="font-bold text-xs sm:text-sm">
                 {testResult.success ? 'Kiểm tra gửi tin nhắn thành công!' : 'Kiểm tra gửi tin nhắn thất bại!'}
               </div>
-              <div className="text-xs opacity-90 mt-0.5">
+              <div className="text-[11px] sm:text-xs opacity-90 mt-0.5">
                 {testResult.success
                   ? testResult.message || `Đã gửi tin nhắn thử nghiệm tới Chat ID: ${chatId}`
                   : testResult.error}
@@ -733,22 +733,22 @@ export default function TelegramConfigSection({
       )}
 
       {/* Main Configuration Form */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 border border-slate-200 shadow-sm flex flex-col gap-4 sm:gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5 sm:pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-sky-50 text-sky-600 rounded-2xl">
+            <div className="p-2 sm:p-2.5 bg-sky-50 text-sky-600 rounded-xl sm:rounded-2xl shrink-0">
               <Bot className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-800">Cấu Hình Thông Báo Telegram</h3>
-              <p className="text-xs text-slate-500">
+              <h3 className="text-sm sm:text-base font-black text-slate-800">Cấu Hình Thông Báo Telegram</h3>
+              <p className="text-[11px] sm:text-xs text-slate-500">
                 Tài khoản: <span className="font-mono font-bold text-indigo-600">{usernameToQuery}</span>
               </p>
             </div>
           </div>
 
           {/* Master Enable/Disable Toggle */}
-          <label className="inline-flex items-center gap-3 cursor-pointer self-start sm:self-auto bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200 hover:bg-slate-100 transition-colors">
+          <label className="inline-flex items-center gap-3 cursor-pointer self-start sm:self-auto bg-slate-50 px-3.5 py-2 rounded-xl sm:rounded-2xl border border-slate-200 hover:bg-slate-100 transition-colors">
             <input
               type="checkbox"
               checked={isEnabled}
@@ -763,16 +763,16 @@ export default function TelegramConfigSection({
         </div>
 
         {/* BOT MODE SELECTOR */}
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2">
           <label className="text-xs font-bold text-slate-800">Lựa Chọn Bot Sử Dụng</label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
             {/* Option 1: System Bot */}
             <div
               onClick={() => {
                 setIsCustomBot(false);
                 setBotToken('');
               }}
-              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col gap-2 relative ${
+              className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all cursor-pointer flex flex-col gap-1.5 sm:gap-2 relative ${
                 !isCustomBot
                   ? 'bg-sky-50/70 border-sky-500 ring-2 ring-sky-200'
                   : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
@@ -780,8 +780,8 @@ export default function TelegramConfigSection({
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
-                  <Globe className="w-4 h-4 text-sky-600" />
-                  <span>Sử Dụng Bot Hệ Thống (Khuyên Dùng)</span>
+                  <Globe className="w-4 h-4 text-sky-600 shrink-0" />
+                  <span>Bot Hệ Thống (Khuyên Dùng)</span>
                 </div>
                 <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full">
                   Tiện Lợi Nhất
@@ -795,7 +795,7 @@ export default function TelegramConfigSection({
             {/* Option 2: Custom Bot */}
             <div
               onClick={() => setIsCustomBot(true)}
-              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col gap-2 relative ${
+              className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all cursor-pointer flex flex-col gap-1.5 sm:gap-2 relative ${
                 isCustomBot
                   ? 'bg-indigo-50/70 border-indigo-500 ring-2 ring-indigo-200'
                   : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
@@ -803,7 +803,7 @@ export default function TelegramConfigSection({
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
-                  <Key className="w-4 h-4 text-indigo-600" />
+                  <Key className="w-4 h-4 text-indigo-600 shrink-0" />
                   <span>Tự Tạo & Cấu Hình Bot Riêng</span>
                 </div>
                 <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full">
@@ -819,13 +819,13 @@ export default function TelegramConfigSection({
 
         {/* SYSTEM BOT SHORTCUT ACTIONS CARD */}
         {!isCustomBot && (
-          <div className="bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border border-sky-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border border-sky-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-sky-500 text-white flex items-center justify-center font-bold shrink-0 shadow-sm shadow-sky-300">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-sky-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs shadow-sky-300">
                 <Bot className="w-5 h-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-xs text-slate-900">
                     {systemBot?.botFirstName || 'PTIT EduSync Official Bot'}
                   </span>
@@ -847,10 +847,10 @@ export default function TelegramConfigSection({
                   href={systemBot.botUrl || `https://t.me/${systemBot.botUsername}?start=start`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3.5 py-2 bg-white hover:bg-sky-50 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                  className="flex-1 sm:flex-none justify-center px-3.5 py-2 bg-white hover:bg-sky-50 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <Send className="w-3.5 h-3.5 text-sky-600" />
-                  <span>Mở Bot & Nhấn Start</span>
+                  <span>Mở Bot & Start</span>
                   <ExternalLink className="w-3 h-3 opacity-60" />
                 </a>
 
@@ -858,10 +858,10 @@ export default function TelegramConfigSection({
                   href={systemBot.addToGroupUrl || `https://t.me/${systemBot.botUsername}?startgroup=true`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  className="flex-1 sm:flex-none justify-center px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <Users className="w-3.5 h-3.5" />
-                  <span>Thêm Bot Vào Nhóm Lớp</span>
+                  <span>Thêm Vào Nhóm</span>
                   <ExternalLink className="w-3 h-3 opacity-60" />
                 </a>
               </div>
@@ -873,7 +873,7 @@ export default function TelegramConfigSection({
           </div>
         )}
 
-        <form onSubmit={handleSave} className="flex flex-col gap-5">
+        <form onSubmit={handleSave} className="flex flex-col gap-4 sm:gap-5">
           {/* Custom Bot Token Input (Only when isCustomBot is true) */}
           {isCustomBot && (
             <div className="animate-in fade-in duration-200">
@@ -891,7 +891,7 @@ export default function TelegramConfigSection({
                   value={botToken}
                   onChange={(e) => setBotToken(e.target.value)}
                   placeholder="Ví dụ: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-20 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 pr-12 text-base sm:text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   required={isCustomBot}
                 />
                 <div className="absolute right-2 flex items-center gap-1">
@@ -909,7 +909,7 @@ export default function TelegramConfigSection({
           )}
 
           {/* Grid: Chat ID and Thread ID */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
             {/* Input 1: Chat ID */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -925,7 +925,7 @@ export default function TelegramConfigSection({
                 value={chatId}
                 onChange={(e) => setChatId(e.target.value)}
                 placeholder="Ví dụ: 123456789 hoặc -100123456789"
-                className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 text-base sm:text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
                 required
               />
               <p className="text-[11px] text-slate-500 mt-1">
@@ -958,7 +958,7 @@ export default function TelegramConfigSection({
                   className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-2.5 py-0.5 rounded-lg border border-sky-200 transition-colors cursor-pointer"
                 >
                   <ListFilter className="w-3 h-3" />
-                  <span>Quét / Chọn Topic</span>
+                  <span>Quét Topic</span>
                 </button>
               </div>
 
@@ -970,8 +970,8 @@ export default function TelegramConfigSection({
                     setThreadId(e.target.value);
                     setSelectedTopicName(null);
                   }}
-                  placeholder="Ví dụ: 24 (để trống nếu là chat thường)"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-28 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
+                  placeholder="Ví dụ: 24 (để trống nếu chat thường)"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 pr-28 text-base sm:text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
                 />
                 <button
                   type="button"
@@ -987,7 +987,7 @@ export default function TelegramConfigSection({
                     }
                     setIsTopicModalOpen(true);
                   }}
-                  className="absolute right-2 px-3 py-1.5 bg-white hover:bg-sky-50 text-sky-600 text-[11px] font-bold border border-slate-200 rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1"
+                  className="absolute right-2 px-2.5 py-1.5 bg-white hover:bg-sky-50 text-sky-600 text-[11px] font-bold border border-slate-200 rounded-lg sm:rounded-xl transition-colors cursor-pointer shadow-2xs flex items-center gap-1 active:scale-95"
                 >
                   <ListFilter className="w-3 h-3 text-sky-500" />
                   <span>Chọn Topic</span>
@@ -1014,13 +1014,13 @@ export default function TelegramConfigSection({
               )}
 
               <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                Bấm <strong>"Chọn Topic"</strong> để tự động tìm chủ đề trong nhóm. <span className="text-amber-700 font-medium">Lưu ý:</span> Do hạn chế của Telegram Bot API, tính năng này có thể quét thiếu topic cũ nếu chưa có tin nhắn gần đây. Bạn có thể tự nhập Thread ID hoặc gửi 1 tin nhắn vào topic rồi quét lại.
+                Bấm <strong>"Chọn Topic"</strong> để quét chủ đề trong nhóm hoặc tự nhập Thread ID.
               </p>
             </div>
           </div>
 
           {/* Notification Types Filter Checkboxes */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-3">
+          <div className="bg-slate-50 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
                 <Bell className="w-3.5 h-3.5 text-sky-600" />
@@ -1030,7 +1030,7 @@ export default function TelegramConfigSection({
 
             {/* QLDTTX Dependency Alert Banner */}
             {!isQldttxAvailable && (
-              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in">
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl sm:rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in">
                 <div className="flex items-start sm:items-center gap-2.5">
                   <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
                   <div>
@@ -1050,7 +1050,7 @@ export default function TelegramConfigSection({
                   <button
                     type="button"
                     onClick={() => onNavigateTab('EXTERNAL_ACCOUNTS')}
-                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shrink-0 transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-98"
+                    className="w-full sm:w-auto px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shrink-0 transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
                   >
                     <Globe className="w-3.5 h-3.5" />
                     <span>{isQldttxError ? 'Cập Nhật Mật Khẩu' : 'Liên Kết Ngay'}</span>
@@ -1059,7 +1059,7 @@ export default function TelegramConfigSection({
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 pt-1">
               {/* Option 1: Exam Schedule */}
               <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
                 <input
@@ -1171,18 +1171,18 @@ export default function TelegramConfigSection({
 
             {/* Class Schedule Setting Panel */}
             {isQldttxAvailable && notifyClassSchedule && (
-              <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="mt-2 p-3 sm:p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex flex-col gap-3 text-xs">
                 <div className="flex flex-col gap-0.5">
                   <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                    <CalendarDays className="w-3.5 h-3.5 text-amber-600" />
+                    <CalendarDays className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                     <span>Tự động nhắc lịch học & thời khóa biểu:</span>
                   </div>
                   <div className="text-[11px] text-amber-700">
-                    Sáng từ <strong>7h00 - 10h00</strong> tự động gửi tổng hợp các ca học hôm nay. Chọn thời gian nhắc nhở trước giờ vào lớp:
+                    Sáng từ <strong>7h00 - 10h00</strong> tự động gửi tổng hợp các ca học hôm nay. Chọn thời gian nhắc nhở:
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex flex-wrap items-center gap-2">
                   {[
                     { value: 30, label: '30 phút trước' },
                     { value: 60, label: '1 tiếng trước' },
@@ -1192,7 +1192,7 @@ export default function TelegramConfigSection({
                       key={item.value}
                       type="button"
                       onClick={() => setClassReminderBefore(item.value)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                         classReminderBefore === item.value
                           ? 'bg-amber-600 text-white shadow-xs'
                           : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
@@ -1206,7 +1206,7 @@ export default function TelegramConfigSection({
                     type="button"
                     onClick={handleCheckClassScheduleNow}
                     disabled={isCheckingClassSchedule || isCheckingNearestClassSchedule}
-                    className="ml-1 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50 active:scale-95"
                     title="Kiểm tra lịch học hôm nay và gửi tin nhắn thử nghiệm ngay"
                   >
                     {isCheckingClassSchedule ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
@@ -1217,7 +1217,7 @@ export default function TelegramConfigSection({
                     type="button"
                     onClick={handleCheckNearestClassSchedule}
                     disabled={isCheckingNearestClassSchedule || isCheckingClassSchedule}
-                    className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs rounded-lg transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs rounded-lg transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50 active:scale-95"
                     title="Quét lịch học gần nhất trong 10 ngày tới và gửi thông báo Telegram nếu có"
                   >
                     {isCheckingNearestClassSchedule ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CalendarDays className="w-3 h-3" />}
@@ -1243,10 +1243,10 @@ export default function TelegramConfigSection({
 
             {/* QLDTTX Check Interval Selector */}
             {isQldttxAvailable && notifyQldtAnnouncements && (
-              <div className="mt-1 p-3 bg-sky-50 border border-sky-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="mt-1 p-3 sm:p-3.5 bg-sky-50 border border-sky-200 rounded-xl flex flex-col gap-3 text-xs">
                 <div className="flex flex-col gap-0.5">
                   <div className="font-bold text-sky-900 flex items-center gap-1.5">
-                    <Globe className="w-3.5 h-3.5 text-sky-600" />
+                    <Globe className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                     <span>Tần suất kiểm tra thông báo mới từ QLDTTX:</span>
                   </div>
                   <div className="text-[11px] text-sky-700">
@@ -1254,7 +1254,7 @@ export default function TelegramConfigSection({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex flex-wrap items-center gap-2">
                   {[
                     { value: 1, label: '1 tiếng' },
                     { value: 2, label: '2 tiếng (Khuyên dùng)' },
@@ -1264,7 +1264,7 @@ export default function TelegramConfigSection({
                       key={item.value}
                       type="button"
                       onClick={() => setQldtCheckInterval(item.value)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                         qldtCheckInterval === item.value
                           ? 'bg-sky-600 text-white shadow-xs'
                           : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
@@ -1278,7 +1278,7 @@ export default function TelegramConfigSection({
                     type="button"
                     onClick={handleCheckQldtNow}
                     disabled={isCheckingQldt}
-                    className="ml-1 px-3 py-1.5 bg-sky-100 hover:bg-sky-200 text-sky-900 font-bold text-xs rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    className="px-3 py-1.5 bg-sky-100 hover:bg-sky-200 text-sky-900 font-bold text-xs rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50 active:scale-95"
                     title="Kiểm tra thông báo ngay lập tức"
                   >
                     {isCheckingQldt ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
@@ -1304,7 +1304,7 @@ export default function TelegramConfigSection({
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="px-4 py-2.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl sm:rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
               >
                 {isDeleting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                 <span>Xóa / Hủy Cấu Hình</span>
@@ -1319,7 +1319,7 @@ export default function TelegramConfigSection({
                 type="button"
                 onClick={handleTest}
                 disabled={isTesting || !chatId || (isCustomBot && !botToken)}
-                className="px-5 py-2.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs disabled:opacity-50 active:scale-95"
                 title="Gửi một tin nhắn mẫu tới Telegram để kiểm tra kết nối"
               >
                 {isTesting ? (
@@ -1339,7 +1339,7 @@ export default function TelegramConfigSection({
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-6 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-sky-500/20 disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-sky-500/20 disabled:opacity-50 active:scale-95"
               >
                 {isSaving ? (
                   <>
@@ -1359,16 +1359,16 @@ export default function TelegramConfigSection({
       </div>
 
       {/* Telegram Message Preview Card */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-sm">
-        <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+      <div className="bg-slate-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-800 shadow-sm">
+        <div className="flex items-center justify-between mb-3.5 sm:mb-4 border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2 text-xs font-bold text-sky-400">
             <Zap className="w-3.5 h-3.5" />
-            <span>Mẫu Tin Nhắn Sẽ Nhận Trên Telegram ({!isCustomBot ? 'Bot Hệ Thống' : 'Bot Riêng'})</span>
+            <span>Mẫu Tin Nhắn Telegram ({!isCustomBot ? 'Bot Hệ Thống' : 'Bot Riêng'})</span>
           </div>
           <span className="text-[11px] text-slate-500 font-mono">HTML Format</span>
         </div>
 
-        <div className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700/60 font-mono text-xs text-slate-200 leading-relaxed max-w-lg">
+        <div className="bg-slate-800/80 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 border border-slate-700/60 font-mono text-xs text-slate-200 leading-relaxed max-w-lg overflow-x-auto">
           <div className="font-bold text-sky-300 mb-1">🤖 THÔNG BÁO THỬ NGHIỆM - PTIT WEB TOOL</div>
           <div className="text-slate-500 mb-2">━━━━━━━━━━━━━━━━━━━━━━━━━</div>
           <div className="text-emerald-400 font-bold mb-2">

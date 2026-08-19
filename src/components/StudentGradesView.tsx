@@ -243,29 +243,29 @@ export default function StudentGradesView({
   const summary = data?.summary;
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-200">
-      {/* Top Banner / Header */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-gradient-to-br from-indigo-600 via-blue-600 to-purple-600 text-white rounded-2xl shadow-md shadow-indigo-500/20">
-            <Award className="w-6 h-6" />
+    <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
+      {/* Top Banner / Quick Header */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4">
+        <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
+          <div className="p-2.5 sm:p-3 bg-gradient-to-br from-indigo-600 via-blue-600 to-purple-600 text-white rounded-xl sm:rounded-2xl shadow-xs shadow-indigo-500/20 shrink-0 mt-0.5 sm:mt-0">
+            <Award className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg font-black text-slate-800">Bảng Điểm & Kết Quả Học Tập</h2>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <h2 className="text-sm sm:text-lg font-black text-slate-800">Bảng Điểm & Kết Quả Học Tập</h2>
               {data?.isCachedDb ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
-                  Đã Lưu Trong CSDL
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600 shrink-0" />
+                  Đã Lưu CSDL
                 </span>
               ) : data?.isLiveSync ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Đồng bộ Trực Tuyến QLĐT
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Đồng bộ Trực Tuyến
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                  <CheckCircle2 className="w-3 h-3 text-slate-500" />
                   Dữ Liệu Đã Lưu
                 </span>
               )}
@@ -273,30 +273,27 @@ export default function StudentGradesView({
               {/* Last Update Badge */}
               {data?.lastSyncAt && (
                 <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200"
                   title="Thời điểm kéo dữ liệu từ Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)"
                 >
-                  <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <Clock className="w-3 h-3 text-indigo-600 shrink-0" />
                   <span>Cập nhật:</span>
                   <strong className="font-mono text-slate-900">{formatSyncDateTime(data.lastSyncAt)}</strong>
-                  {getRelativeSyncTime(data.lastSyncAt) && (
-                    <span className="text-[10px] text-slate-500 font-normal">({getRelativeSyncTime(data.lastSyncAt)})</span>
-                  )}
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Cổng đào tạo: <strong className="text-indigo-600 font-mono">https://qldttx.pttc1.edu.vn/</strong> • Tổng số <b>{semesters.length} học kỳ</b> ({summary?.totalSubjects || 0} học phần)
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-relaxed">
+              Cổng: <strong className="text-indigo-600 font-mono">qldttx.pttc1.edu.vn</strong> • Tổng số <b>{semesters.length} học kỳ</b> ({summary?.totalSubjects || 0} học phần)
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {/* Active Pull button from QLDTTX */}
           <button
             onClick={() => fetchGrades(true)}
             disabled={isRefreshing || isLoading}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+            className="flex-1 sm:flex-initial px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-xs shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
             title="Chủ động kết nối và kéo bảng điểm, điểm thành phần mới nhất từ Cổng Quản Lý Đào Tạo Từ Xa"
           >
             {isRefreshing ? (
@@ -304,22 +301,22 @@ export default function StudentGradesView({
             ) : (
               <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
             )}
-            <span>{isRefreshing ? 'Đang kéo dữ liệu...' : 'Đồng Bộ Từ QLDTTX'}</span>
+            <span>{isRefreshing ? 'Đang kéo...' : 'Đồng Bộ QLDTTX'}</span>
           </button>
 
           <button
             onClick={handleCopySummary}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl transition flex items-center gap-1.5 cursor-pointer active:scale-95"
             title="Sao chép tóm tắt kết quả học tập"
           >
             {copiedSummary ? <CheckCheck className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
-            <span>{copiedSummary ? 'Đã chép!' : 'Sao Chép'}</span>
+            <span>{copiedSummary ? 'Đã chép' : 'Sao Chép'}</span>
           </button>
 
           <button
             onClick={handleExportCSV}
             disabled={!data?.semesters?.length}
-            className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-2xl border border-emerald-200 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl sm:rounded-2xl border border-emerald-200 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
             title="Xuất bảng điểm ra file Excel/CSV"
           >
             <Download className="w-3.5 h-3.5" />
@@ -1030,8 +1027,111 @@ export default function StudentGradesView({
                     </div>
                   </div>
 
-                  {/* Course Table */}
-                  <div className="overflow-x-auto">
+                  {/* Mobile Course Cards (Mobile View) */}
+                  <div className="block md:hidden p-3.5 divide-y divide-slate-100">
+                    {sem.courses.map((course, idx) => (
+                      <div
+                        key={course.id}
+                        className={`py-3.5 first:pt-1 last:pb-1 flex flex-col gap-2.5 ${
+                          course.isPassed === false ? 'bg-rose-50/30 -mx-3.5 px-3.5 rounded-xl' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
+                                {course.subjectCode}
+                              </span>
+                              <span className="text-[11px] font-bold text-slate-500">
+                                {course.credits} TC • Nhóm {course.group}
+                              </span>
+                            </div>
+                            <h5 className="text-xs font-bold text-slate-800 leading-snug">
+                              {course.subjectName}
+                            </h5>
+                            {!course.isCalculatedInGpa && course.reasonNotCalculated && (
+                              <span className="text-[10px] text-amber-700 italic block mt-0.5">
+                                • {course.reasonNotCalculated}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            {course.letterGrade ? (
+                              <span
+                                className={`px-2.5 py-0.5 rounded-lg text-xs font-black font-mono border shadow-2xs ${
+                                  course.letterGrade.startsWith('A')
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    : course.letterGrade.startsWith('B')
+                                    ? 'bg-blue-100 text-blue-800 border-blue-300'
+                                    : course.letterGrade.startsWith('C')
+                                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                    : course.letterGrade.startsWith('D')
+                                    ? 'bg-orange-100 text-orange-800 border-orange-300'
+                                    : 'bg-rose-100 text-rose-800 border-rose-300'
+                                }`}
+                              >
+                                {course.letterGrade}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-xs font-bold">—</span>
+                            )}
+
+                            {course.isPassed === true ? (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <Check className="w-2.5 h-2.5 stroke-[3]" /> Đạt
+                              </span>
+                            ) : course.isPassed === false ? (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                <X className="w-2.5 h-2.5 stroke-[3]" /> Chưa đạt
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                <Clock className="w-2.5 h-2.5" /> Đang học
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Scores Grid */}
+                        <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200/80 text-center">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block">Điểm Thi</span>
+                            <span className="text-xs font-mono font-bold text-slate-700">
+                              {course.examScore !== null ? course.examScore.toFixed(1) : '—'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block">Tổng Kết (10)</span>
+                            <span className="text-xs font-mono font-black text-slate-800">
+                              {course.finalScore10 !== null ? course.finalScore10.toFixed(1) : '—'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block">Tổng Kết (4)</span>
+                            <span className="text-xs font-mono font-black text-indigo-600">
+                              {course.finalScore4 !== null ? course.finalScore4.toFixed(1) : '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action buttons (Chi tiết TP) */}
+                        {course.components.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCourseModal(course)}
+                            className="w-full py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg transition text-[11px] flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            <span>Xem chi tiết {course.components.length} điểm thành phần</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Course Table (Desktop View) */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-xs text-left">
                       <thead className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
                         <tr>

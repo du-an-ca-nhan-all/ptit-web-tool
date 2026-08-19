@@ -362,79 +362,81 @@ export default function UserProfileScreen({
   const configuredCount = externalAccounts.filter((a) => a.isConfigured).length;
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
       {/* Toast notifications */}
       {successMsg && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-3xl text-emerald-800 text-sm font-bold flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>{successMsg}</span>
+        <div className="p-3.5 sm:p-4 bg-emerald-50 border border-emerald-200 rounded-2xl sm:rounded-3xl text-emerald-800 text-xs sm:text-sm font-bold flex items-center justify-between shadow-xs animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 shrink-0" />
+            <span className="truncate sm:whitespace-normal">{successMsg}</span>
           </div>
-          <button onClick={() => setSuccessMsg('')} className="p-1 text-emerald-600 hover:text-emerald-800 cursor-pointer">
+          <button onClick={() => setSuccessMsg('')} className="p-1 text-emerald-600 hover:text-emerald-800 cursor-pointer shrink-0 ml-2">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {errorMsg && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-3xl text-rose-700 text-sm font-bold flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">
-          <div className="flex items-center gap-2.5">
-            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-            <span>{errorMsg}</span>
+        <div className="p-3.5 sm:p-4 bg-rose-50 border border-rose-200 rounded-2xl sm:rounded-3xl text-rose-700 text-xs sm:text-sm font-bold flex items-center justify-between shadow-xs animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600 shrink-0" />
+            <span className="truncate sm:whitespace-normal">{errorMsg}</span>
           </div>
-          <button onClick={() => setErrorMsg('')} className="p-1 text-rose-600 hover:text-rose-800 cursor-pointer">
+          <button onClick={() => setErrorMsg('')} className="p-1 text-rose-600 hover:text-rose-800 cursor-pointer shrink-0 ml-2">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* Main Profile Hero Banner */}
-      <div className="relative rounded-3xl overflow-hidden shadow-lg border border-slate-200/80 bg-gradient-to-r from-blue-700 via-indigo-700 to-indigo-900 text-white p-6 sm:p-8">
+      <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg border border-slate-200/80 bg-gradient-to-r from-blue-700 via-indigo-700 to-indigo-900 text-white p-4 sm:p-6 md:p-8">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-5 flex-wrap sm:flex-nowrap">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-white p-1.5 shadow-2xl shrink-0 overflow-hidden ring-4 ring-white/20">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
+          {/* User Identity Info */}
+          <div className="flex items-center sm:items-start md:items-center gap-3.5 sm:gap-5">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl sm:rounded-3xl bg-white p-1 shadow-2xl shrink-0 overflow-hidden ring-2 sm:ring-4 ring-white/20">
               <img
                 src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${maSV}`}
                 alt={fullName}
-                className="w-full h-full object-cover rounded-2xl"
+                className="w-full h-full object-cover rounded-xl sm:rounded-2xl"
               />
             </div>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{fullName}</h1>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight leading-tight break-words">{fullName}</h1>
                 {currentEffectiveRole === 'admin' && (
-                  <span className="bg-rose-500 text-white text-xs font-black px-3 py-1 rounded-full inline-flex items-center gap-1 shadow-sm">
-                    <Crown className="w-3.5 h-3.5 text-amber-300" /> Quản Trị Viên (Admin)
+                  <span className="bg-rose-500 text-white text-[10px] sm:text-xs font-black px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full inline-flex items-center gap-1 shadow-xs shrink-0">
+                    <Crown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-300" /> Admin
                   </span>
                 )}
                 {currentEffectiveRole === 'lop_truong' && (
-                  <span className="bg-amber-400 text-slate-900 text-xs font-black px-3 py-1 rounded-full inline-flex items-center gap-1 shadow-sm">
-                    <Crown className="w-3.5 h-3.5" /> Lớp Trưởng
+                  <span className="bg-amber-400 text-slate-900 text-[10px] sm:text-xs font-black px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full inline-flex items-center gap-1 shadow-xs shrink-0">
+                    <Crown className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Lớp Trưởng
                   </span>
                 )}
                 {currentEffectiveRole === 'sinh_vien' && (
-                  <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1">
-                    <GraduationCap className="w-3.5 h-3.5" /> Sinh Viên
+                  <span className="bg-white/20 backdrop-blur-sm text-white text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full inline-flex items-center gap-1 shrink-0">
+                    <GraduationCap className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Sinh Viên
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-3 mt-2 text-blue-100 text-xs sm:text-sm font-mono flex-wrap">
+              {/* Badges Line */}
+              <div className="flex items-center gap-1.5 sm:gap-2.5 mt-2 text-blue-100 text-xs sm:text-sm font-mono flex-wrap">
                 <button
                   onClick={handleCopyMssv}
-                  className="bg-black/25 hover:bg-black/40 px-3 py-1 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="bg-black/30 hover:bg-black/45 active:scale-95 px-2.5 py-1 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0"
                   title="Sao chép MSSV"
                 >
-                  <span className="font-bold text-white">{maSV}</span>
-                  {copiedMssv ? <CheckCheck className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span className="font-bold text-white tracking-wider">{maSV}</span>
+                  {copiedMssv ? <CheckCheck className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5 opacity-75" />}
                 </button>
-                <span>•</span>
-                <span className="font-bold text-white">Lớp {maLop}</span>
-                <span>•</span>
-                <span className="text-emerald-300 font-sans font-semibold">
+                <span className="bg-white/15 backdrop-blur-md px-2.5 py-1 rounded-xl font-bold text-white text-[11px] sm:text-xs shrink-0">
+                  Lớp {maLop}
+                </span>
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2.5 py-1 rounded-xl text-[11px] sm:text-xs font-sans font-semibold shrink-0">
                   {trangThai === 'DANG_HOC'
                     ? '● Đang theo học'
                     : trangThai === 'BAO_LUU'
@@ -445,59 +447,59 @@ export default function UserProfileScreen({
             </div>
           </div>
 
-          {/* Quick Metrics on Banner */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 text-center">
-              <div className="text-[11px] text-blue-200 uppercase font-bold tracking-wider">Lịch Thi</div>
-              <div className="text-lg font-black text-white mt-0.5">
+          {/* Quick Metrics on Banner (Balanced 3-column on mobile & desktop) */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 shrink-0 pt-2 sm:pt-0 border-t border-white/10 md:border-t-0">
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl sm:rounded-2xl p-2 sm:p-3 text-center flex flex-col justify-center">
+              <div className="text-[10px] sm:text-[11px] text-blue-200 uppercase font-bold tracking-wider">Lịch Thi</div>
+              <div className="text-sm sm:text-base md:text-lg font-black text-white mt-0.5">
                 {hasExamSchedule ? `${exams.length} môn` : 'Đang đóng'}
               </div>
             </div>
 
             <div
               onClick={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
-              className="bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 rounded-2xl p-3 text-center cursor-pointer transition-colors"
+              className="bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 active:scale-95 rounded-xl sm:rounded-2xl p-2 sm:p-3 text-center cursor-pointer transition-all flex flex-col justify-center"
               title="Nhấp để xem liên kết QLĐT"
             >
-              <div className="text-[11px] text-blue-200 uppercase font-bold tracking-wider">Cổng QLĐT</div>
-              <div className="text-lg font-black text-emerald-300 mt-0.5">
-                {configuredCount > 0 ? 'Đã liên kết' : 'Chưa liên kết'}
+              <div className="text-[10px] sm:text-[11px] text-blue-200 uppercase font-bold tracking-wider">Cổng QLĐT</div>
+              <div className="text-sm sm:text-base md:text-lg font-black text-emerald-300 mt-0.5">
+                {configuredCount > 0 ? 'Đã kết nối' : 'Chưa kết nối'}
               </div>
             </div>
 
-            <div className="col-span-2 sm:col-span-1 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 text-center">
-              <div className="text-[11px] text-blue-200 uppercase font-bold tracking-wider">Số Điện Thoại</div>
-              <div className="text-xs font-mono font-bold text-white mt-1 truncate">
-                {phone || 'Chưa cập nhật'}
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl sm:rounded-2xl p-2 sm:p-3 text-center flex flex-col justify-center">
+              <div className="text-[10px] sm:text-[11px] text-blue-200 uppercase font-bold tracking-wider">Số ĐT</div>
+              <div className="text-xs sm:text-sm font-mono font-bold text-white mt-0.5 truncate">
+                {phone || 'Chưa có'}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Screen Sub-Tabs Navigation */}
-      <div className="bg-white rounded-3xl p-1.5 border border-slate-200 shadow-sm flex items-center gap-1.5 overflow-x-auto">
+      {/* Screen Sub-Tabs Navigation (Optimized for Mobile Horizontal Scroll) */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-1 sm:p-1.5 border border-slate-200 shadow-xs flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none scroll-smooth -mx-1 sm:mx-0 px-2 sm:px-1.5">
         <button
           onClick={() => setActiveSubTab('OVERVIEW')}
-          className={`flex-1 min-w-[140px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap ${
             activeSubTab === 'OVERVIEW'
-              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+              ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <UserIcon className="w-4 h-4" />
+          <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <span>Thông Tin Học Vụ</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('SCHEDULE')}
-          className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer relative ${
+          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
             activeSubTab === 'SCHEDULE'
-              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+              ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <CalendarDays className="w-4 h-4" />
+          <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <span>Lịch Học & TKB</span>
           {configuredCount === 0 ? (
             <Lock className="w-3 h-3 text-amber-500 opacity-80" />
@@ -508,13 +510,13 @@ export default function UserProfileScreen({
 
         <button
           onClick={() => setActiveSubTab('GRADES')}
-          className={`flex-1 min-w-[160px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer relative ${
+          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
             activeSubTab === 'GRADES'
-              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+              ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Award className="w-4 h-4" />
+          <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <span>Bảng Điểm & Kết Quả</span>
           {configuredCount === 0 ? (
             <Lock className="w-3 h-3 text-amber-500 opacity-80" />
@@ -525,13 +527,13 @@ export default function UserProfileScreen({
 
         <button
           onClick={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
-          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer relative ${
+          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
             activeSubTab === 'EXTERNAL_ACCOUNTS'
-              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+              ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Globe className="w-4 h-4" />
+          <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <span>Liên Kết QLĐT Từ Xa</span>
           {configuredCount > 0 && (
             <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white"></span>
@@ -540,63 +542,63 @@ export default function UserProfileScreen({
 
         <button
           onClick={() => setActiveSubTab('TELEGRAM')}
-          className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer relative ${
+          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
             activeSubTab === 'TELEGRAM'
-              ? 'bg-sky-600 text-white shadow-sm shadow-sky-200'
+              ? 'bg-sky-600 text-white shadow-xs shadow-sky-200'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <span>Cấu Hình Telegram</span>
         </button>
 
         {hasExamSchedule && (
           <button
             onClick={() => setActiveSubTab('EXAMS')}
-            className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap ${
               activeSubTab === 'EXAMS'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <Calendar className="w-4 h-4" />
-            <span>Lịch Thi Cá Nhân ({exams.length})</span>
+            <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Lịch Thi ({exams.length})</span>
           </button>
         )}
 
         <button
           onClick={() => setActiveSubTab('SECURITY')}
-          className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap ${
             activeSubTab === 'SECURITY'
-              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+              ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <ShieldCheck className="w-4 h-4" />
+          <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <span>Bảo Mật & Mật Khẩu</span>
         </button>
       </div>
 
       {/* SUB-TAB 1: OVERVIEW & PERSONAL INFO */}
       {activeSubTab === 'OVERVIEW' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main Personal Info Card */}
-          <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 border border-slate-200 shadow-sm flex flex-col gap-4 sm:gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5 sm:pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-2xl">
-                  <UserIcon className="w-5 h-5" />
+                <div className="p-2 sm:p-2.5 bg-indigo-50 text-indigo-600 rounded-xl sm:rounded-2xl shrink-0">
+                  <UserIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-800">Hồ Sơ & Lý Lịch Học Tập</h3>
-                  <p className="text-xs text-slate-500">Thông tin cá nhân được trích xuất từ cơ sở dữ liệu sinh viên</p>
+                  <h3 className="text-sm sm:text-base font-black text-slate-800">Hồ Sơ & Lý Lịch Học Tập</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Thông tin cá nhân trích xuất từ cơ sở dữ liệu sinh viên</p>
                 </div>
               </div>
 
               {!isEditing && (
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl sm:rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                   <span>Chỉnh Sửa SĐT / Ghi Chú</span>
@@ -605,15 +607,15 @@ export default function UserProfileScreen({
             </div>
 
             {isEditing ? (
-              <form onSubmit={handleSaveProfile} className="flex flex-col gap-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    <span className="text-slate-400 text-xs font-bold uppercase block mb-1">Mã sinh viên:</span>
-                    <span className="font-mono font-black text-slate-800 text-base">{maSV}</span>
+              <form onSubmit={handleSaveProfile} className="flex flex-col gap-4 sm:gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="bg-slate-50 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200">
+                    <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase block mb-1">Mã sinh viên:</span>
+                    <span className="font-mono font-black text-slate-800 text-sm sm:text-base">{maSV}</span>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    <span className="text-slate-400 text-xs font-bold uppercase block mb-1">Lớp học chính:</span>
-                    <span className="font-bold text-blue-600 text-base">{maLop}</span>
+                  <div className="bg-slate-50 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200">
+                    <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase block mb-1">Lớp học chính:</span>
+                    <span className="font-bold text-blue-600 text-sm sm:text-base">{maLop}</span>
                   </div>
                 </div>
 
@@ -624,7 +626,7 @@ export default function UserProfileScreen({
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="Nhập số điện thoại (ví dụ: 0912345678)"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 text-sm font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 text-base sm:text-sm font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
 
@@ -635,11 +637,11 @@ export default function UserProfileScreen({
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Thêm ghi chú cá nhân, phân công, trực nhật..."
                     rows={3}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-4 text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 text-base sm:text-sm text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 pt-3 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => {
@@ -647,14 +649,14 @@ export default function UserProfileScreen({
                       setPhone(student?.soDienThoai || currentUser?.phoneNumber || '');
                       setNote(student?.ghiChu || '');
                     }}
-                    className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-2xl transition-colors cursor-pointer"
+                    className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl sm:rounded-2xl transition-colors cursor-pointer text-center justify-center flex items-center"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-xs shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
                   >
                     {isSaving ? (
                       <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -666,44 +668,44 @@ export default function UserProfileScreen({
                 </div>
               </form>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Mã sinh viên</span>
-                  <span className="font-mono font-black text-slate-800 text-base">{maSV}</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
+                <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+                  <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Mã sinh viên</span>
+                  <span className="font-mono font-black text-slate-800 text-sm sm:text-base">{maSV}</span>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Họ và Tên</span>
-                  <span className="font-black text-slate-800 text-base">{fullName}</span>
+                <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+                  <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Họ và Tên</span>
+                  <span className="font-black text-slate-800 text-sm sm:text-base">{fullName}</span>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Giới tính</span>
-                  <span className="font-bold text-slate-800 text-sm">{gioiTinh}</span>
+                <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+                  <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Giới tính</span>
+                  <span className="font-bold text-slate-800 text-xs sm:text-sm">{gioiTinh}</span>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Ngày sinh</span>
-                  <span className="font-bold text-slate-800 text-sm">{ngaySinh}</span>
+                <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+                  <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Ngày sinh</span>
+                  <span className="font-bold text-slate-800 text-xs sm:text-sm">{ngaySinh}</span>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Lớp biên chế</span>
-                  <span className="font-bold text-blue-600 text-sm">{maLop}</span>
+                <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+                  <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Lớp biên chế</span>
+                  <span className="font-bold text-blue-600 text-xs sm:text-sm">{maLop}</span>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Số điện thoại</span>
-                  <span className="font-mono font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+                  <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Số điện thoại</span>
+                  <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     {phone || <span className="text-slate-400 font-normal italic">Chưa cập nhật</span>}
                   </span>
                 </div>
 
                 {note && (
-                  <div className="sm:col-span-2 p-4 bg-amber-50/50 rounded-2xl border border-amber-200/60">
-                    <span className="text-amber-800 text-xs font-bold uppercase tracking-wider block mb-1">Ghi chú cá nhân</span>
-                    <p className="text-slate-700 text-xs italic">"{note}"</p>
+                  <div className="sm:col-span-2 p-3.5 sm:p-4 bg-amber-50/50 rounded-xl sm:rounded-2xl border border-amber-200/60">
+                    <span className="text-amber-800 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Ghi chú cá nhân</span>
+                    <p className="text-slate-700 text-xs italic break-words">"{note}"</p>
                   </div>
                 )}
               </div>
@@ -711,18 +713,18 @@ export default function UserProfileScreen({
           </div>
 
           {/* Side Info Cards */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 sm:gap-6">
             {/* Multi-Role Switcher Card */}
             {userRoles.length > 1 && onSelectRole && (
-              <div className="bg-gradient-to-br from-indigo-900 to-purple-950 text-white rounded-3xl p-6 shadow-md border border-indigo-500/30 flex flex-col gap-4">
+              <div className="bg-gradient-to-br from-indigo-900 to-purple-950 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-md border border-indigo-500/30 flex flex-col gap-3.5 sm:gap-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="p-2 bg-white/10 rounded-xl">
-                      <Crown className="w-5 h-5 text-amber-300" />
+                    <div className="p-2 bg-white/10 rounded-xl shrink-0">
+                      <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
                     </div>
                     <div>
-                      <h4 className="font-black text-sm text-white">Chuyển Vai Trò Hoạt Động</h4>
-                      <p className="text-[11px] text-indigo-200">Bạn sở hữu {userRoles.length} vai trò trong hệ thống</p>
+                      <h4 className="font-black text-xs sm:text-sm text-white">Chuyển Vai Trò Hoạt Động</h4>
+                      <p className="text-[10px] sm:text-[11px] text-indigo-200">Bạn sở hữu {userRoles.length} vai trò trong hệ thống</p>
                     </div>
                   </div>
                 </div>
@@ -734,31 +736,31 @@ export default function UserProfileScreen({
                       <button
                         key={r}
                         onClick={() => onSelectRole(r)}
-                        className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all cursor-pointer text-left border ${
+                        className={`w-full p-2.5 sm:p-3 rounded-xl sm:rounded-2xl flex items-center justify-between transition-all cursor-pointer text-left border active:scale-98 ${
                           isCurrent
-                            ? 'bg-white text-slate-900 font-black border-white shadow-lg scale-[1.02]'
+                            ? 'bg-white text-slate-900 font-black border-white shadow-lg'
                             : 'bg-white/10 hover:bg-white/20 text-white border-white/10 font-bold'
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                           {r === 'admin' ? (
-                            <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-sm shrink-0">
                               👑
                             </div>
                           ) : r === 'lop_truong' ? (
-                            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm shrink-0">
                               🛡️
                             </div>
                           ) : (
-                            <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0">
                               🎓
                             </div>
                           )}
-                          <div>
-                            <div className="text-xs">
+                          <div className="min-w-0">
+                            <div className="text-xs truncate">
                               {r === 'admin' ? 'Quản Trị Viên (Admin)' : r === 'lop_truong' ? 'Lớp Trưởng' : 'Sinh Viên'}
                             </div>
-                            <div className={`text-[10px] ${isCurrent ? 'text-slate-500' : 'text-indigo-200'} font-normal`}>
+                            <div className={`text-[10px] ${isCurrent ? 'text-slate-500' : 'text-indigo-200'} font-normal truncate`}>
                               {r === 'admin'
                                 ? 'Toàn quyền cấu hình, đợt thi & QLĐT'
                                 : r === 'lop_truong'
@@ -768,7 +770,7 @@ export default function UserProfileScreen({
                           </div>
                         </div>
                         {isCurrent && (
-                          <span className="px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded-lg shrink-0">
+                          <span className="px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded-lg shrink-0 ml-2">
                             Đang dùng
                           </span>
                         )}
@@ -780,18 +782,18 @@ export default function UserProfileScreen({
             )}
 
             {/* Institution Card */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col gap-4">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col gap-3.5 sm:gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                  <Award className="w-5 h-5" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                  <Award className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <h4 className="font-black text-slate-800 text-sm">Học Viện Công Nghệ Bưu Chính Viễn Thông</h4>
-                  <p className="text-[11px] text-slate-500">Hệ Đào Tạo Từ Xa (PTTC1)</p>
+                <div className="min-w-0">
+                  <h4 className="font-black text-slate-800 text-xs sm:text-sm truncate sm:whitespace-normal">Học Viện Công Nghệ Bưu Chính Viễn Thông</h4>
+                  <p className="text-[10px] sm:text-[11px] text-slate-500">Hệ Đào Tạo Từ Xa (PTTC1)</p>
                 </div>
               </div>
 
-              <div className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+              <div className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-100">
                 Cổng tiện ích học tập, đối chiếu môn học & tra cứu lịch thi trực tuyến PTIT EduSync. Dữ liệu được đồng bộ trực tiếp từ cổng trường.
               </div>
 
@@ -809,61 +811,61 @@ export default function UserProfileScreen({
             </div>
 
             {/* Quick Actions Card */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col gap-3">
-              <h4 className="font-black text-slate-800 text-sm mb-1">Truy Cập Nhanh</h4>
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col gap-2.5 sm:gap-3">
+              <h4 className="font-black text-slate-800 text-xs sm:text-sm mb-1">Truy Cập Nhanh</h4>
 
               <button
                 onClick={() => setActiveSubTab('SCHEDULE')}
-                className="w-full p-3 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-2xl text-left flex items-center justify-between transition-colors cursor-pointer group"
+                className="w-full p-2.5 sm:p-3 bg-slate-50 hover:bg-indigo-50 active:scale-98 border border-slate-200 rounded-xl sm:rounded-2xl text-left flex items-center justify-between transition-all cursor-pointer group"
               >
-                <div className="flex items-center gap-2.5">
-                  <CalendarDays className="w-4 h-4 text-indigo-600" />
-                  <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">Xem Lịch Học & Thời Khóa Biểu</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <CalendarDays className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700 truncate">Xem Lịch Học & Thời Khóa Biểu</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
               </button>
 
               <button
                 onClick={() => setActiveSubTab('GRADES')}
-                className="w-full p-3 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-2xl text-left flex items-center justify-between transition-colors cursor-pointer group"
+                className="w-full p-2.5 sm:p-3 bg-slate-50 hover:bg-indigo-50 active:scale-98 border border-slate-200 rounded-xl sm:rounded-2xl text-left flex items-center justify-between transition-all cursor-pointer group"
               >
-                <div className="flex items-center gap-2.5">
-                  <Award className="w-4 h-4 text-indigo-600" />
-                  <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">Xem Điểm & Bảng Điểm Học Tập</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Award className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700 truncate">Xem Điểm & Bảng Điểm Học Tập</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
               </button>
 
               <button
                 onClick={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
-                className="w-full p-3 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-2xl text-left flex items-center justify-between transition-colors cursor-pointer group"
+                className="w-full p-2.5 sm:p-3 bg-slate-50 hover:bg-indigo-50 active:scale-98 border border-slate-200 rounded-xl sm:rounded-2xl text-left flex items-center justify-between transition-all cursor-pointer group"
               >
-                <div className="flex items-center gap-2.5">
-                  <Globe className="w-4 h-4 text-indigo-600" />
-                  <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">Cấu Hình Tài Khoản QLDTTX</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Globe className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700 truncate">Cấu Hình Tài Khoản QLDTTX</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
               </button>
 
               {hasExamSchedule && onNavigateTab && (
                 <button
                   onClick={() => onNavigateTab('personal_schedule')}
-                  className="w-full p-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-2xl text-left flex items-center justify-between transition-colors cursor-pointer group"
+                  className="w-full p-2.5 sm:p-3 bg-slate-50 hover:bg-blue-50 active:scale-98 border border-slate-200 rounded-xl sm:rounded-2xl text-left flex items-center justify-between transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Calendar className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-bold text-slate-700 group-hover:text-blue-700">Xem Toàn Bộ Lịch Thi</span>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span className="text-xs font-bold text-slate-700 group-hover:text-blue-700 truncate">Xem Toàn Bộ Lịch Thi</span>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 shrink-0 ml-1" />
                 </button>
               )}
 
               <button
                 onClick={onLogout}
-                className="w-full p-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-2xl text-left flex items-center justify-between transition-colors cursor-pointer text-rose-700"
+                className="w-full p-2.5 sm:p-3 bg-rose-50 hover:bg-rose-100 active:scale-98 border border-rose-200 rounded-xl sm:rounded-2xl text-left flex items-center justify-between transition-all cursor-pointer text-rose-700 mt-1"
               >
                 <div className="flex items-center gap-2.5">
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4 h-4 shrink-0" />
                   <span className="text-xs font-bold">Đăng Xuất Khỏi Hệ Thống</span>
                 </div>
               </button>
@@ -890,14 +892,14 @@ export default function UserProfileScreen({
 
       {/* SUB-TAB 2: EXTERNAL ACCOUNTS (No Token Display) */}
       {activeSubTab === 'EXTERNAL_ACCOUNTS' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 border border-slate-200 shadow-sm flex flex-col gap-4 sm:gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5 sm:pb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl">
-                <Globe className="w-6 h-6" />
+              <div className="p-2 sm:p-2.5 bg-indigo-50 text-indigo-600 rounded-xl sm:rounded-2xl shrink-0">
+                <Globe className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-800">Liên Kết Hệ Thống Quản Lý Đào Tạo Từ Xa</h3>
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-black text-slate-800">Liên Kết Hệ Thống Quản Lý Đào Tạo Từ Xa</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Cổng kết nối: <strong className="text-indigo-600 font-mono">https://qldttx.pttc1.edu.vn/</strong>
                 </p>
@@ -907,14 +909,14 @@ export default function UserProfileScreen({
             <button
               onClick={fetchExternalAccounts}
               disabled={isLoadingExternal}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95 shrink-0"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingExternal ? 'animate-spin' : ''}`} />
               <span>Làm Mới</span>
             </button>
           </div>
 
-          <div className="bg-blue-50/60 border border-blue-200/80 rounded-2xl p-4 text-xs text-slate-700 leading-relaxed flex items-start gap-3">
+          <div className="bg-blue-50/60 border border-blue-200/80 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 text-xs text-slate-700 leading-relaxed flex items-start gap-3">
             <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
             <div>
               <p className="font-bold text-blue-900 mb-1">Cơ chế đồng bộ an toàn</p>
@@ -930,7 +932,7 @@ export default function UserProfileScreen({
               <p className="text-xs text-slate-500 font-bold">Đang tải cấu hình kết nối...</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4 sm:gap-6">
               {externalAccounts.map((sys) => {
                 const form = extForm[sys.systemKey] || {
                   username: sys.extUsername || currentUser.username,
@@ -943,26 +945,26 @@ export default function UserProfileScreen({
                 return (
                   <div
                     key={sys.systemKey}
-                    className={`rounded-3xl border transition-all p-6 flex flex-col gap-5 ${
+                    className={`rounded-2xl sm:rounded-3xl border transition-all p-4 sm:p-6 flex flex-col gap-4 sm:gap-5 ${
                       sys.isConfigured
-                        ? 'bg-white border-indigo-300 shadow-sm'
-                        : 'bg-white border-slate-200 shadow-sm'
+                        ? 'bg-white border-indigo-300 shadow-xs'
+                        : 'bg-white border-slate-200 shadow-xs'
                     }`}
                   >
                     {/* Header: System Info & Status */}
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                          <h4 className="font-black text-slate-800 text-base flex items-center gap-2">
-                            <Globe className="w-5 h-5 text-indigo-600" />
-                            {sys.systemName}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h4 className="font-black text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                            <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 shrink-0" />
+                            <span className="truncate">{sys.systemName}</span>
                           </h4>
                           {sys.isConfigured ? (
-                            <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1">
+                            <span className="bg-emerald-100 text-emerald-800 text-[10px] sm:text-xs font-black px-2.5 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1 shrink-0">
                               <Check className="w-3 h-3" /> Đã Liên Kết
                             </span>
                           ) : (
-                            <span className="bg-slate-100 text-slate-500 text-xs font-bold px-2.5 py-0.5 rounded-full border border-slate-200">
+                            <span className="bg-slate-100 text-slate-500 text-[10px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full border border-slate-200 shrink-0">
                               Chưa Cấu Hình
                             </span>
                           )}
@@ -972,22 +974,22 @@ export default function UserProfileScreen({
                           href={sys.systemUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-indigo-600 hover:text-indigo-800 font-mono font-bold flex items-center gap-1 hover:underline"
+                          className="text-xs text-indigo-600 hover:text-indigo-800 font-mono font-bold flex items-center gap-1 hover:underline truncate"
                         >
-                          <span>{sys.systemUrl}</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span className="truncate">{sys.systemUrl}</span>
+                          <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                         </a>
                       </div>
                     </div>
 
                     {sys.description && (
-                      <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                      <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl sm:rounded-2xl border border-slate-100">
                         {sys.description}
                       </p>
                     )}
 
                     {/* Input Credentials Form */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-3 border-t border-slate-100">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
                           <UserIcon className="w-3.5 h-3.5 text-slate-400" /> Tên đăng nhập (Mã SV trên QLDTTX)
@@ -1002,7 +1004,7 @@ export default function UserProfileScreen({
                             }))
                           }
                           placeholder={sys.placeholderUser || 'Nhập mã sinh viên'}
-                          className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 text-xs font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                          className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 text-base sm:text-xs font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                         />
                       </div>
 
@@ -1021,7 +1023,7 @@ export default function UserProfileScreen({
                               }))
                             }
                             placeholder={sys.hasPassword ? '•••••••• (Nhập lại để cập nhật)' : 'Nhập mật khẩu QLDTTX'}
-                            className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-10 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                            className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 pr-10 text-base sm:text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                           />
                           <button
                             type="button"
@@ -1034,7 +1036,7 @@ export default function UserProfileScreen({
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
                             title={form.showPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                           >
-                            {form.showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            {form.showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
@@ -1042,20 +1044,20 @@ export default function UserProfileScreen({
 
                     {/* Status Message */}
                     {sys.syncMessage && (
-                      <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-2">
+                      <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl sm:rounded-2xl border border-slate-100 flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                         <span>{sys.syncMessage}</span>
                       </div>
                     )}
 
-                    {/* Action Buttons */}
-                    <div className="flex items-center justify-between pt-3 border-t border-slate-100 flex-wrap gap-2.5">
-                      <div className="flex items-center gap-2.5">
+                    {/* Action Buttons (Mobile-friendly layout) */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t border-slate-100 gap-2.5">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                         <button
                           type="button"
                           onClick={() => handleSaveExternalAccount(sys)}
                           disabled={form.isSaving}
-                          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-xs shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
                         >
                           {form.isSaving ? (
                             <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1070,7 +1072,7 @@ export default function UserProfileScreen({
                             type="button"
                             onClick={() => handleTestConnection(sys)}
                             disabled={form.isTesting}
-                            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
                             title="Kiểm tra kết nối tới cổng trường"
                           >
                             {form.isTesting ? (
@@ -1087,7 +1089,7 @@ export default function UserProfileScreen({
                         <button
                           type="button"
                           onClick={() => handleDeleteExternalAccount(sys)}
-                          className="px-4 py-2.5 text-rose-600 hover:bg-rose-50 text-xs font-bold rounded-2xl transition-colors border border-rose-200 flex items-center gap-1.5 cursor-pointer"
+                          className="px-4 py-2.5 text-rose-600 hover:bg-rose-50 text-xs font-bold rounded-xl sm:rounded-2xl transition-colors border border-rose-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                           title="Hủy liên kết tài khoản"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1117,14 +1119,14 @@ export default function UserProfileScreen({
 
       {/* SUB-TAB 3: EXAM SCHEDULE FOR THIS STUDENT */}
       {activeSubTab === 'EXAMS' && hasExamSchedule && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 border border-slate-200 shadow-sm flex flex-col gap-4 sm:gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3.5 sm:pb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl">
-                <Calendar className="w-6 h-6" />
+              <div className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl shrink-0">
+                <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-slate-800">Lịch Thi Đã Đăng Ký Của Bạn</h3>
+                <h3 className="text-base sm:text-lg font-black text-slate-800">Lịch Thi Đã Đăng Ký Của Bạn</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Tổng cộng: <strong className="text-blue-600">{exams.length} môn thi</strong>
                 </p>
@@ -1137,41 +1139,26 @@ export default function UserProfileScreen({
               Không tìm thấy lịch thi nào cho sinh viên {maSV}.
             </div>
           ) : (
-            <div className="border border-slate-200 rounded-2xl overflow-hidden">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
-                  <tr>
-                    <th className="px-4 py-3 text-center">STT</th>
-                    <th className="px-4 py-3">Ngày Thi</th>
-                    <th className="px-4 py-3">Giờ Thi</th>
-                    <th className="px-4 py-3">Mã Môn</th>
-                    <th className="px-4 py-3">Tên Môn Học</th>
-                    <th className="px-4 py-3 text-center">Phòng Thi</th>
-                    <th className="px-4 py-3 text-center">Hình Thức</th>
-                    <th className="px-4 py-3 text-center">Tổ/Nhóm</th>
-                    <th className="px-4 py-3 text-center">Trạng Thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {exams.map((ex: ExamRecord, idx: number) => (
-                    <tr key={idx} className={`transition-colors ${ex.isPostponed ? 'bg-amber-50/40' : 'hover:bg-blue-50/40'}`}>
-                      <td className="px-4 py-3 text-center text-slate-400 font-mono">{idx + 1}</td>
-                      <td className="px-4 py-3 font-bold text-slate-800">{ex.NgayThi}</td>
-                      <td className="px-4 py-3 font-semibold text-blue-600">{ex.GioThi}</td>
-                      <td className="px-4 py-3 font-mono font-bold text-indigo-700">{ex.MaMH}</td>
-                      <td className="px-4 py-3 font-bold text-slate-800">
-                        <div className="flex items-center gap-1.5">
-                          <span className={ex.isPostponed ? 'line-through text-slate-400' : ''}>{ex.TenMH}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center font-black text-emerald-700 bg-emerald-50/50">
-                        {ex.MAPTHI || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center font-bold text-slate-600">{ex.MaHTThi || '—'}</td>
-                      <td className="px-4 py-3 text-center font-mono text-slate-500">
-                        {ex['To thi'] || ex.NhomThi || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
+            <>
+              {/* MOBILE CARDS VIEW (block on mobile, hidden on md+) */}
+              <div className="grid grid-cols-1 gap-3 md:hidden">
+                {exams.map((ex: ExamRecord, idx: number) => (
+                  <div
+                    key={idx}
+                    className={`rounded-2xl border p-4 flex flex-col gap-3 transition-all ${
+                      ex.isPostponed
+                        ? 'bg-amber-50/40 border-amber-200'
+                        : 'bg-white border-slate-200 shadow-xs'
+                    }`}
+                  >
+                    {/* Header: Date, Time & Index */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-xs font-bold">
+                        <Clock className="w-3.5 h-3.5 text-blue-600" />
+                        <span>{ex.NgayThi} • {ex.GioThi}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-mono font-bold text-slate-400">#{idx + 1}</span>
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                             ex.isPostponed
@@ -1181,30 +1168,114 @@ export default function UserProfileScreen({
                         >
                           {ex.isPostponed ? 'Hoãn thi' : 'Dự thi'}
                         </span>
-                      </td>
+                      </div>
+                    </div>
+
+                    {/* Subject Name & Code */}
+                    <div>
+                      <div className="font-mono text-xs font-bold text-indigo-700">{ex.MaMH}</div>
+                      <div className={`font-black text-slate-800 text-sm mt-0.5 ${ex.isPostponed ? 'line-through text-slate-400' : ''}`}>
+                        {ex.TenMH}
+                      </div>
+                    </div>
+
+                    {/* Highlights Grid: Room, Format, Group */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                      <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-2">
+                        <span className="text-[10px] text-emerald-700 font-bold uppercase block">Phòng Thi</span>
+                        <span className="text-xs font-black text-emerald-900 font-mono mt-0.5 block truncate">
+                          {ex.MAPTHI || '—'}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block">Hình Thức</span>
+                        <span className="text-xs font-bold text-slate-700 mt-0.5 block truncate">
+                          {ex.MaHTThi || '—'}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-2">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block">Tổ/Nhóm</span>
+                        <span className="text-xs font-mono font-bold text-slate-700 mt-0.5 block truncate">
+                          {ex['To thi'] || ex.NhomThi || '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* DESKTOP TABLE VIEW (hidden on mobile, block on md+) */}
+              <div className="hidden md:block border border-slate-200 rounded-2xl overflow-x-auto">
+                <table className="w-full text-xs text-left min-w-[700px]">
+                  <thead className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 text-center">STT</th>
+                      <th className="px-4 py-3">Ngày Thi</th>
+                      <th className="px-4 py-3">Giờ Thi</th>
+                      <th className="px-4 py-3">Mã Môn</th>
+                      <th className="px-4 py-3">Tên Môn Học</th>
+                      <th className="px-4 py-3 text-center">Phòng Thi</th>
+                      <th className="px-4 py-3 text-center">Hình Thức</th>
+                      <th className="px-4 py-3 text-center">Tổ/Nhóm</th>
+                      <th className="px-4 py-3 text-center">Trạng Thái</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {exams.map((ex: ExamRecord, idx: number) => (
+                      <tr key={idx} className={`transition-colors ${ex.isPostponed ? 'bg-amber-50/40' : 'hover:bg-blue-50/40'}`}>
+                        <td className="px-4 py-3 text-center text-slate-400 font-mono">{idx + 1}</td>
+                        <td className="px-4 py-3 font-bold text-slate-800">{ex.NgayThi}</td>
+                        <td className="px-4 py-3 font-semibold text-blue-600">{ex.GioThi}</td>
+                        <td className="px-4 py-3 font-mono font-bold text-indigo-700">{ex.MaMH}</td>
+                        <td className="px-4 py-3 font-bold text-slate-800">
+                          <div className="flex items-center gap-1.5">
+                            <span className={ex.isPostponed ? 'line-through text-slate-400' : ''}>{ex.TenMH}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center font-black text-emerald-700 bg-emerald-50/50">
+                          {ex.MAPTHI || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-slate-600">{ex.MaHTThi || '—'}</td>
+                        <td className="px-4 py-3 text-center font-mono text-slate-500">
+                          {ex['To thi'] || ex.NhomThi || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              ex.isPostponed
+                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            }`}
+                          >
+                            {ex.isPostponed ? 'Hoãn thi' : 'Dự thi'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}
 
       {/* SUB-TAB 4: SECURITY & SETTINGS */}
       {activeSubTab === 'SECURITY' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-6 max-w-2xl">
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-            <div className="p-2.5 bg-rose-50 text-rose-600 rounded-2xl">
-              <Lock className="w-6 h-6" />
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 border border-slate-200 shadow-sm flex flex-col gap-4 sm:gap-6 max-w-2xl">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-3.5 sm:pb-4">
+            <div className="p-2 sm:p-2.5 bg-rose-50 text-rose-600 rounded-xl sm:rounded-2xl shrink-0">
+              <Lock className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-800">Bảo Mật Tài Khoản PTIT EduSync</h3>
+              <h3 className="text-base sm:text-lg font-black text-slate-800">Bảo Mật Tài Khoản PTIT EduSync</h3>
               <p className="text-xs text-slate-500 mt-0.5">Đổi mật khẩu đăng nhập cổng portal sinh viên</p>
             </div>
           </div>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed flex items-start gap-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 text-xs text-amber-800 leading-relaxed flex items-start gap-3">
             <Shield className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <strong className="block font-bold mb-0.5">Lưu ý về mật khẩu đăng nhập:</strong>
@@ -1214,7 +1285,7 @@ export default function UserProfileScreen({
 
           {/* Feedback messages */}
           {passSuccessMsg && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center justify-between shadow-xs animate-in slide-in-from-top duration-200">
+            <div className="p-3.5 sm:p-4 bg-emerald-50 border border-emerald-200 rounded-xl sm:rounded-2xl text-emerald-800 text-xs font-bold flex items-center justify-between shadow-2xs animate-in slide-in-from-top duration-200">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{passSuccessMsg}</span>
@@ -1226,7 +1297,7 @@ export default function UserProfileScreen({
           )}
 
           {passErrorMsg && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-bold flex items-center justify-between shadow-xs animate-in slide-in-from-top duration-200">
+            <div className="p-3.5 sm:p-4 bg-rose-50 border border-rose-200 rounded-xl sm:rounded-2xl text-rose-700 text-xs font-bold flex items-center justify-between shadow-2xs animate-in slide-in-from-top duration-200">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                 <span>{passErrorMsg}</span>
@@ -1237,7 +1308,7 @@ export default function UserProfileScreen({
             </div>
           )}
 
-          <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
+          <form onSubmit={handleChangePassword} className="flex flex-col gap-3.5 sm:gap-4">
             {/* Field 1: Current Password */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -1249,13 +1320,13 @@ export default function UserProfileScreen({
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Nhập mật khẩu hiện tại (mặc định là MSSV)"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-10 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 pr-10 text-base sm:text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPass(!showCurrentPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-2 cursor-pointer"
                 >
                   {showCurrentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -1273,13 +1344,13 @@ export default function UserProfileScreen({
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Nhập mật khẩu mới"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 pr-10 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 pr-10 text-base sm:text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPass(!showNewPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-2 cursor-pointer"
                 >
                   {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -1297,7 +1368,7 @@ export default function UserProfileScreen({
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Nhập lại mật khẩu mới để chắc chắn"
-                  className={`w-full bg-slate-50 border rounded-2xl px-4 py-2.5 pr-10 text-xs text-slate-800 focus:bg-white focus:ring-2 outline-none transition-all ${
+                  className={`w-full bg-slate-50 border rounded-xl sm:rounded-2xl px-4 py-2.5 pr-10 text-base sm:text-xs text-slate-800 focus:bg-white focus:ring-2 outline-none transition-all ${
                     confirmPassword
                       ? newPassword === confirmPassword
                         ? 'border-emerald-400 focus:ring-emerald-500'
@@ -1309,7 +1380,7 @@ export default function UserProfileScreen({
                 <button
                   type="button"
                   onClick={() => setShowConfirmPass(!showConfirmPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-2 cursor-pointer"
                 >
                   {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -1333,8 +1404,8 @@ export default function UserProfileScreen({
               )}
             </div>
 
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">
+            <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <span className="text-[11px] text-slate-400 text-center sm:text-left">
                 * Yêu cầu nhập đúng 2 lần mật khẩu mới
               </span>
               <button
@@ -1346,7 +1417,7 @@ export default function UserProfileScreen({
                   !confirmPassword ||
                   newPassword !== confirmPassword
                 }
-                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-xs shadow-indigo-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-95"
               >
                 {isChangingPass ? (
                   <>

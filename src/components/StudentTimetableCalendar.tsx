@@ -470,29 +470,29 @@ export default function StudentTimetableCalendar({
   const todayIso = formatIso(new Date());
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
       {/* Top Banner / Quick Header */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-gradient-to-br from-indigo-500 to-sky-600 text-white rounded-2xl shadow-md shadow-indigo-500/20">
-            <CalendarIcon className="w-6 h-6" />
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4">
+        <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
+          <div className="p-2.5 sm:p-3 bg-gradient-to-br from-indigo-500 to-sky-600 text-white rounded-xl sm:rounded-2xl shadow-xs shadow-indigo-500/20 shrink-0 mt-0.5 sm:mt-0">
+            <CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg font-black text-slate-800">Thời Khóa Biểu & Lịch Học Cá Nhân</h2>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <h2 className="text-sm sm:text-lg font-black text-slate-800">Thời Khóa Biểu & Lịch Học Cá Nhân</h2>
               {data?.isCachedDb ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
-                  Đã Lưu Trong CSDL
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600 shrink-0" />
+                  Đã Lưu CSDL
                 </span>
               ) : data?.isLiveSync ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Đồng bộ Trực Tuyến QLĐT
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Đồng bộ Trực Tuyến
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                  <CheckCircle2 className="w-3 h-3 text-slate-500" />
                   Dữ Liệu Đã Lưu
                 </span>
               )}
@@ -500,30 +500,27 @@ export default function StudentTimetableCalendar({
               {/* Last Update Badge */}
               {data?.lastSyncAt && (
                 <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200"
-                  title="Thời điểm kéo dữ liệu từ Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX). Hệ thống tự động làm mới khi vào lại sau 10 phút."
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200"
+                  title="Thời điểm kéo dữ liệu từ Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)."
                 >
-                  <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                  <span>Lần kéo cuối:</span>
+                  <Clock className="w-3 h-3 text-indigo-600 shrink-0" />
+                  <span>Kéo cuối:</span>
                   <strong className="font-mono text-slate-900">{formatSyncDateTime(data.lastSyncAt)}</strong>
-                  {getRelativeSyncTime(data.lastSyncAt) && (
-                    <span className="text-[10px] text-slate-500 font-normal">({getRelativeSyncTime(data.lastSyncAt)})</span>
-                  )}
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Cổng đào tạo: <strong className="text-indigo-600 font-mono">https://qldttx.pttc1.edu.vn/</strong> • {data?.semesterName || 'Học kỳ 1 Năm học 2025-2026'} • Tổng cộng <b>{data?.uniqueSubjectsCount || 0} môn học</b> ({data?.totalEvents || 0} buổi học trong kỳ)
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-relaxed">
+              Cổng: <strong className="text-indigo-600 font-mono">qldttx.pttc1.edu.vn</strong> • {data?.semesterName || 'Học kỳ hiện tại'} • <b>{data?.uniqueSubjectsCount || 0} môn học</b> ({data?.totalEvents || 0} buổi học)
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {/* Active Pull button from QLDTTX */}
           <button
             onClick={() => fetchTimetable(true)}
             disabled={isRefreshing || isLoading}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+            className="flex-1 sm:flex-initial px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-xs shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
             title="Chủ động kéo lại thời khóa biểu mới nhất từ cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)"
           >
             {isRefreshing ? (
@@ -531,7 +528,7 @@ export default function StudentTimetableCalendar({
             ) : (
               <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
             )}
-            <span>{isRefreshing ? 'Đang kéo TKB...' : 'Kéo Lại Từ QLDTTX'}</span>
+            <span>{isRefreshing ? 'Đang kéo...' : 'Kéo Lại QLDTTX'}</span>
           </button>
 
           {/* View mode toggle */}
