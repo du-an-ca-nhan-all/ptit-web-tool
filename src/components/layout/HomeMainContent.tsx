@@ -23,6 +23,7 @@ import AdminRegistrationManager from '../AdminRegistrationManager';
 import DatabaseBackupManager from '../DatabaseBackupManager';
 import AllStudentsList from '../AllStudentsList';
 import StudentPersonalExamSchedule from '../StudentPersonalExamSchedule';
+import AllExamsSchedule from '../AllExamsSchedule';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
 import { NavigationTab } from '../../types/navigation';
 import { buildSessions } from '../../utils/dataModel';
@@ -339,48 +340,31 @@ export default function HomeMainContent({
           </div>
         )
       ) : activeTab === 'schedule' ? (
-        selectedExamRoom ? (
-          <ExamRoomMembers
-            roomRecord={selectedExamRoom}
-            allRecords={records}
-            batchCode={activeBatch?.code}
-            onBack={() => setSelectedExamRoom(null)}
-            onStudentClick={setConfirmStudentId}
-            onClassClick={setConfirmClassCode}
-            onTogglePostpone={handleToggleExamPostpone}
-            canEditPostpone={canAccessMonitorTools}
-          />
-        ) : (
-          <>
-            <FilterBar
-              filters={filters}
-              onFilterChange={setFilters}
-              classes={classes}
-              subjects={subjects}
-              dates={dates}
-              totalRecords={totalRecords}
-              filteredCount={totalRecords}
-              hideClassFilter={false}
-            />
-            <DataTable
-              records={records}
-              totalRecords={totalRecords}
-              currentPage={page}
-              totalPages={totalPages}
-              itemsPerPage={pageSize}
-              onPageChange={setPage}
-              onItemsPerPageChange={setPageSize}
-              sortConfig={sortConfig}
-              onSortChange={setSortConfig}
-              onStudentClick={setConfirmStudentId}
-              onClassClick={setConfirmClassCode}
-              onRowClick={setSelectedExamRoom}
-              onTogglePostpone={handleToggleExamPostpone}
-              canEditPostpone={canAccessMonitorTools}
-              isLoading={isLoading}
-            />
-          </>
-        )
+        <AllExamsSchedule
+          records={records}
+          totalRecords={totalRecords}
+          page={page}
+          setPage={setPage}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+          totalPages={totalPages}
+          sortConfig={sortConfig}
+          setSortConfig={setSortConfig}
+          filters={filters}
+          setFilters={setFilters}
+          classes={classes}
+          subjects={subjects}
+          dates={dates}
+          selectedExamRoom={selectedExamRoom}
+          setSelectedExamRoom={setSelectedExamRoom}
+          setConfirmStudentId={setConfirmStudentId}
+          setConfirmClassCode={setConfirmClassCode}
+          handleToggleExamPostpone={handleToggleExamPostpone}
+          canAccessMonitorTools={canAccessMonitorTools}
+          isLoading={isLoading}
+          activeBatch={activeBatch}
+          loadDataFromApi={loadDataFromApi}
+        />
       ) : (
         <ClassMembers
           records={records}
