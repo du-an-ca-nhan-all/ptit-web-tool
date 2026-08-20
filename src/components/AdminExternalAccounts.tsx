@@ -26,6 +26,7 @@ import {
   Copy,
   CheckCheck,
   FileKey,
+  Lock,
 } from 'lucide-react';
 import { LoginUser } from '../types';
 
@@ -84,6 +85,11 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
   });
   const [showModalPass, setShowModalPass] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isModalTesting, setIsModalTesting] = useState(false);
+  const [modalTestStatus, setModalTestStatus] = useState<'IDLE' | 'TESTING' | 'SUCCESS' | 'FAILED'>('IDLE');
+  const [modalTestError, setModalTestError] = useState('');
+  const [lastTestedModalUser, setLastTestedModalUser] = useState('');
+  const [lastTestedModalPass, setLastTestedModalPass] = useState('');
 
   // Delete confirm modal
   const [deletingAccount, setDeletingAccount] = useState<ExternalAccountAdminItem | null>(null);
@@ -215,7 +221,73 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
     }
   };
 
-  // Save Modal (Add or Edit)
+  // Test credentials before saving in modal
+  const handleTestModalCredentials = async () => {
+    if (!formData.username.trim()) {
+      setErrorMsg('Vui lòng nhập Mã sinh viên trước khi kiểm tra');
+      return;
+    }
+    if (!formData.extUsername.trim()) {
+      setErrorMsg('Vui lòng nhập Tên đăng nhập QLDTTX trước khi kiểm tra');
+      return;
+    }
+    if (!formData.extPassword.trim()) {
+      setErrorMsg('Vui lòng nhập Mật khẩu QLDTTX trước khi kiểm tra');
+      return;
+    }
+
+    const testUser = formData.extUsername.trim();
+    const testPass = formData.extPassword.trim();
+
+    setIsModalTesting(true);
+    setModalTestStatus('TESTING');
+    setModalTestError('');
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const res = await fetch('/api/external-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TEST',
+          systemKey: formData.systemKey,
+          systemName: formData.systemName,
+          systemUrl: formData.systemUrl,
+          targetUsername: formData.username.trim(),
+          extUsername: testUser,
+          extPassword: testPass,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setModalTestStatus('SUCCESS');
+        setLastTestedModalUser(testUser);
+        setLastTestedModalPass(testPass);
+        setSuccessMsg(data.message || 'Kiểm tra kết nối thành công! Đã mở khóa nút Lưu.');
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        const errMsg = data.error || 'Kiểm tra kết nối thất bại.';
+        setModalTestStatus('FAILED');
+        setModalTestError(errMsg);
+        setLastTestedModalUser('');
+        setLastTestedModalPass('');
+        setErrorMsg(errMsg);
+      }
+    } catch (err) {
+      const errMsg = 'Lỗi kết nối máy chủ khi kiểm tra tài khoản.';
+      setModalTestStatus('FAILED');
+      setModalTestError(errMsg);
+      setLastTestedModalUser('');
+      setLastTestedModalPass('');
+      setErrorMsg(errMsg);
+    } finally {
+      setIsModalTesting(false);
+    }
+  };
+
+  // Save Modal (Add or Edit) - Requires successful test first!
   const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.username.trim()) {
@@ -228,6 +300,16 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
     }
     if (!formData.extPassword.trim()) {
       setErrorMsg('Vui lòng nhập Mật khẩu QLDTTX');
+      return;
+    }
+
+    const isTestPassed =
+      modalTestStatus === 'SUCCESS' &&
+      formData.extUsername.trim() === lastTestedModalUser &&
+      formData.extPassword.trim() === lastTestedModalPass;
+
+    if (!isTestPassed) {
+      setErrorMsg('Yêu cầu bấm "Kiểm Tra Kết Nối" thành công trước khi có thể lưu cấu hình.');
       return;
     }
 
@@ -252,7 +334,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setSuccessMsg(data.message);
+        setSuccessMsg(data.message || 'Lưu cấu hình tài khoản thành công!');
         setIsModalOpen(false);
         fetchAccounts();
         setTimeout(() => setSuccessMsg(''), 4000);
@@ -443,6 +525,10 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 systemName: 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
                 systemUrl: 'https://qldttx.pttc1.edu.vn/',
               });
+              setModalTestStatus('IDLE');
+              setModalTestError('');
+              setLastTestedModalUser('');
+              setLastTestedModalPass('');
               setIsModalOpen(true);
             }}
             className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-1.5 cursor-pointer"
@@ -742,6 +828,10 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                                 systemName: acc.systemName,
                                 systemUrl: acc.systemUrl,
                               });
+                              setModalTestStatus('IDLE');
+                              setModalTestError('');
+                              setLastTestedModalUser('');
+                              setLastTestedModalPass('');
                               setIsModalOpen(true);
                             }}
                             className="p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
@@ -893,7 +983,11 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 <input
                   type="text"
                   value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value.toUpperCase() })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, username: e.target.value.toUpperCase() });
+                    setModalTestStatus('IDLE');
+                    setModalTestError('');
+                  }}
                   disabled={modalMode === 'EDIT'}
                   placeholder="Ví dụ: K25DTCN402"
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-60"
@@ -908,7 +1002,11 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 <input
                   type="text"
                   value={formData.extUsername}
-                  onChange={(e) => setFormData({ ...formData, extUsername: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, extUsername: e.target.value });
+                    setModalTestStatus('IDLE');
+                    setModalTestError('');
+                  }}
                   placeholder="Ví dụ: K25DTCN402"
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                   required
@@ -921,7 +1019,11 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                   <input
                     type={showModalPass ? 'text' : 'password'}
                     value={formData.extPassword}
-                    onChange={(e) => setFormData({ ...formData, extPassword: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, extPassword: e.target.value });
+                      setModalTestStatus('IDLE');
+                      setModalTestError('');
+                    }}
                     placeholder="Nhập mật khẩu tài khoản QLDTTX"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 pr-10 text-sm font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                     required
@@ -934,12 +1036,53 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                     {showModalPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1 italic">
-                  * Hệ thống sẽ tự động đăng nhập tới cổng trường để lấy Access Token ngay sau khi lưu.
-                </p>
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+              {/* Modal Test Connection Banner */}
+              {(() => {
+                const isTestPassed =
+                  modalTestStatus === 'SUCCESS' &&
+                  formData.extUsername.trim() === lastTestedModalUser &&
+                  formData.extPassword.trim() === lastTestedModalPass;
+
+                if (isTestPassed) {
+                  return (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2.5 text-xs text-emerald-900 animate-in fade-in">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div className="flex-1">
+                        <strong className="font-bold block text-emerald-950">Kiểm tra kết nối thành công!</strong>
+                        <span className="text-[11px] text-emerald-700">Tài khoản hợp lệ. Đã mở khóa nút Lưu.</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (modalTestStatus === 'FAILED') {
+                  return (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2.5 text-xs text-rose-900 animate-in fade-in">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <div className="flex-1">
+                        <strong className="font-bold block text-rose-950">Kiểm tra kết nối thất bại!</strong>
+                        <span className="text-[11px] text-rose-700">{modalTestError || 'Tên đăng nhập hoặc mật khẩu không chính xác.'}</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center gap-2.5 text-xs text-amber-900">
+                    <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                    <div className="flex-1">
+                      <strong className="font-bold block text-amber-950">Yêu cầu kiểm tra kết nối</strong>
+                      <span className="text-[11px] text-amber-800">
+                        Vui lòng bấm <strong>"Kiểm Tra Kết Nối"</strong> thành công trước để mở khóa nút Lưu.
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="flex items-center justify-between gap-2.5 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -947,18 +1090,58 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 >
                   Hủy
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isSaving ? (
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Check className="w-3.5 h-3.5" />
-                  )}
-                  <span>{modalMode === 'ADD' ? 'Thêm & Lấy Token' : 'Lưu & Cập Nhật Token'}</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const isTestPassed =
+                      modalTestStatus === 'SUCCESS' &&
+                      formData.extUsername.trim() === lastTestedModalUser &&
+                      formData.extPassword.trim() === lastTestedModalPass;
+
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleTestModalCredentials}
+                          disabled={isModalTesting || !formData.extUsername.trim() || !formData.extPassword.trim()}
+                          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isTestPassed
+                              ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300'
+                              : 'bg-sky-600 hover:bg-sky-700 text-white'
+                          }`}
+                        >
+                          {isModalTesting ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : isTestPassed ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                          ) : (
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          )}
+                          <span>{isModalTesting ? 'Đang Kiểm Tra...' : isTestPassed ? 'Đã Kiểm Tra' : 'Kiểm Tra Kết Nối'}</span>
+                        </button>
+
+                        <button
+                          type="submit"
+                          disabled={isSaving || !isTestPassed}
+                          className={`px-5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                            !isTestPassed
+                              ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-200 cursor-pointer active:scale-95'
+                          }`}
+                        >
+                          {isSaving ? (
+                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : !isTestPassed ? (
+                            <Lock className="w-3.5 h-3.5" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
+                          <span>{modalMode === 'ADD' ? 'Thêm & Lưu' : 'Cập Nhật Cấu Hình'}</span>
+                        </button>
+                      </>
+                    );
+                  })()}
+                </div>
               </div>
             </form>
           </div>

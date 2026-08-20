@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. ACTION: SAVE / CONNECT (Automatically fetch token upon saving!)
+    // 2. ACTION: SAVE / CONNECT (Enforce successful login test before saving!)
     if (action === 'SAVE' || action === 'CONNECT') {
       if (!extUsername || !extUsername.trim()) {
         return NextResponse.json(
@@ -286,21 +286,38 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Try logging in to QLDTTX to get the access token
+      // Test logging in to QLDTTX to verify credentials and extract access token
       let fetchedToken: string | null = null;
-      let status = 'CONNECTED';
-      let syncMessage = 'Đã lưu cấu hình tài khoản và cấp Token kết nối thành công!';
-
       try {
         fetchedToken = await loginAndGetToken({
           username: cleanUsername,
           password: cleanPassword,
         });
       } catch (tokenErr: any) {
-        console.warn(`Could not get token for ${cleanUsername} during SAVE:`, tokenErr.message);
-        status = 'ERROR';
-        syncMessage = `Lưu thông tin thành công, nhưng không thể lấy token từ cổng trường: ${tokenErr.message}`;
+        console.warn(`Test login failed for ${cleanUsername} during SAVE:`, tokenErr.message);
+
+        await logActivity({
+          req,
+          userId: authUser.id,
+          username: authUser.username,
+          userRole: authUser.role,
+          action: 'SAVE_EXTERNAL_ACCOUNT_FAILED',
+          targetType: 'EXTERNAL_ACCOUNT',
+          targetId: effectiveUsername,
+          description: `Lưu cấu hình ${finalSystemName} cho ${effectiveUsername} thất bại do kiểm tra kết nối không thành công: ${tokenErr.message}`,
+          metadata: { effectiveUsername, systemKey, error: tokenErr.message },
+        });
+
+        return NextResponse.json(
+          {
+            error: `Kiểm tra kết nối thất bại: ${tokenErr.message}. Vui lòng kiểm tra lại Tên đăng nhập và Mật khẩu chính xác trước khi lưu cấu hình.`,
+          },
+          { status: 400 }
+        );
       }
+
+      const status = 'CONNECTED';
+      const syncMessage = 'Đã xác thực và cấp Token kết nối QLDTTX thành công!';
 
       const account = await prisma.externalAccount.upsert({
         where: {
@@ -341,15 +358,13 @@ export async function POST(req: NextRequest) {
         action: 'SAVE_EXTERNAL_ACCOUNT',
         targetType: 'EXTERNAL_ACCOUNT',
         targetId: effectiveUsername,
-        description: `Lưu cấu hình liên kết ${finalSystemName} cho ${effectiveUsername} (Trạng thái: ${status})`,
+        description: `Lưu cấu hình liên kết ${finalSystemName} cho ${effectiveUsername} thành công (Đã cấp Token)`,
         metadata: { effectiveUsername, systemKey, status, hasToken: !!fetchedToken },
       });
 
       return NextResponse.json({
         success: true,
-        message: fetchedToken
-          ? `Đã lưu tài khoản & lấy Token thành công cho ${finalSystemName} (${effectiveUsername})`
-          : `Đã lưu tài khoản nhưng chưa lấy được Token: ${syncMessage}`,
+        message: `Đã kết nối và lưu cấu hình tài khoản ${finalSystemName} (${effectiveUsername}) thành công!`,
         hasToken: !!account.token,
         account: {
           systemKey: account.systemKey,
@@ -365,7 +380,58 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. ACTION: GET_TOKEN / TEST / SYNC
-    if (action === 'GET_TOKEN' || action === 'TEST' || action === 'SYNC') {
+    if (action === 'GET_TOKEN' || action === 'TEST' || action === 'SYNC' || action === 'TEST_CREDENTIALS') {
+      const cleanInputUser = extUsername ? String(extUsername).trim() : '';
+      const cleanInputPass = extPassword ? String(extPassword).trim() : '';
+
+      // If credentials provided directly in request body, test them directly
+      if (cleanInputUser && cleanInputPass) {
+        try {
+          const fetchedToken = await loginAndGetToken({
+            username: cleanInputUser,
+            password: cleanInputPass,
+          });
+
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'TEST_EXTERNAL_ACCOUNT_CREDENTIALS',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Kiểm tra kết nối tài khoản ${finalSystemName} (${cleanInputUser}) thành công`,
+            metadata: { effectiveUsername, targetSystemUser: cleanInputUser },
+          });
+
+          return NextResponse.json({
+            success: true,
+            message: `Kiểm tra kết nối tới ${finalSystemName} thành công! Thông tin tài khoản chính xác.`,
+            token: fetchedToken,
+          });
+        } catch (testErr: any) {
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Kiểm tra kết nối ${finalSystemName} (${cleanInputUser}) thất bại: ${testErr.message}`,
+            metadata: { effectiveUsername, targetSystemUser: cleanInputUser, error: testErr.message },
+          });
+
+          return NextResponse.json(
+            {
+              error: `Kiểm tra kết nối thất bại: ${testErr.message}`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Otherwise test existing saved account in DB
       const existing = await prisma.externalAccount.findUnique({
         where: {
           username_systemKey: {
@@ -378,7 +444,7 @@ export async function POST(req: NextRequest) {
       if (!existing) {
         return NextResponse.json(
           {
-            error: `Chưa cấu hình tài khoản cho hệ thống này (${effectiveUsername}). Vui lòng lưu thông tin đăng nhập trước.`,
+            error: `Chưa có thông tin đăng nhập để kiểm tra. Vui lòng nhập Tên đăng nhập và Mật khẩu.`,
           },
           { status: 400 }
         );
@@ -449,7 +515,7 @@ export async function POST(req: NextRequest) {
           {
             error: `Không thể lấy token: ${loginErr.message}`,
           },
-          { status: 500 }
+          { status: 400 }
         );
       }
     }

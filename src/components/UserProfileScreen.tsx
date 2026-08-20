@@ -106,6 +106,10 @@ export default function UserProfileScreen({
       showPass: boolean;
       isSaving: boolean;
       isTesting: boolean;
+      testStatus?: 'IDLE' | 'TESTING' | 'SUCCESS' | 'FAILED';
+      testMessage?: string;
+      lastTestedUser?: string;
+      lastTestedPass?: string;
     };
   }>({});
 
@@ -200,7 +204,7 @@ export default function UserProfileScreen({
     }
   };
 
-  // Save / Connect External Account
+  // Save / Connect External Account (Requires successful test first!)
   const handleSaveExternalAccount = async (sys: any) => {
     setErrorMsg('');
     setSuccessMsg('');
@@ -212,6 +216,16 @@ export default function UserProfileScreen({
     }
     if (!form.password || !form.password.trim()) {
       setErrorMsg('Vui lòng nhập mật khẩu tài khoản hệ thống ngoài');
+      return;
+    }
+
+    const isTestPassed =
+      form.testStatus === 'SUCCESS' &&
+      form.username.trim() === form.lastTestedUser &&
+      form.password.trim() === form.lastTestedPass;
+
+    if (!isTestPassed) {
+      setErrorMsg('Yêu cầu bấm "Kiểm Tra Kết Nối" thành công trước khi có thể lưu cấu hình.');
       return;
     }
 
@@ -236,7 +250,7 @@ export default function UserProfileScreen({
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setSuccessMsg(data.message);
+        setSuccessMsg(data.message || 'Lưu cấu hình tài khoản thành công!');
         fetchExternalAccounts();
         setTimeout(() => setSuccessMsg(''), 4000);
       } else {
@@ -256,9 +270,28 @@ export default function UserProfileScreen({
   const handleTestConnection = async (sys: any) => {
     setErrorMsg('');
     setSuccessMsg('');
+    const form = extForm[sys.systemKey] || { username: '', password: '' };
+
+    const targetUser = form.username ? form.username.trim() : (sys.extUsername || '');
+    const targetPass = form.password ? form.password.trim() : '';
+
+    if (!targetUser) {
+      setErrorMsg('Vui lòng nhập tên đăng nhập / mã sinh viên trước khi kiểm tra');
+      return;
+    }
+    if (!targetPass && !sys.hasPassword) {
+      setErrorMsg('Vui lòng nhập mật khẩu tài khoản QLDTTX trước khi kiểm tra');
+      return;
+    }
+
     setExtForm((prev) => ({
       ...prev,
-      [sys.systemKey]: { ...prev[sys.systemKey], isTesting: true },
+      [sys.systemKey]: {
+        ...prev[sys.systemKey],
+        isTesting: true,
+        testStatus: 'TESTING',
+        testMessage: '',
+      },
     }));
 
     try {
@@ -270,24 +303,55 @@ export default function UserProfileScreen({
           systemKey: sys.systemKey,
           systemName: sys.systemName,
           systemUrl: sys.systemUrl,
+          extUsername: targetUser,
+          extPassword: targetPass,
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setSuccessMsg(data.message);
-        fetchExternalAccounts();
+        setExtForm((prev) => ({
+          ...prev,
+          [sys.systemKey]: {
+            ...prev[sys.systemKey],
+            isTesting: false,
+            testStatus: 'SUCCESS',
+            testMessage: data.message || 'Kiểm tra kết nối và xác thực tài khoản thành công!',
+            lastTestedUser: targetUser,
+            lastTestedPass: targetPass,
+          },
+        }));
+        setSuccessMsg(data.message || 'Kiểm tra kết nối thành công! Đã mở khóa nút Lưu.');
         setTimeout(() => setSuccessMsg(''), 4000);
       } else {
-        setErrorMsg(data.error || 'Kiểm tra kết nối thất bại');
+        const errMsg = data.error || 'Kiểm tra kết nối thất bại.';
+        setExtForm((prev) => ({
+          ...prev,
+          [sys.systemKey]: {
+            ...prev[sys.systemKey],
+            isTesting: false,
+            testStatus: 'FAILED',
+            testMessage: errMsg,
+            lastTestedUser: '',
+            lastTestedPass: '',
+          },
+        }));
+        setErrorMsg(errMsg);
       }
     } catch (err) {
-      setErrorMsg('Lỗi kết nối máy chủ');
-    } finally {
+      const errMsg = 'Lỗi kết nối máy chủ khi kiểm tra tài khoản.';
       setExtForm((prev) => ({
         ...prev,
-        [sys.systemKey]: { ...prev[sys.systemKey], isTesting: false },
+        [sys.systemKey]: {
+          ...prev[sys.systemKey],
+          isTesting: false,
+          testStatus: 'FAILED',
+          testMessage: errMsg,
+          lastTestedUser: '',
+          lastTestedPass: '',
+        },
       }));
+      setErrorMsg(errMsg);
     }
   };
 
@@ -944,7 +1008,12 @@ export default function UserProfileScreen({
                           onChange={(e) =>
                             setExtForm((prev) => ({
                               ...prev,
-                              [sys.systemKey]: { ...prev[sys.systemKey], username: e.target.value },
+                              [sys.systemKey]: {
+                                ...prev[sys.systemKey],
+                                username: e.target.value,
+                                testStatus: 'IDLE',
+                                testMessage: '',
+                              },
                             }))
                           }
                           placeholder={sys.placeholderUser || 'Nhập mã sinh viên'}
@@ -963,7 +1032,12 @@ export default function UserProfileScreen({
                             onChange={(e) =>
                               setExtForm((prev) => ({
                                 ...prev,
-                                [sys.systemKey]: { ...prev[sys.systemKey], password: e.target.value },
+                                [sys.systemKey]: {
+                                  ...prev[sys.systemKey],
+                                  password: e.target.value,
+                                  testStatus: 'IDLE',
+                                  testMessage: '',
+                                },
                               }))
                             }
                             placeholder={sys.hasPassword ? '•••••••• (Nhập lại để cập nhật)' : 'Nhập mật khẩu QLDTTX'}
@@ -986,8 +1060,53 @@ export default function UserProfileScreen({
                       </div>
                     </div>
 
-                    {/* Status Message */}
-                    {sys.syncMessage && (
+                    {/* Test Connection Status Banner */}
+                    {(() => {
+                      const isTestSuccess = Boolean(
+                        form.testStatus === 'SUCCESS' &&
+                        form.username?.trim() === form.lastTestedUser &&
+                        form.password?.trim() === form.lastTestedPass
+                      );
+
+                      if (isTestSuccess) {
+                        return (
+                          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl sm:rounded-2xl flex items-center gap-2.5 text-xs text-emerald-900 animate-in fade-in">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <div className="flex-1">
+                              <strong className="font-bold block text-emerald-950">Kiểm tra kết nối thành công!</strong>
+                              <span className="text-[11px] text-emerald-700">Tài khoản chính xác và hợp lệ. Đã mở khóa nút "Lưu Cấu Hình".</span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (form.testStatus === 'FAILED') {
+                        return (
+                          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl sm:rounded-2xl flex items-center gap-2.5 text-xs text-rose-900 animate-in fade-in">
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                            <div className="flex-1">
+                              <strong className="font-bold block text-rose-950">Kiểm tra kết nối thất bại!</strong>
+                              <span className="text-[11px] text-rose-700">{form.testMessage || 'Tên đăng nhập hoặc mật khẩu không chính xác trên cổng QLDTTX.'}</span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl sm:rounded-2xl flex items-center gap-2.5 text-xs text-amber-900">
+                          <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                          <div className="flex-1">
+                            <strong className="font-bold block text-amber-950">Yêu cầu kiểm tra kết nối</strong>
+                            <span className="text-[11px] text-amber-800">
+                              Vui lòng bấm <strong>"Kiểm Tra Kết Nối"</strong> thành công trước để mở khóa nút Lưu.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Status Message from previous sync if available */}
+                    {sys.syncMessage && form.testStatus !== 'SUCCESS' && form.testStatus !== 'FAILED' && (
                       <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl sm:rounded-2xl border border-slate-100 flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                         <span>{sys.syncMessage}</span>
@@ -995,52 +1114,75 @@ export default function UserProfileScreen({
                     )}
 
                     {/* Action Buttons (Mobile-friendly layout) */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t border-slate-100 gap-2.5">
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleSaveExternalAccount(sys)}
-                          disabled={form.isSaving}
-                          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-xs shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
-                        >
-                          {form.isSaving ? (
-                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          ) : (
-                            <Check className="w-3.5 h-3.5" />
+                    {(() => {
+                      const isTestSuccess = Boolean(
+                        form.testStatus === 'SUCCESS' &&
+                        form.username?.trim() === form.lastTestedUser &&
+                        form.password?.trim() === form.lastTestedPass
+                      );
+
+                      return (
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t border-slate-100 gap-2.5">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            {/* Step 1: Test Connection Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleTestConnection(sys)}
+                              disabled={form.isTesting || !form.username?.trim() || (!form.password?.trim() && !sys.hasPassword)}
+                              className={`px-4 py-2.5 text-xs font-bold rounded-xl sm:rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-xs ${
+                                isTestSuccess
+                                  ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300'
+                                  : 'bg-sky-600 hover:bg-sky-700 text-white'
+                              }`}
+                              title="Kiểm tra kết nối và xác thực tài khoản tới cổng trường"
+                            >
+                              {form.isTesting ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : isTestSuccess ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                              ) : (
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              )}
+                              <span>{form.isTesting ? 'Đang Kiểm Tra...' : isTestSuccess ? 'Đã Kiểm Tra Thành Công' : 'Kiểm Tra Kết Nối'}</span>
+                            </button>
+
+                            {/* Step 2: Save & Connect Button (Locked until test succeeds) */}
+                            <button
+                              type="button"
+                              onClick={() => handleSaveExternalAccount(sys)}
+                              disabled={form.isSaving || !isTestSuccess}
+                              className={`px-5 py-2.5 text-xs font-bold rounded-xl sm:rounded-2xl transition-all flex items-center justify-center gap-1.5 shadow-xs ${
+                                !isTestSuccess
+                                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+                                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 cursor-pointer active:scale-95'
+                              }`}
+                              title={!isTestSuccess ? 'Yêu cầu kiểm tra kết nối thành công trước khi lưu' : 'Lưu cấu hình tài khoản'}
+                            >
+                              {form.isSaving ? (
+                                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              ) : !isTestSuccess ? (
+                                <Lock className="w-3.5 h-3.5" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5" />
+                              )}
+                              <span>{sys.isConfigured ? 'Cập Nhật Cấu Hình' : 'Lưu & Kết Nối'}</span>
+                            </button>
+                          </div>
+
+                          {sys.isConfigured && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteExternalAccount(sys)}
+                              className="px-4 py-2.5 text-rose-600 hover:bg-rose-50 text-xs font-bold rounded-xl sm:rounded-2xl transition-colors border border-rose-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                              title="Hủy liên kết tài khoản"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hủy Liên Kết</span>
+                            </button>
                           )}
-                          <span>{sys.isConfigured ? 'Cập Nhật Cấu Hình' : 'Lưu & Kết Nối'}</span>
-                        </button>
-
-                        {sys.isConfigured && (
-                          <button
-                            type="button"
-                            onClick={() => handleTestConnection(sys)}
-                            disabled={form.isTesting}
-                            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl sm:rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
-                            title="Kiểm tra kết nối tới cổng trường"
-                          >
-                            {form.isTesting ? (
-                              <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-slate-700 rounded-full animate-spin" />
-                            ) : (
-                              <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-                            )}
-                            <span>Kiểm Tra Kết Nối</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {sys.isConfigured && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteExternalAccount(sys)}
-                          className="px-4 py-2.5 text-rose-600 hover:bg-rose-50 text-xs font-bold rounded-xl sm:rounded-2xl transition-colors border border-rose-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                          title="Hủy liên kết tài khoản"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Hủy Liên Kết</span>
-                        </button>
-                      )}
-                    </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
