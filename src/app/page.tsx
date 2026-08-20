@@ -184,8 +184,7 @@ export default function Home() {
         classCode={state.confirmClassCode}
         onClose={() => state.setConfirmClassCode(null)}
         onConfirm={(classCode) => {
-          state.handleTabChange('members');
-          state.setMonitorClass(classCode);
+          state.handleTabChange('members', undefined, { monitorClass: classCode });
           state.setConfirmClassCode(null);
         }}
       />

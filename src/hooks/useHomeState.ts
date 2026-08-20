@@ -1,14 +1,21 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { FilterState } from '../components/FilterBar';
 import { SortKey, SortDirection } from '../components/DataTable';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
-import { NavigationTab, ProfileSubTab, getInitialHomeState, getNavigationPath } from '../types/navigation';
+import {
+  NavigationTab,
+  ProfileSubTab,
+  TabChangeOptions,
+  getInitialHomeState,
+  getNavigationPath,
+} from '../types/navigation';
 import { buildSessions } from '../utils/dataModel';
 import { fetchPricingFromBackend } from '../config/pricingConfig';
 
 export function useHomeState() {
+  const initialState = useMemo(getInitialHomeState, []);
   const [records, setRecords] = useState<ExamRecord[]>([]);
   const [sessions, setSessions] = useState<ExamSession[]>([]);
   const [examBatches, setExamBatches] = useState<ExamBatchItem[]>([]);
@@ -16,12 +23,11 @@ export function useHomeState() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Pagination states for server-side paginated tables (Schedule & Personal Schedule)
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState<number>(initialState.page || 1);
   const [pageSize, setPageSize] = useState(25);
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  const initialState = useMemo(getInitialHomeState, []);
   const [activeTab, setActiveTab] = useState<NavigationTab>(initialState.tab);
   const [profileSubTab, setProfileSubTab] = useState<ProfileSubTab>(initialState.profileSubTab || 'OVERVIEW');
 
@@ -80,8 +86,13 @@ export function useHomeState() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileInitialTab, setProfileInitialTab] = useState<'PROFILE' | 'EXTERNAL_ACCOUNTS'>('PROFILE');
 
-  // Reset page to 1 when filter/sort criteria change
+  // Reset page to 1 only when filter/sort criteria change after initial mount
+  const isFirstFilterChange = useRef(true);
   useEffect(() => {
+    if (isFirstFilterChange.current) {
+      isFirstFilterChange.current = false;
+      return;
+    }
     setPage(1);
   }, [filters.search, filters.classCode, filters.subjectCode, filters.date, sortConfig]);
 
@@ -137,6 +148,105 @@ export function useHomeState() {
   const hasActiveBatch = useMemo(() => examBatches.some((b) => b.isActive), [examBatches]);
   const hasExamSchedule = hasActiveBatch && ((activeBatch?.totalRecords ?? 0) > 0 || totalRecords > 0 || records.length > 0);
 
+  const isAdmin = activeRole === 'admin';
+  const isMonitor = activeRole === 'lop_truong' || activeRole === 'admin';
+  const canAccessMonitorTools = isMonitor || isAdmin;
+  const canImpersonate = isAdmin || Boolean(currentUser?.impersonatedBy);
+
+  const effectiveUser = useMemo(() => {
+    if (!currentUser) return null;
+    return {
+      ...currentUser,
+      role: activeRole,
+      activeRole: activeRole,
+      isAdmin: activeRole === 'admin',
+      isMonitor: activeRole === 'lop_truong' || activeRole === 'admin',
+    };
+  }, [currentUser, activeRole]);
+
+  const [courseCompareData, setCourseCompareData] = useState<{
+    main: any;
+    subAccount: any;
+    allSubAccounts?: any[];
+  } | null>(null);
+  const [showCourseCompare, setShowCourseCompare] = useState(false);
+
+  // Impersonation (Admin login as another user) state
+  const [showImpersonateModal, setShowImpersonateModal] = useState(false);
+  const [impersonateTargetInput, setImpersonateTargetInput] = useState('');
+  const [isImpersonating, setIsImpersonating] = useState(false);
+  const [isRevertingImpersonate, setIsRevertingImpersonate] = useState(false);
+  const [impersonateError, setImpersonateError] = useState('');
+
+  const handleTabChange = useCallback(
+    (
+      tab: NavigationTab,
+      subTab?: ProfileSubTab,
+      options?: TabChangeOptions
+    ) => {
+      const adminOnlyTabs: NavigationTab[] = [
+        'batches',
+        'external_accounts_admin',
+        'activity_logs',
+        'telegram_admin',
+        'user_registrations',
+        'database_backup',
+      ];
+      if (adminOnlyTabs.includes(tab) && !isAdmin) {
+        return;
+      }
+      const monitorOnlyTabs: NavigationTab[] = [
+        'members',
+        'monitor',
+        'envelope',
+        'envelope_all',
+        'settlement',
+      ];
+      if (monitorOnlyTabs.includes(tab) && !canAccessMonitorTools) {
+        return;
+      }
+
+      // If switching tabs or explicitly passing new options, clear irrelevant filters
+      if (tab !== activeTab || options) {
+        if (!options?.preserveFilters) {
+          const newSearch = options?.search ?? '';
+          const newClassCode = options?.classCode ?? '';
+          const newSubjectCode = options?.subjectCode ?? '';
+          const newDate = options?.date ?? '';
+          const newPage = options?.page ?? 1;
+
+          setSearchInput(newSearch);
+          setFilters({
+            search: newSearch,
+            classCode: newClassCode,
+            subjectCode: newSubjectCode,
+            date: newDate,
+          });
+          setPage(newPage);
+          setSelectedExamRoom(null);
+          setSortConfig({ key: 'DateTime', direction: 'asc' });
+
+          if (options?.monitorClass !== undefined) {
+            setMonitorClass(options.monitorClass);
+          } else if (tab === 'members' || tab === 'monitor') {
+            if (!monitorClass && currentUser?.lop) {
+              setMonitorClass(currentUser.lop);
+            }
+          }
+        }
+      }
+
+      setActiveTab(tab);
+      if (tab === 'profile') {
+        if (subTab) {
+          setProfileSubTab(subTab);
+        }
+      }
+      setIsMobileMenuOpen(false);
+    },
+    [activeTab, isAdmin, canAccessMonitorTools, monitorClass, currentUser]
+  );
+
   const handleSelectRole = (newRole: string) => {
     if (!userRoles.includes(newRole)) return;
     setActiveRole(newRole);
@@ -185,7 +295,7 @@ export function useHomeState() {
         'settlement',
       ];
       if (monitorAdminTabs.includes(activeTab)) {
-        setActiveTab('personal_schedule');
+        handleTabChange('personal_schedule');
       }
     } else if (newRole === 'lop_truong') {
       const adminOnlyTabs: NavigationTab[] = [
@@ -197,70 +307,9 @@ export function useHomeState() {
         'database_backup',
       ];
       if (adminOnlyTabs.includes(activeTab)) {
-        setActiveTab('members');
+        handleTabChange('members');
       }
     }
-  };
-
-  const isAdmin = activeRole === 'admin';
-  const isMonitor = activeRole === 'lop_truong' || activeRole === 'admin';
-  const canAccessMonitorTools = isMonitor || isAdmin;
-  const canImpersonate = isAdmin || Boolean(currentUser?.impersonatedBy);
-
-  const effectiveUser = useMemo(() => {
-    if (!currentUser) return null;
-    return {
-      ...currentUser,
-      role: activeRole,
-      activeRole: activeRole,
-      isAdmin: activeRole === 'admin',
-      isMonitor: activeRole === 'lop_truong' || activeRole === 'admin',
-    };
-  }, [currentUser, activeRole]);
-
-  const [courseCompareData, setCourseCompareData] = useState<{
-    main: any;
-    subAccount: any;
-    allSubAccounts?: any[];
-  } | null>(null);
-  const [showCourseCompare, setShowCourseCompare] = useState(false);
-
-  // Impersonation (Admin login as another user) state
-  const [showImpersonateModal, setShowImpersonateModal] = useState(false);
-  const [impersonateTargetInput, setImpersonateTargetInput] = useState('');
-  const [isImpersonating, setIsImpersonating] = useState(false);
-  const [isRevertingImpersonate, setIsRevertingImpersonate] = useState(false);
-  const [impersonateError, setImpersonateError] = useState('');
-
-  const handleTabChange = (tab: NavigationTab, subTab?: ProfileSubTab) => {
-    const adminOnlyTabs: NavigationTab[] = [
-      'batches',
-      'external_accounts_admin',
-      'activity_logs',
-      'telegram_admin',
-      'user_registrations',
-      'database_backup',
-    ];
-    if (adminOnlyTabs.includes(tab) && !isAdmin) {
-      return;
-    }
-    const monitorOnlyTabs: NavigationTab[] = [
-      'members',
-      'monitor',
-      'envelope',
-      'envelope_all',
-      'settlement',
-    ];
-    if (monitorOnlyTabs.includes(tab) && !canAccessMonitorTools) {
-      return;
-    }
-    setActiveTab(tab);
-    if (tab === 'profile') {
-      if (subTab) {
-        setProfileSubTab(subTab);
-      }
-    }
-    setIsMobileMenuOpen(false);
   };
 
   const fetchMonitorsData = async () => {
@@ -344,7 +393,7 @@ export function useHomeState() {
       // Targeted Paged Fetching on Initial Load
       if (currentTab === 'personal_schedule' && user?.username && batchCode) {
         const params = new URLSearchParams({
-          page: '1',
+          page: String(initialUrlState.page || 1),
           limit: String(pageSize),
           batchCode,
           maSV: user.username,
@@ -352,6 +401,10 @@ export function useHomeState() {
         if (initialUrlState.search) params.set('search', initialUrlState.search);
         if (initialUrlState.subjectCode) params.set('subjectCode', initialUrlState.subjectCode);
         if (initialUrlState.date) params.set('date', initialUrlState.date);
+        if (initialUrlState.sortKey) {
+          params.set('sortKey', initialUrlState.sortKey);
+          params.set('sortDir', initialUrlState.sortDir);
+        }
 
         const recordsRes = await fetch(`/api/exam-records?${params.toString()}`);
         if (recordsRes.ok) {
@@ -364,7 +417,7 @@ export function useHomeState() {
         }
       } else if (currentTab === 'schedule' && batchCode) {
         const params = new URLSearchParams({
-          page: '1',
+          page: String(initialUrlState.page || 1),
           limit: String(pageSize),
           batchCode,
         });
@@ -372,6 +425,10 @@ export function useHomeState() {
         if (initialUrlState.subjectCode) params.set('subjectCode', initialUrlState.subjectCode);
         if (initialUrlState.date) params.set('date', initialUrlState.date);
         if (initialUrlState.search) params.set('search', initialUrlState.search);
+        if (initialUrlState.sortKey) {
+          params.set('sortKey', initialUrlState.sortKey);
+          params.set('sortDir', initialUrlState.sortDir);
+        }
 
         const recordsRes = await fetch(`/api/exam-records?${params.toString()}`);
         if (recordsRes.ok) {
@@ -674,7 +731,7 @@ export function useHomeState() {
       if (activeTab === 'personal_schedule' && currentUser?.username) {
         params.set('maSV', currentUser.username);
       }
-      if (filters.classCode) params.set('classCode', filters.classCode);
+      if (activeTab === 'schedule' && filters.classCode) params.set('classCode', filters.classCode);
       if (filters.subjectCode) params.set('subjectCode', filters.subjectCode);
       if (filters.date) params.set('date', filters.date);
       if (filters.search) params.set('search', filters.search);
@@ -764,11 +821,11 @@ export function useHomeState() {
     ];
 
     if (!isAdmin && adminOnlyTabs.includes(activeTab)) {
-      setActiveTab(canAccessMonitorTools ? 'members' : 'personal_schedule');
+      handleTabChange(canAccessMonitorTools ? 'members' : 'personal_schedule');
     } else if (!canAccessMonitorTools && monitorOnlyTabs.includes(activeTab)) {
-      setActiveTab('personal_schedule');
+      handleTabChange('personal_schedule');
     }
-  }, [isMounted, currentUser, isAdmin, canAccessMonitorTools, activeTab]);
+  }, [isMounted, currentUser, isAdmin, canAccessMonitorTools, activeTab, handleTabChange]);
 
   useEffect(() => {
     setSelectedExamRoom(null);
@@ -818,38 +875,69 @@ export function useHomeState() {
   useEffect(() => {
     if (typeof window === 'undefined' || !isMounted) return;
     const basePath = getNavigationPath(activeTab, profileSubTab);
-    const params = new URLSearchParams(window.location.search);
+    let newUrl = basePath;
 
-    if (activeTab !== 'profile' && activeTab !== 'personal_schedule') {
+    if (activeTab === 'schedule') {
+      const params = new URLSearchParams();
       if (filters.search) params.set('search', filters.search);
-      else params.delete('search');
       if (filters.classCode) params.set('classCode', filters.classCode);
-      else params.delete('classCode');
       if (filters.subjectCode) params.set('subjectCode', filters.subjectCode);
-      else params.delete('subjectCode');
       if (filters.date) params.set('date', filters.date);
-      else params.delete('date');
-      if (monitorClass) params.set('monitorClass', monitorClass);
-      else params.delete('monitorClass');
       if (sortConfig && sortConfig.key && (sortConfig.key !== 'DateTime' || sortConfig.direction !== 'asc')) {
         params.set('sortKey', sortConfig.key);
         params.set('sortDir', sortConfig.direction);
-      } else {
-        params.delete('sortKey');
-        params.delete('sortDir');
       }
       if (page > 1) params.set('page', String(page));
-      else params.delete('page');
+      const queryString = params.toString();
+      newUrl = queryString ? `${basePath}?${queryString}` : basePath;
+    } else if (activeTab === 'personal_schedule') {
+      const currentParams = new URLSearchParams(window.location.search);
+      if (filters.search) currentParams.set('search', filters.search);
+      else currentParams.delete('search');
+      if (filters.subjectCode) currentParams.set('subjectCode', filters.subjectCode);
+      else currentParams.delete('subjectCode');
+      if (filters.date) currentParams.set('date', filters.date);
+      else currentParams.delete('date');
+      if (sortConfig && sortConfig.key && (sortConfig.key !== 'DateTime' || sortConfig.direction !== 'asc')) {
+        currentParams.set('sortKey', sortConfig.key);
+        currentParams.set('sortDir', sortConfig.direction);
+      } else {
+        currentParams.delete('sortKey');
+        currentParams.delete('sortDir');
+      }
+      if (page > 1) currentParams.set('page', String(page));
+      else currentParams.delete('page');
+
+      // Make sure schedule-only params are not on personal_schedule
+      currentParams.delete('classCode');
+      currentParams.delete('monitorClass');
+
+      const queryString = currentParams.toString();
+      newUrl = queryString ? `${basePath}?${queryString}` : basePath;
+    } else if (activeTab === 'members' || activeTab === 'monitor') {
+      const params = new URLSearchParams();
+      if (monitorClass && monitorClass !== currentUser?.lop) {
+        params.set('monitorClass', monitorClass);
+      }
+      const queryString = params.toString();
+      newUrl = queryString ? `${basePath}?${queryString}` : basePath;
+    } else {
+      // For tabs with self-managed params (profile, all_students, activity_logs, etc.)
+      // Preserve existing search params on that pathname if the pathname matches
+      const currentPath = window.location.pathname;
+      if (currentPath === basePath && window.location.search) {
+        newUrl = `${basePath}${window.location.search}`;
+      } else {
+        newUrl = basePath;
+      }
     }
 
-    const queryString = params.toString();
-    const newUrl = queryString ? `${basePath}?${queryString}` : basePath;
     const currentFullUrl = window.location.pathname + (window.location.search ? window.location.search : '');
 
     if (currentFullUrl !== newUrl || window.location.hash !== '') {
       window.history.replaceState(null, '', newUrl);
     }
-  }, [isMounted, activeTab, profileSubTab, filters, monitorClass, sortConfig, page]);
+  }, [isMounted, activeTab, profileSubTab, filters, monitorClass, sortConfig, page, currentUser?.lop]);
 
   // Sync state from URL on browser navigation (back/forward)
   useEffect(() => {
@@ -860,13 +948,12 @@ export function useHomeState() {
       if (state.profileSubTab) {
         setProfileSubTab(state.profileSubTab);
       }
-      setFilters((prev) => ({
-        ...prev,
+      setFilters({
         search: state.search,
         classCode: state.classCode,
         subjectCode: state.subjectCode,
         date: state.date,
-      }));
+      });
       setSearchInput(state.search);
       setMonitorClass(state.monitorClass);
       setSortConfig({ key: state.sortKey, direction: state.sortDir });
