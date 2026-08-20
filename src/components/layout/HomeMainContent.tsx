@@ -26,6 +26,7 @@ import AnnouncementModal from '../announcements/AnnouncementModal';
 import AllStudentsList from '../AllStudentsList';
 import StudentPersonalExamSchedule from '../StudentPersonalExamSchedule';
 import AllExamsSchedule from '../AllExamsSchedule';
+import Footer from './Footer';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
 import { NavigationTab, ProfileSubTab, TabChangeOptions } from '../../types/navigation';
 import { buildSessions } from '../../utils/dataModel';
@@ -401,6 +402,9 @@ export default function HomeMainContent({
           loadDataFromApi={loadDataFromApi}
         />
       )}
+
+      {/* Spacing & Admin Contact Footer */}
+      {!isLoading && <Footer />}
     </section>
   );
 }

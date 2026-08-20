@@ -15,6 +15,8 @@ import {
   ShieldCheck,
   Search,
   Loader2,
+  Send,
+  Mail,
 } from 'lucide-react';
 
 interface LoginScreenProps {
@@ -563,6 +565,35 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
             )}
           </div>
         )}
+
+        {/* Bottom Spacing & Admin Contact Information */}
+        <div className="pt-4 pb-4 px-6 bg-slate-50 border-t border-slate-200/80 text-center">
+          <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
+            <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+            <span>Hỗ Trợ & Liên Hệ Quản Trị Viên (Admin)</span>
+          </div>
+          <p className="text-[11px] text-slate-500 max-w-xs mx-auto mb-2.5 leading-tight">
+            Khi cần cấp lại mật khẩu, mở khóa tài khoản hoặc khiếu nại thông tin:
+          </p>
+          <div className="flex items-center justify-center gap-2 text-xs font-mono font-bold flex-wrap">
+            <a
+              href="https://t.me/thanhlv_admin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
+            >
+              <Send className="w-3 h-3" />
+              <span>@thanhlv_admin</span>
+            </a>
+            <a
+              href="mailto:admin@ptit.edu.vn"
+              className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
+            >
+              <Mail className="w-3 h-3 text-amber-600" />
+              <span>admin@ptit.edu.vn</span>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );

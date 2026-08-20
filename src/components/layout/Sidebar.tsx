@@ -21,6 +21,8 @@ import {
   Bot,
   Archive,
   Megaphone,
+  Send,
+  ShieldCheck,
 } from 'lucide-react';
 import { LoginUser } from '../../types';
 import { NavigationTab } from '../../types/navigation';
@@ -336,6 +338,45 @@ export default function Sidebar({
             </div>
           )}
         </nav>
+
+        {/* SECTION BOTTOM: ADMIN CONTACT & SUPPORT */}
+        <div className="p-3 mx-3 mb-3 mt-auto rounded-2xl bg-slate-900/90 border border-slate-800 text-xs flex flex-col gap-2 shadow-inner shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20">
+                <ShieldCheck className="w-3 h-3" />
+              </div>
+              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Hỗ Trợ & Admin</span>
+            </div>
+            <span className="flex h-1.5 w-1.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+            </span>
+          </div>
+
+          <p className="text-[10px] text-slate-400 leading-snug">
+            Cần cấp lại mật khẩu hoặc hỗ trợ kích hoạt tài khoản?
+          </p>
+
+          <div className="flex flex-col gap-1 pt-1.5 border-t border-slate-800 font-mono text-[10px]">
+            <a
+              href="https://t.me/thanhlv_admin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sky-400 hover:text-sky-300 flex items-center gap-1.5 transition-colors py-0.5"
+            >
+              <Send className="w-2.5 h-2.5 text-sky-400 shrink-0" />
+              <span className="truncate">Telegram: @thanhlv_admin</span>
+            </a>
+            <a
+              href="mailto:admin@ptit.edu.vn"
+              className="text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors py-0.5"
+            >
+              <Mail className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+              <span className="truncate">admin@ptit.edu.vn</span>
+            </a>
+          </div>
+        </div>
       </aside>
     </>
   );
