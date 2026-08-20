@@ -1,4 +1,4 @@
-import { SortKey, SortDirection } from '../components/DataTable';
+import { SortKey, SortDirection } from '../features/exam-schedule/types/exam.types';
 
 export type NavigationTab =
   | 'schedule'

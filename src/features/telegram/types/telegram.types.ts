@@ -1,7 +1,16 @@
 import { TelegramConfigItem, SystemTelegramBotInfo, LoginUser } from '../../../types';
-import { ForumTopicItem } from '../components/TelegramTopicSelectorModal';
 
-export type { TelegramConfigItem, SystemTelegramBotInfo, LoginUser, ForumTopicItem };
+export interface ForumTopicItem {
+  threadId: string;
+  name: string;
+  iconColor?: number;
+  iconCustomEmojiId?: string;
+  isGeneral?: boolean;
+  lastMessageSnippet?: string;
+  lastMessageDate?: string;
+}
+
+export type { TelegramConfigItem, SystemTelegramBotInfo, LoginUser };
 
 export interface TelegramSubscriber {
   id: number;

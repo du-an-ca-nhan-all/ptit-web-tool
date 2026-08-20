@@ -18,9 +18,8 @@ import { ProfileOverviewTab } from './Profile/ProfileOverviewTab';
 import { ProfileSecurityTab } from './Profile/ProfileSecurityTab';
 import { ProfileExternalAccountsTab } from './Profile/ProfileExternalAccountsTab';
 import { ProfileExamScheduleTab } from './Profile/ProfileExamScheduleTab';
-import TelegramConfigSection from '../../../components/TelegramConfigSection';
-import StudentTimetableCalendar from '../../../components/StudentTimetableCalendar';
-import StudentGradesView from '../../../components/StudentGradesView';
+import { TelegramConfigSection } from '../../telegram';
+import { StudentTimetableCalendar, StudentGradesView } from '../../external-portal';
 
 export interface UserProfileScreenProps {
   currentUser: LoginUser & { student?: any };
