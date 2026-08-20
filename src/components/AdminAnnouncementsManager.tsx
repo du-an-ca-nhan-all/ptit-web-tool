@@ -374,7 +374,7 @@ export default function AdminAnnouncementsManager({
   };
 
   return (
-    <div className="flex-1 flex flex-col w-full gap-4 sm:gap-6 animate-in fade-in duration-200">
+    <div className="flex-1 flex flex-col p-3 sm:p-5 md:p-6 max-w-7xl mx-auto w-full gap-4 sm:gap-6 animate-in fade-in duration-200">
       {/* Top Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />

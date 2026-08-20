@@ -56,7 +56,7 @@ export default function MonitorsList({
   }, [monitors, searchQuery]);
 
   return (
-    <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 gap-6 w-full">
+    <div className="h-full flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300 gap-6 p-4 md:p-8 max-w-7xl mx-auto w-full">
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden shrink-0">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
@@ -68,43 +68,35 @@ export default function MonitorsList({
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-                Danh Sách Lớp Trưởng & Ban Cán Sự
+                Danh Sách Lớp Trưởng
               </h2>
               <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold rounded-full">
-                Ban Cán Sự
+                {monitors.length} Lớp Trưởng
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Thông tin liên hệ và lớp phụ trách của các Lớp trưởng trong toàn trường
+              Thông tin liên lạc và danh sách quản lý cán bộ lớp các khóa ngành
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3 relative z-10 shrink-0">
           <div className="bg-white/5 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 text-center">
-            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tổng Số</div>
-            <div className="text-lg font-black text-amber-400">{monitors.length}</div>
+            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tổng Số Lớp Trưởng</div>
+            <div className="text-lg font-black text-amber-300">{monitors.length}</div>
           </div>
-          <button
-            onClick={onReload}
-            disabled={isLoading}
-            className="p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all cursor-pointer border border-white/10 disabled:opacity-50"
-            title="Tải lại danh sách"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
         </div>
       </div>
 
-      {/* Search Bar & Stats */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm shrink-0">
-        <div className="relative flex-1 w-full">
+      {/* Toolbar Search */}
+      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+        <div className="relative flex-1 w-full max-w-md">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
+            placeholder="Tìm theo Tên, Mã SV, Mã Lớp, Số điện thoại..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm kiếm theo Tên, Mã SV, Lớp hoặc SĐT..."
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none transition-all"
           />
         </div>
@@ -115,7 +107,7 @@ export default function MonitorsList({
       </div>
 
       {/* Grid of Monitors */}
-      <div className="w-full">
+      <div className="flex-1 overflow-y-auto">
         {isLoading && monitors.length === 0 ? (
           <div className="bg-white rounded-3xl p-16 border border-slate-200 shadow-sm flex flex-col items-center justify-center min-h-[300px] text-slate-500 gap-3 text-center">
             <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />

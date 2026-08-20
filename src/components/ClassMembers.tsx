@@ -499,7 +499,7 @@ export default function ClassMembers({
   };
 
   return (
-    <div className="flex-1 flex flex-col gap-4 sm:gap-6 w-full relative">
+    <div className="p-3 sm:p-4 md:p-8 flex-1 flex flex-col gap-4 sm:gap-6 w-full max-w-7xl mx-auto relative">
       {/* Toast Notification */}
       {toastMessage && (
         <div
