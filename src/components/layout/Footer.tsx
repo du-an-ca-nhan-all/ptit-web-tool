@@ -53,62 +53,91 @@ export default function Footer() {
             </div>
 
             {/* Right: Contact Channel Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
               {/* Telegram Admin */}
-              <div className="flex items-center justify-between gap-3 p-3 bg-slate-50 hover:bg-sky-50/60 border border-slate-200 hover:border-sky-200 rounded-2xl transition-all group">
+              <div className="flex items-center justify-between gap-2.5 p-3 bg-slate-50 hover:bg-sky-50/60 border border-slate-200 hover:border-sky-200 rounded-2xl transition-all group">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                     <Send className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Telegram Admin
+                      Telegram
                     </span>
                     <a
-                      href="https://t.me/thanhlv_admin"
+                      href="https://t.me/lethanh9398"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-mono font-bold text-xs text-sky-700 hover:text-sky-800 truncate block hover:underline"
                     >
-                      @thanhlv_admin
+                      @lethanh9398
                     </a>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleCopy('@thanhlv_admin', 'telegram')}
-                  className="p-1.5 text-slate-400 hover:text-sky-600 bg-white border border-slate-200 rounded-xl transition-colors cursor-pointer"
+                  onClick={() => handleCopy('@lethanh9398', 'telegram')}
+                  className="p-1.5 text-slate-400 hover:text-sky-600 bg-white border border-slate-200 rounded-xl transition-colors cursor-pointer shrink-0"
                   title="Sao chép Telegram handle"
                 >
                   {copied === 'telegram' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </div>
 
-              {/* Email Admin */}
-              <div className="flex items-center justify-between gap-3 p-3 bg-slate-50 hover:bg-amber-50/60 border border-slate-200 hover:border-amber-200 rounded-2xl transition-all group">
+              {/* Phone / Zalo Admin */}
+              <div className="flex items-center justify-between gap-2.5 p-3 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-200 rounded-2xl transition-all group">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Mail className="w-4 h-4" />
-                  </div>
                   <div className="min-w-0">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Email Quản Trị
+                      SĐT / Zalo
                     </span>
                     <a
-                      href="mailto:admin@ptit.edu.vn"
-                      className="font-mono font-bold text-xs text-slate-800 hover:text-indigo-600 truncate block hover:underline"
+                      href="tel:0966211618"
+                      className="font-mono font-bold text-xs text-emerald-700 hover:text-emerald-800 truncate block hover:underline"
                     >
-                      admin@ptit.edu.vn
+                      0966.211.618
                     </a>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleCopy('admin@ptit.edu.vn', 'email')}
-                  className="p-1.5 text-slate-400 hover:text-amber-600 bg-white border border-slate-200 rounded-xl transition-colors cursor-pointer"
-                  title="Sao chép Email"
+                  onClick={() => handleCopy('0966211618', 'phone')}
+                  className="p-1.5 text-slate-400 hover:text-emerald-600 bg-white border border-slate-200 rounded-xl transition-colors cursor-pointer shrink-0"
+                  title="Sao chép Số điện thoại"
                 >
-                  {copied === 'email' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied === 'phone' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
+              {/* Facebook Admin */}
+              <div className="flex items-center justify-between gap-2.5 p-3 bg-slate-50 hover:bg-blue-50/60 border border-slate-200 hover:border-blue-200 rounded-2xl transition-all group">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Facebook
+                    </span>
+                    <a
+                      href="https://www.facebook.com/lethanh9398"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono font-bold text-xs text-blue-700 hover:text-blue-800 truncate block hover:underline"
+                    >
+                      lethanh9398
+                    </a>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopy('https://www.facebook.com/lethanh9398', 'facebook')}
+                  className="p-1.5 text-slate-400 hover:text-blue-600 bg-white border border-slate-200 rounded-xl transition-colors cursor-pointer shrink-0"
+                  title="Sao chép link Facebook"
+                >
+                  {copied === 'facebook' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>

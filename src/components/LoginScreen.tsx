@@ -577,20 +577,31 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
           </p>
           <div className="flex items-center justify-center gap-2 text-xs font-mono font-bold flex-wrap">
             <a
-              href="https://t.me/thanhlv_admin"
+              href="https://t.me/lethanh9398"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
             >
               <Send className="w-3 h-3" />
-              <span>@thanhlv_admin</span>
+              <span>@lethanh9398</span>
             </a>
             <a
-              href="mailto:admin@ptit.edu.vn"
-              className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
+              href="tel:0966211618"
+              className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
             >
-              <Mail className="w-3 h-3 text-amber-600" />
-              <span>admin@ptit.edu.vn</span>
+              <Phone className="w-3 h-3" />
+              <span>0966.211.618</span>
+            </a>
+            <a
+              href="https://www.facebook.com/lethanh9398"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
+            >
+              <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+              <span>FB: lethanh9398</span>
             </a>
           </div>
         </div>
