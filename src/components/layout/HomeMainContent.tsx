@@ -7,7 +7,6 @@ import FilterBar, { FilterState } from '../FilterBar';
 import DataTable, { SortKey, SortDirection } from '../DataTable';
 import ClassMonitorTools from '../ClassMonitorTools';
 import ClassMembers from '../ClassMembers';
-import RoomEnvelopeManager from '../RoomEnvelopeManager';
 import AllMonitorsEnvelopes from '../AllMonitorsEnvelopes';
 import ExamRoomMembers from '../ExamRoomMembers';
 import MonitorsList from '../MonitorsList';
@@ -246,17 +245,7 @@ export default function HomeMainContent({
           selectedClass={monitorClass}
           onClassChange={setMonitorClass}
         />
-      ) : activeTab === 'envelope' ? (
-        <RoomEnvelopeManager
-          sessions={sessions}
-          records={records}
-          selectedClass={effectiveUser?.lop || monitorClass}
-          onClassChange={setMonitorClass}
-          loginUsers={loginUsers}
-          hideClassSelector={true}
-          isAdmin={isAdmin}
-        />
-      ) : activeTab === 'envelope_all' ? (
+      ) : activeTab === 'envelope_all' || activeTab === 'envelope' ? (
         <AllMonitorsEnvelopes
           records={records}
           sessions={sessions}

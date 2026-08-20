@@ -423,7 +423,7 @@ export default function AllMonitorsEnvelopes({
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-slate-800 flex items-center gap-2">
             <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
-            <span>Phân Công Phong Bì Toàn Trường</span>
+            <span>Phân Công Phong Bì</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             Danh sách tất cả phòng thi. Lớp đông SV nhất được gợi ý phụ trách, các lớp có thể chủ động nhận hoặc gán sinh viên hỗ trợ.

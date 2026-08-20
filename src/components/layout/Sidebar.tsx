@@ -206,31 +206,17 @@ export default function Sidebar({
                 <Users className="w-4 h-4 text-amber-400" /> Danh Sách & Điểm Danh
               </button>
 
-              {/* PB Lớp Mình */}
-              {hasExamSchedule && (
-                <button
-                  onClick={() => onTabChange('envelope')}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
-                    activeTab === 'envelope'
-                      ? 'bg-amber-600/20 text-amber-400 border border-amber-500/30 font-bold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
-                  }`}
-                >
-                  <Mail className="w-4 h-4 text-amber-400" /> Phân Công Phong Bì Lớp Mình
-                </button>
-              )}
-
-              {/* PB Lớp Khác */}
+              {/* Phân Công Phong Bì */}
               {hasExamSchedule && (
                 <button
                   onClick={() => onTabChange('envelope_all')}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
-                    activeTab === 'envelope_all'
+                    activeTab === 'envelope_all' || activeTab === 'envelope'
                       ? 'bg-amber-600/20 text-amber-400 border border-amber-500/30 font-bold'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
                   }`}
                 >
-                  <BookOpen className="w-4 h-4 text-amber-400" /> Phân Công Phong Bì Toàn Trường
+                  <Mail className="w-4 h-4 text-amber-400" /> Phân Công Phong Bì
                 </button>
               )}
 
