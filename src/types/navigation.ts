@@ -169,64 +169,120 @@ export const ADMIN_SUBPATH_MAP: Record<string, NavigationTab> = {
   thongbao: 'announcements_admin',
 };
 
-export const getNavigationPath = (tab: NavigationTab, profileSubTab?: ProfileSubTab): string => {
+export const getNavigationPath = (
+  tab: NavigationTab,
+  profileSubTab?: ProfileSubTab,
+  options?: {
+    search?: string;
+    classCode?: string;
+    subjectCode?: string;
+    date?: string;
+    monitorClass?: string;
+    page?: number;
+    sortKey?: string;
+    sortDir?: string;
+  }
+): string => {
+  let basePath = '/';
   switch (tab) {
     case 'profile':
       switch (profileSubTab) {
         case 'SCHEDULE':
-          return '/profile/PersonalSchedule';
+          basePath = '/profile/PersonalSchedule';
+          break;
         case 'GRADES':
-          return '/profile/Grades';
+          basePath = '/profile/Grades';
+          break;
         case 'EXAMS':
-          return '/profile/Exams';
+          basePath = '/profile/Exams';
+          break;
         case 'EXTERNAL_ACCOUNTS':
-          return '/profile/ExternalAccounts';
+          basePath = '/profile/ExternalAccounts';
+          break;
         case 'TELEGRAM':
-          return '/profile/Telegram';
+          basePath = '/profile/Telegram';
+          break;
         case 'SECURITY':
-          return '/profile/Security';
+          basePath = '/profile/Security';
+          break;
         case 'OVERVIEW':
         default:
-          return '/profile/Overview';
+          basePath = '/profile/Overview';
+          break;
       }
+      break;
     case 'personal_schedule':
-      return '/personal-schedule';
+      basePath = '/personal-schedule';
+      break;
     case 'schedule':
-      return '/schedule';
+      basePath = '/schedule';
+      break;
     case 'registered_courses':
-      return '/courses';
+      basePath = '/courses';
+      break;
     case 'course_compare':
-      return '/course-compare';
+      basePath = '/course-compare';
+      break;
     case 'monitors_list':
-      return '/monitors';
+      basePath = '/monitors';
+      break;
     case 'all_students':
-      return '/students';
+      basePath = '/students';
+      break;
     case 'members':
-      return '/monitor/members';
+      basePath = '/monitor/members';
+      break;
     case 'envelope':
     case 'envelope_all':
-      return '/monitor/envelope-all';
+      basePath = '/monitor/envelope-all';
+      break;
     case 'settlement':
-      return '/monitor/settlement';
+      basePath = '/monitor/settlement';
+      break;
     case 'monitor':
-      return '/monitor/tools';
+      basePath = '/monitor/tools';
+      break;
     case 'batches':
-      return '/admin/batches';
+      basePath = '/admin/batches';
+      break;
     case 'external_accounts_admin':
-      return '/admin/external-accounts';
+      basePath = '/admin/external-accounts';
+      break;
     case 'telegram_admin':
-      return '/admin/telegram';
+      basePath = '/admin/telegram';
+      break;
     case 'activity_logs':
-      return '/admin/activity-logs';
+      basePath = '/admin/activity-logs';
+      break;
     case 'user_registrations':
-      return '/admin/user-registrations';
+      basePath = '/admin/user-registrations';
+      break;
     case 'database_backup':
-      return '/admin/database-backup';
+      basePath = '/admin/database-backup';
+      break;
     case 'announcements_admin':
-      return '/admin/announcements';
+      basePath = '/admin/announcements';
+      break;
     default:
-      return '/';
+      basePath = '/';
+      break;
   }
+
+  if (options) {
+    const params = new URLSearchParams();
+    if (options.search) params.set('search', options.search);
+    if (options.classCode) params.set('classCode', options.classCode);
+    if (options.subjectCode) params.set('subjectCode', options.subjectCode);
+    if (options.date) params.set('date', options.date);
+    if (options.monitorClass) params.set('monitorClass', options.monitorClass);
+    if (options.page && options.page > 1) params.set('page', String(options.page));
+    if (options.sortKey && options.sortKey !== 'DateTime') params.set('sortKey', options.sortKey);
+    if (options.sortDir && options.sortDir !== 'asc') params.set('sortDir', options.sortDir);
+    const qs = params.toString();
+    if (qs) return `${basePath}?${qs}`;
+  }
+
+  return basePath;
 };
 
 export const getInitialHomeState = (): InitialHomeState => {

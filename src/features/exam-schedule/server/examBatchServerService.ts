@@ -1,4 +1,4 @@
-import { prisma } from '../../../lib/prisma';
+import { prisma } from '@/src/lib/prisma';
 import { ExamBatchItem } from '../types/exam.types';
 
 export const examBatchService = {

@@ -8,7 +8,7 @@ import HomeMainContent from '../components/layout/HomeMainContent';
 import {
   ConfirmStudentModal,
   ConfirmClassModal,
-} from '../components/modals/ConfirmationModals';
+} from '../components/common/ConfirmationModals';
 import { useHomeState } from '../hooks/useHomeState';
 
 export default function Home() {

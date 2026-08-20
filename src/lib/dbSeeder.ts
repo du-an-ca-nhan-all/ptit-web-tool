@@ -6,7 +6,16 @@ import { prisma } from './prisma';
 
 import { syncPostgresSequences } from './backupService';
 
+let isDbSeededChecked = false;
+
 export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ success: boolean; message: string; counts?: any }> {
+  if (isDbSeededChecked && !force) {
+    return {
+      success: true,
+      message: 'Database already verified as seeded',
+    };
+  }
+
   try {
     const existingStudentCount = await prisma.student.count().catch(() => 0);
     const existingUserCount = await prisma.user.count().catch(() => 0);
@@ -18,6 +27,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
     }).catch(() => null);
 
     if ((meta || existingStudentCount > 0) && !force) {
+      isDbSeededChecked = true;
       if (!meta && existingStudentCount > 0) {
         await prisma.systemMeta.upsert({
           where: { key: 'initial_seeded' },
@@ -426,6 +436,7 @@ export async function ensureDatabaseSeeded(force: boolean = false): Promise<{ su
     });
 
     console.log(`[DB Seeder] Done! Seeded ${studentCount} students, ${userCount} users, ${examCount} exam records.`);
+    isDbSeededChecked = true;
     return {
       success: true,
       message: 'Database seeded successfully',
