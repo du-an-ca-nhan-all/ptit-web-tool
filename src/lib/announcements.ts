@@ -20,46 +20,6 @@ export interface AnnouncementItem {
   updatedAt: string;
 }
 
-let isTableInitialized = false;
-
-/**
- * Đảm bảo bảng Announcement tồn tại trong cơ sở dữ liệu PostgreSQL
- */
-export async function ensureAnnouncementTable(): Promise<void> {
-  if (isTableInitialized) return;
-  try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "Announcement" (
-        "id" SERIAL PRIMARY KEY,
-        "title" TEXT NOT NULL,
-        "content" TEXT NOT NULL,
-        "type" TEXT NOT NULL DEFAULT 'INFO',
-        "displayMode" TEXT NOT NULL DEFAULT 'BANNER',
-        "targetRole" TEXT NOT NULL DEFAULT 'ALL',
-        "targetClass" TEXT,
-        "linkUrl" TEXT,
-        "linkText" TEXT,
-        "isPinned" BOOLEAN NOT NULL DEFAULT false,
-        "isActive" BOOLEAN NOT NULL DEFAULT true,
-        "startDate" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
-        "endDate" TIMESTAMP(3),
-        "author" TEXT,
-        "viewCount" INTEGER NOT NULL DEFAULT 0,
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE INDEX IF NOT EXISTS "Announcement_isActive_idx" ON "Announcement"("isActive");
-      CREATE INDEX IF NOT EXISTS "Announcement_displayMode_idx" ON "Announcement"("displayMode");
-      CREATE INDEX IF NOT EXISTS "Announcement_targetRole_idx" ON "Announcement"("targetRole");
-      CREATE INDEX IF NOT EXISTS "Announcement_isPinned_idx" ON "Announcement"("isPinned");
-      CREATE INDEX IF NOT EXISTS "Announcement_createdAt_idx" ON "Announcement"("createdAt");
-    `);
-    isTableInitialized = true;
-  } catch (err) {
-    console.error('ensureAnnouncementTable error:', err);
-  }
-}
-
 /**
  * Lấy danh sách các thông báo đang có hiệu lực dành cho người dùng
  */
@@ -68,7 +28,6 @@ export async function getActiveAnnouncements(options?: {
   classCode?: string | null;
   limit?: number;
 }): Promise<AnnouncementItem[]> {
-  await ensureAnnouncementTable();
   const now = new Date();
   const limit = options?.limit || 20;
 
@@ -152,7 +111,6 @@ export async function getAllAnnouncementsAdmin(options?: {
     totalViews: number;
   };
 }> {
-  await ensureAnnouncementTable();
   const page = Math.max(1, options?.page || 1);
   const limit = Math.max(1, options?.limit || 15);
   const skip = (page - 1) * limit;
@@ -251,8 +209,6 @@ export async function createAnnouncement(data: {
   endDate?: string | null;
   author?: string | null;
 }): Promise<AnnouncementItem> {
-  await ensureAnnouncementTable();
-
   const created = await (prisma as any).announcement.create({
     data: {
       title: data.title.trim(),
@@ -295,8 +251,6 @@ export async function updateAnnouncement(
     author: string | null;
   }>
 ): Promise<AnnouncementItem> {
-  await ensureAnnouncementTable();
-
   const updateData: any = {};
   if (data.title !== undefined) updateData.title = data.title.trim();
   if (data.content !== undefined) updateData.content = data.content.trim();
@@ -323,7 +277,6 @@ export async function updateAnnouncement(
  * Bật / tắt trạng thái hiển thị
  */
 export async function toggleAnnouncementStatus(id: number, isActive: boolean): Promise<AnnouncementItem> {
-  await ensureAnnouncementTable();
   const updated = await (prisma as any).announcement.update({
     where: { id },
     data: { isActive },
@@ -335,7 +288,6 @@ export async function toggleAnnouncementStatus(id: number, isActive: boolean): P
  * Xóa thông báo
  */
 export async function deleteAnnouncement(id: number): Promise<void> {
-  await ensureAnnouncementTable();
   await (prisma as any).announcement.delete({
     where: { id },
   });
@@ -345,7 +297,6 @@ export async function deleteAnnouncement(id: number): Promise<void> {
  * Xóa nhiều thông báo
  */
 export async function bulkDeleteAnnouncements(ids: number[]): Promise<number> {
-  await ensureAnnouncementTable();
   const res = await (prisma as any).announcement.deleteMany({
     where: { id: { in: ids } },
   });
@@ -358,7 +309,6 @@ export async function bulkDeleteAnnouncements(ids: number[]): Promise<number> {
 export async function incrementAnnouncementViews(ids: number[]): Promise<void> {
   if (!ids || ids.length === 0) return;
   try {
-    await ensureAnnouncementTable();
     await (prisma as any).announcement.updateMany({
       where: { id: { in: ids } },
       data: {
