@@ -412,6 +412,7 @@ export default function TelegramConfigSection({
           botInfo: data.botInfo,
         });
         setSuccessMsg(data.message || 'Đã gửi tin nhắn thử nghiệm thành công!');
+        fetchConfig();
         setTimeout(() => setSuccessMsg(''), 5000);
       } else {
         setTestResult({
@@ -482,6 +483,12 @@ export default function TelegramConfigSection({
   }
 
   const isConnected = !!config?.id;
+  const isCustomConfigValid = !isCustomBot || !!(config?.botToken && config.botToken.trim());
+  const isTelegramConfigured = Boolean(isConnected && config?.chatId && isCustomConfigValid);
+  const isTelegramTestSuccess = Boolean(
+    testResult ? testResult.success : config?.lastTestStatus === 'SUCCESS'
+  );
+  const isTelegramReady = Boolean(isTelegramConfigured && isTelegramTestSuccess);
   const activeBotUsername =
     !isCustomBot ? systemBot?.botUsername : (config?.botUsername || 'CustomBot');
 
@@ -1020,16 +1027,67 @@ export default function TelegramConfigSection({
           </div>
 
           {/* Notification Types Filter Checkboxes */}
-          <div className="bg-slate-50 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 flex flex-col gap-3">
+          <div className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border flex flex-col gap-3 transition-colors ${
+            !isTelegramReady
+              ? 'bg-slate-100/70 border-slate-300'
+              : 'bg-slate-50 border-slate-200'
+          }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
                 <Bell className="w-3.5 h-3.5 text-sky-600" />
                 <span>Tùy Chọn Nhận Các Loại Thông Báo</span>
               </div>
+              <div>
+                {isTelegramReady ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    <span>Đã sẵn sàng</span>
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-rose-600" />
+                    <span>Chưa kích hoạt</span>
+                  </span>
+                )}
+              </div>
             </div>
 
+            {/* Telegram Configuration & Test Readiness Alert Banner */}
+            {!isTelegramReady && (
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl sm:rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-rose-900 animate-in fade-in">
+                <div className="flex items-start sm:items-center gap-2.5">
+                  <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5 sm:mt-0" />
+                  <div>
+                    <strong className="font-bold block text-rose-950">
+                      {!isTelegramConfigured
+                        ? 'Chưa hoàn tất cấu hình kết nối Telegram'
+                        : testResult?.success === false || config?.lastTestStatus === 'FAILED'
+                        ? 'Kiểm tra gửi tin nhắn Telegram thất bại'
+                        : 'Yêu cầu kiểm tra kết nối Telegram thành công'}
+                    </strong>
+                    <span className="text-[11px] text-rose-800">
+                      {!isTelegramConfigured
+                        ? 'Vui lòng nhập Chat ID (và Bot Token nếu dùng Bot riêng), sau đó bấm "Gửi Tin Nhắn Thử Nghiệm" hoặc "Lưu Cấu Hình" để mở khóa nhận thông báo.'
+                        : testResult?.success === false || config?.lastTestStatus === 'FAILED'
+                        ? 'Lần gửi thử nghiệm gần nhất không thành công. Vui lòng kiểm tra lại Chat ID / Token và gửi thử nghiệm thành công để kích hoạt nhận thông báo.'
+                        : 'Để sử dụng các tùy chọn nhận thông báo, bạn cần bấm "Gửi Tin Nhắn Thử Nghiệm" thành công ít nhất một lần để xác thực kết nối.'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTest}
+                  disabled={isTesting || !chatId.trim() || (isCustomBot && !botToken.trim())}
+                  className="w-full sm:w-auto px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shrink-0 transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isTesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  <span>Gửi Thử Nghiệm Ngay</span>
+                </button>
+              </div>
+            )}
+
             {/* QLDTTX Dependency Alert Banner */}
-            {!isQldttxAvailable && (
+            {isTelegramReady && !isQldttxAvailable && (
               <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl sm:rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in">
                 <div className="flex items-start sm:items-center gap-2.5">
                   <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
@@ -1061,51 +1119,67 @@ export default function TelegramConfigSection({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 pt-1">
               {/* Option 1: Exam Schedule */}
-              <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border transition-colors ${
+                !isTelegramReady
+                  ? 'bg-slate-100/80 border-slate-200 opacity-60 cursor-not-allowed'
+                  : 'bg-white border-slate-200 hover:border-sky-300 cursor-pointer'
+              }`}>
                 <input
                   type="checkbox"
-                  checked={notifyExamSchedule}
-                  onChange={(e) => setNotifyExamSchedule(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0"
+                  disabled={!isTelegramReady}
+                  checked={isTelegramReady && notifyExamSchedule}
+                  onChange={(e) => isTelegramReady && setNotifyExamSchedule(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0 disabled:cursor-not-allowed"
                 />
-                <div className="text-xs">
-                  <div className="font-bold text-slate-800 flex items-center gap-1">
-                    <span>Lịch Thi & Ca Thi</span>
+                <div className="text-xs flex-1">
+                  <div className="font-bold flex items-center justify-between gap-1">
+                    <span className={isTelegramReady ? 'text-slate-800' : 'text-slate-500'}>Lịch Thi & Ca Thi</span>
+                    {!isTelegramReady && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-slate-200 text-slate-600 flex items-center gap-0.5">
+                        <Lock className="w-2.5 h-2.5" /> Khóa
+                      </span>
+                    )}
                   </div>
                   <div className="text-[10px] text-slate-400 mt-0.5">Nhắc trước 1 ngày & 7h sáng hôm thi</div>
                 </div>
               </label>
 
-              {/* Option 2: Class Schedule & Timetable (Requires QLDTTX) */}
+              {/* Option 2: Class Schedule & Timetable (Requires Telegram Ready & QLDTTX) */}
               <div
                 className={`p-3 rounded-xl border transition-all ${
-                  !isQldttxAvailable
+                  !isTelegramReady || !isQldttxAvailable
                     ? 'bg-slate-100/80 border-slate-200 opacity-60 cursor-not-allowed'
                     : 'bg-white border-amber-300 bg-amber-50/40 hover:border-amber-400 cursor-pointer'
                 }`}
               >
-                <label className={`flex items-start gap-2.5 ${!isQldttxAvailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                <label className={`flex items-start gap-2.5 ${!isTelegramReady || !isQldttxAvailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                   <input
                     type="checkbox"
-                    disabled={!isQldttxAvailable}
-                    checked={isQldttxAvailable && notifyClassSchedule}
-                    onChange={(e) => isQldttxAvailable && setNotifyClassSchedule(e.target.checked)}
+                    disabled={!isTelegramReady || !isQldttxAvailable}
+                    checked={isTelegramReady && isQldttxAvailable && notifyClassSchedule}
+                    onChange={(e) => isTelegramReady && isQldttxAvailable && setNotifyClassSchedule(e.target.checked)}
                     className="w-4 h-4 mt-0.5 text-amber-600 rounded focus:ring-amber-500 cursor-pointer shrink-0 disabled:cursor-not-allowed"
                   />
                   <div className="text-xs flex-1">
                     <div className="font-bold flex items-center justify-between gap-1">
-                      <span className={isQldttxAvailable ? 'text-amber-900' : 'text-slate-500'}>
+                      <span className={isTelegramReady && isQldttxAvailable ? 'text-amber-900' : 'text-slate-500'}>
                         Lịch Học & Thời Khóa Biểu
                       </span>
-                      {!isQldttxAvailable && (
+                      {!isTelegramReady ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-slate-200 text-slate-600 flex items-center gap-0.5">
+                          <Lock className="w-2.5 h-2.5" /> Khóa
+                        </span>
+                      ) : !isQldttxAvailable ? (
                         <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
                           <Lock className="w-2.5 h-2.5" />
                           {isQldttxError ? 'Lỗi xác thực' : 'Chưa liên kết'}
                         </span>
-                      )}
+                      ) : null}
                     </div>
-                    <div className={`text-[10px] mt-0.5 ${isQldttxAvailable ? 'text-amber-700' : 'text-slate-400'}`}>
-                      {!isQldttxAvailable
+                    <div className={`text-[10px] mt-0.5 ${isTelegramReady && isQldttxAvailable ? 'text-amber-700' : 'text-slate-400'}`}>
+                      {!isTelegramReady
+                        ? 'Yêu cầu cấu hình & test Telegram thành công.'
+                        : !isQldttxAvailable
                         ? isQldttxError
                           ? 'Mật khẩu QLDTTX sai/hết hạn. Cần cập nhật lại.'
                           : 'Yêu cầu liên kết tài khoản Cổng QLDTTX.'
@@ -1116,49 +1190,67 @@ export default function TelegramConfigSection({
               </div>
 
               {/* Option 3: Class Activity */}
-              <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border transition-colors ${
+                !isTelegramReady
+                  ? 'bg-slate-100/80 border-slate-200 opacity-60 cursor-not-allowed'
+                  : 'bg-white border-slate-200 hover:border-sky-300 cursor-pointer'
+              }`}>
                 <input
                   type="checkbox"
-                  checked={notifyClassActivity}
-                  onChange={(e) => setNotifyClassActivity(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0"
+                  disabled={!isTelegramReady}
+                  checked={isTelegramReady && notifyClassActivity}
+                  onChange={(e) => isTelegramReady && setNotifyClassActivity(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0 disabled:cursor-not-allowed"
                 />
-                <div className="text-xs">
-                  <div className="font-bold text-slate-800">Biến Động Lớp Học</div>
+                <div className="text-xs flex-1">
+                  <div className="font-bold flex items-center justify-between gap-1">
+                    <span className={isTelegramReady ? 'text-slate-800' : 'text-slate-500'}>Biến Động Lớp Học</span>
+                    {!isTelegramReady && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-slate-200 text-slate-600 flex items-center gap-0.5">
+                        <Lock className="w-2.5 h-2.5" /> Khóa
+                      </span>
+                    )}
+                  </div>
                   <div className="text-[10px] text-slate-400 mt-0.5">Phân công phong bì & bù trừ lớp</div>
                 </div>
               </label>
 
-              {/* Option 5: QLDTTX Portal Announcements (Requires QLDTTX) */}
+              {/* Option 5: QLDTTX Portal Announcements (Requires Telegram Ready & QLDTTX) */}
               <div
                 className={`p-3 rounded-xl border transition-all sm:col-span-2 lg:col-span-2 ${
-                  !isQldttxAvailable
+                  !isTelegramReady || !isQldttxAvailable
                     ? 'bg-slate-100/80 border-slate-200 opacity-60 cursor-not-allowed'
                     : 'bg-white border-sky-300 bg-sky-50/40 hover:border-sky-400 cursor-pointer'
                 }`}
               >
-                <label className={`flex items-start gap-2.5 ${!isQldttxAvailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                <label className={`flex items-start gap-2.5 ${!isTelegramReady || !isQldttxAvailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                   <input
                     type="checkbox"
-                    disabled={!isQldttxAvailable}
-                    checked={isQldttxAvailable && notifyQldtAnnouncements}
-                    onChange={(e) => isQldttxAvailable && setNotifyQldtAnnouncements(e.target.checked)}
+                    disabled={!isTelegramReady || !isQldttxAvailable}
+                    checked={isTelegramReady && isQldttxAvailable && notifyQldtAnnouncements}
+                    onChange={(e) => isTelegramReady && isQldttxAvailable && setNotifyQldtAnnouncements(e.target.checked)}
                     className="w-4 h-4 mt-0.5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer shrink-0 disabled:cursor-not-allowed"
                   />
                   <div className="text-xs flex-1">
                     <div className="font-bold flex items-center justify-between gap-1">
-                      <span className={isQldttxAvailable ? 'text-sky-900' : 'text-slate-500'}>
+                      <span className={isTelegramReady && isQldttxAvailable ? 'text-sky-900' : 'text-slate-500'}>
                         Thông Báo Cổng QLDTTX
                       </span>
-                      {!isQldttxAvailable && (
+                      {!isTelegramReady ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-slate-200 text-slate-600 flex items-center gap-0.5">
+                          <Lock className="w-2.5 h-2.5" /> Khóa
+                        </span>
+                      ) : !isQldttxAvailable ? (
                         <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-800 border border-sky-200 flex items-center gap-1">
                           <Lock className="w-2.5 h-2.5" />
                           {isQldttxError ? 'Lỗi xác thực' : 'Chưa liên kết'}
                         </span>
-                      )}
+                      ) : null}
                     </div>
-                    <div className={`text-[10px] mt-0.5 ${isQldttxAvailable ? 'text-sky-700' : 'text-slate-400'}`}>
-                      {!isQldttxAvailable
+                    <div className={`text-[10px] mt-0.5 ${isTelegramReady && isQldttxAvailable ? 'text-sky-700' : 'text-slate-400'}`}>
+                      {!isTelegramReady
+                        ? 'Yêu cầu cấu hình & test Telegram thành công.'
+                        : !isQldttxAvailable
                         ? isQldttxError
                           ? 'Mật khẩu QLDTTX sai/hết hạn. Cần cập nhật lại.'
                           : 'Yêu cầu liên kết tài khoản Cổng QLDTTX.'
@@ -1170,7 +1262,7 @@ export default function TelegramConfigSection({
             </div>
 
             {/* Class Schedule Setting Panel */}
-            {isQldttxAvailable && notifyClassSchedule && (
+            {isTelegramReady && isQldttxAvailable && notifyClassSchedule && (
               <div className="mt-2 p-3 sm:p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex flex-col gap-3 text-xs">
                 <div className="flex flex-col gap-0.5">
                   <div className="font-bold text-amber-900 flex items-center gap-1.5">
@@ -1227,14 +1319,14 @@ export default function TelegramConfigSection({
               </div>
             )}
 
-            {classScheduleCheckMsg && (
+            {isTelegramReady && classScheduleCheckMsg && (
               <div className="p-3 bg-amber-50/80 border border-amber-300 text-amber-900 text-xs font-medium rounded-xl flex items-center gap-2 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>{classScheduleCheckMsg}</span>
               </div>
             )}
 
-            {nearestClassScheduleMsg && (
+            {isTelegramReady && nearestClassScheduleMsg && (
               <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 text-amber-950 text-xs font-medium rounded-xl flex items-center gap-2 animate-in fade-in shadow-xs">
                 <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>{nearestClassScheduleMsg}</span>
@@ -1242,7 +1334,7 @@ export default function TelegramConfigSection({
             )}
 
             {/* QLDTTX Check Interval Selector */}
-            {isQldttxAvailable && notifyQldtAnnouncements && (
+            {isTelegramReady && isQldttxAvailable && notifyQldtAnnouncements && (
               <div className="mt-1 p-3 sm:p-3.5 bg-sky-50 border border-sky-200 rounded-xl flex flex-col gap-3 text-xs">
                 <div className="flex flex-col gap-0.5">
                   <div className="font-bold text-sky-900 flex items-center gap-1.5">
@@ -1288,7 +1380,7 @@ export default function TelegramConfigSection({
               </div>
             )}
 
-            {qldtCheckMsg && (
+            {isTelegramReady && qldtCheckMsg && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-xl flex items-center gap-2 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{qldtCheckMsg}</span>
