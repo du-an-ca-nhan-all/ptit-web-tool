@@ -18,6 +18,7 @@ export type NavigationTab =
   | 'telegram_admin'
   | 'user_registrations'
   | 'database_backup'
+  | 'announcements_admin'
   | 'all_students'
   | 'course_compare';
 
@@ -71,6 +72,7 @@ export const VALID_NAVIGATION_TABS: NavigationTab[] = [
   'telegram_admin',
   'user_registrations',
   'database_backup',
+  'announcements_admin',
   'all_students',
   'course_compare',
 ];
@@ -129,6 +131,9 @@ export const PATH_TO_TAB_MAP: Record<string, NavigationTab> = {
   user_registrations: 'user_registrations',
   'database-backup': 'database_backup',
   database_backup: 'database_backup',
+  announcements: 'announcements_admin',
+  announcements_admin: 'announcements_admin',
+  'announcements-admin': 'announcements_admin',
 };
 
 export const MONITOR_SUBPATH_MAP: Record<string, NavigationTab> = {
@@ -159,6 +164,9 @@ export const ADMIN_SUBPATH_MAP: Record<string, NavigationTab> = {
   'database-backup': 'database_backup',
   database_backup: 'database_backup',
   saoluu: 'database_backup',
+  announcements: 'announcements_admin',
+  announcements_admin: 'announcements_admin',
+  thongbao: 'announcements_admin',
 };
 
 export const getNavigationPath = (tab: NavigationTab, profileSubTab?: ProfileSubTab): string => {
@@ -214,6 +222,8 @@ export const getNavigationPath = (tab: NavigationTab, profileSubTab?: ProfileSub
       return '/admin/user-registrations';
     case 'database_backup':
       return '/admin/database-backup';
+    case 'announcements_admin':
+      return '/admin/announcements';
     default:
       return '/';
   }

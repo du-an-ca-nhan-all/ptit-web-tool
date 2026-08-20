@@ -435,3 +435,33 @@ model RoomEnvelopeConfirmation {
   @@index([batchCode])
   @@index([assistantStudentId])
 }
+
+// 20. Bảng Announcement: Quản lý thông báo từ Admin hiển thị cho người dùng trên web
+model Announcement {
+  id          Int       @id @default(autoincrement())
+  title       String    // Tiêu đề thông báo
+  content     String    // Nội dung thông báo (hỗ trợ text / markdown / ghi chú)
+  type        String    @default("INFO") // 'INFO' | 'WARNING' | 'SUCCESS' | 'DANGER' | 'MAINTENANCE' | 'SYSTEM'
+  displayMode String    @default("BANNER") // 'BANNER' (Thanh thông báo đầu trang) | 'MODAL' (Popup khi vào web) | 'BOTH' (Cả hai)
+  targetRole  String    @default("ALL") // 'ALL' | 'sinh_vien' | 'lop_truong' | 'admin'
+  targetClass String?   // Mã lớp áp dụng cụ thể (tùy chọn, để trống nếu cho tất cả)
+  linkUrl     String?   // URL liên kết ngoài hoặc nội bộ (CTA link)
+  linkText    String?   // Nhãn cho nút bấm liên kết (ví dụ: "Xem chi tiết", "Đăng ký ngay")
+  isPinned    Boolean   @default(false) // Ghim lên đầu
+  isActive    Boolean   @default(true)  // Đang bật hay tắt
+  startDate   DateTime? @default(now()) // Thời điểm bắt đầu hiển thị
+  endDate     DateTime? // Thời điểm kết thúc / hết hạn hiển thị (tùy chọn)
+  author      String?   // Username admin tạo thông báo
+  viewCount   Int       @default(0)     // Lượt xem / hiển thị
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive])
+  @@index([displayMode])
+  @@index([targetRole])
+  @@index([targetClass])
+  @@index([isPinned])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([createdAt])
+}

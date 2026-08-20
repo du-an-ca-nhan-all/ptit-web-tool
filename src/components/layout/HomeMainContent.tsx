@@ -20,12 +20,16 @@ import ActivityLogsManager from '../ActivityLogsManager';
 import AdminTelegramBotManager from '../AdminTelegramBotManager';
 import AdminRegistrationManager from '../AdminRegistrationManager';
 import DatabaseBackupManager from '../DatabaseBackupManager';
+import AdminAnnouncementsManager from '../AdminAnnouncementsManager';
+import AnnouncementBanner from '../announcements/AnnouncementBanner';
+import AnnouncementModal from '../announcements/AnnouncementModal';
 import AllStudentsList from '../AllStudentsList';
 import StudentPersonalExamSchedule from '../StudentPersonalExamSchedule';
 import AllExamsSchedule from '../AllExamsSchedule';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
 import { NavigationTab, ProfileSubTab, TabChangeOptions } from '../../types/navigation';
 import { buildSessions } from '../../utils/dataModel';
+import { AnnouncementItem } from '../../lib/announcements';
 
 interface HomeMainContentProps {
   isLoading: boolean;
@@ -84,6 +88,7 @@ interface HomeMainContentProps {
   totalPages: number;
   profileSubTab?: ProfileSubTab;
   setProfileSubTab?: (subTab: ProfileSubTab) => void;
+  announcements?: AnnouncementItem[];
 }
 
 export default function HomeMainContent({
@@ -139,9 +144,22 @@ export default function HomeMainContent({
   totalPages,
   profileSubTab,
   setProfileSubTab,
+  announcements = [],
 }: HomeMainContentProps) {
   return (
     <section className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+      {/* Global Active Announcement Banner */}
+      <AnnouncementBanner
+        announcements={announcements}
+        onNavigateTab={(tab) => handleTabChange(tab as NavigationTab)}
+      />
+
+      {/* Global Active Announcement Modal Popup */}
+      <AnnouncementModal
+        announcements={announcements}
+        onNavigateTab={(tab) => handleTabChange(tab as NavigationTab)}
+      />
+
       {isLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3">
           <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -178,6 +196,8 @@ export default function HomeMainContent({
         <AdminRegistrationManager currentUser={effectiveUser!} />
       ) : activeTab === 'database_backup' && isAdmin ? (
         <DatabaseBackupManager currentUser={effectiveUser!} />
+      ) : activeTab === 'announcements_admin' && isAdmin ? (
+        <AdminAnnouncementsManager currentUser={effectiveUser!} />
       ) : activeTab === 'batches' ? (
         <ExamBatchManagement
           currentUser={effectiveUser!}

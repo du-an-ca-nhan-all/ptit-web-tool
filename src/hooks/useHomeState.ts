@@ -13,6 +13,7 @@ import {
 } from '../types/navigation';
 import { buildSessions } from '../utils/dataModel';
 import { fetchPricingFromBackend } from '../config/pricingConfig';
+import { AnnouncementItem } from '../lib/announcements';
 
 export function useHomeState() {
   const initialState = useMemo(getInitialHomeState, []);
@@ -178,6 +179,29 @@ export function useHomeState() {
   const [isRevertingImpersonate, setIsRevertingImpersonate] = useState(false);
   const [impersonateError, setImpersonateError] = useState('');
 
+  // Active Announcements for all users
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+
+  const fetchActiveAnnouncements = useCallback(async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/announcements', { headers });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAnnouncements(data.announcements || []);
+      }
+    } catch {
+      // Ignore error
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchActiveAnnouncements();
+  }, [fetchActiveAnnouncements]);
+
   const handleTabChange = useCallback(
     (
       tab: NavigationTab,
@@ -191,6 +215,7 @@ export function useHomeState() {
         'telegram_admin',
         'user_registrations',
         'database_backup',
+        'announcements_admin',
       ];
       if (adminOnlyTabs.includes(tab) && !isAdmin) {
         return;
@@ -1109,6 +1134,9 @@ export function useHomeState() {
     loadDataFromApi,
     handleToggleExamPostpone,
     fetchCourseCompareData,
+    announcements,
+    setAnnouncements,
+    fetchActiveAnnouncements,
     handleLogout,
   };
 }

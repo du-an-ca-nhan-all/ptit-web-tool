@@ -20,6 +20,7 @@ import {
   History,
   Bot,
   Archive,
+  Megaphone,
 } from 'lucide-react';
 import { LoginUser } from '../../types';
 import { NavigationTab } from '../../types/navigation';
@@ -319,6 +320,18 @@ export default function Sidebar({
                 }`}
               >
                 <Archive className="w-4 h-4 text-indigo-400" /> Sao Lưu Dữ Liệu DB
+              </button>
+
+              {/* Thông Báo Hệ Thống */}
+              <button
+                onClick={() => onTabChange('announcements_admin')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'announcements_admin'
+                    ? 'bg-sky-600/25 text-sky-400 border border-sky-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Megaphone className="w-4 h-4 text-sky-400" /> Thông Báo Hệ Thống
               </button>
             </div>
           )}

@@ -98,6 +98,7 @@ export default function Home() {
           isLoading={state.isLoading}
           onRefresh={() => state.loadDataFromApi()}
           onLogout={state.handleLogout}
+          announcements={state.announcements}
         />
 
         <HomeMainContent
@@ -155,6 +156,7 @@ export default function Home() {
           totalPages={state.totalPages}
           profileSubTab={state.profileSubTab}
           setProfileSubTab={state.setProfileSubTab}
+          announcements={state.announcements}
         />
       </main>
 

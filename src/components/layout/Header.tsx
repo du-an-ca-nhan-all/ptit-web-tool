@@ -13,9 +13,12 @@ import {
   UserCheck,
   Layers,
   Power,
+  Bell,
 } from 'lucide-react';
 import { LoginUser, ExamBatchItem } from '../../types';
 import { NavigationTab } from '../../types/navigation';
+import { AnnouncementItem } from '../../lib/announcements';
+import AnnouncementDrawer from '../announcements/AnnouncementDrawer';
 
 interface HeaderProps {
   activeTab: NavigationTab;
@@ -40,6 +43,7 @@ interface HeaderProps {
   isLoading: boolean;
   onRefresh: () => void;
   onLogout: () => void;
+  announcements?: AnnouncementItem[];
 }
 
 export default function Header({
@@ -65,7 +69,10 @@ export default function Header({
   isLoading,
   onRefresh,
   onLogout,
+  announcements = [],
 }: HeaderProps) {
+  const [isAnnouncementDrawerOpen, setIsAnnouncementDrawerOpen] = React.useState(false);
+
   const getHeaderTitle = () => {
     switch (activeTab) {
       case 'schedule':
@@ -84,6 +91,14 @@ export default function Header({
         return 'Quản Trị Bot Telegram Toàn Cục';
       case 'database_backup':
         return 'Sao Lưu & Xuất Dữ Liệu DB';
+      case 'announcements_admin':
+        return 'Quản Lý Thông Báo Hệ Thống';
+      case 'activity_logs':
+        return 'Nhật Ký Hoạt Động';
+      case 'user_registrations':
+        return 'Duyệt Đăng Ký Tài Khoản';
+      case 'external_accounts_admin':
+        return 'Tài Khoản QLĐT Từ Xa';
       case 'envelope':
       case 'envelope_all':
         return 'Phân Công Phong Bì';
@@ -249,6 +264,21 @@ export default function Header({
           </button>
         )}
 
+        {/* Notifications Bell */}
+        <button
+          onClick={() => setIsAnnouncementDrawerOpen(true)}
+          title="Xem thông báo hệ thống"
+          className="relative p-2 text-slate-500 hover:text-sky-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+        >
+          <Bell className="w-4 h-4" />
+          {announcements.length > 0 && (
+            <span className="absolute 1 top-1.5 right-1.5 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+            </span>
+          )}
+        </button>
+
         <button
           onClick={onRefresh}
           title="Đồng bộ lại từ Database"
@@ -285,6 +315,13 @@ export default function Header({
           </button>
         )}
       </div>
+
+      <AnnouncementDrawer
+        isOpen={isAnnouncementDrawerOpen}
+        onClose={() => setIsAnnouncementDrawerOpen(false)}
+        announcements={announcements}
+        onNavigateTab={onTabChange}
+      />
     </header>
   );
 }
