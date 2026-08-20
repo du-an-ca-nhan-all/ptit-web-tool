@@ -20,6 +20,9 @@ import {
   GraduationCap,
   X,
   Clock,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import {
   calculateRoomPrice,
@@ -51,11 +54,18 @@ interface AllMonitorsEnvelopesProps {
   isAdmin?: boolean;
 }
 
-export default function AllMonitorsEnvelopes({ sessions = [], records = [], loginUsers = [], isAdmin }: AllMonitorsEnvelopesProps) {
+export default function AllMonitorsEnvelopes({
+  sessions = [],
+  records = [],
+  loginUsers = [],
+  isAdmin,
+}: AllMonitorsEnvelopesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'UNCLAIMED' | 'CLAIMED' | 'MY_CLASS' | 'MY_CLAIMED'>('ALL');
   const [filterDate, setFilterDate] = useState<string>('ALL');
   const [filterClass, setFilterClass] = useState<string>('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const [pricingVersion, setPricingVersion] = useState(0);
@@ -65,7 +75,7 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
   const [assigningInitialClass, setAssigningInitialClass] = useState<string>('');
   const [quickEditSession, setQuickEditSession] = useState<any | null>(null);
 
-  // Load and listen for envelope assignments
+  // Load and listen for envelope assignments & pricing updates
   useEffect(() => {
     fetchEnvelopeAssignments().then((res) => {
       if (res) setEnvelopeAssignments(res);
@@ -92,10 +102,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
       return null;
     }
   }, []);
-
-  const userIsMonitor = useMemo(() => {
-    return isUserMonitor(currentUser);
-  }, [currentUser]);
 
   const userClass = useMemo(() => {
     return currentUser?.lop?.trim() || '';
@@ -131,8 +137,8 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
 
   // Compute responsible classes for each session
   const enhancedSessions = useMemo(() => {
-    return sessions.map(session => {
-      const monitoredClassesInRoom = session.classCounts.filter(c => monitorClasses.has(c.className));
+    return sessions.map((session) => {
+      const monitoredClassesInRoom = session.classCounts.filter((c) => monitorClasses.has(c.className));
       const { responsibleClass, isClaimedManual, assignmentInfo } = getEffectiveResponsibleClass(
         session,
         monitoredClassesInRoom,
@@ -155,7 +161,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
     return 0;
   };
 
-  // Available unique dates for date filter dropdown
   const availableDates = useMemo(() => {
     const datesSet = new Set<string>();
     enhancedSessions.forEach((s) => {
@@ -164,7 +169,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
     return Array.from(datesSet).sort((a, b) => parseDate(a) - parseDate(b));
   }, [enhancedSessions]);
 
-  // Available unique classes for class filter dropdown
   const availableClasses = useMemo(() => {
     const classesSet = new Set<string>();
     enhancedSessions.forEach((s) => {
@@ -179,7 +183,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
     return Array.from(classesSet).sort((a, b) => a.localeCompare(b));
   }, [enhancedSessions, monitorClasses]);
 
-  // Summary counts for filter chips
   const counts = useMemo(() => {
     const total = enhancedSessions.filter((s) => s.responsibleClasses.length > 0).length;
     const unclaimed = enhancedSessions.filter((s) => s.responsibleClasses.length > 0 && !s.isClaimedManual).length;
@@ -227,7 +230,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
       try {
         const existingAssign = envelopeAssignments[sessionId];
         if (existingAssign) {
-          // Save to confirmation record with customPrice
           const res = await saveEnvelopeAssignment(sessionId, existingAssign.assignedClass, {
             assistantStudentId: existingAssign.assistantStudentId,
             assistantStudentName: existingAssign.assistantStudentName,
@@ -243,7 +245,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
             setEnvelopeAssignments(res.assignments);
           }
         } else {
-          // Not claimed yet, save direct room price override
           if (newPrice !== null && newPrice > 0) {
             saveSessionPriceOverride(sessionId, newPrice);
           } else {
@@ -276,10 +277,14 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
     }
   }, []);
 
+  // Reset page to 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, filterStatus, filterDate, filterClass]);
+
   const displayedSessions = useMemo(() => {
     let filtered = enhancedSessions.filter((s) => s.responsibleClasses.length > 0);
 
-    // 1. Status Filter
     if (filterStatus === 'UNCLAIMED') {
       filtered = filtered.filter((s) => !s.isClaimedManual);
     } else if (filterStatus === 'CLAIMED') {
@@ -292,19 +297,16 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
       filtered = filtered.filter((s) => s.responsibleClasses.includes(userClass) && s.isClaimedManual);
     }
 
-    // 2. Date Filter
     if (filterDate && filterDate !== 'ALL') {
       filtered = filtered.filter((s) => s.date === filterDate);
     }
 
-    // 3. Class Filter
     if (filterClass && filterClass !== 'ALL') {
       filtered = filtered.filter(
         (s) => s.classCounts.some((c) => c.className === filterClass) || s.responsibleClasses.includes(filterClass)
       );
     }
 
-    // 4. Search Text
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter((s) => {
@@ -334,6 +336,14 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
     return filtered;
   }, [enhancedSessions, filterStatus, filterDate, filterClass, searchTerm, userClass]);
 
+  const totalPages = Math.max(1, Math.ceil(displayedSessions.length / pageSize));
+
+  const paginatedSessions = useMemo(() => {
+    if (pageSize >= 9999) return displayedSessions;
+    const start = (page - 1) * pageSize;
+    return displayedSessions.slice(start, start + pageSize);
+  }, [displayedSessions, page, pageSize]);
+
   const isFilterActive =
     filterStatus !== 'ALL' || filterDate !== 'ALL' || filterClass !== 'ALL' || searchTerm.trim() !== '';
 
@@ -342,6 +352,7 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
     setFilterDate('ALL');
     setFilterClass('ALL');
     setSearchTerm('');
+    setPage(1);
   };
 
   const totalExpectedMoney = useMemo(() => {
@@ -356,16 +367,16 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
   }, [displayedSessions]);
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 lg:p-8 flex-1 flex flex-col gap-4 sm:gap-6 overflow-y-auto min-h-0 bg-[#F8FAFC]">
+    <div className="p-3 sm:p-4 md:p-6 lg:p-8 flex flex-col gap-4 sm:gap-6 bg-[#F8FAFC]">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-slate-800 flex items-center gap-2">
             <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
-            <span>Phân Công Phong Bì Lớp Trưởng</span>
+            <span>Phân Công Phong Bì Toàn Trường</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Danh sách tất cả các phòng thi. Hệ thống gợi ý lớp đông sinh viên nhất phụ trách, các lớp có thể chủ động nhận hoặc gán sinh viên hỗ trợ.
+            Danh sách tất cả phòng thi. Lớp đông SV nhất được gợi ý phụ trách, các lớp có thể chủ động nhận hoặc gán sinh viên hỗ trợ.
           </p>
         </div>
 
@@ -481,7 +492,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
         {/* Row 2: Quick Filter Chips / Pills */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pt-2 border-t border-slate-100 text-xs">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Lọc nhanh:</span>
-
           <button
             type="button"
             onClick={() => setFilterStatus('ALL')}
@@ -493,7 +503,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
           >
             Tất cả ({counts.total})
           </button>
-
           <button
             type="button"
             onClick={() => setFilterStatus('UNCLAIMED')}
@@ -506,7 +515,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
             <Sparkles className="w-3 h-3" />
             <span>Chưa ai nhận ({counts.unclaimed})</span>
           </button>
-
           <button
             type="button"
             onClick={() => setFilterStatus('CLAIMED')}
@@ -519,7 +527,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
             <CheckCircle2 className="w-3 h-3" />
             <span>Đã nhận ({counts.claimed})</span>
           </button>
-
           {userClass && (
             <>
               <button
@@ -534,7 +541,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                 <GraduationCap className="w-3 h-3" />
                 <span>Lớp tôi ({userClass}: {counts.myClass})</span>
               </button>
-
               <button
                 type="button"
                 onClick={() => setFilterStatus('MY_CLAIMED')}
@@ -594,7 +600,7 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
             <p className="text-base sm:text-2xl font-extrabold text-emerald-700 mt-0.5 leading-none">
               {claimedCountInDisplayed}{' '}
               <span className="text-xs sm:text-sm font-medium text-slate-400">
-                / {displayedSessions.length} phòng ({displayedSessions.length > 0 ? Math.round((claimedCountInDisplayed / displayedSessions.length) * 100) : 0}%)
+                / {displayedSessions.length} ({displayedSessions.length > 0 ? Math.round((claimedCountInDisplayed / displayedSessions.length) * 100) : 0}%)
               </span>
             </p>
           </div>
@@ -602,13 +608,13 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
       </div>
 
       {/* Main Content Table & Mobile Cards */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col overflow-hidden min-h-0 flex-1">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
         {displayedSessions.length === 0 ? (
           <div className="p-8 sm:p-12 text-center text-slate-400 font-medium flex flex-col items-center justify-center gap-3">
             <Mail className="w-12 h-12 text-slate-300" />
             <div className="text-center">
-              <p className="text-sm font-bold text-slate-600">Không tìm thấy phòng thi nào phù hợp bộ lọc.</p>
-              <p className="text-xs text-slate-400 mt-1">Hãy thử chọn ngày khác hoặc xóa các điều kiện lọc.</p>
+              <p className="text-sm font-bold text-slate-600">Không tìm thấy phòng thi nào phù hợp.</p>
+              <p className="text-xs text-slate-400 mt-1">Hãy thử xóa hoặc thay đổi điều kiện bộ lọc.</p>
             </div>
             {isFilterActive && (
               <button
@@ -616,28 +622,18 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                 onClick={handleResetFilters}
                 className="mt-1 px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
               >
-                Xóa bộ lọc tìm kiếm
+                Xóa bộ lọc
               </button>
             )}
           </div>
         ) : (
           <>
             {/* MOBILE VIEW: Cards (< 768px) */}
-            <div className="block md:hidden overflow-y-auto p-3 space-y-3.5">
-              {displayedSessions.map((session, index) => {
-                const roomPrice = calculateRoomPrice(
-                  session.subject,
-                  session.subjectCode,
-                  session.room,
-                  session.examFormat,
-                  session.id
-                );
-                const defaultRoomPrice = getDefaultRoomPrice(
-                  session.subject,
-                  session.subjectCode,
-                  session.room,
-                  session.examFormat
-                );
+            <div className="block md:hidden p-3 space-y-3.5">
+              {paginatedSessions.map((session, index) => {
+                const itemIndex = (page - 1) * pageSize + index + 1;
+                const roomPrice = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id);
+                const defaultRoomPrice = getDefaultRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat);
                 const isCustomPrice = roomPrice !== defaultRoomPrice;
 
                 return (
@@ -645,12 +641,11 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                     {/* Header: Room & Date/Time */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-xs font-mono font-bold text-slate-400">#{index + 1}</span>
+                        <span className="text-xs font-mono font-bold text-slate-400">#{itemIndex}</span>
                         <span className="inline-flex items-center font-bold text-rose-600 bg-rose-50 border border-rose-200/70 px-2.5 py-0.5 rounded-lg text-sm truncate">
                           Phòng {session.room}
                         </span>
                       </div>
-
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200/60 px-2.5 py-1 rounded-lg shrink-0">
                         <span>{session.date}</span>
                         <span className="text-slate-400">•</span>
@@ -660,9 +655,7 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
 
                     {/* Subject */}
                     <div>
-                      <h4 className="font-bold text-slate-900 text-sm leading-snug">
-                        {session.subject}
-                      </h4>
+                      <h4 className="font-bold text-slate-900 text-sm leading-snug">{session.subject}</h4>
                       <p className="text-xs text-slate-500 font-mono mt-0.5">
                         Mã MH: <span className="font-semibold text-slate-700">{session.subjectCode}</span>
                         {session.examFormat && (
@@ -705,28 +698,16 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                     {/* Pricing */}
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Mức Bồi Dưỡng</span>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Bồi dưỡng</span>
                         <button
                           type="button"
                           onClick={() => setQuickEditSession(session)}
-                          className={`inline-flex items-center gap-1.5 font-extrabold px-2.5 py-1 rounded-lg text-xs border transition-all cursor-pointer shadow-2xs group mt-0.5 ${
-                            isCustomPrice
-                              ? 'bg-amber-100/90 text-amber-950 border-amber-300 hover:bg-amber-200'
-                              : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
-                          }`}
-                          title="Bấm để sửa mức giá tiền phòng này"
+                          className="inline-flex items-center gap-1.5 font-extrabold px-2.5 py-1 rounded-lg text-xs border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-all cursor-pointer"
                         >
                           <span>{formatCurrency(roomPrice)}</span>
-                          <Edit3 className="w-3 h-3 text-amber-600 group-hover:scale-110 transition-transform" />
+                          <Edit3 className="w-3 h-3 text-amber-600" />
                         </button>
-                        {isCustomPrice && (
-                          <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1 py-0.5 rounded ml-1.5">
-                            Tùy chỉnh
-                          </span>
-                        )}
                       </div>
-
-                      {/* Status indicator badge */}
                       <div>
                         {session.isClaimedManual ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-1 rounded-lg">
@@ -736,7 +717,7 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-2 py-1 rounded-lg">
                             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                            Gợi ý phân công
+                            Gợi ý
                           </span>
                         )}
                       </div>
@@ -752,7 +733,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                         const isMyClass = userClass && cleanCls === userClass.trim().toUpperCase();
 
                         if (session.isClaimedManual) {
-                          // ĐÃ NHẬN
                           return (
                             <div key={cls} className="bg-emerald-50/80 border border-emerald-300 rounded-xl p-3 flex flex-col gap-2">
                               <div className="flex items-center justify-between gap-2">
@@ -805,7 +785,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                           );
                         }
 
-                        // CHƯA NHẬN - GỢI Ý
                         const suggestedClassCount = session.classCounts.find((c) => c.className === cls)?.count || 0;
                         return (
                           <div key={cls} className="bg-amber-50/50 border border-dashed border-amber-300 rounded-xl p-3 flex flex-col gap-2">
@@ -835,7 +814,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                               </button>
                             </div>
 
-                            {/* Các lớp khác trong phòng */}
                             {session.classCounts.filter((c) => c.className !== cls).length > 0 && (
                               <div className="pt-2 border-t border-amber-200/60 flex flex-wrap items-center gap-1.5">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase">Lớp khác nhận:</span>
@@ -873,25 +851,26 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
             </div>
 
             {/* DESKTOP VIEW: Table (>= 768px) */}
-            <div className="hidden md:block flex-1 overflow-auto">
-              <table className="w-full text-left border-collapse min-w-[900px]">
-                <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200 shadow-2xs">
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[960px]">
+                <thead className="bg-slate-50 border-b border-slate-200 shadow-2xs">
                   <tr>
-                    <th className="px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-14 text-center">STT</th>
-                    <th className="px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-40">Thời gian</th>
-                    <th className="px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-64">Phòng & Môn</th>
-                    <th className="px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Cơ cấu sinh viên</th>
-                    <th className="px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap w-44">
+                    <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-12 text-center align-top">STT</th>
+                    <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-36 align-top">Thời gian</th>
+                    <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-60 align-top">Phòng & Môn</th>
+                    <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider min-w-[240px] align-top">Cơ cấu sinh viên</th>
+                    <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-36 whitespace-nowrap align-top">
                       <div className="flex items-center gap-1">
                         <span>Bồi dưỡng</span>
-                        <span className="text-[10px] text-slate-400 font-normal lowercase">(bấm sửa)</span>
+                        <span className="text-[10px] text-slate-400 font-normal lowercase">(sửa)</span>
                       </div>
                     </th>
-                    <th className="px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-80">Trách nhiệm phụ trách</th>
+                    <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-[360px] min-w-[320px] align-top">Trách nhiệm phụ trách</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {displayedSessions.map((session, index) => {
+                  {paginatedSessions.map((session, index) => {
+                    const itemIndex = (page - 1) * pageSize + index + 1;
                     const roomPrice = calculateRoomPrice(
                       session.subject,
                       session.subjectCode,
@@ -909,21 +888,20 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
 
                     return (
                       <tr key={session.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-5 py-4 text-xs text-slate-400 font-semibold text-center">{index + 1}</td>
+                        <td className="px-4 py-4 text-xs text-slate-400 font-semibold text-center align-top">{itemIndex}</td>
 
                         {/* Date & Time */}
-                        <td className="px-5 py-4">
+                        <td className="px-4 py-4 align-top">
                           <div className="flex flex-col">
                             <span className="font-semibold text-slate-800 text-xs sm:text-sm">{session.date}</span>
                             <span className="text-blue-600 font-bold text-xs mt-0.5 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {session.time}
+                              <Clock className="w-3 h-3" /> {session.time}
                             </span>
                           </div>
                         </td>
 
                         {/* Room & Subject */}
-                        <td className="px-5 py-4">
+                        <td className="px-4 py-4 align-top">
                           <div className="flex flex-col">
                             <span className="font-bold text-rose-600 text-sm">Phòng {session.room}</span>
                             <span
@@ -944,8 +922,8 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                         </td>
 
                         {/* Student class counts */}
-                        <td className="px-5 py-4">
-                          <div className="flex flex-wrap gap-1.5">
+                        <td className="px-4 py-4 align-top">
+                          <div className="flex flex-wrap gap-1.5 items-center">
                             {session.classCounts.map((c) => {
                               const isMonitorClass = monitorClasses.has(c.className);
                               const isMyClass = userClass && c.className.trim().toUpperCase() === userClass.trim().toUpperCase();
@@ -975,7 +953,7 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                         </td>
 
                         {/* Room Price */}
-                        <td className="px-5 py-4">
+                        <td className="px-4 py-4 align-top">
                           <div className="flex flex-col items-start gap-1">
                             <button
                               type="button"
@@ -1000,7 +978,7 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                         </td>
 
                         {/* RESPONSIBILITY (Desktop Table) */}
-                        <td className="px-5 py-4">
+                        <td className="px-4 py-4 align-top">
                           <div className="flex flex-col gap-2">
                             {session.responsibleClasses.map((cls) => {
                               const cleanCls = cls.trim().toUpperCase();
@@ -1010,11 +988,10 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                               const isMyClass = userClass && cleanCls === userClass.trim().toUpperCase();
 
                               if (session.isClaimedManual) {
-                                // ĐÃ NHẬN
                                 return (
                                   <div
                                     key={cls}
-                                    className="flex flex-col gap-1.5 items-start bg-emerald-50/90 border border-emerald-300 p-3 rounded-xl shadow-2xs"
+                                    className="flex flex-col gap-1.5 items-start bg-emerald-50/90 border border-emerald-300 p-2.5 rounded-xl shadow-2xs"
                                   >
                                     <div className="flex items-center justify-between w-full gap-2">
                                       <div className="flex items-center gap-1.5 text-emerald-950 font-extrabold text-xs">
@@ -1063,31 +1040,31 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                                         </p>
                                       )}
 
-                                      <div className="flex items-center justify-between gap-2 mt-1 pt-1 border-t border-emerald-100">
-                                        <div className="flex items-center gap-1.5">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleOpenAssignModal(session, cls)}
-                                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
-                                          >
-                                            Đổi người
-                                          </button>
-                                          <span className="text-slate-300">•</span>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleCancelClaim(session.id)}
-                                            disabled={loadingClaimId === session.id}
-                                            className="text-[11px] font-bold text-rose-600 hover:text-rose-700 underline cursor-pointer shrink-0"
-                                            title="Hủy nhận, trở về gợi ý tự động"
-                                          >
-                                            {loadingClaimId === session.id ? '...' : 'Hủy nhận'}
-                                          </button>
+                                      <div className="flex flex-col w-full gap-1.5 mt-1 pt-1.5 border-t border-emerald-200/70">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleOpenAssignModal(session, cls)}
+                                              className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                                            >
+                                              Đổi người
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleCancelClaim(session.id)}
+                                              disabled={loadingClaimId === session.id}
+                                              className="text-[11px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                                              title="Hủy nhận, trở về gợi ý tự động"
+                                            >
+                                              {loadingClaimId === session.id ? 'Đang hủy...' : 'Hủy nhận'}
+                                            </button>
+                                          </div>
                                         </div>
 
-                                        {/* Switch to other classes in the room */}
                                         {session.classCounts.filter((c) => c.className !== cls).length > 0 && (
-                                          <div className="flex items-center gap-1">
-                                            <span className="text-[10px] text-slate-400 font-medium">Chuyển:</span>
+                                          <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-emerald-100/70">
+                                            <span className="text-[10px] text-slate-500 font-medium">Chuyển sang:</span>
                                             {session.classCounts
                                               .filter((c) => c.className !== cls)
                                               .map((c) => (
@@ -1096,7 +1073,7 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                                                   type="button"
                                                   onClick={() => handleOpenAssignModal(session, c.className)}
                                                   disabled={loadingClaimId === session.id}
-                                                  className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                                                  className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
                                                   title={`Chuyển trách nhiệm sang lớp ${c.className}`}
                                                 >
                                                   {c.className}
@@ -1110,32 +1087,31 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                                 );
                               }
 
-                              // CHƯA NHẬN - GỢI Ý
                               const suggestedClassCount =
                                 session.classCounts.find((c) => c.className === cls)?.count || 0;
                               return (
                                 <div
                                   key={cls}
-                                  className="flex flex-col gap-2 items-start bg-amber-50/40 border border-dashed border-amber-300 p-3 rounded-xl shadow-2xs"
+                                  className="flex flex-col gap-2 items-start bg-amber-50/40 border border-dashed border-amber-300 p-2.5 rounded-xl shadow-2xs"
                                 >
                                   <div className="flex items-center justify-between w-full gap-2">
-                                    <div className="flex flex-col">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                    <div className="flex flex-col min-w-0">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
                                           <Sparkles className="w-3 h-3 text-amber-600" />
                                           Gợi ý
                                         </span>
-                                        <span className="font-bold text-slate-800 text-sm">Lớp {cls}</span>
-                                        <span className="text-xs text-slate-500 font-semibold">
+                                        <span className="font-bold text-slate-800 text-sm truncate">Lớp {cls}</span>
+                                        <span className="text-xs text-slate-500 font-semibold shrink-0">
                                           ({suggestedClassCount} SV)
                                         </span>
                                         {isMyClass && (
-                                          <span className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                                          <span className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0">
                                             Lớp bạn
                                           </span>
                                         )}
                                       </div>
-                                      <span className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                      <span className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
                                         Đông SV nhất phòng (chưa ai nhận)
                                       </span>
                                     </div>
@@ -1155,14 +1131,13 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                                         ? 'Đang lưu...'
                                         : isMyClass
                                         ? 'Lớp tôi nhận'
-                                        : 'Nhận phòng này'}
+                                        : 'Nhận phòng'}
                                     </button>
                                   </div>
 
-                                  {/* If there are other classes in the room, allow them to take it */}
                                   {session.classCounts.filter((c) => c.className !== cls).length > 0 && (
                                     <div className="w-full pt-1.5 border-t border-amber-200/60 flex items-center gap-1.5 flex-wrap">
-                                      <span className="text-[10px] font-bold text-slate-400 uppercase">Lớp khác nhận:</span>
+                                      <span className="text-[10px] font-bold text-slate-400 uppercase shrink-0">Lớp khác:</span>
                                       {session.classCounts
                                         .filter((c) => c.className !== cls)
                                         .map((c) => {
@@ -1199,11 +1174,81 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {displayedSessions.length > 0 && (
+              <div className="px-4 py-3 bg-slate-50/90 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-3 text-slate-600">
+                  <span>
+                    Hiển thị <strong>{(page - 1) * pageSize + 1}</strong> -{' '}
+                    <strong>{Math.min(page * pageSize, displayedSessions.length)}</strong> trên tổng số{' '}
+                    <strong>{displayedSessions.length}</strong> phòng
+                  </span>
+
+                  <div className="flex items-center gap-1.5 ml-2">
+                    <span className="text-slate-400">Dòng/trang:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setPage(1);
+                      }}
+                      className="bg-white border border-slate-200 rounded-lg px-2 py-1 font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value={15}>15</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={9999}>Tất cả</option>
+                    </select>
+                  </div>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition-colors"
+                      title="Trang trước"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-slate-600" />
+                    </button>
+
+                    <div className="flex items-center gap-1 px-2 font-semibold text-slate-700">
+                      <span>Trang</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        value={page}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (val >= 1 && val <= totalPages) setPage(val);
+                        }}
+                        className="w-12 text-center py-0.5 border border-slate-200 rounded-md font-bold bg-white"
+                      />
+                      <span>/ {totalPages}</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition-colors"
+                      title="Trang sau"
+                    >
+                      <ChevronRight className="w-4 h-4 text-slate-600" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {/* Assign Envelope Modal */}
       <AssignEnvelopeModal
         isOpen={Boolean(assigningSession)}
         onClose={() => setAssigningSession(null)}
@@ -1216,7 +1261,6 @@ export default function AllMonitorsEnvelopes({ sessions = [], records = [], logi
         isLoading={loadingClaimId === assigningSession?.id}
       />
 
-      {/* Quick Edit Price Modal */}
       <QuickEditPriceModal
         isOpen={Boolean(quickEditSession)}
         onClose={() => setQuickEditSession(null)}
