@@ -155,7 +155,7 @@ export default function ClassMonitorTools({ records, selectedClass, onClassChang
   }
 
   return (
-    <div className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-y-auto">
+    <div className="flex-1 flex flex-col gap-6 w-full">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Công Cụ Lớp Trưởng</h2>

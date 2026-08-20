@@ -147,7 +147,7 @@ export default function HomeMainContent({
   announcements = [],
 }: HomeMainContentProps) {
   return (
-    <section className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+    <section className="flex-1 flex flex-col min-h-0 overflow-y-auto w-full p-3 sm:p-4 md:p-8 pb-32 sm:pb-24 pb-mobile-scroll max-w-7xl mx-auto">
       {/* Global Active Announcement Banner */}
       <AnnouncementBanner
         announcements={announcements}
@@ -161,7 +161,7 @@ export default function HomeMainContent({
       />
 
       {isLoading ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 py-20">
           <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-sm text-slate-500 font-medium">Đang tải dữ liệu từ máy chủ...</p>
         </div>

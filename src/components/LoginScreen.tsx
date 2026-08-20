@@ -200,7 +200,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900/95 p-4 font-sans relative overflow-hidden">
+    <div className="min-h-[100dvh] h-full flex items-center justify-center bg-slate-900/95 p-4 font-sans relative overflow-y-auto py-8 sm:py-12 pb-safe">
       {/* Dynamic Background Blurs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none translate-x-1/2 translate-y-1/2" />

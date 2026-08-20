@@ -79,7 +79,7 @@ export default function Sidebar({
             <X className="w-6 h-6" />
           </button>
         </div>
-        <nav className="flex-1 overflow-y-auto py-3 px-3 flex flex-col gap-5 scrollbar-hide">
+        <nav className="flex-1 overflow-y-auto py-3 px-3 pb-24 pb-safe flex flex-col gap-5 scrollbar-hide">
           {/* SECTION 1: SINH VIÊN & TRA CỨU */}
           <div className="flex flex-col gap-1">
             <div className="px-3 py-1 text-[11px] font-extrabold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">

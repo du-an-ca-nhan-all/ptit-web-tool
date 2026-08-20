@@ -288,7 +288,7 @@ export default function ExamBatchManagement({
   };
 
   return (
-    <div className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-y-auto min-h-0 bg-slate-50 relative">
+    <div className="flex-1 flex flex-col gap-6 w-full relative">
       {/* Toast Notification */}
       {toast && (
         <div
