@@ -30,6 +30,16 @@ export type ProfileSubTab =
   | 'EXAMS'
   | 'SECURITY';
 
+export interface TabChangeOptions {
+  preserveFilters?: boolean;
+  search?: string;
+  classCode?: string;
+  subjectCode?: string;
+  date?: string;
+  monitorClass?: string;
+  page?: number;
+}
+
 export interface InitialHomeState {
   tab: NavigationTab;
   profileSubTab: ProfileSubTab;
@@ -40,6 +50,7 @@ export interface InitialHomeState {
   monitorClass: string;
   sortKey: SortKey;
   sortDir: SortDirection;
+  page: number;
 }
 
 export const VALID_NAVIGATION_TABS: NavigationTab[] = [
@@ -220,6 +231,7 @@ export const getInitialHomeState = (): InitialHomeState => {
       monitorClass: '',
       sortKey: 'DateTime',
       sortDir: 'asc',
+      page: 1,
     };
   }
 
@@ -269,6 +281,9 @@ export const getInitialHomeState = (): InitialHomeState => {
     profileSubTab = querySubTab;
   }
 
+  const pageParam = parseInt(getParam('page'), 10);
+  const initialPage = !isNaN(pageParam) && pageParam > 0 ? pageParam : 1;
+
   return {
     tab,
     profileSubTab,
@@ -276,8 +291,9 @@ export const getInitialHomeState = (): InitialHomeState => {
     classCode: getParam('classCode'),
     subjectCode: getParam('subjectCode'),
     date: getParam('date'),
-    monitorClass: getParam('monitorClass'),
+    monitorClass: getParam('monitorClass') || getParam('classCode'),
     sortKey: (getParam('sortKey') as SortKey) || 'DateTime',
     sortDir: (getParam('sortDir') as SortDirection) || 'asc',
+    page: initialPage,
   };
 };

@@ -24,7 +24,7 @@ import AllStudentsList from '../AllStudentsList';
 import StudentPersonalExamSchedule from '../StudentPersonalExamSchedule';
 import AllExamsSchedule from '../AllExamsSchedule';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
-import { NavigationTab, ProfileSubTab } from '../../types/navigation';
+import { NavigationTab, ProfileSubTab, TabChangeOptions } from '../../types/navigation';
 import { buildSessions } from '../../utils/dataModel';
 
 interface HomeMainContentProps {
@@ -58,7 +58,7 @@ interface HomeMainContentProps {
   activeRole: string;
   handleSelectRole: (role: string) => void;
   handleLogout: () => Promise<void>;
-  handleTabChange: (tab: NavigationTab) => void;
+  handleTabChange: (tab: NavigationTab, subTab?: ProfileSubTab, options?: TabChangeOptions) => void;
   handleImpersonate: (username: string) => Promise<void>;
   handleToggleExamPostpone: (record: ExamRecord, newStatus: boolean) => Promise<void>;
   loadDataFromApi: (batchCode?: string) => Promise<void>;
@@ -195,8 +195,7 @@ export default function HomeMainContent({
           onReload={fetchMonitorsData}
           isLoading={isLoading}
           onClassClick={(classCode) => {
-            setMonitorClass(classCode);
-            handleTabChange('members');
+            handleTabChange('members', undefined, { monitorClass: classCode });
             setIsClassGroupOpen(true);
           }}
         />
@@ -204,14 +203,11 @@ export default function HomeMainContent({
         <AllStudentsList
           currentUser={effectiveUser}
           onSelectStudentSchedule={(studentId) => {
-            setSearchInput(studentId);
-            setFilters((prev) => ({ ...prev, search: studentId }));
-            handleTabChange('personal_schedule');
+            handleTabChange('schedule', undefined, { search: studentId });
           }}
           onImpersonate={canImpersonate ? handleImpersonate : undefined}
           onClassClick={(classCode) => {
-            setMonitorClass(classCode);
-            handleTabChange('members');
+            handleTabChange('members', undefined, { monitorClass: classCode });
             setIsClassGroupOpen(true);
           }}
         />
@@ -234,9 +230,7 @@ export default function HomeMainContent({
           onTogglePostpone={handleToggleExamPostpone}
           onReloadMonitors={fetchMonitorsData}
           onSelectStudentSchedule={(studentId) => {
-            setSearchInput(studentId);
-            setFilters((prev) => ({ ...prev, search: studentId }));
-            handleTabChange('personal_schedule');
+            handleTabChange('schedule', undefined, { search: studentId });
           }}
         />
       ) : activeTab === 'monitor' ? (
