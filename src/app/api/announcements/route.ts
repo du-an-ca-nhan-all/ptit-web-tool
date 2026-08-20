@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
 
     // Public / End-user view
     const userRole = authUser?.role || 'sinh_vien';
-    const userClass = authUser?.lop || authUser?.student?.maLop || undefined;
+    const userClass = authUser?.lop || undefined;
 
     const announcements = await getActiveAnnouncements({
       role: userRole,

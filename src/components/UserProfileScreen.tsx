@@ -208,7 +208,17 @@ export default function UserProfileScreen({
   const handleSaveExternalAccount = async (sys: any) => {
     setErrorMsg('');
     setSuccessMsg('');
-    const form = extForm[sys.systemKey] || { username: '', password: '' };
+    const form = extForm[sys.systemKey] || {
+      username: sys.extUsername || currentUser.username || '',
+      password: '',
+      showPass: false,
+      isSaving: false,
+      isTesting: false,
+      testStatus: 'IDLE' as const,
+      testMessage: '',
+      lastTestedUser: '',
+      lastTestedPass: '',
+    };
 
     if (!form.username || !form.username.trim()) {
       setErrorMsg('Vui lòng nhập tên đăng nhập hệ thống');
@@ -270,7 +280,17 @@ export default function UserProfileScreen({
   const handleTestConnection = async (sys: any) => {
     setErrorMsg('');
     setSuccessMsg('');
-    const form = extForm[sys.systemKey] || { username: '', password: '' };
+    const form = extForm[sys.systemKey] || {
+      username: sys.extUsername || currentUser.username || '',
+      password: '',
+      showPass: false,
+      isSaving: false,
+      isTesting: false,
+      testStatus: 'IDLE' as const,
+      testMessage: '',
+      lastTestedUser: '',
+      lastTestedPass: '',
+    };
 
     const targetUser = form.username ? form.username.trim() : (sys.extUsername || '');
     const targetPass = form.password ? form.password.trim() : '';
@@ -943,11 +963,15 @@ export default function UserProfileScreen({
             <div className="flex flex-col gap-4 sm:gap-6">
               {externalAccounts.map((sys) => {
                 const form = extForm[sys.systemKey] || {
-                  username: sys.extUsername || currentUser.username,
+                  username: sys.extUsername || currentUser.username || '',
                   password: '',
                   showPass: false,
                   isSaving: false,
                   isTesting: false,
+                  testStatus: 'IDLE' as const,
+                  testMessage: '',
+                  lastTestedUser: '',
+                  lastTestedPass: '',
                 };
 
                 return (
