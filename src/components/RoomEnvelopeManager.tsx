@@ -1,8 +1,27 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from '../types';
-import { Mail, MapPin, Users, Info, X, DollarSign, Download, Settings } from 'lucide-react';
-import { calculateRoomPrice, formatCurrency } from '../config/pricingConfig';
+import { Mail, MapPin, Users, Info, X, DollarSign, Download, Settings, CheckCircle2, Hand, RotateCcw, User, UserCheck, Edit3, Tag } from 'lucide-react';
+import {
+  calculateRoomPrice,
+  getDefaultRoomPrice,
+  formatCurrency,
+  saveSessionPriceOverride,
+  removeSessionPriceOverride,
+} from '../config/pricingConfig';
+import {
+  getStoredEnvelopeAssignments,
+  fetchEnvelopeAssignments,
+  saveEnvelopeAssignment,
+  removeEnvelopeAssignment,
+  getEffectiveResponsibleClass,
+  ENVELOPE_ASSIGNMENTS_CHANGED_EVENT,
+  EnvelopeAssignmentsMap,
+  EnvelopeAssignment,
+  SaveEnvelopeOptions,
+} from '../config/envelopeAssignmentConfig';
 import PricingConfigModal from './PricingConfigModal';
+import AssignEnvelopeModal from './AssignEnvelopeModal';
+import QuickEditPriceModal from './QuickEditPriceModal';
 
 interface SessionEnvelope {
   id: string;
@@ -14,6 +33,9 @@ interface SessionEnvelope {
   examFormat?: string;
   classCounts: { className: string; count: number }[];
   isResponsible: boolean;
+  responsibleClass: string;
+  isClaimedManual: boolean;
+  assignmentInfo?: EnvelopeAssignment;
 }
 
 interface RoomEnvelopeManagerProps {
@@ -48,6 +70,29 @@ export default function RoomEnvelopeManager({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const [pricingVersion, setPricingVersion] = useState(0);
+  const [envelopeAssignments, setEnvelopeAssignments] = useState<EnvelopeAssignmentsMap>(getStoredEnvelopeAssignments);
+  const [loadingClaimId, setLoadingClaimId] = useState<string | null>(null);
+  const [assigningSession, setAssigningSession] = useState<any | null>(null);
+  const [assigningInitialClass, setAssigningInitialClass] = useState<string>('');
+  const [quickEditSession, setQuickEditSession] = useState<any | null>(null);
+
+  // Load and listen for envelope assignments
+  useEffect(() => {
+    fetchEnvelopeAssignments().then((res) => {
+      if (res) setEnvelopeAssignments(res);
+    });
+
+    const handler = (e: any) => {
+      if (e.detail) {
+        setEnvelopeAssignments(e.detail);
+      } else {
+        setEnvelopeAssignments(getStoredEnvelopeAssignments());
+      }
+    };
+
+    window.addEventListener(ENVELOPE_ASSIGNMENTS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(ENVELOPE_ASSIGNMENTS_CHANGED_EVENT, handler);
+  }, []);
 
   // Sync filters to URL query params
   useEffect(() => {
@@ -80,6 +125,19 @@ export default function RoomEnvelopeManager({
     }
   }, [filterDate, filterResponsibleOnly]);
 
+  const currentUser = useMemo(() => {
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('currentUser') : null;
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const userIsMonitor = useMemo(() => {
+    return isUserMonitor(currentUser);
+  }, [currentUser]);
+
   const effectiveIsAdmin = useMemo(() => {
     if (typeof isAdmin === 'boolean') return isAdmin;
     try {
@@ -97,6 +155,16 @@ export default function RoomEnvelopeManager({
     window.addEventListener('pricing_config_changed', handler);
     return () => window.removeEventListener('pricing_config_changed', handler);
   }, []);
+
+  const monitorClasses = useMemo(() => {
+    const set = new Set<string>();
+    loginUsers.forEach((u) => {
+      if (isUserMonitor(u) && u.lop && u.lop.trim()) {
+        set.add(u.lop.trim());
+      }
+    });
+    return set;
+  }, [loginUsers]);
 
   const classes = useMemo(() => {
     const cls = new Set(records.map((r) => r.MaLop).filter(Boolean));
@@ -149,9 +217,15 @@ export default function RoomEnvelopeManager({
 
     const result: SessionEnvelope[] = Array.from(sessionMap.entries()).map(([id, session]) => {
       const classCounts = Array.from(session.counts.entries()).map(([className, count]) => ({ className, count })).sort((a, b) => b.count - a.count);
-      
-      const responsibleClass = classCounts[0]?.className;
-      const isResponsible = selectedClass === responsibleClass && classCounts[0]?.count > 0;
+      const monitoredClassesInRoom = classCounts.filter(c => monitorClasses.has(c.className));
+
+      const { responsibleClass, isClaimedManual, assignmentInfo } = getEffectiveResponsibleClass(
+        { id, room: session.room, date: session.date, time: session.time, subject: session.subject, classCounts },
+        monitoredClassesInRoom,
+        envelopeAssignments
+      );
+
+      const isResponsible = selectedClass === responsibleClass;
 
       return {
         id,
@@ -162,7 +236,10 @@ export default function RoomEnvelopeManager({
         subjectCode: session.subjectCode,
         examFormat: session.examFormat,
         classCounts,
-        isResponsible
+        isResponsible,
+        responsibleClass,
+        isClaimedManual,
+        assignmentInfo,
       };
     });
 
@@ -198,7 +275,7 @@ export default function RoomEnvelopeManager({
       if (timeA !== timeB) return timeA - timeB;
       return (a.room || '').localeCompare(b.room || '');
     });
-  }, [records, selectedClass, sessions]);
+  }, [records, selectedClass, sessions, monitorClasses, envelopeAssignments]);
 
   const availableDates = useMemo(() => {
     const dates = new Set(monitorEnvelopes.map(s => s.date));
@@ -228,15 +305,77 @@ export default function RoomEnvelopeManager({
       .reduce((acc, s) => acc + calculateRoomPrice(s.subject, s.subjectCode, s.room, s.examFormat, s.id), 0);
   }, [filteredEnvelopes, pricingVersion]);
 
-  const monitorClasses = useMemo(() => {
-    const set = new Set<string>();
-    loginUsers.forEach((u) => {
-      if (isUserMonitor(u) && u.lop && u.lop.trim()) {
-        set.add(u.lop.trim());
+  const handleOpenAssignModal = useCallback((session: any, initialClass?: string) => {
+    setAssigningSession(session);
+    setAssigningInitialClass(initialClass || selectedClass);
+  }, [selectedClass]);
+
+  const handleConfirmAssign = useCallback(async (sessionId: string, targetClass: string, options: SaveEnvelopeOptions) => {
+    setLoadingClaimId(sessionId);
+    try {
+      const res = await saveEnvelopeAssignment(sessionId, targetClass, options);
+      if (res.success && res.assignments) {
+        setEnvelopeAssignments(res.assignments);
       }
-    });
-    return set;
-  }, [loginUsers]);
+      setPricingVersion(v => v + 1);
+    } catch (e) {
+      console.error('Error confirming envelope assignment:', e);
+    } finally {
+      setLoadingClaimId(null);
+    }
+  }, []);
+
+  const handleSaveQuickPrice = useCallback(async (sessionId: string, newPrice: number | null) => {
+    setLoadingClaimId(sessionId);
+    try {
+      const existingAssign = envelopeAssignments[sessionId];
+      if (existingAssign) {
+        // Save to confirmation record with customPrice
+        const res = await saveEnvelopeAssignment(sessionId, existingAssign.assignedClass, {
+          assistantStudentId: existingAssign.assistantStudentId,
+          assistantStudentName: existingAssign.assistantStudentName,
+          customPrice: newPrice,
+          note: existingAssign.note,
+          room: existingAssign.room,
+          date: existingAssign.date,
+          time: existingAssign.time,
+          subjectCode: existingAssign.subjectCode,
+          subject: existingAssign.subject,
+        });
+        if (res.success && res.assignments) {
+          setEnvelopeAssignments(res.assignments);
+        }
+      } else {
+        // Not claimed yet, save direct room price override
+        if (newPrice !== null && newPrice > 0) {
+          saveSessionPriceOverride(sessionId, newPrice);
+        } else {
+          removeSessionPriceOverride(sessionId);
+        }
+      }
+      setPricingVersion(v => v + 1);
+      fetchEnvelopeAssignments().then(res => res && setEnvelopeAssignments(res));
+    } catch (e) {
+      console.error('Error saving quick price:', e);
+    } finally {
+      setLoadingClaimId(null);
+    }
+  }, [envelopeAssignments]);
+
+  const handleCancelClaim = useCallback(async (sessionId: string) => {
+    setLoadingClaimId(sessionId);
+    try {
+      const res = await removeEnvelopeAssignment(sessionId);
+      if (res.success && res.assignments) {
+        setEnvelopeAssignments(res.assignments);
+      }
+      setPricingVersion(v => v + 1);
+    } catch (e) {
+      console.error('Error cancelling envelope claim:', e);
+    } finally {
+      setLoadingClaimId(null);
+    }
+  }, []);
 
   const handleExportCSV = () => {
     const headers = [
@@ -497,24 +636,109 @@ export default function RoomEnvelopeManager({
                     {/* Bottom Row: Price & Responsibility */}
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block">ĐỊNH MỨC</span>
-                        <span className="inline-block bg-amber-50 text-amber-800 font-extrabold px-2.5 py-1 rounded-lg text-xs border border-amber-200">
-                          {formatCurrency(roomPrice)}
-                        </span>
+                        {(() => {
+                          const defaultPrice = getDefaultRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat);
+                          const isCustomPrice = roomPrice !== defaultPrice;
+                          return (
+                            <div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-bold text-slate-400 block">ĐỊNH MỨC</span>
+                                {isCustomPrice && (
+                                  <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1 rounded">Đã sửa</span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setQuickEditSession(session)}
+                                className={`inline-flex items-center gap-1.5 font-extrabold px-2.5 py-1 rounded-lg text-xs border transition-all cursor-pointer shadow-2xs group mt-0.5 ${
+                                  isCustomPrice
+                                    ? 'bg-amber-100/90 text-amber-950 border-amber-300 hover:bg-amber-200'
+                                    : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                }`}
+                                title="Bấm để sửa mức giá tiền phòng này"
+                              >
+                                <span>{formatCurrency(roomPrice)}</span>
+                                <Edit3 className="w-3 h-3 text-amber-600 group-hover:scale-110 transition-transform" />
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
                         {session.isResponsible ? (
-                          <div className="flex items-center gap-1 text-emerald-800 font-bold bg-emerald-100/90 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs shadow-2xs">
-                            <Mail className="w-3.5 h-3.5 text-emerald-700" />
-                            <span>Lớp mình</span>
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-center gap-1 text-emerald-800 font-bold bg-emerald-100/90 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Lớp mình</span>
+                            </div>
+
+                            {session.isClaimedManual ? (
+                              <div className="flex flex-col items-end gap-1">
+                                {session.assignmentInfo?.assistantStudentName ? (
+                                  <div className="flex items-center gap-1 text-[11px] font-semibold text-indigo-800 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                                    <Users className="w-3 h-3 text-indigo-600 shrink-0" />
+                                    <span>SV: {session.assignmentInfo.assistantStudentName}</span>
+                                    <span className="text-[10px] text-indigo-600 font-mono">({session.assignmentInfo.assistantStudentId})</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                                    <UserCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                                    <span>LT: {session.assignmentInfo?.claimedByName || 'Lớp trưởng'}</span>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenAssignModal(session, selectedClass)}
+                                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                                  >
+                                    Đổi người
+                                  </button>
+                                  <span className="text-slate-300">•</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancelClaim(session.id)}
+                                    disabled={loadingClaimId === session.id}
+                                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline cursor-pointer"
+                                  >
+                                    {loadingClaimId === session.id ? 'Đang hủy...' : 'Hủy nhận'}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAssignModal(session, selectedClass)}
+                                disabled={loadingClaimId === session.id}
+                                className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer active:scale-95 shadow-2xs"
+                                title="Xác nhận nhận phòng thi này hoặc gán sinh viên hỗ trợ"
+                              >
+                                <Hand className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>{loadingClaimId === session.id ? 'Đang lưu...' : 'Nhận đi PB / Gán SV'}</span>
+                              </button>
+                            )}
                           </div>
                         ) : (
-                          <div className="text-right">
-                            <span className="text-[10px] font-bold text-slate-400 block">PHỤ TRÁCH</span>
-                            <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 inline-block">
-                              {session.classCounts[0]?.className || 'Khác'} ({session.classCounts[0]?.count || 0} SV)
-                            </span>
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="text-right">
+                              <span className="text-[10px] font-bold text-slate-400 block">PHỤ TRÁCH</span>
+                              <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 inline-block">
+                                {session.responsibleClass || session.classCounts[0]?.className || 'Khác'}
+                                {session.isClaimedManual ? ' (Đã nhận)' : ''}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAssignModal(session, selectedClass)}
+                              disabled={loadingClaimId === session.id}
+                              className="flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 border border-blue-300 px-2.5 py-1 rounded-lg transition-colors cursor-pointer shadow-2xs active:scale-95"
+                              title="Chủ động nhận đi phong bì phòng này cho lớp mình"
+                            >
+                              <Hand className="w-3 h-3 text-blue-600" />
+                              <span>{loadingClaimId === session.id ? 'Đang lưu...' : 'Nhận đi PB'}</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -533,73 +757,188 @@ export default function RoomEnvelopeManager({
                     <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-44">Thời gian</th>
                     <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-64">Phòng & Môn</th>
                     <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Cơ cấu sinh viên</th>
-                    <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap w-36">Bồi dưỡng</th>
-                    <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-44 text-right">Trách nhiệm</th>
+                    <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap w-48">
+                      <div className="flex items-center gap-1">
+                        <span>Bồi dưỡng</span>
+                        <span className="text-[10px] text-slate-400 font-normal lowercase">(bấm để sửa)</span>
+                      </div>
+                    </th>
+                    <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-64 text-right">Trách nhiệm</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredEnvelopes.map((session, index) => (
-                    <tr key={session.id} className={`hover:bg-slate-50/80 transition-colors ${session.isResponsible ? 'bg-emerald-50/15' : ''}`}>
-                      <td className="px-6 py-4 text-sm text-slate-400 font-semibold">{index + 1}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-slate-800 text-sm">{session.date}</span>
-                          <span className="text-blue-600 font-bold text-xs mt-0.5">{session.time}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-rose-600 text-sm">{session.room}</span>
-                          <span className="text-slate-800 font-medium text-sm mt-0.5 break-words whitespace-normal" title={session.subject}>{session.subject}</span>
-                          <span className="text-slate-400 text-xs font-mono">{session.subjectCode}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          {session.classCounts.map(c => (
-                            <span 
-                              key={c.className} 
-                              className={`text-xs px-2.5 py-0.5 rounded-md font-bold border flex gap-1.5 items-center ${
-                                c.className === selectedClass 
-                                  ? 'bg-blue-100 text-blue-800 border-blue-200 shadow-2xs' 
-                                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                  {filteredEnvelopes.map((session, index) => {
+                    const roomPrice = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id);
+                    const defaultRoomPrice = getDefaultRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat);
+                    const isCustomPrice = roomPrice !== defaultRoomPrice;
+
+                    return (
+                      <tr key={session.id} className={`hover:bg-slate-50/80 transition-colors ${session.isResponsible ? 'bg-emerald-50/15' : ''}`}>
+                        <td className="px-6 py-4 text-sm text-slate-400 font-semibold">{index + 1}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-slate-800 text-sm">{session.date}</span>
+                            <span className="text-blue-600 font-bold text-xs mt-0.5">{session.time}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-rose-600 text-sm">{session.room}</span>
+                            <span className="text-slate-800 font-medium text-sm mt-0.5 break-words whitespace-normal" title={session.subject}>{session.subject}</span>
+                            <span className="text-slate-400 text-xs font-mono">{session.subjectCode}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1.5">
+                            {session.classCounts.map(c => (
+                              <span 
+                                key={c.className} 
+                                className={`text-xs px-2.5 py-0.5 rounded-md font-bold border flex gap-1.5 items-center ${
+                                  c.className === selectedClass 
+                                    ? 'bg-blue-100 text-blue-800 border-blue-200 shadow-2xs' 
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                }`}
+                              >
+                                <span>{c.className}</span>
+                                <span className={`w-px h-3 ${c.className === selectedClass ? 'bg-blue-300' : 'bg-slate-300'}`}></span>
+                                <span>{c.count}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col items-start gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setQuickEditSession(session)}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold border transition-all cursor-pointer shadow-2xs group ${
+                                isCustomPrice
+                                  ? 'bg-amber-100/90 text-amber-950 border-amber-300 hover:bg-amber-200'
+                                  : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
                               }`}
+                              title="Bấm để chỉnh sửa mức giá tiền cho phòng này"
                             >
-                              <span>{c.className}</span>
-                              <span className={`w-px h-3 ${c.className === selectedClass ? 'bg-blue-300' : 'bg-slate-300'}`}></span>
-                              <span>{c.count}</span>
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-block bg-amber-50 text-amber-800 font-bold px-2.5 py-1 rounded-md text-xs border border-amber-200 whitespace-nowrap">
-                          {formatCurrency(calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id))}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {session.isResponsible ? (
-                          <div className="flex items-center justify-end">
-                            <div className="inline-flex items-center justify-center gap-1.5 text-emerald-800 font-bold bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200 shadow-2xs text-xs">
-                              <Mail className="w-3.5 h-3.5 text-emerald-700" />
-                              <span>Lớp mình</span>
+                              <span>{formatCurrency(roomPrice)}</span>
+                              <Edit3 className="w-3 h-3 text-amber-600 group-hover:scale-110 transition-transform" />
+                            </button>
+                            {isCustomPrice && (
+                              <div className="flex items-center gap-1 text-[10px] text-amber-700 font-medium">
+                                <Tag className="w-3 h-3 text-amber-600 shrink-0" />
+                                <span>Tùy chỉnh (Chuẩn: {formatCurrency(defaultRoomPrice)})</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {session.isResponsible ? (
+                            <div className="flex flex-col items-end gap-1.5">
+                              <div className="inline-flex items-center justify-center gap-1.5 text-emerald-800 font-bold bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200 shadow-2xs text-xs">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                <span>Lớp mình</span>
+                              </div>
+
+                              {session.isClaimedManual ? (
+                                <div className="flex flex-col items-end gap-1 text-right">
+                                  {session.assignmentInfo?.assistantStudentName ? (
+                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg">
+                                      <Users className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                      <span>SV: {session.assignmentInfo.assistantStudentName}</span>
+                                      <span className="text-[11px] text-indigo-600 font-mono">({session.assignmentInfo.assistantStudentId})</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                                      <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                      <span>LT: {session.assignmentInfo?.claimedByName || 'Lớp trưởng'}</span>
+                                    </div>
+                                  )}
+
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenAssignModal(session, selectedClass)}
+                                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                                    >
+                                      Đổi người
+                                    </button>
+                                    <span className="text-slate-300">•</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCancelClaim(session.id)}
+                                      disabled={loadingClaimId === session.id}
+                                      className="text-xs font-bold text-rose-600 hover:text-rose-700 underline cursor-pointer"
+                                      title="Hủy nhận, trở về phân công tự động"
+                                    >
+                                      {loadingClaimId === session.id ? '...' : 'Hủy nhận'}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAssignModal(session, selectedClass)}
+                                  disabled={loadingClaimId === session.id}
+                                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer active:scale-95 shadow-2xs"
+                                  title="Xác nhận nhận phòng thi này hoặc gán sinh viên hỗ trợ"
+                                >
+                                  <Hand className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>{loadingClaimId === session.id ? 'Đang lưu...' : 'Nhận đi PB / Gán SV'}</span>
+                                </button>
+                              )}
                             </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-end gap-1 text-slate-500 text-xs w-full">
-                            <span className="font-semibold text-slate-700">{session.classCounts[0]?.className}</span>
-                            <span className="text-slate-400">({session.classCounts[0]?.count} SV)</span>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          ) : (
+                            <div className="flex flex-col items-end gap-1.5">
+                              <div className="flex items-center justify-end gap-1 text-slate-500 text-xs">
+                                <span className="font-semibold text-slate-700">{session.responsibleClass || session.classCounts[0]?.className}</span>
+                                {session.isClaimedManual && (
+                                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                    Chủ động nhận
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAssignModal(session, selectedClass)}
+                                disabled={loadingClaimId === session.id}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 border border-blue-300 px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-2xs active:scale-95"
+                                title="Chủ động nhận đi phong bì phòng này"
+                              >
+                                <Hand className="w-3.5 h-3.5 text-blue-600" />
+                                <span>{loadingClaimId === session.id ? 'Đang lưu...' : 'Nhận đi PB'}</span>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </>
         )}
       </div>
+
+      {/* Assign Envelope Modal */}
+      <AssignEnvelopeModal
+        isOpen={Boolean(assigningSession)}
+        onClose={() => setAssigningSession(null)}
+        session={assigningSession}
+        initialClass={assigningInitialClass}
+        records={records}
+        loginUsers={loginUsers}
+        currentAssignment={assigningSession ? envelopeAssignments[assigningSession.id] : undefined}
+        onConfirm={handleConfirmAssign}
+        isLoading={loadingClaimId === assigningSession?.id}
+      />
+
+      {/* Quick Edit Price Modal */}
+      <QuickEditPriceModal
+        isOpen={Boolean(quickEditSession)}
+        onClose={() => setQuickEditSession(null)}
+        session={quickEditSession}
+        onSave={handleSaveQuickPrice}
+        isLoading={loadingClaimId === quickEditSession?.id}
+      />
 
       <PricingConfigModal
         isOpen={isPricingModalOpen && effectiveIsAdmin}

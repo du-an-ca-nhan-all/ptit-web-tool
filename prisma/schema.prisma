@@ -410,6 +410,28 @@ model StudentQldtExamRecord {
   @@index([semesterId])
 }
 
+// 19. Bảng RoomEnvelopeConfirmation: Quản lý xác nhận đi phong bì các phòng thi và phân công sinh viên hỗ trợ
+model RoomEnvelopeConfirmation {
+  id                    Int       @id @default(autoincrement())
+  sessionId             String    @unique // Định danh ca/phòng thi: `${MAPTHI}|${NgayThi}|${GioThi}|${TenMH}`
+  batchCode             String?   // Mã đợt thi (ExamBatch.code)
+  room                  String?   // Tên / Mã phòng thi
+  date                  String?   // Ngày thi
+  time                  String?   // Giờ thi
+  subjectCode           String?   // Mã môn học
+  subject               String?   // Tên môn học
+  assignedClass         String    // Mã lớp phụ trách đi phong bì
+  claimedByUsername     String    // Mã SV / Username của lớp trưởng/admin thực hiện xác nhận
+  claimedByName         String?   // Họ tên của lớp trưởng/người xác nhận
+  assistantStudentId    String?   // Mã SV của sinh viên được phân công hỗ trợ đi phong bì (nếu có)
+  assistantStudentName  String?   // Họ tên của sinh viên được phân công hỗ trợ
+  customPrice           Int?      // Mức giá tiền bồi dưỡng tùy chỉnh cho phòng thi này (nếu khác mặc định)
+  note                  String?   // Ghi chú thêm
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-
-
+  @@index([sessionId])
+  @@index([assignedClass])
+  @@index([batchCode])
+  @@index([assistantStudentId])
+}
