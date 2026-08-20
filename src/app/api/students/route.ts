@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 import { checkIsAdmin, getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 
 async function getAuthUser(req: NextRequest) {
@@ -19,8 +18,6 @@ async function getAuthUser(req: NextRequest) {
 // List all students with basic fields for standard users and full info for Admins
 export async function GET(req: NextRequest) {
   try {
-    await ensureDatabaseSeeded(false);
-
     const authUser = await getAuthUser(req);
     const isAdmin = Boolean(
       authUser &&

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
 import { logActivity } from '@/src/lib/activityLog';
 
@@ -20,8 +19,6 @@ async function getAuthUser(req: NextRequest) {
 // Fetch excluded/transferred students of a class directly from Student table
 export async function GET(req: NextRequest) {
   try {
-    await ensureDatabaseSeeded(false);
-
     const { searchParams } = new URL(req.url);
     const classCode = searchParams.get('classCode');
 
@@ -66,8 +63,6 @@ export async function GET(req: NextRequest) {
 // POST /api/class-members/transfer
 export async function POST(req: NextRequest) {
   try {
-    await ensureDatabaseSeeded(false);
-
     const authUser = await getAuthUser(req);
     if (!authUser) {
       return NextResponse.json(

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 import { prisma } from '@/src/lib/prisma';
 
 export async function GET() {
@@ -10,7 +9,7 @@ export async function GET() {
     const meta = await prisma.systemMeta.findUnique({ where: { key: 'initial_seeded' } });
 
     return NextResponse.json({
-      initialized: !!meta,
+      initialized: !!meta || studentCount > 0,
       lastSeeded: meta?.value || null,
       stats: {
         students: studentCount,
@@ -25,11 +24,19 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const force = body.force === true;
+    const studentCount = await prisma.student.count();
+    const userCount = await prisma.user.count();
+    const examCount = await prisma.examRecord.count();
 
-    const result = await ensureDatabaseSeeded(force);
-    return NextResponse.json(result);
+    return NextResponse.json({
+      success: true,
+      message: 'Database status verified',
+      counts: {
+        students: studentCount,
+        users: userCount,
+        examRecords: examCount,
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

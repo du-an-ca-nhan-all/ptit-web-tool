@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
 import { logActivity } from '@/src/lib/activityLog';
 import { dispatchExamPostponed } from '@/src/lib/telegram-dispatcher';
 
 export async function GET(req: NextRequest) {
   try {
-    await ensureDatabaseSeeded(false);
-
     const { searchParams } = new URL(req.url);
     const all = searchParams.get('all') === 'true';
     const batchCode = searchParams.get('batchCode') || undefined;

@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 
 export async function GET(req: NextRequest) {
   try {
-    await ensureDatabaseSeeded(false);
-
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get('q') || '').trim();
     const limit = parseInt(searchParams.get('limit') || '20', 10);

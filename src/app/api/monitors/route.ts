@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 import { checkIsAdmin, getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { logActivity } from '@/src/lib/activityLog';
 import { monitorsServerService } from '@/src/features/classes-monitor/server/monitorsServerService';
@@ -18,8 +17,6 @@ async function getAuthUser(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    await ensureDatabaseSeeded(false);
-
     const { searchParams } = new URL(req.url);
     const includeAll = searchParams.get('all') === 'true';
 

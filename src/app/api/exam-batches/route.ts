@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { ensureDatabaseSeeded } from '@/src/lib/dbSeeder';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
 import { logActivity } from '@/src/lib/activityLog';
 
@@ -20,8 +19,6 @@ async function getAuthUser(req: NextRequest) {
 // Returns all exam batches with summary statistics
 export async function GET(req: NextRequest) {
   try {
-    await ensureDatabaseSeeded(false);
-
     const batches = await prisma.examBatch.findMany({
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
       include: {
@@ -80,8 +77,6 @@ export async function GET(req: NextRequest) {
 // Create, update, activate, or delete an exam batch (Admin only)
 export async function POST(req: NextRequest) {
   try {
-    await ensureDatabaseSeeded(false);
-
     const authUser = await getAuthUser(req);
     if (!authUser || !checkIsAdmin(authUser.role)) {
       return NextResponse.json(
