@@ -103,7 +103,7 @@ export const PATH_TO_TAB_MAP: Record<string, NavigationTab> = {
   'all-students': 'all_students',
   all_students: 'all_students',
   members: 'members',
-  envelope: 'envelope',
+  envelope: 'envelope_all',
   'envelope-all': 'envelope_all',
   envelope_all: 'envelope_all',
   settlement: 'settlement',
@@ -123,8 +123,8 @@ export const PATH_TO_TAB_MAP: Record<string, NavigationTab> = {
 export const MONITOR_SUBPATH_MAP: Record<string, NavigationTab> = {
   members: 'members',
   danhsach: 'members',
-  envelope: 'envelope',
-  phongbi: 'envelope',
+  envelope: 'envelope_all',
+  phongbi: 'envelope_all',
   'envelope-all': 'envelope_all',
   envelope_all: 'envelope_all',
   phongbitoantruong: 'envelope_all',
@@ -185,7 +185,6 @@ export const getNavigationPath = (tab: NavigationTab, profileSubTab?: ProfileSub
     case 'members':
       return '/monitor/members';
     case 'envelope':
-      return '/monitor/envelope';
     case 'envelope_all':
       return '/monitor/envelope-all';
     case 'settlement':

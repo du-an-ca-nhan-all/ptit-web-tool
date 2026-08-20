@@ -15,6 +15,17 @@ async function getAuthUser(req: NextRequest) {
   return authUser;
 }
 
+function verifyIsMonitorOrAdmin(authUser: any): boolean {
+  if (!authUser) return false;
+  if (checkIsAdmin(authUser.role) || authUser.isAdmin || authUser.activeRole === 'admin') return true;
+  if (authUser.isMonitor) return true;
+  if (typeof authUser.role === 'string') {
+    const roles = authUser.role.split(',').map((r: string) => r.trim().toLowerCase());
+    if (roles.includes('lop_truong') || roles.includes('admin')) return true;
+  }
+  return false;
+}
+
 function verifyIsAdmin(authUser: any): boolean {
   if (!authUser) return false;
   return Boolean(
@@ -73,8 +84,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
-    if (!verifyIsAdmin(authUser)) {
-      return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền cấu hình tiền phòng' }, { status: 403 });
+    if (!verifyIsMonitorOrAdmin(authUser)) {
+      return NextResponse.json({ error: 'Chỉ Lớp Trưởng hoặc Quản trị viên mới có quyền cấu hình tiền phòng' }, { status: 403 });
     }
     const body = await req.json();
 

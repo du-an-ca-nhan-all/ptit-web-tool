@@ -85,9 +85,8 @@ export default function Header({
       case 'database_backup':
         return 'Sao Lưu & Xuất Dữ Liệu DB';
       case 'envelope':
-        return 'Phân Công Phong Bì Lớp Mình';
       case 'envelope_all':
-        return 'Phân Công Phong Bì Lớp Trưởng';
+        return 'Phân Công Phong Bì';
       case 'settlement':
         return 'Bù Trừ Thanh Toán';
       case 'profile':

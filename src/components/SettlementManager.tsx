@@ -1,7 +1,14 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from '../types';
-import { DollarSign, ChevronDown, ChevronUp, FileText, ArrowDownLeft, ArrowUpRight, CheckCircle2, User, X, Mail, Users, Search, Settings } from 'lucide-react';
-import { calculateRoomPrice, formatCurrency } from '../config/pricingConfig';
+import { DollarSign, ChevronDown, ChevronUp, FileText, ArrowDownLeft, ArrowUpRight, CheckCircle2, User, X, Mail, Users, Search, Settings, Hand } from 'lucide-react';
+import { calculateRoomPrice, formatCurrency, fetchPricingFromBackend } from '../config/pricingConfig';
+import {
+  getStoredEnvelopeAssignments,
+  fetchEnvelopeAssignments,
+  getEffectiveResponsibleClass,
+  ENVELOPE_ASSIGNMENTS_CHANGED_EVENT,
+  EnvelopeAssignmentsMap,
+} from '../config/envelopeAssignmentConfig';
 import PricingConfigModal from './PricingConfigModal';
 
 interface SettlementManagerProps {
@@ -42,7 +49,27 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
   const [excludedOverrides, setExcludedOverrides] = useState<Map<string, boolean>>(new Map());
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const [pricingVersion, setPricingVersion] = useState(0);
+  const [envelopeAssignments, setEnvelopeAssignments] = useState<EnvelopeAssignmentsMap>(getStoredEnvelopeAssignments);
+  const [settlementScope, setSettlementScope] = useState<'CLAIMED_ONLY' | 'ALL'>('CLAIMED_ONLY');
   const studentListRef = React.useRef<HTMLDivElement>(null);
+
+  // Load and listen for envelope assignments
+  useEffect(() => {
+    fetchEnvelopeAssignments().then((res) => {
+      if (res) setEnvelopeAssignments(res);
+    });
+
+    const handler = (e: any) => {
+      if (e.detail) {
+        setEnvelopeAssignments(e.detail);
+      } else {
+        setEnvelopeAssignments(getStoredEnvelopeAssignments());
+      }
+    };
+
+    window.addEventListener(ENVELOPE_ASSIGNMENTS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(ENVELOPE_ASSIGNMENTS_CHANGED_EVENT, handler);
+  }, []);
 
   const effectiveIsAdmin = useMemo(() => {
     if (typeof isAdmin === 'boolean') return isAdmin;
@@ -57,6 +84,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
   }, [isAdmin]);
 
   useEffect(() => {
+    fetchPricingFromBackend().catch(() => {});
     const handler = () => setPricingVersion((v) => v + 1);
     window.addEventListener('pricing_config_changed', handler);
     return () => window.removeEventListener('pricing_config_changed', handler);
@@ -111,6 +139,24 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
       return true;
     });
   }, [currentRoomRecords, studentClassFilter, studentSearchQuery]);
+
+  const modalClassCounts = useMemo(() => {
+    if (!selectedDetail) return [];
+    const countsMap = new Map<string, number>();
+    currentRoomRecords.forEach(r => {
+      const cls = r.MaLop || 'Khác';
+      countsMap.set(cls, (countsMap.get(cls) || 0) + 1);
+    });
+    if (selectedDetail.toClass && !countsMap.has(selectedDetail.toClass)) {
+      countsMap.set(selectedDetail.toClass, 0);
+    }
+    if (selectedDetail.fromClass && !countsMap.has(selectedDetail.fromClass)) {
+      countsMap.set(selectedDetail.fromClass, 0);
+    }
+    return Array.from(countsMap.entries())
+      .map(([className, count]) => ({ className, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [selectedDetail, currentRoomRecords]);
 
   const getMonitorUser = useCallback((cls: string): LoginUser | null => {
     if (!cls) return null;
@@ -232,17 +278,36 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
     }
   }, [availableClasses, selectedClass]);
 
+  const totalClaimedRoomsAll = useMemo(() => {
+    return sessions.filter((s) => {
+      const monitoredClassesInRoom = s.classCounts.filter((c) => monitorClasses.has(c.className));
+      const { isClaimedManual } = getEffectiveResponsibleClass(s, monitoredClassesInRoom, envelopeAssignments);
+      return isClaimedManual;
+    }).length;
+  }, [sessions, monitorClasses, envelopeAssignments]);
+
   const data = useMemo(() => {
     if (!selectedClass || sessions.length === 0) {
-      return { receivables: [], payables: [], settled: [], totalReceive: 0, totalPay: 0, netTotal: 0 };
+      return {
+        receivables: [],
+        payables: [],
+        settled: [],
+        totalReceive: 0,
+        totalPay: 0,
+        netTotal: 0,
+        involvedRoomsCount: 0,
+        claimedRoomsInvolvedCount: 0,
+      };
     }
 
     const allDebts: DebtDetail[] = [];
+    const involvedRoomIds = new Set<string>();
+    let claimedRoomsInvolvedCount = 0;
 
-    sessions.forEach(session => {
+    sessions.forEach((session) => {
       // Recalculate effective class counts (excluding students marked as hoãn thi / excluded)
       const effectiveCounts = new Map<string, number>();
-      session.records.forEach(r => {
+      session.records.forEach((r) => {
         const isExcluded = isStudentExcluded(session.id, r);
         if (!isExcluded) {
           const cls = r.MaLop || 'Khác';
@@ -254,79 +319,155 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
       const monitoredClassesInRoom = Array.from(effectiveCounts.entries())
         .filter(([cls]) => monitorClasses.has(cls))
         .map(([cls, count]) => ({ className: cls, count }))
-        .sort((a, b) => b.count !== a.count ? b.count - a.count : a.className.localeCompare(b.className));
+        .sort((a, b) => (b.count !== a.count ? b.count - a.count : a.className.localeCompare(b.className)));
 
-      if (monitoredClassesInRoom.length <= 1) return; // Only 1 monitor or none, no cross-settlement needed
+      // The monitor who claimed or has the most students is responsible for the envelope
+      const { responsibleClass, isClaimedManual, assignmentInfo } = getEffectiveResponsibleClass(
+        session,
+        monitoredClassesInRoom,
+        envelopeAssignments
+      );
+      if (!responsibleClass) return;
 
-      // The monitor with the most students is responsible for the envelope
-      const responsibleClass = monitoredClassesInRoom[0].className;
-      const totalMonitoredStudents = monitoredClassesInRoom.reduce((acc, c) => acc + c.count, 0);
+      // Scope Filter: When CLAIMED_ONLY, only calculate for sessions that have been claimed
+      if (settlementScope === 'CLAIMED_ONLY' && !isClaimedManual) {
+        return;
+      }
+
+      const allClassesInRoom = Array.from(effectiveCounts.entries())
+        .map(([className, count]) => ({ className, count }))
+        .filter((c) => c.count > 0);
+
+      if (allClassesInRoom.length === 0) return;
+
+      // If only 1 class in room and it's the responsible class (and not manually claimed from another class), no debts
+      if (allClassesInRoom.length === 1 && allClassesInRoom[0].className === responsibleClass && !isClaimedManual) {
+        return;
+      }
+
+      const totalStudents = allClassesInRoom.reduce((acc, c) => acc + c.count, 0);
       const roomPrice = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id);
-      const pricePerStudent = totalMonitoredStudents > 0 ? roomPrice / totalMonitoredStudents : 0;
+      const pricePerStudent = totalStudents > 0 ? roomPrice / totalStudents : 0;
 
-      monitoredClassesInRoom.forEach(c => {
+      let isSessionInvolved = false;
+
+      allClassesInRoom.forEach((c) => {
         if (c.className !== responsibleClass) {
           allDebts.push({
-            session,
+            session: { ...session, isClaimedManual, assignmentInfo, room: session.room, subject: session.subject },
             fromClass: c.className, // Class C owes
-            toClass: responsibleClass, // Class A (the one who receives the envelope)
+            toClass: responsibleClass, // Class responsible (the one who receives the envelope)
             amount: c.count * pricePerStudent,
             studentsCount: c.count,
             pricePerStudent,
-            totalRoomPrice: roomPrice
+            totalRoomPrice: roomPrice,
           });
+
+          if (c.className === selectedClass || responsibleClass === selectedClass) {
+            isSessionInvolved = true;
+          }
         }
       });
+
+      if (isSessionInvolved) {
+        involvedRoomIds.add(session.id);
+        if (isClaimedManual) {
+          claimedRoomsInvolvedCount++;
+        }
+      }
     });
 
     const pMap = new Map<string, PartnerBalance>();
-    monitorClasses.forEach(c => {
+    // Pre-populate with all known classes so they are available
+    availableClasses.allClasses.forEach((c) => {
       if (c !== selectedClass) {
         pMap.set(c, {
           partnerClass: c,
           partnerMonitor: getMonitorName(c),
           netBalance: 0,
           detailsOweUs: [],
-          detailsWeOwe: []
+          detailsWeOwe: [],
         });
       }
     });
 
-    allDebts.forEach(debt => {
+    allDebts.forEach((debt) => {
       if (debt.fromClass === selectedClass) {
         // We owe them
-        const p = pMap.get(debt.toClass);
-        if (p) {
-          p.netBalance -= debt.amount;
-          p.detailsWeOwe.push(debt);
+        let p = pMap.get(debt.toClass);
+        if (!p) {
+          p = {
+            partnerClass: debt.toClass,
+            partnerMonitor: getMonitorName(debt.toClass),
+            netBalance: 0,
+            detailsOweUs: [],
+            detailsWeOwe: [],
+          };
+          pMap.set(debt.toClass, p);
         }
+        p.netBalance -= debt.amount;
+        p.detailsWeOwe.push(debt);
       } else if (debt.toClass === selectedClass) {
         // They owe us
-        const p = pMap.get(debt.fromClass);
-        if (p) {
-          p.netBalance += debt.amount;
-          p.detailsOweUs.push(debt);
+        let p = pMap.get(debt.fromClass);
+        if (!p) {
+          p = {
+            partnerClass: debt.fromClass,
+            partnerMonitor: getMonitorName(debt.fromClass),
+            netBalance: 0,
+            detailsOweUs: [],
+            detailsWeOwe: [],
+          };
+          pMap.set(debt.fromClass, p);
         }
+        p.netBalance += debt.amount;
+        p.detailsOweUs.push(debt);
       }
     });
 
-    const activePartners = Array.from(pMap.values()).filter(p => Math.abs(p.netBalance) > 0.01 || p.detailsOweUs.length > 0 || p.detailsWeOwe.length > 0);
+    const activePartners = Array.from(pMap.values()).filter(
+      (p) => Math.abs(p.netBalance) > 0.01 || p.detailsOweUs.length > 0 || p.detailsWeOwe.length > 0
+    );
 
     let totalReceive = 0;
     let totalPay = 0;
 
-    activePartners.forEach(p => {
+    activePartners.forEach((p) => {
       if (p.netBalance > 0.01) totalReceive += p.netBalance;
       if (p.netBalance < -0.01) totalPay += Math.abs(p.netBalance);
     });
 
-    const receivables = activePartners.filter(p => p.netBalance > 0.01).sort((a, b) => b.netBalance - a.netBalance);
-    const payables = activePartners.filter(p => p.netBalance < -0.01).sort((a, b) => a.netBalance - b.netBalance);
-    const settled = activePartners.filter(p => Math.abs(p.netBalance) <= 0.01);
+    const receivables = activePartners
+      .filter((p) => p.netBalance > 0.01)
+      .sort((a, b) => b.netBalance - a.netBalance);
+    const payables = activePartners
+      .filter((p) => p.netBalance < -0.01)
+      .sort((a, b) => a.netBalance - b.netBalance);
+    const settled = activePartners.filter(
+      (p) => Math.abs(p.netBalance) <= 0.01 && (p.detailsOweUs.length > 0 || p.detailsWeOwe.length > 0)
+    );
 
-    return { receivables, payables, settled, totalReceive, totalPay, netTotal: totalReceive - totalPay };
-
-  }, [sessions, selectedClass, monitorClasses, loginUsers, isStudentExcluded, pricingVersion]);
+    return {
+      receivables,
+      payables,
+      settled,
+      totalReceive,
+      totalPay,
+      netTotal: totalReceive - totalPay,
+      involvedRoomsCount: involvedRoomIds.size,
+      claimedRoomsInvolvedCount,
+    };
+  }, [
+    sessions,
+    selectedClass,
+    monitorClasses,
+    availableClasses,
+    getMonitorName,
+    isStudentExcluded,
+    pricingVersion,
+    envelopeAssignments,
+    settlementScope,
+  ]);
 
   // Compute effective class counts for the detail modal (accounting for exclusions)
   const effectiveClassCountsForModal = useMemo(() => {
@@ -354,27 +495,22 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
   const activeDetailCalc = useMemo(() => {
     if (!selectedDetail) return null;
     const sess = selectedDetail.session;
-    const monitoredCounts = Array.from(effectiveClassCountsForModal.entries())
-      .filter(([cls]) => monitorClasses.has(cls))
-      .map(([className, count]) => ({ className, count }))
-      .sort((a, b) => (b.count !== a.count ? b.count - a.count : a.className.localeCompare(b.className)));
-
-    const responsibleClass = monitoredCounts[0]?.className || selectedDetail.toClass;
-    const totalMonitoredStudents = monitoredCounts.reduce((acc, c) => acc + c.count, 0);
+    const responsibleClass = selectedDetail.toClass;
+    const totalStudents = Array.from(effectiveClassCountsForModal.values()).reduce((sum, cnt) => sum + cnt, 0);
     const roomPrice = calculateRoomPrice(sess.subject, sess.subjectCode, sess.room, sess.examFormat, sess.id);
-    const pricePerStudent = totalMonitoredStudents > 0 ? roomPrice / totalMonitoredStudents : 0;
+    const pricePerStudent = totalStudents > 0 ? roomPrice / totalStudents : 0;
     const fromClassCount = effectiveClassCountsForModal.get(selectedDetail.fromClass) || 0;
     const amount = fromClassCount * pricePerStudent;
 
     return {
       responsibleClass,
-      totalMonitoredStudents,
+      totalMonitoredStudents: totalStudents,
       pricePerStudent,
       totalRoomPrice: roomPrice,
       fromClassCount,
       amount,
     };
-  }, [selectedDetail, effectiveClassCountsForModal, monitorClasses, pricingVersion]);
+  }, [selectedDetail, effectiveClassCountsForModal, pricingVersion, envelopeAssignments]);
 
 
 
@@ -463,7 +599,19 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                       {p.detailsOweUs.map((d, idx) => (
                         <tr key={idx} className="hover:bg-blue-50 cursor-pointer transition-colors" onClick={() => setSelectedDetail(d)}>
                           <td className="px-4 py-3">
-                            <div className="font-bold text-slate-700">{d.session.room}</div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-700">{d.session.room}</span>
+                              {d.session.isClaimedManual ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-0.5">
+                                  <CheckCircle2 className="w-2.5 h-2.5" />
+                                  Đã nhận
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                  Gợi ý
+                                </span>
+                              )}
+                            </div>
                             <div className="text-slate-500 text-xs">{d.session.subject}</div>
                           </td>
                           <td className="px-4 py-3 text-center text-slate-600 font-medium">{formatCurrency(d.totalRoomPrice)}</td>
@@ -499,7 +647,19 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                       {p.detailsWeOwe.map((d, idx) => (
                         <tr key={idx} className="hover:bg-blue-50 cursor-pointer transition-colors" onClick={() => setSelectedDetail(d)}>
                           <td className="px-4 py-3">
-                            <div className="font-bold text-slate-700">{d.session.room}</div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-700">{d.session.room}</span>
+                              {d.session.isClaimedManual ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-0.5">
+                                  <CheckCircle2 className="w-2.5 h-2.5" />
+                                  Đã nhận
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                  Gợi ý
+                                </span>
+                              )}
+                            </div>
                             <div className="text-slate-500 text-xs">{d.session.subject}</div>
                           </td>
                           <td className="px-4 py-3 text-center text-slate-600 font-medium">{formatCurrency(d.totalRoomPrice)}</td>
@@ -575,35 +735,91 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
       </div>
     </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-            <ArrowDownLeft className="w-6 h-6 text-emerald-600" />
+      {/* Scope Filter Bar & Explanation */}
+      <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-2xs p-3 sm:p-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cơ sở tính toán:</span>
+          <button
+            type="button"
+            onClick={() => setSettlementScope('CLAIMED_ONLY')}
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+              settlementScope === 'CLAIMED_ONLY'
+                ? 'bg-emerald-600 text-white shadow-2xs shadow-emerald-200'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Chỉ tính phòng đã có lớp nhận ({totalClaimedRoomsAll} phòng)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettlementScope('ALL')}
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+              settlementScope === 'ALL'
+                ? 'bg-blue-600 text-white shadow-2xs shadow-blue-200'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Tính tất cả (bao gồm gợi ý: {sessions.length} phòng)</span>
+          </button>
+        </div>
+
+        <div className="text-xs text-slate-600 font-medium flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-xl">
+          {settlementScope === 'CLAIMED_ONLY' ? (
+            <>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+              <span>Chính thức: Chỉ tính tiền khi phòng thi đã có Lớp trưởng nhận.</span>
+            </>
+          ) : (
+            <>
+              <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+              <span>Tạm tính: Tự động phân bổ theo gợi ý phân công cả các phòng chưa ai nhận.</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 shrink-0">
+        <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 md:p-5 flex items-center gap-3 sm:gap-3.5 shadow-2xs">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+            <ArrowDownLeft className="w-5 h-5 text-emerald-600" />
           </div>
-          <div>
-            <p className="text-sm text-slate-500 font-semibold uppercase tracking-wider">Tổng phải thu</p>
-            <p className="text-2xl font-bold text-emerald-700">{formatCurrency(data.totalReceive)}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">Tổng phải thu</p>
+            <p className="text-base sm:text-lg md:text-xl font-extrabold text-emerald-700 mt-0.5 whitespace-nowrap">{formatCurrency(data.totalReceive)}</p>
           </div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center shrink-0">
-            <ArrowUpRight className="w-6 h-6 text-rose-600" />
+        <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 md:p-5 flex items-center gap-3 sm:gap-3.5 shadow-2xs">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-rose-100 rounded-xl flex items-center justify-center shrink-0">
+            <ArrowUpRight className="w-5 h-5 text-rose-600" />
           </div>
-          <div>
-            <p className="text-sm text-slate-500 font-semibold uppercase tracking-wider">Tổng phải trả</p>
-            <p className="text-2xl font-bold text-rose-700">{formatCurrency(data.totalPay)}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">Tổng phải trả</p>
+            <p className="text-base sm:text-lg md:text-xl font-extrabold text-rose-700 mt-0.5 whitespace-nowrap">{formatCurrency(data.totalPay)}</p>
           </div>
         </div>
-        <div className={`border rounded-2xl p-5 flex items-center gap-4 shadow-sm \${data.netTotal >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 \${data.netTotal >= 0 ? 'bg-blue-100' : 'bg-orange-100'}`}>
-            <DollarSign className={`w-6 h-6 \${data.netTotal >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
+        <div className={`border rounded-xl sm:rounded-2xl p-3.5 sm:p-4 md:p-5 flex items-center gap-3 sm:gap-3.5 shadow-2xs ${data.netTotal >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
+          <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0 ${data.netTotal >= 0 ? 'bg-blue-100' : 'bg-orange-100'}`}>
+            <DollarSign className={`w-5 h-5 ${data.netTotal >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
           </div>
-          <div>
-            <p className={`text-sm font-semibold uppercase tracking-wider \${data.netTotal >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+          <div className="min-w-0 flex-1">
+            <p className={`text-[11px] sm:text-xs font-bold uppercase tracking-wider ${data.netTotal >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
               {data.netTotal >= 0 ? 'Thực nhận sau cùng' : 'Thực chi sau cùng'}
             </p>
-            <p className={`text-2xl font-bold \${data.netTotal >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
+            <p className={`text-base sm:text-lg md:text-xl font-extrabold mt-0.5 whitespace-nowrap ${data.netTotal >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
               {formatCurrency(Math.abs(data.netTotal))}
+            </p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 md:p-5 flex items-center gap-3.5 shadow-2xs">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">Số phòng liên quan</p>
+            <p className="text-base sm:text-lg md:text-xl font-extrabold text-slate-800 mt-0.5 whitespace-nowrap">
+              {data.involvedRoomsCount} <span className="text-xs font-medium text-slate-400">phòng</span>
             </p>
           </div>
         </div>
@@ -763,7 +979,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {selectedDetail.session.classCounts.map((c: any, i: number) => {
+                      {modalClassCounts.map((c: any, i: number) => {
                         const hasMonitor = monitorClasses.has(c.className);
                         const isResponsible = c.className === selectedDetail.toClass;
                         const isPaying = c.className === selectedDetail.fromClass;
@@ -775,7 +991,16 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                           <tr key={i} className={isResponsible ? 'bg-emerald-50/70' : isPaying ? 'bg-rose-50/70' : 'bg-white'}>
                             <td className="px-4 py-3 font-medium text-slate-800 flex items-center gap-2">
                               {c.className}
-                              {isResponsible && <span className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-bold border border-emerald-200 uppercase">Đại diện lấy PB</span>}
+                              {isResponsible && (
+                                <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold border border-emerald-200 uppercase">
+                                  {selectedDetail.session?.isClaimedManual ? 'Chủ động nhận đi PB' : 'Đại diện lấy PB'}
+                                </span>
+                              )}
+                              {isPaying && (
+                                <span className="bg-rose-100 text-rose-800 text-[10px] px-2 py-0.5 rounded font-bold border border-rose-200 uppercase">
+                                  Đang thanh toán
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-center">
                               <div className="flex flex-col items-center gap-0.5">
@@ -791,23 +1016,43 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                               {hasMonitor ? (
                                 <div className="flex flex-col">
                                   <span className="text-emerald-700 text-xs font-bold flex items-center gap-1">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Có tham gia chia
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Lớp có Lớp Trưởng
                                   </span>
-                                  <span className="text-slate-500 text-[11px] font-medium">
-                                    LT: <strong className="text-slate-700 font-bold">{monName}</strong>
-                                  </span>
+                                  {isResponsible && selectedDetail.session?.assignmentInfo?.assistantStudentName ? (
+                                    <span className="text-indigo-700 text-[11px] font-semibold">
+                                      SV hỗ trợ đi PB: <strong>{selectedDetail.session.assignmentInfo.assistantStudentName}</strong> ({selectedDetail.session.assignmentInfo.assistantStudentId})
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500 text-[11px] font-medium">
+                                      LT: <strong className="text-slate-700 font-bold">{monName}</strong>
+                                    </span>
+                                  )}
                                 </div>
                               ) : (
-                                <span className="text-slate-400 text-xs italic">Không có LT / Miễn chia</span>
+                                <div className="flex flex-col">
+                                  <span className="text-slate-500 text-xs">
+                                    {isResponsible && selectedDetail.session?.assignmentInfo?.assistantStudentName ? (
+                                      <span className="text-indigo-700 text-[11px] font-semibold">
+                                        SV hỗ trợ đi PB: <strong>{selectedDetail.session.assignmentInfo.assistantStudentName}</strong> ({selectedDetail.session.assignmentInfo.assistantStudentId})
+                                      </span>
+                                    ) : (
+                                      'Chưa có LT đăng ký'
+                                    )}
+                                  </span>
+                                </div>
                               )}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <button
-                                onClick={() => handleOpenStudentListForClass(c.className)}
-                                className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-white hover:bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md inline-flex items-center gap-1 transition-colors shadow-sm cursor-pointer"
-                              >
-                                <Users className="w-3 h-3" /> Xem {c.count} SV
-                              </button>
+                              {c.count > 0 ? (
+                                <button
+                                  onClick={() => handleOpenStudentListForClass(c.className)}
+                                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-white hover:bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md inline-flex items-center gap-1 transition-colors shadow-sm cursor-pointer"
+                                >
+                                  <Users className="w-3 h-3" /> Xem {c.count} SV
+                                </button>
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">0 SV</span>
+                              )}
                             </td>
                           </tr>
                         );
