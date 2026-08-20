@@ -62,7 +62,7 @@ export default function AllMonitorsEnvelopes({
 }: AllMonitorsEnvelopesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
-    'ALL' | 'UNCLAIMED' | 'CLAIMED' | 'MY_CLASS' | 'MY_CLASS_LARGEST' | 'MY_CLAIMED'
+    'ALL' | 'UNCLAIMED' | 'CLAIMED' | 'MY_CLASS' | 'MY_CLASS_STRICT_LARGEST' | 'MY_CLASS_SUGGESTED' | 'MY_CLAIMED'
   >('ALL');
   const [filterDate, setFilterDate] = useState<string>('ALL');
   const [filterClass, setFilterClass] = useState<string>('ALL');
@@ -185,17 +185,25 @@ export default function AllMonitorsEnvelopes({
     return Array.from(classesSet).sort((a, b) => a.localeCompare(b));
   }, [enhancedSessions, monitorClasses]);
 
-  const isUserClassLargestInSession = useCallback(
-    (s: { classCounts: { className: string; count: number }[]; responsibleClasses?: string[] }, uClass: string) => {
+  // Check if user's class has the absolute highest number of students in the room (including classes without a monitor)
+  const isUserClassStrictLargestInSession = useCallback(
+    (s: { classCounts: { className: string; count: number }[] }, uClass: string) => {
       if (!uClass) return false;
       const cleanUClass = uClass.trim().toUpperCase();
       const userCount = s.classCounts.find((c) => c.className.trim().toUpperCase() === cleanUClass)?.count || 0;
       if (userCount <= 0) return false;
       const maxCount = Math.max(...s.classCounts.map((c) => c.count));
-      return (
-        userCount === maxCount ||
-        (s.responsibleClasses && s.responsibleClasses.some((rc) => rc.trim().toUpperCase() === cleanUClass))
-      );
+      return userCount === maxCount;
+    },
+    []
+  );
+
+  // Check if user's class is suggested by the system (prioritizing classes with a monitor)
+  const isUserClassSuggestedInSession = useCallback(
+    (s: { responsibleClasses: string[] }, uClass: string) => {
+      if (!uClass) return false;
+      const cleanUClass = uClass.trim().toUpperCase();
+      return s.responsibleClasses.some((rc) => rc.trim().toUpperCase() === cleanUClass);
     },
     []
   );
@@ -212,9 +220,14 @@ export default function AllMonitorsEnvelopes({
               s.responsibleClasses.some((rc) => rc.trim().toUpperCase() === userClass.trim().toUpperCase()))
         ).length
       : 0;
-    const myClassLargest = userClass
+    const myClassStrictLargest = userClass
       ? enhancedSessions.filter(
-          (s) => s.responsibleClasses.length > 0 && isUserClassLargestInSession(s, userClass)
+          (s) => s.responsibleClasses.length > 0 && isUserClassStrictLargestInSession(s, userClass)
+        ).length
+      : 0;
+    const myClassSuggested = userClass
+      ? enhancedSessions.filter(
+          (s) => s.responsibleClasses.length > 0 && isUserClassSuggestedInSession(s, userClass)
         ).length
       : 0;
     const myClaimed = userClass
@@ -225,8 +238,8 @@ export default function AllMonitorsEnvelopes({
         ).length
       : 0;
 
-    return { total, unclaimed, claimed, myClass, myClassLargest, myClaimed };
-  }, [enhancedSessions, userClass, isUserClassLargestInSession]);
+    return { total, unclaimed, claimed, myClass, myClassStrictLargest, myClassSuggested, myClaimed };
+  }, [enhancedSessions, userClass, isUserClassStrictLargestInSession, isUserClassSuggestedInSession]);
 
   const handleOpenAssignModal = useCallback((session: any, initialClass?: string) => {
     setAssigningSession(session);
@@ -323,8 +336,10 @@ export default function AllMonitorsEnvelopes({
           s.classCounts.some((c) => c.className.trim().toUpperCase() === cleanUClass) ||
           s.responsibleClasses.some((rc) => rc.trim().toUpperCase() === cleanUClass)
       );
-    } else if (filterStatus === 'MY_CLASS_LARGEST' && userClass) {
-      filtered = filtered.filter((s) => isUserClassLargestInSession(s, userClass));
+    } else if (filterStatus === 'MY_CLASS_STRICT_LARGEST' && userClass) {
+      filtered = filtered.filter((s) => isUserClassStrictLargestInSession(s, userClass));
+    } else if (filterStatus === 'MY_CLASS_SUGGESTED' && userClass) {
+      filtered = filtered.filter((s) => isUserClassSuggestedInSession(s, userClass));
     } else if (filterStatus === 'MY_CLAIMED' && userClass) {
       const cleanUClass = userClass.trim().toUpperCase();
       filtered = filtered.filter(
@@ -469,7 +484,10 @@ export default function AllMonitorsEnvelopes({
               {userClass && (
                 <>
                   <option value="MY_CLASS">Phòng có lớp tôi ({counts.myClass})</option>
-                  <option value="MY_CLASS_LARGEST">Lớp tôi đông nhất / Gợi ý ({counts.myClassLargest})</option>
+                  <option value="MY_CLASS_STRICT_LARGEST">
+                    Lớp tôi đông nhất (so sánh tất cả lớp kể cả không có LT) ({counts.myClassStrictLargest})
+                  </option>
+                  <option value="MY_CLASS_SUGGESTED">Gợi ý cho lớp tôi ({counts.myClassSuggested})</option>
                   <option value="MY_CLAIMED">Lớp tôi đã nhận ({counts.myClaimed})</option>
                 </>
               )}
@@ -579,16 +597,29 @@ export default function AllMonitorsEnvelopes({
               </button>
               <button
                 type="button"
-                onClick={() => setFilterStatus('MY_CLASS_LARGEST')}
+                onClick={() => setFilterStatus('MY_CLASS_STRICT_LARGEST')}
                 className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  filterStatus === 'MY_CLASS_LARGEST'
+                  filterStatus === 'MY_CLASS_STRICT_LARGEST'
                     ? 'bg-indigo-600 text-white shadow-2xs shadow-indigo-200'
                     : 'bg-indigo-50 text-indigo-900 border border-indigo-200 hover:bg-indigo-100'
                 }`}
-                title="Các phòng thi mà lớp bạn có đông sinh viên nhất hoặc được hệ thống gợi ý phụ trách"
+                title="Các phòng thi mà lớp bạn có đông sinh viên nhất so với toàn bộ các lớp trong phòng (bao gồm cả các lớp không có lớp trưởng)"
               >
-                <Sparkles className="w-3 h-3 text-indigo-500" />
-                <span>Lớp tôi đông nhất ({counts.myClassLargest})</span>
+                <Users className="w-3 h-3" />
+                <span>Lớp tôi đông nhất (tất cả lớp: {counts.myClassStrictLargest})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterStatus('MY_CLASS_SUGGESTED')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filterStatus === 'MY_CLASS_SUGGESTED'
+                    ? 'bg-amber-600 text-white shadow-2xs shadow-amber-200'
+                    : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
+                }`}
+                title="Các phòng thi mà hệ thống gợi ý lớp bạn phụ trách (dựa trên lớp có Lớp trưởng đông SV nhất)"
+              >
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>Gợi ý cho lớp tôi ({counts.myClassSuggested})</span>
               </button>
               <button
                 type="button"
