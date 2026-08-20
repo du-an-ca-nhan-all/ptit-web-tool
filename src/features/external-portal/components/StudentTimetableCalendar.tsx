@@ -585,7 +585,7 @@ export default function StudentTimetableCalendar({
   };
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Top Banner / Quick Header */}
       <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4">
         <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">

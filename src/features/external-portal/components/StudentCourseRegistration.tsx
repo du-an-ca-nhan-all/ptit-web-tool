@@ -204,7 +204,7 @@ export default function StudentCourseRegistration({
   }, [courses, searchQuery]);
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Toast notifications */}
       {successMsg && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-3xl text-emerald-800 text-sm font-bold flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">

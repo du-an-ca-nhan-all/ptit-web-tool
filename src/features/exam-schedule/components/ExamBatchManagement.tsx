@@ -284,7 +284,7 @@ export default function ExamBatchManagement({
   };
 
   return (
-    <div className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-y-auto min-h-0 bg-slate-50 relative">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 relative">
       {/* Toast Notification */}
       {toast && (
         <div
@@ -401,7 +401,7 @@ export default function ExamBatchManagement({
       </div>
 
       {/* Main Content Area */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col flex-1 overflow-hidden min-h-[400px]">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Search Bar */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
@@ -420,7 +420,7 @@ export default function ExamBatchManagement({
         </div>
 
         {/* Batches Grid / Cards */}
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="p-6">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
               <div className="w-8 h-8 border-3 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" />

@@ -225,7 +225,7 @@ export default function DataTable({
           </span>
         </div>
       )}
-      <div className="overflow-x-auto overflow-y-auto flex-1">
+      <div className="overflow-x-auto w-full">
         <table className="w-full text-left border-collapse whitespace-nowrap">
           <thead className="bg-slate-50 sticky top-0 z-10">
             <tr>

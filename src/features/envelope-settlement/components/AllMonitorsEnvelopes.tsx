@@ -417,7 +417,7 @@ export default function AllMonitorsEnvelopes({
   }, [displayedSessions]);
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 lg:p-8 flex flex-col gap-4 sm:gap-6 bg-[#F8FAFC]">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
         <div>

@@ -528,8 +528,14 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
 
   if (records.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-slate-500 font-medium">Vui lòng tải dữ liệu trước.</p>
+      <div className="p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div className="bg-white rounded-3xl p-16 border border-slate-200 shadow-sm flex flex-col items-center justify-center min-h-[300px] text-slate-500 gap-3 text-center">
+          <DollarSign className="w-12 h-12 text-slate-300" />
+          <p className="text-sm font-bold text-slate-700">Chưa có dữ liệu lịch thi để tính sổ quỹ bù trừ.</p>
+          <p className="text-xs text-slate-400 max-w-sm">
+            Vui lòng chọn hoặc nhập dữ liệu lịch thi của đợt thi hiện tại.
+          </p>
+        </div>
       </div>
     );
   }
@@ -680,7 +686,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
   };
 
   return (
-    <div className="p-4 md:p-8 flex-1 flex flex-col gap-6 overflow-y-auto min-h-0 bg-slate-50">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -825,8 +831,8 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-0 flex-1">
-        <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50/50">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 md:p-6 bg-slate-50/50">
           {data.receivables.length === 0 && data.payables.length === 0 && data.settled.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-500 py-12">
               <CheckCircle2 className="w-12 h-12 text-slate-300 mb-3" />

@@ -232,16 +232,18 @@ export default function CourseCompare({
 
   if (isLoading && !data) {
     return (
-      <div className="flex flex-col items-center justify-center py-28 gap-3.5 bg-white rounded-3xl border border-slate-200 shadow-sm animate-in fade-in duration-200">
-        <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm font-bold text-slate-700">Đang đối chiếu dữ liệu đăng ký môn học...</p>
-        <p className="text-xs text-slate-400">Đang tải và so sánh danh sách môn học với Lớp trưởng</p>
+      <div className="p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div className="flex flex-col items-center justify-center py-28 gap-3.5 bg-white rounded-3xl border border-slate-200 shadow-sm animate-in fade-in duration-200">
+          <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-bold text-slate-700">Đang đối chiếu dữ liệu đăng ký môn học...</p>
+          <p className="text-xs text-slate-400">Đang tải và so sánh danh sách môn học với Lớp trưởng</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Toast */}
       {pullMsg && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top">
