@@ -2,30 +2,42 @@
 
 import React from 'react';
 import { CalendarDays, RefreshCw, Layers, Power } from 'lucide-react';
-import UploadSection from '../UploadSection';
-import FilterBar, { FilterState } from '../FilterBar';
-import DataTable, { SortKey, SortDirection } from '../DataTable';
-import ClassMonitorTools from '../ClassMonitorTools';
-import ClassMembers from '../ClassMembers';
-import AllMonitorsEnvelopes from '../AllMonitorsEnvelopes';
-import ExamRoomMembers from '../ExamRoomMembers';
-import MonitorsList from '../MonitorsList';
-import CourseCompare from '../CourseCompare';
-import SettlementManager from '../SettlementManager';
-import UserProfileScreen from '../UserProfileScreen';
-import StudentCourseRegistration from '../StudentCourseRegistration';
-import ExamBatchManagement from '../ExamBatchManagement';
-import AdminExternalAccounts from '../AdminExternalAccounts';
-import ActivityLogsManager from '../ActivityLogsManager';
-import AdminTelegramBotManager from '../AdminTelegramBotManager';
-import AdminRegistrationManager from '../AdminRegistrationManager';
-import DatabaseBackupManager from '../DatabaseBackupManager';
-import AdminAnnouncementsManager from '../AdminAnnouncementsManager';
-import AnnouncementBanner from '../announcements/AnnouncementBanner';
-import AnnouncementModal from '../announcements/AnnouncementModal';
-import AllStudentsList from '../AllStudentsList';
-import StudentPersonalExamSchedule from '../StudentPersonalExamSchedule';
-import AllExamsSchedule from '../AllExamsSchedule';
+import { UserProfileScreen, AdminRegistrationManager } from '../../features/auth';
+import {
+  UploadSection,
+  FilterBar,
+  DataTable,
+  AllExamsSchedule,
+  StudentPersonalExamSchedule,
+  ExamBatchManagement,
+  ExamRoomMembers,
+  type FilterState,
+  type SortKey,
+  type SortDirection,
+} from '../../features/exam-schedule';
+import {
+  ClassMonitorTools,
+  ClassMembers,
+  MonitorsList,
+  AllStudentsList,
+} from '../../features/classes-monitor';
+import {
+  AllMonitorsEnvelopes,
+  SettlementManager,
+} from '../../features/envelope-settlement';
+import {
+  CourseCompare,
+  StudentCourseRegistration,
+  AdminExternalAccounts,
+} from '../../features/external-portal';
+import { AdminTelegramBotManager } from '../../features/telegram';
+import {
+  AdminAnnouncementsManager,
+  AnnouncementBanner,
+  AnnouncementModal,
+} from '../../features/announcements';
+import { ActivityLogsManager } from '../../features/activity-logs';
+import { DatabaseBackupManager } from '../../features/database-backup';
 import Footer from './Footer';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
 import { NavigationTab, ProfileSubTab, TabChangeOptions } from '../../types/navigation';

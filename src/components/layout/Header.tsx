@@ -17,8 +17,7 @@ import {
 } from 'lucide-react';
 import { LoginUser, ExamBatchItem } from '../../types';
 import { NavigationTab } from '../../types/navigation';
-import { AnnouncementItem } from '../../lib/announcements';
-import AnnouncementDrawer from '../announcements/AnnouncementDrawer';
+import { AnnouncementDrawer, AnnouncementItem } from '../../features/announcements';
 
 interface HeaderProps {
   activeTab: NavigationTab;

@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { FilterState } from '../components/FilterBar';
-import { SortKey, SortDirection } from '../components/DataTable';
+import { FilterState, SortKey, SortDirection } from '../features/exam-schedule';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
 import {
   NavigationTab,

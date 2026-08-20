@@ -1,12 +1,10 @@
 'use client';
 
 import React from 'react';
-import LoginScreen from '../components/LoginScreen';
+import { LoginScreen, ImpersonationBanner, ImpersonateModal } from '../features/auth';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
-import ImpersonationBanner from '../components/layout/ImpersonationBanner';
 import HomeMainContent from '../components/layout/HomeMainContent';
-import ImpersonateModal from '../components/modals/ImpersonateModal';
 import {
   ConfirmStudentModal,
   ConfirmClassModal,
