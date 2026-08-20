@@ -61,7 +61,9 @@ export default function AllMonitorsEnvelopes({
   isAdmin,
 }: AllMonitorsEnvelopesProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'UNCLAIMED' | 'CLAIMED' | 'MY_CLASS' | 'MY_CLAIMED'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<
+    'ALL' | 'UNCLAIMED' | 'CLAIMED' | 'MY_CLASS' | 'MY_CLASS_LARGEST' | 'MY_CLAIMED'
+  >('ALL');
   const [filterDate, setFilterDate] = useState<string>('ALL');
   const [filterClass, setFilterClass] = useState<string>('ALL');
   const [page, setPage] = useState(1);
@@ -183,6 +185,21 @@ export default function AllMonitorsEnvelopes({
     return Array.from(classesSet).sort((a, b) => a.localeCompare(b));
   }, [enhancedSessions, monitorClasses]);
 
+  const isUserClassLargestInSession = useCallback(
+    (s: { classCounts: { className: string; count: number }[]; responsibleClasses?: string[] }, uClass: string) => {
+      if (!uClass) return false;
+      const cleanUClass = uClass.trim().toUpperCase();
+      const userCount = s.classCounts.find((c) => c.className.trim().toUpperCase() === cleanUClass)?.count || 0;
+      if (userCount <= 0) return false;
+      const maxCount = Math.max(...s.classCounts.map((c) => c.count));
+      return (
+        userCount === maxCount ||
+        (s.responsibleClasses && s.responsibleClasses.some((rc) => rc.trim().toUpperCase() === cleanUClass))
+      );
+    },
+    []
+  );
+
   const counts = useMemo(() => {
     const total = enhancedSessions.filter((s) => s.responsibleClasses.length > 0).length;
     const unclaimed = enhancedSessions.filter((s) => s.responsibleClasses.length > 0 && !s.isClaimedManual).length;
@@ -191,15 +208,25 @@ export default function AllMonitorsEnvelopes({
       ? enhancedSessions.filter(
           (s) =>
             s.responsibleClasses.length > 0 &&
-            (s.classCounts.some((c) => c.className === userClass) || s.responsibleClasses.includes(userClass))
+            (s.classCounts.some((c) => c.className.trim().toUpperCase() === userClass.trim().toUpperCase()) ||
+              s.responsibleClasses.some((rc) => rc.trim().toUpperCase() === userClass.trim().toUpperCase()))
+        ).length
+      : 0;
+    const myClassLargest = userClass
+      ? enhancedSessions.filter(
+          (s) => s.responsibleClasses.length > 0 && isUserClassLargestInSession(s, userClass)
         ).length
       : 0;
     const myClaimed = userClass
-      ? enhancedSessions.filter((s) => s.responsibleClasses.includes(userClass) && s.isClaimedManual).length
+      ? enhancedSessions.filter(
+          (s) =>
+            s.responsibleClasses.some((rc) => rc.trim().toUpperCase() === userClass.trim().toUpperCase()) &&
+            s.isClaimedManual
+        ).length
       : 0;
 
-    return { total, unclaimed, claimed, myClass, myClaimed };
-  }, [enhancedSessions, userClass]);
+    return { total, unclaimed, claimed, myClass, myClassLargest, myClaimed };
+  }, [enhancedSessions, userClass, isUserClassLargestInSession]);
 
   const handleOpenAssignModal = useCallback((session: any, initialClass?: string) => {
     setAssigningSession(session);
@@ -290,11 +317,19 @@ export default function AllMonitorsEnvelopes({
     } else if (filterStatus === 'CLAIMED') {
       filtered = filtered.filter((s) => s.isClaimedManual);
     } else if (filterStatus === 'MY_CLASS' && userClass) {
+      const cleanUClass = userClass.trim().toUpperCase();
       filtered = filtered.filter(
-        (s) => s.classCounts.some((c) => c.className === userClass) || s.responsibleClasses.includes(userClass)
+        (s) =>
+          s.classCounts.some((c) => c.className.trim().toUpperCase() === cleanUClass) ||
+          s.responsibleClasses.some((rc) => rc.trim().toUpperCase() === cleanUClass)
       );
+    } else if (filterStatus === 'MY_CLASS_LARGEST' && userClass) {
+      filtered = filtered.filter((s) => isUserClassLargestInSession(s, userClass));
     } else if (filterStatus === 'MY_CLAIMED' && userClass) {
-      filtered = filtered.filter((s) => s.responsibleClasses.includes(userClass) && s.isClaimedManual);
+      const cleanUClass = userClass.trim().toUpperCase();
+      filtered = filtered.filter(
+        (s) => s.responsibleClasses.some((rc) => rc.trim().toUpperCase() === cleanUClass) && s.isClaimedManual
+      );
     }
 
     if (filterDate && filterDate !== 'ALL') {
@@ -434,6 +469,7 @@ export default function AllMonitorsEnvelopes({
               {userClass && (
                 <>
                   <option value="MY_CLASS">Phòng có lớp tôi ({counts.myClass})</option>
+                  <option value="MY_CLASS_LARGEST">Lớp tôi đông nhất / Gợi ý ({counts.myClassLargest})</option>
                   <option value="MY_CLAIMED">Lớp tôi đã nhận ({counts.myClaimed})</option>
                 </>
               )}
@@ -540,6 +576,19 @@ export default function AllMonitorsEnvelopes({
               >
                 <GraduationCap className="w-3 h-3" />
                 <span>Lớp tôi ({userClass}: {counts.myClass})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterStatus('MY_CLASS_LARGEST')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filterStatus === 'MY_CLASS_LARGEST'
+                    ? 'bg-indigo-600 text-white shadow-2xs shadow-indigo-200'
+                    : 'bg-indigo-50 text-indigo-900 border border-indigo-200 hover:bg-indigo-100'
+                }`}
+                title="Các phòng thi mà lớp bạn có đông sinh viên nhất hoặc được hệ thống gợi ý phụ trách"
+              >
+                <Sparkles className="w-3 h-3 text-indigo-500" />
+                <span>Lớp tôi đông nhất ({counts.myClassLargest})</span>
               </button>
               <button
                 type="button"
