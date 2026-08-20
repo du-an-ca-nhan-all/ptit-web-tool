@@ -108,7 +108,7 @@ export default function ExamRoomMembers({
   const postponedCount = useMemo(() => roomMembers.filter((r) => r.isPostponed).length, [roomMembers]);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 gap-3 sm:gap-4">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 max-w-7xl mx-auto w-full">
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
@@ -119,7 +119,7 @@ export default function ExamRoomMembers({
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 overflow-hidden shrink-0">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
             <div className="flex items-center gap-2.5 sm:gap-3">
@@ -180,7 +180,7 @@ export default function ExamRoomMembers({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col relative">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         {isLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-500 gap-3">
             <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />

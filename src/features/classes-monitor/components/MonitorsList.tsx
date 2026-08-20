@@ -56,9 +56,9 @@ export default function MonitorsList({
   }, [monitors, searchQuery]);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300 gap-6 p-4 md:p-8 max-w-7xl mx-auto w-full">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-7xl mx-auto w-full">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden shrink-0">
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
 
         <div className="flex items-center gap-4 relative z-10">
@@ -89,7 +89,7 @@ export default function MonitorsList({
       </div>
 
       {/* Toolbar Search */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="relative flex-1 w-full max-w-md">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
@@ -107,7 +107,7 @@ export default function MonitorsList({
       </div>
 
       {/* Grid of Monitors */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="w-full">
         {isLoading && monitors.length === 0 ? (
           <div className="bg-white rounded-3xl p-16 border border-slate-200 shadow-sm flex flex-col items-center justify-center min-h-[300px] text-slate-500 gap-3 text-center">
             <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
