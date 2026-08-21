@@ -558,9 +558,15 @@ export async function cancelCourseGroupQLDTTX(
   }
 
   const resData = parsed?.data || {};
-  const isThanhCong = Boolean(resData?.is_thanh_cong || (parsed?.code === 200 && parsed?.result === true && !resData?.thong_bao_loi));
-  const newIdRs = String(resData?.id_rs || parsed?.id_rs || effectiveIdRs || '');
   const thongBaoLoi = resData?.thong_bao_loi || parsed?.message || '';
+  const isThanhCong = Boolean(
+    resData?.is_thanh_cong === true ||
+    resData?.is_thanh_cong === 'true' ||
+    (parsed?.result === true && !thongBaoLoi && resData?.is_thanh_cong !== false) ||
+    (parsed?.code === 200 && parsed?.result === true && !thongBaoLoi) ||
+    (parsed?.code === 200 && !thongBaoLoi && resData?.is_thanh_cong !== false && parsed?.result !== false)
+  );
+  const newIdRs = String(resData?.id_rs || parsed?.id_rs || effectiveIdRs || '');
 
   return {
     success: isThanhCong,

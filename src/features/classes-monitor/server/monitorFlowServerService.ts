@@ -363,7 +363,6 @@ export async function executeMonitorFlowAction(options: {
 
         const res = await cancelCourseGroupQLDTTX(creds, {
           id_to_hoc: options.id_to_hoc,
-          id_rs: options.id_rs,
           sv_nganh: svNganh,
         });
 
@@ -397,36 +396,88 @@ export async function executeMonitorFlowAction(options: {
           },
         });
       } else if (options.flowAction === 'SYNC_ALL_COURSES') {
-        // Đồng bộ toàn bộ các môn của lớp trưởng cho sinh viên này
-        let subSuccess = 0;
-        let subFail = 0;
+        // Đồng bộ 2 chiều toàn bộ các môn của lớp trưởng cho sinh viên này (Cả Đăng ký môn thiếu và Hủy môn thừa)
+        let regSuccess = 0;
+        let regFail = 0;
+        let cancelSuccess = 0;
+        let cancelFail = 0;
 
-        for (const item of monitorRegisteredCourses) {
-          const toHoc = item.to_hoc;
-          if (!toHoc?.id_to_hoc) continue;
+        // 1. Lấy danh sách môn sinh viên hiện đang có trên QLDTTX
+        const followerRes = await fetchRegisteredCoursesFromQLDTTX(creds);
+        const followerCourses = followerRes.ds_kqdkmh || [];
 
-          try {
-            const regRes = await registerCourseGroupQLDTTX(creds, {
-              id_to_hoc: toHoc.id_to_hoc,
-              sv_nganh: svNganh,
-            });
-            if (regRes.success) subSuccess++;
-            else subFail++;
-          } catch {
-            subFail++;
+        const monitorToHocMap = new Map<string, any>();
+        monitorRegisteredCourses.forEach((c) => {
+          const id = String(c.to_hoc?.id_to_hoc || '').trim();
+          if (id) monitorToHocMap.set(id, c);
+        });
+
+        const followerToHocMap = new Map<string, any>();
+        followerCourses.forEach((c) => {
+          const id = String(c.to_hoc?.id_to_hoc || '').trim();
+          if (id) followerToHocMap.set(id, c);
+        });
+
+        // 2. HỦY các môn mà Sinh viên đang có nhưng Lớp trưởng KHÔNG có (hoặc Lớp trưởng đã hủy)
+        if (cfg.allowCancelCourse) {
+          for (const [idToHoc, item] of followerToHocMap.entries()) {
+            if (!monitorToHocMap.has(idToHoc)) {
+              try {
+                const cancelRes = await cancelCourseGroupQLDTTX(creds, {
+                  id_to_hoc: idToHoc,
+                  sv_nganh: svNganh,
+                });
+                if (cancelRes.success) cancelSuccess++;
+                else cancelFail++;
+              } catch {
+                cancelFail++;
+              }
+            }
           }
         }
 
-        const isAllOk = subFail === 0 && subSuccess > 0;
-        if (isAllOk || subSuccess > 0) successCount++;
+        // 3. ĐĂNG KÝ các môn mà Lớp trưởng CÓ nhưng Sinh viên CHƯA có
+        if (cfg.allowRegisterCourse) {
+          for (const [idToHoc, item] of monitorToHocMap.entries()) {
+            if (!followerToHocMap.has(idToHoc)) {
+              try {
+                const regRes = await registerCourseGroupQLDTTX(creds, {
+                  id_to_hoc: idToHoc,
+                  sv_nganh: svNganh,
+                });
+                if (regRes.success) regSuccess++;
+                else regFail++;
+              } catch {
+                regFail++;
+              }
+            }
+          }
+        }
+
+        const hasErrors = cancelFail > 0 || regFail > 0;
+        const hasChanges = cancelSuccess > 0 || regSuccess > 0;
+        const isMatched = !hasChanges && !hasErrors && followerToHocMap.size === monitorToHocMap.size;
+
+        let summaryMsg = '';
+        if (isMatched) {
+          summaryMsg = `Đã khớp 100% môn học với Lớp trưởng (${monitorToHocMap.size} môn)`;
+        } else {
+          const parts = [];
+          if (regSuccess > 0) parts.push(`Đăng ký ${regSuccess} môn`);
+          if (cancelSuccess > 0) parts.push(`Hủy ${cancelSuccess} môn`);
+          if (hasErrors) parts.push(`${regFail + cancelFail} lỗi`);
+          summaryMsg = parts.length > 0 ? `Đã đồng bộ: ${parts.join(', ')}` : 'Đã đồng bộ xong';
+        }
+
+        const isSuccess = !hasErrors || (regSuccess > 0 || cancelSuccess > 0) || isMatched;
+        if (isSuccess) successCount++;
         else failCount++;
 
-        const summaryMsg = `Đã đồng bộ: ${subSuccess} môn thành công, ${subFail} thất bại`;
         executionResults.push({
           username: normFollower,
           hoTen: studentName,
-          success: subSuccess > 0,
-          status: isAllOk ? 'SUCCESS' : 'FAILED',
+          success: isSuccess,
+          status: isSuccess ? 'SUCCESS' : 'FAILED',
           message: summaryMsg,
         });
 
@@ -435,7 +486,7 @@ export async function executeMonitorFlowAction(options: {
           data: {
             lastActionAt: new Date(),
             lastActionType: 'SYNC_ALL_COURSES',
-            lastActionResult: isAllOk ? 'SUCCESS' : 'PARTIAL',
+            lastActionResult: isSuccess ? 'SUCCESS' : 'PARTIAL',
             lastActionMessage: summaryMsg,
           },
         });
