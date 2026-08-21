@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { LoginUser } from '../../../types';
 import { FollowerStudentItem, MonitorProfileData } from '../server/monitorFlowServerService';
+import { FlowActionType } from '../types/flow.types';
 
 export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string) {
   const [selectedClass, setSelectedClass] = useState<string>(
@@ -194,7 +195,7 @@ export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string
 
   // Execute Flow Action
   const executeFlow = useCallback(async (options: {
-    flowAction: 'REGISTER' | 'CANCEL' | 'SYNC_ALL_COURSES';
+    flowAction: FlowActionType | string;
     id_to_hoc?: string;
     id_rs?: string;
     ma_mon?: string;

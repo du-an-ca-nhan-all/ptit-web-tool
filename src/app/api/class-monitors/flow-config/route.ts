@@ -6,6 +6,7 @@ import {
   executeMonitorFlowAction,
   pullClassCourseRegistrations,
 } from '@/src/features/classes-monitor/server/monitorFlowServerService';
+import { enqueueFlowAction } from '@/src/features/classes-monitor/server/monitorFlowQueueServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 async function getAuthUser(req: NextRequest) {
@@ -114,6 +115,44 @@ export async function POST(req: NextRequest) {
 
     // 2. ACTION: EXECUTE_FLOW
     if (action === 'EXECUTE_FLOW') {
+      const isBatch = !targetFollowerUsernames || targetFollowerUsernames.length > 1;
+
+      // Nếu là chạy hàng loạt cho nhiều người -> Đưa vào Hàng Đợi (Queue) xử lý ngầm tránh nghẽn mạng / timeout
+      if (isBatch) {
+        const enqueueRes = await enqueueFlowAction({
+          monitorUsername: normMonitor,
+          classCode: normClass,
+          flowAction,
+          id_to_hoc,
+          ma_mon,
+          ten_mon,
+          nhom_to,
+          sv_nganh: Number(sv_nganh) || 1,
+          targetFollowerUsernames,
+        });
+
+        await logActivity({
+          req,
+          userId: authUser.id,
+          username: authUser.username,
+          userRole: authUser.role,
+          action: 'ENQUEUE_MONITOR_FLOW_BATCH',
+          targetType: 'MONITOR_FLOW',
+          targetId: normClass,
+          description: `Đưa ${enqueueRes.totalItems} tác vụ Flow [${flowAction}] vào hàng đợi xử lý ngầm (Batch ID: ${enqueueRes.batchId})`,
+          metadata: { classCode: normClass, flowAction, id_to_hoc, batchId: enqueueRes.batchId },
+        });
+
+        return NextResponse.json({
+          success: enqueueRes.success,
+          isQueued: true,
+          batchId: enqueueRes.batchId,
+          total: enqueueRes.totalItems,
+          message: enqueueRes.message || `Đã đưa ${enqueueRes.totalItems} tác vụ vào Hàng Đợi Flow để xử lý ngầm.`,
+        });
+      }
+
+      // Nếu chỉ thao tác cho 1 sinh viên duy nhất -> Chạy trực tiếp để phản hồi tức thì
       const execRes = await executeMonitorFlowAction({
         monitorUsername: normMonitor,
         classCode: normClass,
@@ -142,7 +181,7 @@ export async function POST(req: NextRequest) {
         action: 'EXECUTE_MONITOR_FLOW_ACTION',
         targetType: 'MONITOR_FLOW',
         targetId: normClass,
-        description: `Thực thi Flow Action [${actionName}] cho lớp ${normClass}: ${execRes.successCount} thành công, ${execRes.failCount} thất bại, ${execRes.skippedCount} bỏ qua (Tổ ID: ${id_to_hoc || 'ALL'})`,
+        description: `Thực thi Flow Action [${actionName}] cho ${execRes.total} thành viên: ${execRes.successCount} thành công, ${execRes.failCount} thất bại`,
         metadata: {
           classCode: normClass,
           flowAction,
@@ -155,7 +194,8 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: execRes.success,
-        message: `Đã thực thi Flow Action [${actionName}] cho ${execRes.total} thành viên: ${execRes.successCount} thành công, ${execRes.failCount} thất bại, ${execRes.skippedCount} bỏ qua.`,
+        isQueued: false,
+        message: `Đã thực thi Flow Action [${actionName}] cho ${execRes.total} thành viên: ${execRes.successCount} thành công, ${execRes.failCount} thất bại.`,
         ...execRes,
       });
     }

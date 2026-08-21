@@ -5,6 +5,11 @@ import {
   fetchOpenCourseGroupsFromQLDTTX,
   fetchRegisteredCoursesFromQLDTTX,
 } from '@/src/features/external-portal/server/courseRegistrationServerService';
+import {
+  FlowActionType,
+  normalizeFlowAction,
+  getFlowActionDefinition,
+} from '@/src/features/classes-monitor/types/flow.types';
 
 export interface CourseItem {
   id_to_hoc: string;
@@ -481,7 +486,7 @@ export async function saveMonitorFlowConfigs(
 export async function executeMonitorFlowAction(options: {
   monitorUsername: string;
   classCode?: string;
-  flowAction: 'REGISTER' | 'CANCEL' | 'SYNC_ALL_COURSES';
+  flowAction: FlowActionType | string;
   id_to_hoc?: string;
   id_rs?: string;
   ma_mon?: string;
@@ -507,6 +512,7 @@ export async function executeMonitorFlowAction(options: {
 }> {
   const normMonitor = options.monitorUsername.trim().toUpperCase();
   const svNganh = options.sv_nganh ?? 1;
+  const canonicalAction = normalizeFlowAction(options.flowAction);
 
   // 1. Lấy danh sách cấu hình flow đang bật của Lớp trưởng
   const flowConfigs = await prisma.monitorFlowConfig.findMany({
@@ -514,8 +520,8 @@ export async function executeMonitorFlowAction(options: {
       monitorUsername: normMonitor,
       isEnabled: true,
       ...(options.classCode ? { classCode: options.classCode.trim().toUpperCase() } : {}),
-      ...(options.flowAction === 'REGISTER' ? { allowRegisterCourse: true } : {}),
-      ...(options.flowAction === 'CANCEL' ? { allowCancelCourse: true } : {}),
+      ...(canonicalAction === 'COURSE_REGISTER' ? { allowRegisterCourse: true } : {}),
+      ...(canonicalAction === 'COURSE_CANCEL' ? { allowCancelCourse: true } : {}),
     },
   });
 
@@ -550,9 +556,9 @@ export async function executeMonitorFlowAction(options: {
   let skippedCount = 0;
   const executionResults: any[] = [];
 
-  // 2. Nếu action là SYNC_ALL_COURSES: Lấy danh sách môn của lớp trưởng trước
+  // 2. Nếu action là COURSE_SYNC_ALL: Lấy danh sách môn của lớp trưởng trước
   let monitorRegisteredCourses: any[] = [];
-  if (options.flowAction === 'SYNC_ALL_COURSES') {
+  if (canonicalAction === 'COURSE_SYNC_ALL') {
     const monitorExtAcc = await prisma.externalAccount.findFirst({
       where: { username: normMonitor, systemKey: 'QLDTTX_PTTC1' },
     });
@@ -592,7 +598,7 @@ export async function executeMonitorFlowAction(options: {
         where: { monitorUsername: normMonitor, followerUsername: normFollower },
         data: {
           lastActionAt: new Date(),
-          lastActionType: options.flowAction,
+          lastActionType: canonicalAction,
           lastActionResult: 'SKIPPED',
           lastActionMessage: msg,
         },
@@ -607,7 +613,7 @@ export async function executeMonitorFlowAction(options: {
     };
 
     try {
-      if (options.flowAction === 'REGISTER') {
+      if (canonicalAction === 'COURSE_REGISTER') {
         if (!options.id_to_hoc) {
           throw new Error('Thiếu id_to_hoc để thực hiện Flow Đăng Ký');
         }
@@ -642,12 +648,12 @@ export async function executeMonitorFlowAction(options: {
           where: { monitorUsername: normMonitor, followerUsername: normFollower },
           data: {
             lastActionAt: new Date(),
-            lastActionType: 'REGISTER',
+            lastActionType: 'COURSE_REGISTER',
             lastActionResult: res.success ? 'SUCCESS' : 'FAILED',
             lastActionMessage: res.message || (res.success ? 'Đăng ký thành công' : 'Đăng ký thất bại'),
           },
         });
-      } else if (options.flowAction === 'CANCEL') {
+      } else if (canonicalAction === 'COURSE_CANCEL') {
         if (!options.id_to_hoc) {
           throw new Error('Thiếu id_to_hoc để thực hiện Flow Hủy Môn');
         }
@@ -681,12 +687,12 @@ export async function executeMonitorFlowAction(options: {
           where: { monitorUsername: normMonitor, followerUsername: normFollower },
           data: {
             lastActionAt: new Date(),
-            lastActionType: 'CANCEL',
+            lastActionType: 'COURSE_CANCEL',
             lastActionResult: res.success ? 'SUCCESS' : 'FAILED',
             lastActionMessage: res.message || (res.success ? 'Hủy môn thành công' : 'Hủy môn thất bại'),
           },
         });
-      } else if (options.flowAction === 'SYNC_ALL_COURSES') {
+      } else if (canonicalAction === 'COURSE_SYNC_ALL') {
         // Đồng bộ 2 chiều toàn bộ các môn của lớp trưởng cho sinh viên này (Cả Đăng ký môn thiếu và Hủy môn thừa)
         let regSuccess = 0;
         let regFail = 0;
@@ -776,7 +782,7 @@ export async function executeMonitorFlowAction(options: {
           where: { monitorUsername: normMonitor, followerUsername: normFollower },
           data: {
             lastActionAt: new Date(),
-            lastActionType: 'SYNC_ALL_COURSES',
+            lastActionType: 'COURSE_SYNC_ALL',
             lastActionResult: isSuccess ? 'SUCCESS' : 'PARTIAL',
             lastActionMessage: summaryMsg,
           },
@@ -797,7 +803,7 @@ export async function executeMonitorFlowAction(options: {
         where: { monitorUsername: normMonitor, followerUsername: normFollower },
         data: {
           lastActionAt: new Date(),
-          lastActionType: options.flowAction,
+          lastActionType: canonicalAction,
           lastActionResult: 'FAILED',
           lastActionMessage: errMsg,
         },

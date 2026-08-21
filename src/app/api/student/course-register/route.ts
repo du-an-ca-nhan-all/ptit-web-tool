@@ -7,7 +7,7 @@ import {
   registerCourseGroupQLDTTX,
   cancelCourseGroupQLDTTX,
 } from '@/src/features/external-portal/server/courseRegistrationServerService';
-import { executeMonitorFlowAction } from '@/src/features/classes-monitor/server/monitorFlowServerService';
+import { enqueueFlowAction } from '@/src/features/classes-monitor/server/monitorFlowQueueServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 async function getAuthUser(req: NextRequest) {
@@ -303,7 +303,7 @@ export async function POST(req: NextRequest) {
         sv_nganh: Number(sv_nganh) || 1,
       });
 
-      // Nếu người đăng ký là Lớp trưởng và có thành viên đang BẬT Flow Đăng Ký -> Tự động Flow đăng ký cho cả lớp
+      // Nếu người đăng ký là Lớp trưởng và có thành viên đang BẬT Flow Đăng Ký -> Đưa vào Hàng Đợi xử lý ngầm
       let flowSummary: any = null;
       if (regResult.success) {
         const activeFollowers = await prisma.monitorFlowConfig.findMany({
@@ -316,8 +316,9 @@ export async function POST(req: NextRequest) {
 
         if (activeFollowers.length > 0) {
           try {
-            flowSummary = await executeMonitorFlowAction({
+            flowSummary = await enqueueFlowAction({
               monitorUsername: effectiveUsername,
+              classCode: authUser.lop || '',
               flowAction: 'REGISTER',
               id_to_hoc: String(id_to_hoc),
               sv_nganh: Number(sv_nganh) || 1,
@@ -339,7 +340,7 @@ export async function POST(req: NextRequest) {
         targetType: 'COURSE_REGISTRATION',
         targetId: String(id_to_hoc),
         description: regResult.success
-          ? `Đăng ký môn học thành công: Tổ học ID [${id_to_hoc}]${flowSummary ? ` (Đã Flow cho ${flowSummary.total} thành viên: ${flowSummary.successCount} thành công)` : ''}`
+          ? `Đăng ký môn học thành công: Tổ học ID [${id_to_hoc}]${flowSummary ? ` (Đã đưa ${flowSummary.totalItems} tác vụ vào Hàng Đợi Flow)` : ''}`
           : `Đăng ký môn học thất bại: Tổ học ID [${id_to_hoc}] - ${regResult.message}`,
         metadata: { id_to_hoc, result: regResult, flowSummary },
       });
@@ -353,8 +354,8 @@ export async function POST(req: NextRequest) {
       }
 
       let responseMsg = regResult.message;
-      if (regResult.success && flowSummary && flowSummary.total > 0) {
-        responseMsg = `${regResult.message} • Đã Flow cho ${flowSummary.total} thành viên (${flowSummary.successCount} thành công, ${flowSummary.failCount} thất bại, ${flowSummary.skippedCount} bỏ qua)`;
+      if (regResult.success && flowSummary && flowSummary.totalItems > 0) {
+        responseMsg = `${regResult.message} • Đã đưa ${flowSummary.totalItems} thành viên vào Hàng Đợi Flow xử lý ngầm`;
       }
 
       return NextResponse.json({
@@ -379,7 +380,7 @@ export async function POST(req: NextRequest) {
         sv_nganh: Number(sv_nganh) || 1,
       });
 
-      // Nếu người hủy là Lớp trưởng và có thành viên đang BẬT Flow Hủy Môn -> Tự động Flow hủy cho cả lớp
+      // Nếu người hủy là Lớp trưởng và có thành viên đang BẬT Flow Hủy Môn -> Đưa vào Hàng Đợi xử lý ngầm (và hủy lệnh đăng ký chờ nếu có)
       let flowSummary: any = null;
       if (cancelResult.success) {
         const activeFollowers = await prisma.monitorFlowConfig.findMany({
@@ -392,8 +393,9 @@ export async function POST(req: NextRequest) {
 
         if (activeFollowers.length > 0) {
           try {
-            flowSummary = await executeMonitorFlowAction({
+            flowSummary = await enqueueFlowAction({
               monitorUsername: effectiveUsername,
+              classCode: authUser.lop || '',
               flowAction: 'CANCEL',
               id_to_hoc: String(id_to_hoc),
               sv_nganh: Number(sv_nganh) || 1,
@@ -414,7 +416,7 @@ export async function POST(req: NextRequest) {
         targetType: 'COURSE_REGISTRATION',
         targetId: String(id_to_hoc),
         description: cancelResult.success
-          ? `Hủy môn học thành công: Tổ học ID [${id_to_hoc}]${flowSummary ? ` (Đã Flow hủy cho ${flowSummary.total} thành viên: ${flowSummary.successCount} thành công)` : ''}`
+          ? `Hủy môn học thành công: Tổ học ID [${id_to_hoc}]${flowSummary ? ` (Đã đưa ${flowSummary.totalItems} tác vụ Hủy vào Hàng Đợi Flow)` : ''}`
           : `Hủy môn học thất bại: Tổ học ID [${id_to_hoc}] - ${cancelResult.message}`,
         metadata: { id_to_hoc, result: cancelResult, flowSummary },
       });

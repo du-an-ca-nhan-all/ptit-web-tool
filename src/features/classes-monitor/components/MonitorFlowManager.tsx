@@ -42,6 +42,8 @@ import {
 import { LoginUser } from '../../../types';
 import { useMonitorFlow } from '../hooks/useMonitorFlow';
 import { CourseItem, FollowerStudentItem } from '../server/monitorFlowServerService';
+import { getFlowActionDefinition } from '../types/flow.types';
+import FlowQueueMonitor from './FlowQueueMonitor';
 
 interface MonitorFlowManagerProps {
   currentUser: LoginUser;
@@ -49,7 +51,7 @@ interface MonitorFlowManagerProps {
   onNavigateTab?: (tab: string, subTab?: string) => void;
 }
 
-type MainSubTab = 'ALL_COMPARE' | 'FLOW_CONFIG' | 'MONITOR_COURSES';
+type MainSubTab = 'ALL_COMPARE' | 'FLOW_CONFIG' | 'MONITOR_COURSES' | 'FLOW_QUEUE';
 type CompareFilter = 'ALL' | 'ACTIVE_FLOW' | 'NEEDS_ATTENTION' | 'MATCHED_100' | 'NOT_LINKED';
 
 export default function MonitorFlowManager({
@@ -300,6 +302,18 @@ export default function MonitorFlowManager({
         >
           <BookOpen className="w-4 h-4 text-emerald-600" />
           <span>Môn Lớp Trưởng Đã Đăng Ký ({monitorCourses.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('FLOW_QUEUE')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all shrink-0 cursor-pointer ${
+            activeSubTab === 'FLOW_QUEUE'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Layers className="w-4 h-4 text-purple-600" />
+          <span>Hàng Đợi & Tiến Trình Flow (Queue)</span>
         </button>
       </div>
 
@@ -1019,20 +1033,26 @@ export default function MonitorFlowManager({
                         <td className="px-4 py-3.5 max-w-xs">
                           {student.lastActionAt ? (
                             <div className="space-y-0.5">
-                              <div className="flex items-center gap-1.5 text-[11px]">
-                                <span
-                                  className={`px-1.5 py-0.2 rounded font-black text-[9px] ${
-                                    student.lastActionResult === 'SUCCESS'
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : student.lastActionResult === 'SKIPPED'
-                                      ? 'bg-amber-100 text-amber-800'
-                                      : 'bg-rose-100 text-rose-800'
-                                  }`}
-                                >
-                                  {student.lastActionResult || 'DONE'}
-                                </span>
-                                <span className="font-bold text-slate-700">{student.lastActionType}</span>
-                              </div>
+                              {(() => {
+                                const actionDef = getFlowActionDefinition(student.lastActionType);
+                                return (
+                                  <div className="flex items-center gap-1.5 text-[11px] flex-wrap">
+                                    <span
+                                      className={`px-1.5 py-0.2 rounded font-black text-[9px] ${
+                                        student.lastActionResult === 'SUCCESS'
+                                          ? 'bg-emerald-100 text-emerald-800'
+                                          : student.lastActionResult === 'SKIPPED'
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : 'bg-rose-100 text-rose-800'
+                                      }`}
+                                    >
+                                      {student.lastActionResult || 'DONE'}
+                                    </span>
+                                    <span className="font-bold text-slate-700">{actionDef.name}</span>
+                                    <span className="text-[9px] text-slate-400 font-mono">({actionDef.categoryName})</span>
+                                  </div>
+                                );
+                              })()}
                               {student.lastActionMessage && (
                                 <p className="text-[11px] text-slate-500 truncate" title={student.lastActionMessage}>
                                   {student.lastActionMessage}
@@ -1224,6 +1244,13 @@ export default function MonitorFlowManager({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUBTAB 4: FLOW QUEUE & LIVE PROGRESS MONITOR */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'FLOW_QUEUE' && (
+        <FlowQueueMonitor currentUser={currentUser} selectedClass={selectedClass} />
       )}
 
       {/* ============================================================= */}

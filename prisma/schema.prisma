@@ -524,3 +524,67 @@ model MonitorFlowConfig {
   @@index([isEnabled])
 }
 
+// 23. Bảng MonitorFlowBatch: Phiên thực thi Flow hàng loạt
+model MonitorFlowBatch {
+  id               String                 @id @default(uuid())
+  classCode        String                 // Mã lớp
+  monitorUsername  String                 // Lớp trưởng phát lệnh
+  flowAction       String                 // 'REGISTER' | 'CANCEL' | 'SYNC_ALL_COURSES'
+  title            String                 // Tên đợt (Ví dụ: "Flow Đăng ký môn Tiếng Anh B1")
+  id_to_hoc        String?                // ID tổ học nếu là register/cancel
+  ma_mon           String?                // Mã môn
+  ten_mon          String?                // Tên môn
+  nhom_to          String?                // Nhóm tổ
+  totalItems       Int                    @default(0)
+  pendingCount     Int                    @default(0)
+  processingCount  Int                    @default(0)
+  successCount     Int                    @default(0)
+  failedCount      Int                    @default(0)
+  cancelledCount   Int                    @default(0)
+  status           String                 @default("PENDING") // PENDING | PROCESSING | COMPLETED | CANCELLED | PAUSED
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  queueItems       MonitorFlowQueueItem[]
+
+  @@index([classCode])
+  @@index([monitorUsername])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// 24. Bảng MonitorFlowQueueItem: Từng tác vụ trong hàng đợi xử lý cho từng sinh viên
+model MonitorFlowQueueItem {
+  id               String            @id @default(uuid())
+  batchId          String            // Thuộc batch nào
+  classCode        String            // Mã lớp
+  monitorUsername  String            // Lớp trưởng phát lệnh
+  followerUsername String            // Mã sinh viên thực hiện
+  followerName     String?           // Họ tên sinh viên
+  flowAction       String            // 'REGISTER' | 'CANCEL' | 'SYNC_ALL_COURSES'
+  id_to_hoc        String?           // ID tổ học
+  ma_mon           String?
+  ten_mon          String?
+  nhom_to          String?
+  sv_nganh         Int?              @default(1)
+  
+  status           String            @default("QUEUED") // QUEUED | RUNNING | SUCCESS | FAILED | CANCELLED | SKIPPED
+  attempts         Int               @default(0)
+  maxAttempts      Int               @default(3)
+  
+  resultMessage    String?           // Kết quả hoặc lỗi
+  resultData       String?           // JSON data chi tiết phản hồi từ QLDTTX
+  
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  
+  batch            MonitorFlowBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([followerUsername])
+  @@index([status])
+  @@index([createdAt])
+}
+
+

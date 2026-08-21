@@ -1,8 +1,12 @@
 export * from './types/class.types';
+export * from './types/flow.types';
 export { default as ClassMembers } from './components/ClassMembers';
 export { default as ClassMonitorTools } from './components/ClassMonitorTools';
 export { default as MonitorsList } from './components/MonitorsList';
 export { default as AllStudentsList } from './components/AllStudentsList';
 export { default as MonitorFlowManager } from './components/MonitorFlowManager';
+export { default as FlowQueueMonitor } from './components/FlowQueueMonitor';
 export * from './hooks/useMonitorFlow';
+export * from './hooks/useFlowQueue';
 export * from './server/monitorFlowServerService';
+export * from './server/monitorFlowQueueServerService';
