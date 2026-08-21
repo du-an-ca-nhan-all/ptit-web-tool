@@ -5,12 +5,9 @@ import { CalendarDays, RefreshCw, Layers, Power } from 'lucide-react';
 import { UserProfileScreen, AdminRegistrationManager } from '../../features/auth';
 import {
   UploadSection,
-  FilterBar,
-  DataTable,
   AllExamsSchedule,
   StudentPersonalExamSchedule,
   ExamBatchManagement,
-  ExamRoomMembers,
   type FilterState,
   type SortKey,
   type SortDirection,
