@@ -61,40 +61,7 @@ export default function NextExamCountdownCard({
   }, [exam?.isoDateTime]);
 
   if (!hasExam || !exam) {
-    return (
-      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm flex flex-col justify-between h-full relative overflow-hidden">
-        <div className="flex items-center justify-between gap-2 mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
-              <CalendarCheck2 className="w-4 h-4" />
-            </div>
-            <h3 className="font-bold text-slate-800 text-base sm:text-lg">Môn Thi Tiếp Theo</h3>
-          </div>
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            Đã hoàn thành
-          </span>
-        </div>
-
-        <div className="py-6 text-center flex flex-col items-center">
-          <div className="w-14 h-14 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center mb-3">
-            <CheckCircle2 className="w-7 h-7 text-emerald-500" />
-          </div>
-          <p className="text-sm font-bold text-slate-700">Không có môn thi sắp tới</p>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs">
-            Bạn hiện tại không có môn thi nào cần thi trong đợt này hoặc tất cả các môn đã thi xong.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={onNavigateToSchedule}
-          className="w-full py-2.5 px-4 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-2xl transition-colors border border-slate-200 flex items-center justify-center gap-2 cursor-pointer mt-2"
-        >
-          <span>Xem Lịch Thi Đầy Đủ</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    );
+    return null;
   }
 
   const isUrgent = exam.isToday || (exam.daysLeft === 0 && exam.hoursLeft <= 12);

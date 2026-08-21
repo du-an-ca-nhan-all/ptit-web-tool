@@ -14,16 +14,19 @@ function parseExamDateTime(ngayThi?: string | null, gioThi?: string | null): Dat
   const baseDate = parseDateString(ngayThi);
   if (!baseDate) return null;
 
-  if (gioThi && gioThi.includes(':')) {
-    const [h, m] = gioThi.split(':').map(Number);
-    if (!isNaN(h)) baseDate.setHours(h);
-    if (!isNaN(m)) baseDate.setMinutes(m);
-    baseDate.setSeconds(0);
-    baseDate.setMilliseconds(0);
-  } else {
-    baseDate.setHours(7, 30, 0, 0); // Default morning exam slot
+  if (gioThi) {
+    const match = gioThi.trim().match(/^(\d{1,2})[gGhH:](\d{1,2})/);
+    if (match) {
+      const h = Number(match[1]);
+      const m = Number(match[2]);
+      if (!isNaN(h) && !isNaN(m)) {
+        baseDate.setHours(h, m, 0, 0);
+        return baseDate;
+      }
+    }
   }
 
+  baseDate.setHours(7, 30, 0, 0); // Default morning exam slot
   return baseDate;
 }
 
@@ -130,7 +133,7 @@ export async function getDashboardData(username: string): Promise<DashboardData 
       return (a.examDateTime?.getTime() || 0) - (b.examDateTime?.getTime() || 0);
     });
 
-  const nextExamItem = futureExams[0] || (parsedExamsList.length > 0 ? parsedExamsList[0] : undefined);
+  const nextExamItem = futureExams[0];
 
   const nextExam = {
     hasExam: Boolean(nextExamItem),
@@ -138,7 +141,7 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     totalUpcomingExams: futureExams.length,
   };
 
-  const upcomingExams = parsedExamsList.map((e) => ({
+  const upcomingExams = futureExams.map((e) => ({
     id: e.id,
     subjectCode: e.subjectCode,
     subjectName: e.subjectName,

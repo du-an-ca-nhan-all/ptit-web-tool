@@ -95,12 +95,18 @@ export default function DashboardOverview({
         />
       )}
 
-      {/* 4. Main 3-Column Stats Grid (Exam Countdown, Timetable & Today's Classes, Academic Snapshot) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <NextExamCountdownCard
-          countdown={data.nextExam}
-          onNavigateToSchedule={() => onNavigateTab('personal_schedule')}
-        />
+      {/* 4. Main Stats Grid (Exam Countdown, Timetable & Today's Classes, Academic Snapshot) */}
+      <div
+        className={`grid grid-cols-1 gap-6 ${
+          data.nextExam.hasExam ? 'lg:grid-cols-3' : 'lg:grid-cols-2'
+        }`}
+      >
+        {data.nextExam.hasExam && (
+          <NextExamCountdownCard
+            countdown={data.nextExam}
+            onNavigateToSchedule={() => onNavigateTab('personal_schedule')}
+          />
+        )}
 
         <PersonalTimetableCard
           timetable={data.timetableSummary}
