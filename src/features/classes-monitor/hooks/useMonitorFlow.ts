@@ -7,7 +7,7 @@ import { FlowActionType } from '../types/flow.types';
 
 export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string) {
   const [selectedClass, setSelectedClass] = useState<string>(
-    initialClassCode || currentUser.lop || ''
+    currentUser.lop || initialClassCode || ''
   );
 
   const [students, setStudents] = useState<FollowerStudentItem[]>([]);

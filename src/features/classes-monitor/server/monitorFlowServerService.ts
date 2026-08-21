@@ -202,9 +202,20 @@ export async function getMonitorFlowList(
     },
   });
 
-  // 2. Lấy danh sách tất cả sinh viên thuộc lớp
+  // 2. Lấy danh sách sinh viên đang theo học (trangThai: DANG_HOC) và đã liên kết QLDTTX thuộc lớp
   const classStudents = await prisma.student.findMany({
-    where: { maLop: normClass },
+    where: {
+      maLop: normClass,
+      trangThai: 'DANG_HOC',
+      user: {
+        externalAccounts: {
+          some: {
+            systemKey: 'QLDTTX_PTTC1',
+            extUsername: { not: '' },
+          },
+        },
+      },
+    },
     include: {
       user: {
         include: {
@@ -271,7 +282,12 @@ export async function getMonitorFlowList(
   let configuredAccountsCount = 0;
 
   const students: FollowerStudentItem[] = classStudents
-    .filter((st) => st.maSV.toUpperCase() !== normMonitor) // Không bao gồm chính lớp trưởng trong danh sách follow
+    .filter((st) => {
+      if (st.maSV.toUpperCase() === normMonitor) return false;
+      const extAcc = st.user?.externalAccounts?.[0];
+      const isExtConfigured = Boolean(extAcc && extAcc.extUsername);
+      return isExtConfigured;
+    })
     .map((st) => {
       const maSVUpper = st.maSV.toUpperCase();
       const extAcc = st.user?.externalAccounts?.[0];
@@ -350,7 +366,10 @@ export async function pullClassCourseRegistrations(monitorUsername: string, clas
   const normClass = classCode.trim().toUpperCase();
 
   const classStudents = await prisma.student.findMany({
-    where: { maLop: normClass },
+    where: {
+      maLop: normClass,
+      trangThai: 'DANG_HOC',
+    },
     include: {
       user: {
         include: {
