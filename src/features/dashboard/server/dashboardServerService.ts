@@ -262,9 +262,9 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     botUsername: telConfig?.botUsername || null,
   };
 
-  // 7. Class Monitor Summary (if student is Monitor or assigned to a Class)
+  // 7. Class Monitor Summary (STRICTLY only for users with lop_truong role)
   let classMonitorSummary = undefined;
-  if (studentLop) {
+  if (isMonitor && studentLop) {
     const [totalClassStudents, activeAccountsCount, studentsWithExams, envelopesAssigned] =
       await Promise.all([
         prisma.student.count({ where: { maLop: studentLop } }),

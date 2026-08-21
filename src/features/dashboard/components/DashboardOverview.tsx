@@ -87,8 +87,8 @@ export default function DashboardOverview({
         />
       )}
 
-      {/* 3. Class Monitor Tools (if Monitor / Class Assigned) */}
-      {data.classMonitorSummary && (
+      {/* 3. Class Monitor Tools (Only if Monitor role) */}
+      {data.classMonitorSummary && data.classMonitorSummary.isMonitor && (
         <ClassMonitorDashboardCard
           summary={data.classMonitorSummary}
           onNavigateTab={onNavigateTab}
