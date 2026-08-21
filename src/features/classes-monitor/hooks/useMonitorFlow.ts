@@ -296,6 +296,66 @@ export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string
     }
   }, [selectedClass, currentUser.username]);
 
+  // Import danh sách sinh viên Flow từ file hoặc văn bản
+  const importFlowConfigs = useCallback(
+    async (options: {
+      mode: 'MERGE' | 'REPLACE';
+      items: Array<{
+        maSV: string;
+        hoTen?: string;
+        isEnabled?: boolean;
+        allowRegisterCourse?: boolean;
+        allowCancelCourse?: boolean;
+        autoSyncOnAction?: boolean;
+        note?: string;
+      }>;
+      defaultAllowRegister?: boolean;
+      defaultAllowCancel?: boolean;
+      defaultAutoSync?: boolean;
+    }) => {
+      setIsSaving(true);
+      setErrorMsg('');
+      setSuccessMsg('');
+
+      try {
+        const res = await fetch('/api/class-monitors/flow-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'IMPORT_CONFIG',
+            classCode: selectedClass,
+            monitorUsername: currentUser.username,
+            mode: options.mode,
+            items: options.items,
+            defaultAllowRegister: options.defaultAllowRegister ?? true,
+            defaultAllowCancel: options.defaultAllowCancel ?? true,
+            defaultAutoSync: options.defaultAutoSync ?? false,
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setSuccessMsg(data.message || 'Import danh sách sinh viên Flow thành công!');
+          if (data.students) setStudents(data.students);
+          if (data.monitorData) setMonitorData(data.monitorData);
+          setEditedConfigs({});
+          setTimeout(() => setSuccessMsg(''), 5000);
+          return { success: true, ...data };
+        } else {
+          setErrorMsg(data.error || 'Import danh sách sinh viên Flow thất bại');
+          return { success: false, error: data.error };
+        }
+      } catch (err: any) {
+        const msg = err.message || 'Lỗi mạng khi import cấu hình Flow';
+        setErrorMsg(msg);
+        return { success: false, error: msg };
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [selectedClass, currentUser.username]
+  );
+
   return {
     selectedClass,
     setSelectedClass,
@@ -319,5 +379,6 @@ export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string
     saveAllConfigs,
     executeFlow,
     pullAllCourses,
+    importFlowConfigs,
   };
 }

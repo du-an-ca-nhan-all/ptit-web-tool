@@ -38,12 +38,15 @@ import {
   Table,
   UserCheck,
   HelpCircle,
+  UploadCloud,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import { useMonitorFlow } from '../hooks/useMonitorFlow';
 import { CourseItem, FollowerStudentItem } from '../server/monitorFlowServerService';
 import { getFlowActionDefinition } from '../types/flow.types';
 import FlowQueueMonitor from './FlowQueueMonitor';
+import ImportFlowStudentsModal from './ImportFlowStudentsModal';
 
 interface MonitorFlowManagerProps {
   currentUser: LoginUser;
@@ -82,6 +85,7 @@ export default function MonitorFlowManager({
     saveAllConfigs,
     executeFlow,
     pullAllCourses,
+    importFlowConfigs,
   } = useMonitorFlow(currentUser, currentUser.lop || availableClasses[0] || '');
 
   // Sub-tabs: Default to 'ALL_COMPARE' so users instantly see the all-in-one comparison
@@ -100,6 +104,7 @@ export default function MonitorFlowManager({
   const [cancelTargetIdToHoc, setCancelTargetIdToHoc] = useState('');
 
   const [showSyncAllModal, setShowSyncAllModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Selected student for single drawer inspection
   const [inspectingStudent, setInspectingStudent] = useState<FollowerStudentItem | null>(null);
@@ -231,6 +236,17 @@ export default function MonitorFlowManager({
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isPullingCourses ? 'animate-spin text-indigo-600' : ''}`} />
             <span>{isPullingCourses ? 'Đang kéo QLDTTX...' : 'Kéo Môn Cả Lớp (QLDTTX)'}</span>
+          </button>
+
+          {/* Import Followers from CSV / Text */}
+          <button
+            onClick={() => setShowImportModal(true)}
+            disabled={isLoading}
+            className="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold rounded-2xl transition-colors border border-amber-200 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            title="Import danh sách sinh viên được Flow theo Lớp trưởng bằng file CSV hoặc nhập Text"
+          >
+            <UploadCloud className="w-3.5 h-3.5 text-amber-600" />
+            <span>Import Flow SV</span>
           </button>
 
           <button
@@ -385,6 +401,16 @@ export default function MonitorFlowManager({
               >
                 <BookOpen className="w-4 h-4" />
                 <span>Đồng Bộ Khớp 100% Cả Lớp</span>
+              </button>
+
+              <button
+                onClick={() => setShowImportModal(true)}
+                disabled={isLoading}
+                className="px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold rounded-2xl transition-all border border-amber-500/30 flex items-center gap-1.5 cursor-pointer"
+                title="Import danh sách sinh viên được Flow theo Lớp trưởng bằng file CSV hoặc nhập Text"
+              >
+                <UploadCloud className="w-4 h-4 text-amber-400" />
+                <span>Import Flow SV (CSV/Text)</span>
               </button>
 
               <button
@@ -887,6 +913,16 @@ export default function MonitorFlowManager({
                   <Trash2 className="w-4 h-4" />
                   <span>Flow Hủy Môn...</span>
                 </button>
+
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  disabled={isLoading}
+                  className="px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold rounded-2xl transition-all border border-amber-500/30 flex items-center gap-1.5 cursor-pointer"
+                  title="Import danh sách sinh viên Flow từ file hoặc text"
+                >
+                  <UploadCloud className="w-4 h-4 text-amber-400" />
+                  <span>Import Danh Sách Flow...</span>
+                </button>
               </div>
             </div>
           </div>
@@ -906,6 +942,14 @@ export default function MonitorFlowManager({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold rounded-xl transition-colors border border-amber-200 flex items-center gap-1 cursor-pointer"
+                  title="Import danh sách sinh viên bật flow từ file hoặc text"
+                >
+                  <UploadCloud className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Import Danh Sách</span>
+                </button>
                 <button
                   onClick={() => setAllFollowersStatus(true)}
                   className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-xl transition-colors cursor-pointer"
@@ -1699,6 +1743,22 @@ export default function MonitorFlowManager({
           </div>
         </div>
       )}
+
+      {/* ============================================================= */}
+      {/* MODAL 5: IMPORT FLOW STUDENTS FROM CSV/TEXT */}
+      {/* ============================================================= */}
+      <ImportFlowStudentsModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        selectedClass={selectedClass}
+        monitorUsername={monitorData?.username || currentUser.username}
+        monitorFullName={monitorData?.hoTen || currentUser.fullName}
+        existingClassStudents={students}
+        onConfirmImport={async (payload) => {
+          await importFlowConfigs(payload);
+        }}
+        isSubmitting={isLoading || isSaving}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import {
   getMonitorFlowList,
   saveMonitorFlowConfigs,
+  importMonitorFlowConfigs,
   executeMonitorFlowAction,
   pullClassCourseRegistrations,
 } from '@/src/features/classes-monitor/server/monitorFlowServerService';
@@ -113,7 +114,61 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. ACTION: EXECUTE_FLOW
+    // 2. ACTION: IMPORT_CONFIG (Import danh sách sinh viên theo Lớp trưởng bằng file CSV/Text)
+    if (action === 'IMPORT_CONFIG') {
+      const {
+        mode = 'MERGE', // 'MERGE' | 'REPLACE'
+        items = [],
+        defaultAllowRegister = true,
+        defaultAllowCancel = true,
+        defaultAutoSync = false,
+      } = body;
+
+      const importRes = await importMonitorFlowConfigs({
+        monitorUsername: normMonitor,
+        classCode: normClass,
+        mode: mode === 'REPLACE' ? 'REPLACE' : 'MERGE',
+        defaultAllowRegister: Boolean(defaultAllowRegister),
+        defaultAllowCancel: Boolean(defaultAllowCancel),
+        defaultAutoSync: Boolean(defaultAutoSync),
+        items: Array.isArray(items) ? items : [],
+      });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'IMPORT_MONITOR_FLOW_CONFIG',
+        targetType: 'MONITOR_FLOW',
+        targetId: normClass,
+        description: `Import danh sách Flow theo Lớp trưởng ${normMonitor} (${mode === 'REPLACE' ? 'Ghi đè/Reset cũ' : 'Thêm mới/Bổ sung'}): Đã kích hoạt ${importRes.enabledCount}/${importRes.totalImported} sinh viên`,
+        metadata: {
+          classCode: normClass,
+          monitorUsername: normMonitor,
+          mode,
+          totalImported: importRes.totalImported,
+          enabledCount: importRes.enabledCount,
+          replacedCount: importRes.replacedCount,
+        },
+      });
+
+      const updatedFlowData = await getMonitorFlowList(normMonitor, normClass);
+
+      return NextResponse.json({
+        success: true,
+        message: importRes.message,
+        importSummary: {
+          mode: importRes.mode,
+          totalImported: importRes.totalImported,
+          enabledCount: importRes.enabledCount,
+          replacedCount: importRes.replacedCount,
+        },
+        ...updatedFlowData,
+      });
+    }
+
+    // 3. ACTION: EXECUTE_FLOW
     if (action === 'EXECUTE_FLOW') {
       const isBatch = !targetFollowerUsernames || targetFollowerUsernames.length > 1;
 
