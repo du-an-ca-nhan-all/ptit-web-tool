@@ -6,6 +6,27 @@ import {
   fetchRegisteredCoursesFromQLDTTX,
 } from '@/src/features/external-portal/server/courseRegistrationServerService';
 
+export interface CourseItem {
+  id_to_hoc: string;
+  ma_mon: string;
+  ten_mon: string;
+  nhom_to: string;
+  so_tc: number;
+  lop?: string;
+  tkb?: string;
+  phai_dong?: number;
+  ngay_dang_ky?: string | null;
+  raw?: any;
+}
+
+export interface DiffSummary {
+  matchedCount: number;      // Số môn trùng mã môn & đúng nhóm tổ
+  diffGroupCount: number;    // Số môn trùng mã môn nhưng khác nhóm tổ
+  missingCount: number;      // Số môn Lớp trưởng có nhưng sinh viên chưa có
+  extraCount: number;        // Số môn sinh viên có nhưng Lớp trưởng không có
+  matchPercent: number;      // % Trùng khớp (0 - 100)
+}
+
 export interface FollowerStudentItem {
   maSV: string;
   hoTen: string;
@@ -22,6 +43,14 @@ export interface FollowerStudentItem {
   allowCancelCourse: boolean;
   autoSyncOnAction: boolean;
   note?: string | null;
+  // Registered Courses Info
+  totalCourses: number;
+  totalCredits: number;
+  tuitionFee: number;
+  lastPulledAt?: string | null;
+  courses: CourseItem[];
+  // Comparison vs Monitor
+  diffSummary: DiffSummary;
   // Last Action Record
   lastActionAt?: string | null;
   lastActionType?: string | null;
@@ -29,8 +58,117 @@ export interface FollowerStudentItem {
   lastActionMessage?: string | null;
 }
 
+export interface MonitorProfileData {
+  username: string;
+  hoTen: string;
+  maLop: string;
+  totalCourses: number;
+  totalCredits: number;
+  tuitionFee: number;
+  lastPulledAt?: string | null;
+  courses: CourseItem[];
+}
+
 /**
- * Lấy danh sách thành viên trong lớp kèm cấu hình Flow Action theo Lớp trưởng
+ * Trích xuất danh sách môn học từ chuỗi JSON CourseRegistration.data
+ */
+export function extractCourseListFromData(dataStr?: string | null): CourseItem[] {
+  if (!dataStr) return [];
+  try {
+    const parsed = JSON.parse(dataStr);
+    const rawList = parsed?.data?.ds_kqdkmh || parsed?.ds_kqdkmh || (Array.isArray(parsed) ? parsed : []);
+    return rawList
+      .map((item: any) => {
+        const toHoc = item.to_hoc || item;
+        const maMon = toHoc.ma_mon || toHoc.MaMH || '';
+        const idToHoc = String(toHoc.id_to_hoc || item.id_to_hoc || '').trim();
+        if (!maMon && !idToHoc) return null;
+
+        return {
+          id_to_hoc: idToHoc,
+          ma_mon: maMon,
+          ten_mon: toHoc.ten_mon || toHoc.TenMH || maMon,
+          nhom_to: String(toHoc.nhom_to || toHoc.NhomHoc || '').trim(),
+          so_tc: Number(toHoc.so_tc) || Number(toHoc.so_tc_hp) || 0,
+          lop: toHoc.lop || toHoc.Lop || '',
+          tkb: toHoc.tkb || '',
+          phai_dong: Number(toHoc.phai_dong) || Number(item.hoc_phi_tam_tinh) || 0,
+          ngay_dang_ky: item.ngay_dang_ky || null,
+          raw: item,
+        };
+      })
+      .filter(Boolean) as CourseItem[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Tính toán so sánh môn học giữa Lớp trưởng và Sinh viên
+ */
+export function calculateCourseDiff(monitorCourses: CourseItem[], followerCourses: CourseItem[]): DiffSummary {
+  const monitorMapByCode = new Map<string, CourseItem>();
+  monitorCourses.forEach((c) => {
+    const code = String(c.ma_mon || '').trim().toUpperCase();
+    if (code) monitorMapByCode.set(code, c);
+  });
+
+  const followerMapByCode = new Map<string, CourseItem>();
+  followerCourses.forEach((c) => {
+    const code = String(c.ma_mon || '').trim().toUpperCase();
+    if (code) followerMapByCode.set(code, c);
+  });
+
+  let matchedCount = 0;
+  let diffGroupCount = 0;
+  let missingCount = 0;
+  let extraCount = 0;
+
+  // So sánh môn của Lớp trưởng với Sinh viên
+  monitorMapByCode.forEach((monCourse, code) => {
+    const folCourse = followerMapByCode.get(code);
+    if (!folCourse) {
+      missingCount++; // Sinh viên chưa đăng ký môn này
+    } else {
+      const monGroup = String(monCourse.nhom_to || '').trim().toUpperCase();
+      const folGroup = String(folCourse.nhom_to || '').trim().toUpperCase();
+      const monId = String(monCourse.id_to_hoc || '').trim();
+      const folId = String(folCourse.id_to_hoc || '').trim();
+
+      if ((monId && folId && monId === folId) || (monGroup && folGroup && monGroup === folGroup)) {
+        matchedCount++; // Trùng cả mã môn và nhóm tổ
+      } else {
+        diffGroupCount++; // Trùng mã môn nhưng lệch nhóm tổ
+      }
+    }
+  });
+
+  // Môn sinh viên đăng ký mà Lớp trưởng không có
+  followerMapByCode.forEach((_, code) => {
+    if (!monitorMapByCode.has(code)) {
+      extraCount++;
+    }
+  });
+
+  const totalMon = monitorCourses.length;
+  const matchPercent =
+    totalMon > 0
+      ? Math.round((matchedCount / totalMon) * 100)
+      : followerCourses.length === 0
+      ? 100
+      : 0;
+
+  return {
+    matchedCount,
+    diffGroupCount,
+    missingCount,
+    extraCount,
+    matchPercent,
+  };
+}
+
+/**
+ * Lấy danh sách thành viên trong lớp kèm cấu hình Flow Action và Dữ liệu So Sánh Môn Học
  */
 export async function getMonitorFlowList(
   monitorUsername: string,
@@ -38,6 +176,7 @@ export async function getMonitorFlowList(
 ): Promise<{
   monitorUsername: string;
   classCode: string;
+  monitorData: MonitorProfileData | null;
   totalStudents: number;
   activeFollowersCount: number;
   configuredAccountsCount: number;
@@ -46,7 +185,19 @@ export async function getMonitorFlowList(
   const normMonitor = monitorUsername.trim().toUpperCase();
   const normClass = classCode.trim().toUpperCase();
 
-  // 1. Lấy danh sách tất cả sinh viên thuộc lớp
+  // 1. Lấy thông tin lớp trưởng
+  const monitorStudent = await prisma.student.findFirst({
+    where: { maSV: normMonitor },
+    include: {
+      user: {
+        include: {
+          externalAccounts: { where: { systemKey: 'QLDTTX_PTTC1' } },
+        },
+      },
+    },
+  });
+
+  // 2. Lấy danh sách tất cả sinh viên thuộc lớp
   const classStudents = await prisma.student.findMany({
     where: { maLop: normClass },
     include: {
@@ -61,7 +212,7 @@ export async function getMonitorFlowList(
     orderBy: { ten: 'asc' },
   });
 
-  // 2. Lấy danh sách cấu hình flow đã lưu
+  // 3. Lấy cấu hình flow
   const existingConfigs = await prisma.monitorFlowConfig.findMany({
     where: {
       classCode: normClass,
@@ -73,6 +224,43 @@ export async function getMonitorFlowList(
   existingConfigs.forEach((cfg) => {
     configMap.set(cfg.followerUsername.toUpperCase(), cfg);
   });
+
+  // 4. Lấy dữ liệu CourseRegistration đã lưu cho cả lớp
+  const registrations = await prisma.courseRegistration.findMany({
+    where: { classCode: normClass },
+  });
+
+  const regMap = new Map<string, any>();
+  registrations.forEach((r) => {
+    regMap.set(r.username.toUpperCase(), r);
+  });
+
+  // Trích xuất môn học của Lớp trưởng
+  const monitorReg = regMap.get(normMonitor);
+  const monitorCourses = extractCourseListFromData(monitorReg?.data);
+  const monitorFullName =
+    monitorStudent?.hoTen || `${monitorStudent?.hoLot || ''} ${monitorStudent?.ten || ''}`.trim() || normMonitor;
+
+  let monitorTotalCredits = monitorReg?.totalCredits || 0;
+  let monitorTuitionFee = monitorReg?.tuitionFee || 0;
+
+  if (monitorCourses.length > 0 && monitorTotalCredits === 0) {
+    monitorTotalCredits = monitorCourses.reduce((acc, cur) => acc + (cur.so_tc || 0), 0);
+  }
+  if (monitorCourses.length > 0 && monitorTuitionFee === 0) {
+    monitorTuitionFee = monitorCourses.reduce((acc, cur) => acc + (cur.phai_dong || 0), 0);
+  }
+
+  const monitorData: MonitorProfileData = {
+    username: normMonitor,
+    hoTen: monitorFullName,
+    maLop: normClass,
+    totalCourses: monitorCourses.length,
+    totalCredits: monitorTotalCredits,
+    tuitionFee: monitorTuitionFee,
+    lastPulledAt: monitorReg?.lastPulledAt?.toISOString() || null,
+    courses: monitorCourses,
+  };
 
   let activeFollowersCount = 0;
   let configuredAccountsCount = 0;
@@ -95,6 +283,22 @@ export async function getMonitorFlowList(
 
       const isStudentMonitor = Boolean(st.user?.role?.includes('lop_truong'));
 
+      // Course Registration data
+      const studentReg = regMap.get(maSVUpper);
+      const followerCourses = extractCourseListFromData(studentReg?.data);
+      let totalCredits = studentReg?.totalCredits || 0;
+      let tuitionFee = studentReg?.tuitionFee || 0;
+
+      if (followerCourses.length > 0 && totalCredits === 0) {
+        totalCredits = followerCourses.reduce((acc, cur) => acc + (cur.so_tc || 0), 0);
+      }
+      if (followerCourses.length > 0 && tuitionFee === 0) {
+        tuitionFee = followerCourses.reduce((acc, cur) => acc + (cur.phai_dong || 0), 0);
+      }
+
+      // Calculate diff vs monitor
+      const diffSummary = calculateCourseDiff(monitorCourses, followerCourses);
+
       return {
         maSV: st.maSV,
         hoTen: st.hoTen || `${st.hoLot || ''} ${st.ten || ''}`.trim() || st.maSV,
@@ -109,6 +313,12 @@ export async function getMonitorFlowList(
         allowCancelCourse,
         autoSyncOnAction,
         note: cfg?.note || null,
+        totalCourses: followerCourses.length,
+        totalCredits,
+        tuitionFee,
+        lastPulledAt: studentReg?.lastPulledAt?.toISOString() || null,
+        courses: followerCourses,
+        diffSummary,
         lastActionAt: cfg?.lastActionAt?.toISOString() || null,
         lastActionType: cfg?.lastActionType || null,
         lastActionResult: cfg?.lastActionResult || null,
@@ -119,11 +329,93 @@ export async function getMonitorFlowList(
   return {
     monitorUsername: normMonitor,
     classCode: normClass,
+    monitorData,
     totalStudents: students.length,
     activeFollowersCount,
     configuredAccountsCount,
     students,
   };
+}
+
+/**
+ * Kéo dữ liệu ĐKMH mới nhất từ Cổng QLDTTX cho Lớp trưởng và tất cả thành viên trong lớp
+ */
+export async function pullClassCourseRegistrations(monitorUsername: string, classCode: string) {
+  const normMonitor = monitorUsername.trim().toUpperCase();
+  const normClass = classCode.trim().toUpperCase();
+
+  const classStudents = await prisma.student.findMany({
+    where: { maLop: normClass },
+    include: {
+      user: {
+        include: {
+          externalAccounts: {
+            where: { systemKey: 'QLDTTX_PTTC1' },
+          },
+        },
+      },
+    },
+  });
+
+  let pulledCount = 0;
+  let failCount = 0;
+
+  for (const st of classStudents) {
+    const extAcc = st.user?.externalAccounts?.[0];
+    if (!extAcc || !extAcc.extUsername || !extAcc.extPassword) continue;
+
+    try {
+      const res = await fetchRegisteredCoursesFromQLDTTX({
+        username: extAcc.extUsername,
+        password: extAcc.extPassword,
+        token: extAcc.token,
+      });
+
+      if (res.newToken && res.newToken !== extAcc.token) {
+        await prisma.externalAccount.update({
+          where: { id: extAcc.id },
+          data: { token: res.newToken, lastSyncAt: new Date() },
+        });
+      }
+
+      const totalCredits = res.totalCredits || 0;
+      const tuitionFee = res.tuitionFee || 0;
+      const totalCourses = res.totalCourses || (res.ds_kqdkmh || []).length;
+      const rawDataJson = JSON.stringify(res.rawResponse || { data: { ds_kqdkmh: res.ds_kqdkmh } });
+
+      await prisma.courseRegistration.upsert({
+        where: {
+          classCode_username: {
+            classCode: normClass,
+            username: st.maSV.toUpperCase(),
+          },
+        },
+        create: {
+          classCode: normClass,
+          username: st.maSV.toUpperCase(),
+          data: rawDataJson,
+          totalCourses,
+          totalCredits,
+          tuitionFee,
+          lastPulledAt: new Date(),
+        },
+        update: {
+          data: rawDataJson,
+          totalCourses,
+          totalCredits,
+          tuitionFee,
+          lastPulledAt: new Date(),
+        },
+      });
+
+      pulledCount++;
+    } catch (err) {
+      failCount++;
+      console.error(`Lỗi khi kéo môn học cho ${st.maSV}:`, err);
+    }
+  }
+
+  return { success: true, pulledCount, failCount };
 }
 
 /**
@@ -322,7 +614,6 @@ export async function executeMonitorFlowAction(options: {
 
         const res = await registerCourseGroupQLDTTX(creds, {
           id_to_hoc: options.id_to_hoc,
-          id_rs: options.id_rs,
           sv_nganh: svNganh,
         });
 

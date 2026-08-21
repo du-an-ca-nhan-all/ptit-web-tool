@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { LoginUser } from '../../../types';
-import { FollowerStudentItem } from '../server/monitorFlowServerService';
+import { FollowerStudentItem, MonitorProfileData } from '../server/monitorFlowServerService';
 
 export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string) {
   const [selectedClass, setSelectedClass] = useState<string>(
@@ -10,9 +10,11 @@ export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string
   );
 
   const [students, setStudents] = useState<FollowerStudentItem[]>([]);
+  const [monitorData, setMonitorData] = useState<MonitorProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isPullingCourses, setIsPullingCourses] = useState(false);
 
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -52,6 +54,7 @@ export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string
 
       if (res.ok && data.success) {
         setStudents(data.students || []);
+        setMonitorData(data.monitorData || null);
         // Reset local edits
         setEditedConfigs({});
       } else {
@@ -259,13 +262,48 @@ export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string
     }
   }, [hasUnsavedChanges, saveAllConfigs, selectedClass, currentUser.username, fetchFlowData]);
 
+  // Kéo dữ liệu ĐKMH mới nhất từ QLDTTX cho toàn bộ tài khoản trong lớp
+  const pullAllCourses = useCallback(async () => {
+    setIsPullingCourses(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const res = await fetch('/api/class-monitors/flow-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'PULL_COURSES',
+          classCode: selectedClass,
+          monitorUsername: currentUser.username,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg(data.message || 'Đã kéo dữ liệu ĐKMH mới nhất từ QLDTTX thành công!');
+        if (data.students) setStudents(data.students);
+        if (data.monitorData) setMonitorData(data.monitorData);
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        setErrorMsg(data.error || 'Kéo dữ liệu ĐKMH thất bại');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Lỗi mạng khi kéo dữ liệu ĐKMH');
+    } finally {
+      setIsPullingCourses(false);
+    }
+  }, [selectedClass, currentUser.username]);
+
   return {
     selectedClass,
     setSelectedClass,
     students: combinedStudents,
+    monitorData,
     isLoading,
     isSaving,
     isExecuting,
+    isPullingCourses,
     successMsg,
     setSuccessMsg,
     errorMsg,
@@ -279,5 +317,6 @@ export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string
     setAllPermissions,
     saveAllConfigs,
     executeFlow,
+    pullAllCourses,
   };
 }

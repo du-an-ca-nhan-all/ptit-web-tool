@@ -21,20 +21,36 @@ import {
   Globe,
   Lock,
   ChevronDown,
+  ChevronRight,
   Layers,
   ArrowRight,
   BookOpen,
   Send,
   AlertTriangle,
+  ArrowLeftRight,
+  BarChart3,
+  Calendar,
+  DollarSign,
+  Plus,
+  Flame,
+  Sparkles,
+  LayoutGrid,
+  Table,
+  UserCheck,
+  HelpCircle,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import { useMonitorFlow } from '../hooks/useMonitorFlow';
+import { CourseItem, FollowerStudentItem } from '../server/monitorFlowServerService';
 
 interface MonitorFlowManagerProps {
   currentUser: LoginUser;
   availableClasses?: string[];
   onNavigateTab?: (tab: string, subTab?: string) => void;
 }
+
+type MainSubTab = 'ALL_COMPARE' | 'FLOW_CONFIG' | 'MONITOR_COURSES';
+type CompareFilter = 'ALL' | 'ACTIVE_FLOW' | 'NEEDS_ATTENTION' | 'MATCHED_100' | 'NOT_LINKED';
 
 export default function MonitorFlowManager({
   currentUser,
@@ -45,9 +61,11 @@ export default function MonitorFlowManager({
     selectedClass,
     setSelectedClass,
     students,
+    monitorData,
     isLoading,
     isSaving,
     isExecuting,
+    isPullingCourses,
     successMsg,
     setSuccessMsg,
     errorMsg,
@@ -61,15 +79,19 @@ export default function MonitorFlowManager({
     setAllPermissions,
     saveAllConfigs,
     executeFlow,
+    pullAllCourses,
   } = useMonitorFlow(currentUser, currentUser.lop || availableClasses[0] || '');
 
+  // Sub-tabs: Default to 'ALL_COMPARE' so users instantly see the all-in-one comparison
+  const [activeSubTab, setActiveSubTab] = useState<MainSubTab>('ALL_COMPARE');
+
+  // Matrix Filter
+  const [compareFilter, setCompareFilter] = useState<CompareFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterMode, setFilterMode] = useState<'ALL' | 'ACTIVE' | 'INACTIVE' | 'LINKED' | 'NOT_LINKED'>('ALL');
 
   // Quick Trigger Modal States
   const [showQuickRegisterModal, setShowQuickRegisterModal] = useState(false);
   const [quickTargetIdToHoc, setQuickTargetIdToHoc] = useState('');
-  const [quickTargetSubjectCode, setQuickTargetSubjectCode] = useState('');
   const [quickTargetGroupName, setQuickTargetGroupName] = useState('');
 
   const [showQuickCancelModal, setShowQuickCancelModal] = useState(false);
@@ -77,11 +99,29 @@ export default function MonitorFlowManager({
 
   const [showSyncAllModal, setShowSyncAllModal] = useState(false);
 
+  // Selected student for single drawer inspection
+  const [inspectingStudent, setInspectingStudent] = useState<FollowerStudentItem | null>(null);
+
   // Statistics
   const activeFollowersCount = useMemo(() => students.filter((s) => s.isEnabled).length, [students]);
   const linkedAccountsCount = useMemo(() => students.filter((s) => s.isExternalConfigured).length, [students]);
 
-  // Filtered students
+  // Monitor's courses
+  const monitorCourses: CourseItem[] = useMemo(() => monitorData?.courses || [], [monitorData]);
+
+  // Students who match 100%
+  const matched100Count = useMemo(() => {
+    if (monitorCourses.length === 0) return 0;
+    return students.filter((s) => s.diffSummary?.matchPercent === 100).length;
+  }, [students, monitorCourses]);
+
+  // Students who need attention (have flow enabled or linked, but < 100% match)
+  const needsAttentionCount = useMemo(() => {
+    if (monitorCourses.length === 0) return 0;
+    return students.filter((s) => (s.isEnabled || s.isExternalConfigured) && s.diffSummary?.matchPercent < 100).length;
+  }, [students, monitorCourses]);
+
+  // Filtered students for ALL Comparison Matrix
   const filteredStudents = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return students.filter((st) => {
@@ -93,14 +133,16 @@ export default function MonitorFlowManager({
 
       if (!matchQuery) return false;
 
-      if (filterMode === 'ACTIVE') return st.isEnabled;
-      if (filterMode === 'INACTIVE') return !st.isEnabled;
-      if (filterMode === 'LINKED') return st.isExternalConfigured;
-      if (filterMode === 'NOT_LINKED') return !st.isExternalConfigured;
+      if (compareFilter === 'ACTIVE_FLOW') return st.isEnabled;
+      if (compareFilter === 'NEEDS_ATTENTION') {
+        return (st.isEnabled || st.isExternalConfigured) && st.diffSummary?.matchPercent < 100;
+      }
+      if (compareFilter === 'MATCHED_100') return st.diffSummary?.matchPercent === 100;
+      if (compareFilter === 'NOT_LINKED') return !st.isExternalConfigured;
 
       return true;
     });
-  }, [students, searchQuery, filterMode]);
+  }, [students, searchQuery, compareFilter]);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -139,14 +181,19 @@ export default function MonitorFlowManager({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
-                  Cấu Hình Flow Action Theo Lớp Trưởng
+                  Cấu Hình Flow Action & So Sánh Môn Học
                 </h1>
                 <span className="bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold px-2.5 py-0.5 rounded-full">
                   Lớp Trưởng Tool
                 </span>
               </div>
               <p className="text-slate-500 text-xs sm:text-sm mt-1">
-                Lớp trưởng: <strong className="text-amber-700 font-mono">{currentUser.fullName || currentUser.username}</strong> ({currentUser.username})
+                Lớp trưởng: <strong className="text-amber-700 font-mono">{monitorData?.hoTen || currentUser.fullName || currentUser.username}</strong> ({currentUser.username})
+                {monitorCourses.length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 bg-indigo-50 text-indigo-700 font-bold rounded-lg text-xs border border-indigo-100">
+                    Đã đăng ký {monitorCourses.length} môn ({monitorData?.totalCredits || 0} TC)
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -173,6 +220,17 @@ export default function MonitorFlowManager({
             </select>
           )}
 
+          {/* Pull live courses from QLDTTX for whole class */}
+          <button
+            onClick={pullAllCourses}
+            disabled={isPullingCourses || isLoading}
+            className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-2xl transition-colors border border-indigo-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Kéo và cập nhật dữ liệu môn học trực tiếp từ Cổng QLDTTX cho toàn bộ tài khoản trong lớp"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isPullingCourses ? 'animate-spin text-indigo-600' : ''}`} />
+            <span>{isPullingCourses ? 'Đang kéo QLDTTX...' : 'Kéo Môn Cả Lớp (QLDTTX)'}</span>
+          </button>
+
           <button
             onClick={() => fetchFlowData(selectedClass)}
             disabled={isLoading}
@@ -198,362 +256,1126 @@ export default function MonitorFlowManager({
         </div>
       </div>
 
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Tổng Sinh Viên Lớp</div>
-            <div className="text-2xl font-black text-slate-800 mt-0.5">
-              {students.length} <span className="text-xs font-normal text-slate-400">thành viên</span>
-            </div>
-            <div className="text-[11px] text-indigo-600 font-bold mt-0.5">Lớp {selectedClass}</div>
-          </div>
-        </div>
+      {/* Main Sub-tabs Navigation */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200 w-full sm:w-fit overflow-x-auto">
+        <button
+          onClick={() => setActiveSubTab('ALL_COMPARE')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all shrink-0 cursor-pointer ${
+            activeSubTab === 'ALL_COMPARE'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Table className="w-4 h-4 text-indigo-600" />
+          <span>Bảng So Sánh Toàn Bộ Thành Viên Flow</span>
+          {monitorCourses.length > 0 && (
+            <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded-md text-[10px] font-black">
+              {students.length} bạn
+            </span>
+          )}
+        </button>
 
-        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <GitFork className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Đang Bật Flow Action</div>
-            <div className="text-2xl font-black text-amber-600 mt-0.5">
-              {activeFollowersCount} <span className="text-xs font-normal text-slate-400">/ {students.length}</span>
-            </div>
-            <div className="text-[11px] text-amber-700 font-bold mt-0.5">Sẽ tự động hành động theo</div>
-          </div>
-        </div>
+        <button
+          onClick={() => setActiveSubTab('FLOW_CONFIG')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all shrink-0 cursor-pointer ${
+            activeSubTab === 'FLOW_CONFIG'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <GitFork className="w-4 h-4 text-amber-500" />
+          <span>Cấu Hình Flow Thành Viên</span>
+          <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded-md text-[10px] font-black">
+            {activeFollowersCount}
+          </span>
+        </button>
 
-        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <Globe className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Đã Liên Kết QLDTTX</div>
-            <div className="text-2xl font-black text-emerald-700 mt-0.5">
-              {linkedAccountsCount} <span className="text-xs font-normal text-slate-400">/ {students.length}</span>
-            </div>
-            <div className="text-[11px] text-emerald-700 font-bold mt-0.5">Sẵn sàng chạy tự động</div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-            <Lock className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Chưa Cấu Hình QLDTTX</div>
-            <div className="text-2xl font-black text-rose-600 mt-0.5">
-              {students.length - linkedAccountsCount} <span className="text-xs font-normal text-slate-400">bạn</span>
-            </div>
-            <div className="text-[11px] text-rose-600 font-bold mt-0.5">Cần nhắc cấu hình tài khoản</div>
-          </div>
-        </div>
+        <button
+          onClick={() => setActiveSubTab('MONITOR_COURSES')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all shrink-0 cursor-pointer ${
+            activeSubTab === 'MONITOR_COURSES'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <BookOpen className="w-4 h-4 text-emerald-600" />
+          <span>Môn Lớp Trưởng Đã Đăng Ký ({monitorCourses.length})</span>
+        </button>
       </div>
 
-      {/* Quick Flow Actions Launcher Card */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-7 border border-slate-800 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-amber-400 fill-current" />
-              <h3 className="font-black text-base sm:text-lg text-white">
-                Bắn Lệnh Flow Action Cho Cả Lớp
-              </h3>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Thực thi đồng loạt cho <strong className="text-amber-300">{activeFollowersCount} thành viên</strong> đang bật Flow Action
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {/* Action 1: Sync All courses */}
-            <button
-              onClick={() => setShowSyncAllModal(true)}
-              disabled={isExecuting || activeFollowersCount === 0}
-              className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black rounded-2xl transition-all shadow-md shadow-emerald-900/40 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>Đồng Bộ Tất Cả Môn Của Lớp Trưởng</span>
-            </button>
-
-            {/* Action 2: Quick Register specific group */}
-            <button
-              onClick={() => setShowQuickRegisterModal(true)}
-              disabled={isExecuting || activeFollowersCount === 0}
-              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black rounded-2xl transition-all shadow-md shadow-orange-900/40 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <Zap className="w-4 h-4 fill-current" />
-              <span>Flow Đăng Ký Môn...</span>
-            </button>
-
-            {/* Action 3: Quick Cancel specific group */}
-            <button
-              onClick={() => setShowQuickCancelModal(true)}
-              disabled={isExecuting || activeFollowersCount === 0}
-              className="px-4 py-2.5 bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold rounded-2xl transition-all border border-rose-500/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Flow Hủy Môn...</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Table: Configuration of Class Members */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-        {/* Table Toolbar */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-50/50">
-          {/* Search Box */}
-          <div className="relative w-full md:max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo mã SV, họ tên, số điện thoại..."
-              className="w-full bg-white border border-slate-200 rounded-2xl pl-9.5 pr-4 py-2 text-xs text-slate-800 focus:ring-2 focus:ring-amber-500 outline-none"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter & Batch Actions */}
-          <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
-            <div className="flex items-center bg-slate-100 p-1 rounded-2xl text-xs font-bold text-slate-600">
-              <button
-                onClick={() => setFilterMode('ALL')}
-                className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
-                  filterMode === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
-                }`}
-              >
-                Tất Cả ({students.length})
-              </button>
-              <button
-                onClick={() => setFilterMode('ACTIVE')}
-                className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
-                  filterMode === 'ACTIVE' ? 'bg-amber-600 text-white shadow-xs' : 'hover:text-slate-900'
-                }`}
-              >
-                Bật Flow ({activeFollowersCount})
-              </button>
-              <button
-                onClick={() => setFilterMode('LINKED')}
-                className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
-                  filterMode === 'LINKED' ? 'bg-emerald-600 text-white shadow-xs' : 'hover:text-slate-900'
-                }`}
-              >
-                Đã Liên Kết ({linkedAccountsCount})
-              </button>
-              <button
-                onClick={() => setFilterMode('NOT_LINKED')}
-                className={`px-3 py-1 rounded-xl transition-all cursor-pointer ${
-                  filterMode === 'NOT_LINKED' ? 'bg-rose-600 text-white shadow-xs' : 'hover:text-slate-900'
-                }`}
-              >
-                Chưa Liên Kết ({students.length - linkedAccountsCount})
-              </button>
+      {/* ========================================================================= */}
+      {/* SUBTAB 1 (PRIMARY): ALL-IN-ONE COMPARISON MATRIX TABLE FOR ALL MEMBERS */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'ALL_COMPARE' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm">
+              <div className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Tổng Môn Lớp Trưởng</div>
+              <div className="text-2xl font-black text-indigo-700 mt-1">
+                {monitorCourses.length} <span className="text-xs font-normal text-slate-400">môn</span>
+              </div>
+              <div className="text-[11px] text-indigo-600 font-bold mt-0.5">
+                {monitorData?.totalCredits || 0} Tín chỉ chuẩn
+              </div>
             </div>
 
-            {/* Bulk set all */}
-            <div className="flex items-center gap-1">
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm">
+              <div className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Đã Khớp 100% Môn</div>
+              <div className="text-2xl font-black text-emerald-700 mt-1">
+                {matched100Count} <span className="text-xs font-normal text-slate-400">/ {students.length} bạn</span>
+              </div>
+              <div className="text-[11px] text-emerald-700 font-bold mt-0.5">
+                🟢 Học chung toàn bộ ca học
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm">
+              <div className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Cần Đồng Bộ (Lệch/Thiếu)</div>
+              <div className="text-2xl font-black text-amber-600 mt-1">
+                {needsAttentionCount} <span className="text-xs font-normal text-slate-400">bạn</span>
+              </div>
+              <div className="text-[11px] text-amber-700 font-bold mt-0.5">
+                🟡 / 🔴 Cần bấm đồng bộ ngay
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm">
+              <div className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Đang Bật Flow Action</div>
+              <div className="text-2xl font-black text-slate-800 mt-1">
+                {activeFollowersCount} <span className="text-xs font-normal text-slate-400">/ {students.length} bạn</span>
+              </div>
+              <div className="text-[11px] text-slate-500 font-bold mt-0.5">
+                {linkedAccountsCount} bạn đã liên kết QLDTTX
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Action Bar: Đồng Bộ 2 Chiều Cả Lớp & Kéo QLDTTX */}
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-5 sm:p-6 border border-slate-800 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <h3 className="font-black text-base text-white">Đồng Bộ 2 Chiều Toàn Diện Cho Cả Lớp</h3>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Tự động Đăng ký môn thiếu và Hủy môn thừa cho <strong className="text-amber-300">{activeFollowersCount} bạn</strong> đang bật Flow để khớp 100% với Lớp trưởng
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5 flex-wrap">
               <button
-                onClick={() => setAllFollowersStatus(true)}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-xl transition-colors cursor-pointer"
-                title="Bật Flow cho tất cả thành viên trong lớp"
+                onClick={() => setShowSyncAllModal(true)}
+                disabled={isExecuting || activeFollowersCount === 0}
+                className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black rounded-2xl transition-all shadow-md shadow-emerald-900/40 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
-                Bật Tất Cả
+                <BookOpen className="w-4 h-4" />
+                <span>Đồng Bộ Khớp 100% Cả Lớp</span>
               </button>
+
               <button
-                onClick={() => setAllFollowersStatus(false)}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-xl transition-colors cursor-pointer"
-                title="Tắt Flow cho tất cả thành viên trong lớp"
+                onClick={pullAllCourses}
+                disabled={isPullingCourses || isLoading}
+                className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-2xl transition-all border border-white/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
-                Tắt Tất Cả
+                <RefreshCw className={`w-3.5 h-3.5 ${isPullingCourses ? 'animate-spin' : ''}`} />
+                <span>{isPullingCourses ? 'Đang kéo QLDTTX...' : 'Cập Nhật Mới Từ QLDTTX'}</span>
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Table Content */}
-        <div className="overflow-x-auto">
-          {isLoading ? (
-            <div className="py-20 flex flex-col items-center justify-center gap-3">
-              <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs text-slate-500 font-bold">Đang tải danh sách thành viên và cấu hình Flow...</p>
+          {/* All-in-One Matrix Table Container */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            {/* Filter Toolbar */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-slate-50/50">
+              {/* Search Box */}
+              <div className="relative w-full lg:max-w-xs">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Tìm sinh viên theo mã SV, họ tên..."
+                  className="w-full bg-white border border-slate-200 rounded-2xl pl-9.5 pr-4 py-2 text-xs text-slate-800 focus:ring-2 focus:ring-amber-500 outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Filter Buttons */}
+              <div className="flex items-center gap-1.5 flex-wrap w-full lg:w-auto">
+                <button
+                  onClick={() => setCompareFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    compareFilter === 'ALL'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Tất Cả ({students.length})
+                </button>
+
+                <button
+                  onClick={() => setCompareFilter('NEEDS_ATTENTION')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    compareFilter === 'NEEDS_ATTENTION'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                  }`}
+                >
+                  <Flame className="w-3.5 h-3.5" />
+                  <span>Cần Xử Lý Lệch/Thiếu ({needsAttentionCount})</span>
+                </button>
+
+                <button
+                  onClick={() => setCompareFilter('ACTIVE_FLOW')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    compareFilter === 'ACTIVE_FLOW'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                  }`}
+                >
+                  Đang Bật Flow ({activeFollowersCount})
+                </button>
+
+                <button
+                  onClick={() => setCompareFilter('MATCHED_100')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    compareFilter === 'MATCHED_100'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  }`}
+                >
+                  Đã Khớp 100% ({matched100Count})
+                </button>
+
+                <button
+                  onClick={() => setCompareFilter('NOT_LINKED')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    compareFilter === 'NOT_LINKED'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                  }`}
+                >
+                  Chưa Có TK QLDTTX ({students.length - linkedAccountsCount})
+                </button>
+              </div>
             </div>
-          ) : filteredStudents.length === 0 ? (
-            <div className="py-20 text-center flex flex-col items-center justify-center gap-2 text-slate-400">
-              <Users className="w-8 h-8 text-slate-300" />
-              <p className="text-sm font-bold text-slate-700">Không tìm thấy sinh viên nào</p>
-              <p className="text-xs text-slate-400">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc.</p>
+
+            {/* Legend Guidance */}
+            <div className="px-5 py-2.5 bg-slate-100/50 border-b border-slate-200 flex items-center gap-4 text-[11px] font-bold text-slate-600 flex-wrap">
+              <span className="text-slate-400 uppercase text-[10px]">Chú thích ký hiệu:</span>
+              <span className="flex items-center gap-1 text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                <Check className="w-3 h-3 text-emerald-600" /> Trùng Khớp 100% (Cùng nhóm & TKB)
+              </span>
+              <span className="flex items-center gap-1 text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                <AlertTriangle className="w-3 h-3 text-amber-600" /> Lệch Nhóm Tổ
+              </span>
+              <span className="flex items-center gap-1 text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                <X className="w-3 h-3 text-rose-600" /> Chưa Đăng Ký
+              </span>
+              <span className="flex items-center gap-1 text-purple-800 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                🟣 Môn Thừa Ngoài Danh Sách
+              </span>
             </div>
-          ) : (
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3.5 text-center w-12">STT</th>
-                  <th className="px-4 py-3.5">Mã SV</th>
-                  <th className="px-4 py-3.5">Họ và Tên</th>
-                  <th className="px-4 py-3.5 text-center">Tài Khoản QLDTTX</th>
-                  <th className="px-4 py-3.5 text-center">Bật / Tắt Flow</th>
-                  <th className="px-4 py-3.5 text-center">Flow Đăng Ký Môn</th>
-                  <th className="px-4 py-3.5 text-center">Flow Hủy Môn</th>
-                  <th className="px-4 py-3.5">Lịch Sử Flow Gần Nhất</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredStudents.map((student, idx) => {
-                  return (
-                    <tr
-                      key={student.maSV}
-                      className={`hover:bg-slate-50/80 transition-colors ${
-                        student.isEnabled ? 'bg-amber-50/20' : 'opacity-70 bg-slate-50/30'
-                      }`}
-                    >
-                      <td className="px-4 py-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
 
-                      {/* Mã SV */}
-                      <td className="px-4 py-3.5">
-                        <span className="font-mono font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md text-xs border border-indigo-100">
-                          {student.maSV}
-                        </span>
-                      </td>
+            {/* Matrix Table */}
+            <div className="overflow-x-auto max-h-[70vh]">
+              {isLoading ? (
+                <div className="py-24 flex flex-col items-center justify-center gap-3">
+                  <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs text-slate-500 font-bold">Đang tải và tính toán đối chiếu môn học cho cả lớp...</p>
+                </div>
+              ) : filteredStudents.length === 0 ? (
+                <div className="py-24 text-center flex flex-col items-center justify-center gap-2 text-slate-400">
+                  <Users className="w-8 h-8 text-slate-300" />
+                  <p className="text-sm font-bold text-slate-700">Không có thành viên nào khớp bộ lọc</p>
+                  <p className="text-xs text-slate-400">Thử bấm "Tất Cả" hoặc tìm kiếm với từ khóa khác.</p>
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-slate-50 text-slate-700 font-bold sticky top-0 z-20 shadow-xs border-b border-slate-200">
+                    <tr>
+                      {/* Fixed Left Columns */}
+                      <th className="px-3.5 py-3 text-center w-10 bg-slate-50 border-r border-slate-200">STT</th>
+                      <th className="px-3.5 py-3 bg-slate-50 border-r border-slate-200 min-w-[200px]">
+                        Thành Viên Trong Lớp
+                      </th>
+                      <th className="px-3 py-3 text-center bg-slate-50 border-r border-slate-200 min-w-[90px]">
+                        Flow
+                      </th>
+                      <th className="px-3 py-3 text-center bg-slate-50 border-r border-slate-200 min-w-[110px]">
+                        Tỷ Lệ Khớp
+                      </th>
 
-                      {/* Họ Tên */}
-                      <td className="px-4 py-3.5">
-                        <span className="font-bold text-slate-800 text-sm block">{student.hoTen}</span>
-                        {student.soDienThoai && (
-                          <span className="text-[11px] text-slate-400 font-mono">SĐT: {student.soDienThoai}</span>
-                        )}
-                      </td>
+                      {/* Dynamic Columns: Each of Monitor's Courses */}
+                      {monitorCourses.map((mCourse, mIdx) => (
+                        <th
+                          key={mCourse.id_to_hoc || mIdx}
+                          className="px-3 py-3 text-center border-r border-slate-200 min-w-[145px] bg-slate-50"
+                        >
+                          <div className="space-y-0.5">
+                            <span className="font-mono font-black text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded text-[10px] block truncate">
+                              {mCourse.ma_mon}
+                            </span>
+                            <span className="font-bold text-slate-800 text-[11px] block truncate" title={mCourse.ten_mon}>
+                              {mCourse.ten_mon}
+                            </span>
+                            <div className="flex items-center justify-center gap-1 text-[10px]">
+                              <span className="px-1.5 py-0.2 bg-amber-100 text-amber-900 font-black rounded border border-amber-300">
+                                Nhóm {mCourse.nhom_to || '—'}
+                              </span>
+                              <span className="text-slate-400 font-normal">({mCourse.so_tc} TC)</span>
+                            </div>
+                          </div>
+                        </th>
+                      ))}
 
-                      {/* Trạng thái QLDTTX */}
-                      <td className="px-4 py-3.5 text-center">
-                        {student.isExternalConfigured ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                            <Check className="w-3 h-3" /> Đã Liên Kết
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                            Chưa Liên Kết
-                          </span>
-                        )}
-                      </td>
+                      {/* Right Columns: Môn Thừa & Thao Tác */}
+                      <th className="px-3.5 py-3 text-center border-r border-slate-200 min-w-[130px] bg-slate-50">
+                        Môn Thừa Ngoài
+                      </th>
+                      <th className="px-3.5 py-3 text-center bg-slate-50 min-w-[120px]">
+                        Hành Động
+                      </th>
+                    </tr>
+                  </thead>
 
-                      {/* Switch Bật/Tắt Flow */}
-                      <td className="px-4 py-3.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => updateFollowerConfig(student.maSV, 'isEnabled', !student.isEnabled)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            student.isEnabled ? 'bg-amber-500' : 'bg-slate-300'
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredStudents.map((student, idx) => {
+                      const diff = student.diffSummary || { matchPercent: 0, matchedCount: 0, missingCount: 0, diffGroupCount: 0, extraCount: 0 };
+                      const is100 = diff.matchPercent === 100 && monitorCourses.length > 0;
+
+                      // Extra courses outside monitor list
+                      const extraCourses = student.courses.filter(
+                        (c) =>
+                          !monitorCourses.some(
+                            (m) => String(m.ma_mon).toUpperCase() === String(c.ma_mon).toUpperCase()
+                          )
+                      );
+
+                      return (
+                        <tr
+                          key={student.maSV}
+                          className={`hover:bg-indigo-50/20 transition-colors ${
+                            is100 ? 'bg-emerald-50/10' : student.isEnabled ? 'bg-white' : 'bg-slate-50/50 opacity-80'
                           }`}
                         >
-                          <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                              student.isEnabled ? 'translate-x-5' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </td>
+                          {/* STT */}
+                          <td className="px-3.5 py-3 text-center text-slate-400 font-mono border-r border-slate-100">
+                            {idx + 1}
+                          </td>
 
-                      {/* Action 1: Allow Register Course */}
-                      <td className="px-4 py-3.5 text-center">
-                        <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={student.allowRegisterCourse}
-                            disabled={!student.isEnabled}
-                            onChange={(e) =>
-                              updateFollowerConfig(student.maSV, 'allowRegisterCourse', e.target.checked)
-                            }
-                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer disabled:opacity-40"
-                          />
-                          <span className="text-[11px] font-bold text-slate-700">Đăng ký</span>
-                        </label>
-                      </td>
+                          {/* Thành Viên */}
+                          <td className="px-3.5 py-3 border-r border-slate-100">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono font-black text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded text-[11px] border border-indigo-100">
+                                    {student.maSV}
+                                  </span>
+                                  <strong className="text-slate-800 text-xs">{student.hoTen}</strong>
+                                </div>
+                                <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1.5">
+                                  <span>{student.courses.length} môn ({student.totalCredits} TC)</span>
+                                  {!student.isExternalConfigured && (
+                                    <span className="text-rose-600 font-bold">(Chưa có TK)</span>
+                                  )}
+                                </div>
+                              </div>
 
-                      {/* Action 2: Allow Cancel Course */}
-                      <td className="px-4 py-3.5 text-center">
-                        <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={student.allowCancelCourse}
-                            disabled={!student.isEnabled}
-                            onChange={(e) =>
-                              updateFollowerConfig(student.maSV, 'allowCancelCourse', e.target.checked)
-                            }
-                            className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer disabled:opacity-40"
-                          />
-                          <span className="text-[11px] font-bold text-slate-700">Hủy môn</span>
-                        </label>
-                      </td>
+                              <button
+                                onClick={() => setInspectingStudent(student)}
+                                className="p-1 text-slate-400 hover:text-indigo-600 cursor-pointer"
+                                title="Xem đối chiếu chi tiết 1-1"
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
 
-                      {/* Last Action Details */}
-                      <td className="px-4 py-3.5 max-w-xs">
-                        {student.lastActionAt ? (
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-1.5 text-[11px]">
+                          {/* Switch Bật/Tắt Flow */}
+                          <td className="px-3 py-3 text-center border-r border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => updateFollowerConfig(student.maSV, 'isEnabled', !student.isEnabled)}
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                student.isEnabled ? 'bg-amber-500' : 'bg-slate-300'
+                              }`}
+                              title={student.isEnabled ? 'Đang BẬT Flow' : 'Đang TẮT Flow'}
+                            >
                               <span
-                                className={`px-1.5 py-0.2 rounded font-black text-[9px] ${
-                                  student.lastActionResult === 'SUCCESS'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : student.lastActionResult === 'SKIPPED'
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : 'bg-rose-100 text-rose-800'
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                                  student.isEnabled ? 'translate-x-4' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          </td>
+
+                          {/* Tỷ Lệ Khớp Progress Badge */}
+                          <td className="px-3 py-3 text-center border-r border-slate-100">
+                            <div className="space-y-1">
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                                  is100
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    : diff.matchPercent > 0
+                                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                    : 'bg-rose-100 text-rose-800 border-rose-300'
                                 }`}
                               >
-                                {student.lastActionResult || 'DONE'}
+                                {diff.matchPercent}% Khớp
                               </span>
-                              <span className="font-bold text-slate-700">{student.lastActionType}</span>
-                              <span className="text-slate-400 font-mono text-[10px]">
-                                ({new Date(student.lastActionAt).toLocaleTimeString('vi-VN')})
-                              </span>
+                              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${
+                                    is100 ? 'bg-emerald-500' : diff.matchPercent > 0 ? 'bg-amber-500' : 'bg-rose-400'
+                                  }`}
+                                  style={{ width: `${diff.matchPercent}%` }}
+                                />
+                              </div>
                             </div>
-                            {student.lastActionMessage && (
-                              <p className="text-[11px] text-slate-500 truncate" title={student.lastActionMessage}>
-                                {student.lastActionMessage}
-                              </p>
+                          </td>
+
+                          {/* Course Cells for Each Monitor Course */}
+                          {monitorCourses.map((mCourse, mIdx) => {
+                            const monCode = String(mCourse.ma_mon || '').toUpperCase();
+                            const folCourse = student.courses.find(
+                              (c) => String(c.ma_mon || '').toUpperCase() === monCode
+                            );
+
+                            const isMatched = folCourse && String(folCourse.id_to_hoc).trim() === String(mCourse.id_to_hoc).trim();
+                            const isDiffGroup = folCourse && !isMatched;
+                            const isMissing = !folCourse;
+
+                            return (
+                              <td
+                                key={mCourse.id_to_hoc || mIdx}
+                                className={`px-2 py-2.5 text-center border-r border-slate-100 ${
+                                  isMatched
+                                    ? 'bg-emerald-50/30'
+                                    : isDiffGroup
+                                    ? 'bg-amber-50/40'
+                                    : 'bg-rose-50/40'
+                                }`}
+                              >
+                                {isMatched ? (
+                                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black shadow-2xs">
+                                    <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                                    <span>Nhóm {folCourse.nhom_to}</span>
+                                  </div>
+                                ) : isDiffGroup ? (
+                                  <div className="space-y-1">
+                                    <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold">
+                                      <span>Nhóm {folCourse.nhom_to}</span>
+                                    </div>
+                                    <button
+                                      onClick={async () => {
+                                        if (folCourse?.id_to_hoc) {
+                                          await executeFlow({
+                                            flowAction: 'CANCEL',
+                                            id_to_hoc: folCourse.id_to_hoc,
+                                            targetFollowerUsernames: [student.maSV],
+                                          });
+                                        }
+                                        await executeFlow({
+                                          flowAction: 'REGISTER',
+                                          id_to_hoc: mCourse.id_to_hoc,
+                                          targetFollowerUsernames: [student.maSV],
+                                        });
+                                      }}
+                                      disabled={isExecuting}
+                                      className="block w-full text-[9px] font-bold px-1.5 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded cursor-pointer transition-colors shadow-2xs"
+                                      title={`Chuyển sang nhóm ${mCourse.nhom_to} của Lớp trưởng`}
+                                    >
+                                      🔄 Đổi sang {mCourse.nhom_to}
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-1">
+                                    <span className="inline-block px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-200">
+                                      Chưa ĐK
+                                    </span>
+                                    <button
+                                      onClick={() =>
+                                        executeFlow({
+                                          flowAction: 'REGISTER',
+                                          id_to_hoc: mCourse.id_to_hoc,
+                                          targetFollowerUsernames: [student.maSV],
+                                        })
+                                      }
+                                      disabled={isExecuting}
+                                      className="block w-full text-[9px] font-black px-1.5 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded cursor-pointer transition-colors shadow-2xs"
+                                      title={`Flow đăng ký nhóm ${mCourse.nhom_to} cho bạn này`}
+                                    >
+                                      + Đăng Ký
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+
+                          {/* Môn Thừa Ngoài */}
+                          <td className="px-3 py-3 text-center border-r border-slate-100">
+                            {extraCourses.length > 0 ? (
+                              <div className="flex items-center justify-center gap-1 flex-wrap">
+                                {extraCourses.map((ex) => (
+                                  <span
+                                    key={ex.id_to_hoc}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-900 border border-purple-300 rounded text-[10px] font-bold"
+                                    title={`${ex.ten_mon} (Nhóm ${ex.nhom_to})`}
+                                  >
+                                    <span>{ex.ma_mon}</span>
+                                    <button
+                                      onClick={() =>
+                                        executeFlow({
+                                          flowAction: 'CANCEL',
+                                          id_to_hoc: ex.id_to_hoc,
+                                          targetFollowerUsernames: [student.maSV],
+                                        })
+                                      }
+                                      disabled={isExecuting}
+                                      className="text-rose-500 hover:text-rose-700 cursor-pointer"
+                                      title="Hủy môn thừa này"
+                                    >
+                                      <X className="w-2.5 h-2.5" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 font-mono text-[10px]">Không có</span>
                             )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic text-[11px]">Chưa có hành động nào</span>
-                        )}
+                          </td>
+
+                          {/* Hành Động Đồng Bộ Riêng */}
+                          <td className="px-3.5 py-3 text-center">
+                            {is100 ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-700 font-bold text-[11px]">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Đã Khớp
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  executeFlow({
+                                    flowAction: 'SYNC_ALL_COURSES',
+                                    targetFollowerUsernames: [student.maSV],
+                                  })
+                                }
+                                disabled={isExecuting || !student.isExternalConfigured}
+                                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black transition-all shadow-xs flex items-center gap-1 mx-auto cursor-pointer disabled:opacity-40"
+                                title="Đồng bộ 2 chiều đưa toàn bộ môn của bạn này khớp 100% với Lớp trưởng"
+                              >
+                                <Sparkles className="w-3 h-3 text-amber-300" />
+                                <span>Đồng Bộ 100%</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+
+                  {/* Summary Footer Row */}
+                  <tfoot className="bg-slate-100/90 text-slate-700 font-bold border-t-2 border-slate-300 sticky bottom-0 z-10 text-[11px]">
+                    <tr>
+                      <td colSpan={4} className="px-4 py-3 text-right font-black uppercase text-slate-600 border-r border-slate-200">
+                        Tổng Số Thành Viên Đã Khớp Môn:
+                      </td>
+                      {monitorCourses.map((mCourse, mIdx) => {
+                        const monCode = String(mCourse.ma_mon || '').toUpperCase();
+                        const enrolledCount = students.filter((s) => {
+                          const fol = s.courses.find((c) => String(c.ma_mon || '').toUpperCase() === monCode);
+                          return fol && String(fol.id_to_hoc).trim() === String(mCourse.id_to_hoc).trim();
+                        }).length;
+
+                        const isAllEnrolled = enrolledCount === students.length && students.length > 0;
+
+                        return (
+                          <td key={mCourse.id_to_hoc || mIdx} className="px-2 py-3 text-center border-r border-slate-200">
+                            <span
+                              className={`px-2 py-0.5 rounded-md font-black text-[11px] ${
+                                isAllEnrolled
+                                  ? 'bg-emerald-200 text-emerald-900'
+                                  : enrolledCount > 0
+                                  ? 'bg-amber-200 text-amber-900'
+                                  : 'bg-rose-200 text-rose-900'
+                              }`}
+                            >
+                              {enrolledCount} / {students.length}
+                            </span>
+                          </td>
+                        );
+                      })}
+                      <td colSpan={2} className="px-4 py-3 text-center text-slate-500 font-mono text-[10px]">
+                        Lớp {selectedClass}
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Footer save reminder */}
-        {hasUnsavedChanges && (
-          <div className="p-4 bg-amber-50 border-t border-amber-200 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Bạn có thay đổi cấu hình chưa lưu. Bấm "Lưu Cấu Hình" để áp dụng.</span>
+                  </tfoot>
+                </table>
+              )}
             </div>
-            <button
-              onClick={saveAllConfigs}
-              disabled={isSaving}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer"
-            >
-              {isSaving ? 'Đang lưu...' : 'Lưu Thay Đổi Ngay'}
-            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUBTAB 2: FLOW CONFIGURATION & DETAILED SETTINGS */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'FLOW_CONFIG' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Quick Flow Actions Launcher Card */}
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-7 border border-slate-800 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-amber-400 fill-current" />
+                  <h3 className="font-black text-base sm:text-lg text-white">
+                    Bắn Lệnh Flow Action Cho Cả Lớp
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Thực thi đồng loạt cho <strong className="text-amber-300">{activeFollowersCount} thành viên</strong> đang bật Flow Action
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <button
+                  onClick={() => setShowSyncAllModal(true)}
+                  disabled={isExecuting || activeFollowersCount === 0}
+                  className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black rounded-2xl transition-all shadow-md shadow-emerald-900/40 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Đồng Bộ 2 Chiều Tất Cả Môn Của Lớp Trưởng</span>
+                </button>
+
+                <button
+                  onClick={() => setShowQuickRegisterModal(true)}
+                  disabled={isExecuting || activeFollowersCount === 0}
+                  className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black rounded-2xl transition-all shadow-md shadow-orange-900/40 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Zap className="w-4 h-4 fill-current" />
+                  <span>Flow Đăng Ký Môn...</span>
+                </button>
+
+                <button
+                  onClick={() => setShowQuickCancelModal(true)}
+                  disabled={isExecuting || activeFollowersCount === 0}
+                  className="px-4 py-2.5 bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold rounded-2xl transition-all border border-rose-500/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Flow Hủy Môn...</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Config Table */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-50/50">
+              <div className="relative w-full md:max-w-md">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Tìm theo mã SV, họ tên, số điện thoại..."
+                  className="w-full bg-white border border-slate-200 rounded-2xl pl-9.5 pr-4 py-2 text-xs text-slate-800 focus:ring-2 focus:ring-amber-500 outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button
+                  onClick={() => setAllFollowersStatus(true)}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Bật Tất Cả
+                </button>
+                <button
+                  onClick={() => setAllFollowersStatus(false)}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Tắt Tất Cả
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3.5 text-center w-12">STT</th>
+                    <th className="px-4 py-3.5">Mã SV</th>
+                    <th className="px-4 py-3.5">Họ và Tên</th>
+                    <th className="px-4 py-3.5 text-center">Tài Khoản QLDTTX</th>
+                    <th className="px-4 py-3.5 text-center">Bật / Tắt Flow</th>
+                    <th className="px-4 py-3.5 text-center">Flow Đăng Ký Môn</th>
+                    <th className="px-4 py-3.5 text-center">Flow Hủy Môn</th>
+                    <th className="px-4 py-3.5 text-center">So Khớp Môn</th>
+                    <th className="px-4 py-3.5">Lịch Sử Flow Gần Nhất</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredStudents.map((student, idx) => {
+                    const diff = student.diffSummary || { matchPercent: 0, matchedCount: 0, missingCount: 0, diffGroupCount: 0, extraCount: 0 };
+                    const is100Percent = diff.matchPercent === 100 && monitorCourses.length > 0;
+
+                    return (
+                      <tr
+                        key={student.maSV}
+                        className={`hover:bg-slate-50/80 transition-colors ${
+                          student.isEnabled ? 'bg-amber-50/20' : 'opacity-70 bg-slate-50/30'
+                        }`}
+                      >
+                        <td className="px-4 py-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
+                        <td className="px-4 py-3.5">
+                          <span className="font-mono font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md text-xs border border-indigo-100">
+                            {student.maSV}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className="font-bold text-slate-800 text-sm block">{student.hoTen}</span>
+                          {student.soDienThoai && (
+                            <span className="text-[11px] text-slate-400 font-mono">SĐT: {student.soDienThoai}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          {student.isExternalConfigured ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <Check className="w-3 h-3" /> Đã Liên Kết
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              Chưa Liên Kết
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => updateFollowerConfig(student.maSV, 'isEnabled', !student.isEnabled)}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              student.isEnabled ? 'bg-amber-500' : 'bg-slate-300'
+                            }`}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                                student.isEnabled ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={student.allowRegisterCourse}
+                              disabled={!student.isEnabled}
+                              onChange={(e) =>
+                                updateFollowerConfig(student.maSV, 'allowRegisterCourse', e.target.checked)
+                              }
+                              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer disabled:opacity-40"
+                            />
+                            <span className="text-[11px] font-bold text-slate-700">Đăng ký</span>
+                          </label>
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={student.allowCancelCourse}
+                              disabled={!student.isEnabled}
+                              onChange={(e) =>
+                                updateFollowerConfig(student.maSV, 'allowCancelCourse', e.target.checked)
+                              }
+                              className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer disabled:opacity-40"
+                            />
+                            <span className="text-[11px] font-bold text-slate-700">Hủy môn</span>
+                          </label>
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <button
+                            onClick={() => {
+                              setInspectingStudent(student);
+                            }}
+                            className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                              is100Percent
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                                : diff.matchPercent > 0
+                                ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                            }`}
+                          >
+                            <span>{diff.matchPercent}% Khớp</span>
+                          </button>
+                        </td>
+                        <td className="px-4 py-3.5 max-w-xs">
+                          {student.lastActionAt ? (
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-1.5 text-[11px]">
+                                <span
+                                  className={`px-1.5 py-0.2 rounded font-black text-[9px] ${
+                                    student.lastActionResult === 'SUCCESS'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : student.lastActionResult === 'SKIPPED'
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-rose-100 text-rose-800'
+                                  }`}
+                                >
+                                  {student.lastActionResult || 'DONE'}
+                                </span>
+                                <span className="font-bold text-slate-700">{student.lastActionType}</span>
+                              </div>
+                              {student.lastActionMessage && (
+                                <p className="text-[11px] text-slate-500 truncate" title={student.lastActionMessage}>
+                                  {student.lastActionMessage}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">Chưa có hành động</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUBTAB 3: MONITOR'S REGISTERED COURSES (DANH SÁCH MÔN CỦA LỚP TRƯỞNG) */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'MONITOR_COURSES' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-slate-400 text-xs font-bold uppercase">Tổng Số Môn Đã Đăng Ký</div>
+                <div className="text-2xl font-black text-slate-800 mt-0.5">{monitorCourses.length} môn</div>
+                <div className="text-[11px] text-indigo-600 font-bold mt-0.5">Lớp trưởng {monitorData?.hoTen}</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-slate-400 text-xs font-bold uppercase">Tổng Tín Chỉ (TC)</div>
+                <div className="text-2xl font-black text-amber-600 mt-0.5">{monitorData?.totalCredits || 0} TC</div>
+                <div className="text-[11px] text-amber-700 font-bold mt-0.5">Kỳ học hiện tại</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <DollarSign className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-slate-400 text-xs font-bold uppercase">Học Phí Tạm Tính</div>
+                <div className="text-2xl font-black text-emerald-700 mt-0.5">
+                  {(monitorData?.tuitionFee || 0).toLocaleString('vi-VN')} đ
+                </div>
+                <div className="text-[11px] text-emerald-700 font-bold mt-0.5">Học phí theo nhóm tổ</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-slate-800 text-sm">Danh Sách Môn Học Lớp Trưởng Đang Đăng Ký</h3>
+                  {monitorData?.lastPulledAt && (
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] rounded-lg font-mono">
+                      Cập nhật: {new Date(monitorData.lastPulledAt).toLocaleTimeString('vi-VN')} {new Date(monitorData.lastPulledAt).toLocaleDateString('vi-VN')}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">Các môn học này sẽ được dùng làm chuẩn để Flow đồng bộ cho cả lớp</p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Nút Kéo Mới Dữ Liệu Từ QLDTTX */}
+                <button
+                  onClick={pullAllCourses}
+                  disabled={isPullingCourses || isLoading}
+                  className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-2xl border border-indigo-200 shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
+                  title="Kéo danh sách môn học mới nhất của Lớp trưởng và cả lớp trực tiếp từ Cổng QLDTTX"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isPullingCourses ? 'animate-spin' : ''}`} />
+                  <span>{isPullingCourses ? 'Đang kéo QLDTTX...' : 'Pull Mới Dữ Liệu (QLDTTX)'}</span>
+                </button>
+
+                <button
+                  onClick={() => setShowSyncAllModal(true)}
+                  disabled={isExecuting || monitorCourses.length === 0}
+                  className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 text-white font-bold text-xs rounded-2xl shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Đồng Bộ Toàn Bộ Môn Này Cho Cả Lớp</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              {monitorCourses.length === 0 ? (
+                <div className="py-20 text-center flex flex-col items-center justify-center gap-3">
+                  <BookOpen className="w-8 h-8 text-slate-300" />
+                  <p className="text-sm font-bold text-slate-700">Lớp trưởng chưa đăng ký môn học nào hoặc chưa kéo dữ liệu</p>
+                  <button
+                    onClick={pullAllCourses}
+                    disabled={isPullingCourses}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+                  >
+                    Kéo Dữ Liệu Từ QLDTTX Ngay
+                  </button>
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3.5 text-center w-12">STT</th>
+                      <th className="px-4 py-3.5">Mã Môn</th>
+                      <th className="px-4 py-3.5">Tên Môn Học</th>
+                      <th className="px-4 py-3.5 text-center">Số TC</th>
+                      <th className="px-4 py-3.5 text-center">Nhóm / Tổ</th>
+                      <th className="px-4 py-3.5">Lớp Học Phần</th>
+                      <th className="px-4 py-3.5">Thời Khóa Biểu (TKB)</th>
+                      <th className="px-4 py-3.5 text-right">Học Phí</th>
+                      <th className="px-4 py-3.5 text-center">Flow Cho Cả Lớp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {monitorCourses.map((course, idx) => (
+                      <tr key={course.id_to_hoc || idx} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-4 py-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
+                        <td className="px-4 py-3.5 font-mono font-bold text-indigo-700 bg-indigo-50/30">
+                          {course.ma_mon}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className="font-bold text-slate-800 text-sm block">{course.ten_mon}</span>
+                          {course.ngay_dang_ky && (
+                            <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3" /> Đăng ký: {new Date(course.ngay_dang_ky).toLocaleString('vi-VN')}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md text-xs">
+                            {course.so_tc} TC
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <span className="font-mono font-black text-amber-800 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300">
+                            {course.nhom_to || '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-slate-600 font-mono">{course.lop || '—'}</td>
+                        <td className="px-4 py-3.5 max-w-xs">
+                          {course.tkb ? (
+                            <div
+                              className="text-[11px] text-slate-600 leading-relaxed"
+                              dangerouslySetInnerHTML={{ __html: course.tkb }}
+                            />
+                          ) : (
+                            <span className="text-slate-400 italic">Chưa xếp lịch</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-mono font-bold text-emerald-700">
+                          {(course.phai_dong || 0).toLocaleString('vi-VN')} đ
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <button
+                            onClick={() =>
+                              executeFlow({
+                                flowAction: 'REGISTER',
+                                id_to_hoc: course.id_to_hoc,
+                                nhom_to: course.nhom_to,
+                              })
+                            }
+                            disabled={isExecuting || activeFollowersCount === 0}
+                            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 mx-auto cursor-pointer disabled:opacity-50"
+                            title="Flow đăng ký tổ này cho toàn bộ thành viên đang bật Flow"
+                          >
+                            <Zap className="w-3 h-3 fill-current" />
+                            <span>Flow Cho Lớp</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* DRAWER: SINGLE STUDENT DETAILED 1-1 INSPECTION */}
+      {/* ============================================================= */}
+      {inspectingStudent && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setInspectingStudent(null);
+          }}
+        >
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="p-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-base font-black">
+                  Đối Chiếu Môn Học: Lớp Trưởng vs {inspectingStudent.hoTen} ({inspectingStudent.maSV})
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Tỷ lệ trùng khớp: <strong className="text-amber-300 font-mono">{inspectingStudent.diffSummary?.matchPercent}%</strong> • {inspectingStudent.courses.length} môn đã đăng ký
+                </p>
+              </div>
+              <button
+                onClick={() => setInspectingStudent(null)}
+                className="p-1 text-white/80 hover:text-white rounded-full cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="space-y-1">
+                  <div className="font-bold text-slate-800 text-sm">Hành Động Khắc Phục Nhanh</div>
+                  <p className="text-slate-500 text-[11px]">Đưa toàn bộ môn của sinh viên này về khớp 100% với Lớp trưởng</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    const sv = inspectingStudent.maSV;
+                    setInspectingStudent(null);
+                    await executeFlow({
+                      flowAction: 'SYNC_ALL_COURSES',
+                      targetFollowerUsernames: [sv],
+                    });
+                  }}
+                  disabled={isExecuting}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Đồng Bộ Khớp 100% Ngay</span>
+                </button>
+              </div>
+
+              <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 text-slate-600 font-bold uppercase">
+                    <tr>
+                      <th className="px-3 py-2.5">Môn Học (LT)</th>
+                      <th className="px-3 py-2.5 text-center">Nhóm LT</th>
+                      <th className="px-3 py-2.5 text-center">Trạng Thái SV</th>
+                      <th className="px-3 py-2.5 text-center">Nhóm SV</th>
+                      <th className="px-3 py-2.5 text-center">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {monitorCourses.map((m, i) => {
+                      const fol = inspectingStudent.courses.find(
+                        (c) => String(c.ma_mon).toUpperCase() === String(m.ma_mon).toUpperCase()
+                      );
+                      const isMatch = fol && String(fol.id_to_hoc).trim() === String(m.id_to_hoc).trim();
+                      const isDiff = fol && !isMatch;
+
+                      return (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-3 py-2.5">
+                            <strong className="text-slate-800">{m.ten_mon}</strong>
+                            <span className="text-[10px] text-slate-400 font-mono block">{m.ma_mon}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-black text-amber-900 bg-amber-50">
+                            {m.nhom_to}
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            {isMatch ? (
+                              <span className="text-emerald-700 font-black text-[10px]">🟢 Trùng khớp</span>
+                            ) : isDiff ? (
+                              <span className="text-amber-700 font-black text-[10px]">🟡 Lệch nhóm</span>
+                            ) : (
+                              <span className="text-rose-700 font-black text-[10px]">🔴 Chưa đăng ký</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-bold text-slate-700">
+                            {fol ? fol.nhom_to : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            {isMatch ? (
+                              <span className="text-emerald-600 font-bold text-[10px]">Đã chuẩn</span>
+                            ) : isDiff ? (
+                              <button
+                                onClick={async () => {
+                                  if (fol?.id_to_hoc) {
+                                    await executeFlow({
+                                      flowAction: 'CANCEL',
+                                      id_to_hoc: fol.id_to_hoc,
+                                      targetFollowerUsernames: [inspectingStudent.maSV],
+                                    });
+                                  }
+                                  await executeFlow({
+                                    flowAction: 'REGISTER',
+                                    id_to_hoc: m.id_to_hoc,
+                                    targetFollowerUsernames: [inspectingStudent.maSV],
+                                  });
+                                }}
+                                disabled={isExecuting}
+                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold"
+                              >
+                                Đổi nhóm {m.nhom_to}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  executeFlow({
+                                    flowAction: 'REGISTER',
+                                    id_to_hoc: m.id_to_hoc,
+                                    targetFollowerUsernames: [inspectingStudent.maSV],
+                                  })
+                                }
+                                disabled={isExecuting}
+                                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold"
+                              >
+                                Đăng ký
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
+              <button
+                onClick={() => setInspectingStudent(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ============================================================= */}
       {/* MODAL 1: QUICK FLOW REGISTER SPECIFIC COURSE */}
@@ -720,7 +1542,7 @@ export default function MonitorFlowManager({
             <div className="p-6 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <BookOpen className="w-5 h-5" />
-                <h3 className="text-base font-black">Đồng Bộ Tất Cả Môn Học Của Lớp Trưởng</h3>
+                <h3 className="text-base font-black">Đồng Bộ 2 Chiều Tất Cả Môn Của Lớp Trưởng</h3>
               </div>
               <button
                 onClick={() => setShowSyncAllModal(false)}
@@ -732,11 +1554,16 @@ export default function MonitorFlowManager({
 
             <div className="p-6 space-y-4 text-xs text-slate-700">
               <p className="leading-relaxed">
-                Hệ thống sẽ lấy toàn bộ các môn học mà <strong>Lớp trưởng ({currentUser.fullName || currentUser.username})</strong> đã đăng ký thành công trên cổng QLDTTX và tự động gửi lệnh đăng ký tương ứng cho <strong>{activeFollowersCount} thành viên</strong> flow trong lớp.
+                Hệ thống sẽ đối chiếu danh sách môn của <strong>Lớp trưởng ({monitorData?.hoTen || currentUser.fullName || currentUser.username})</strong> với <strong>{activeFollowersCount} thành viên</strong>:
               </p>
 
+              <ul className="space-y-1.5 list-disc pl-4 text-slate-600">
+                <li><strong>Đăng ký</strong> các môn Lớp trưởng có mà thành viên còn thiếu.</li>
+                <li><strong>Hủy</strong> các môn thừa mà thành viên có nhưng Lớp trưởng không học (hoặc đã hủy).</li>
+              </ul>
+
               <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-emerald-900 text-[11px] leading-relaxed">
-                ✨ Giúp toàn bộ các thành viên trong lớp học cùng 1 thời khóa biểu, cùng ca học và cùng phòng thi với Lớp trưởng một cách tự động!
+                ✨ Giúp toàn bộ các thành viên trong lớp học cùng 1 thời khóa biểu, cùng ca học và cùng phòng thi với Lớp trưởng một cách chuẩn xác 100%!
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -758,7 +1585,7 @@ export default function MonitorFlowManager({
                   }}
                   className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm cursor-pointer disabled:opacity-50"
                 >
-                  {isExecuting ? 'Đang thực thi...' : 'Bắt Đầu Đồng Bộ Cả Lớp'}
+                  {isExecuting ? 'Đang thực thi...' : 'Bắt Đầu Đồng Bộ 2 Chiều'}
                 </button>
               </div>
             </div>
@@ -790,7 +1617,6 @@ export default function MonitorFlowManager({
               </button>
             </div>
 
-            {/* Summary Counters */}
             <div className="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-3 gap-2 text-center text-xs shrink-0">
               <div className="bg-white p-2.5 rounded-2xl border border-slate-200">
                 <span className="text-slate-400 font-bold block text-[10px] uppercase">Thành Công</span>
@@ -806,7 +1632,6 @@ export default function MonitorFlowManager({
               </div>
             </div>
 
-            {/* Detailed results list */}
             <div className="p-4 overflow-y-auto flex-1 divide-y divide-slate-100 text-xs">
               {lastExecutionResult.results.map((res, i) => (
                 <div key={i} className="py-3 flex items-center justify-between gap-3">

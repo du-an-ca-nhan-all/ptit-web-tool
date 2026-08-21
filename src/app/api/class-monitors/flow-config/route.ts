@@ -4,6 +4,7 @@ import {
   getMonitorFlowList,
   saveMonitorFlowConfigs,
   executeMonitorFlowAction,
+  pullClassCourseRegistrations,
 } from '@/src/features/classes-monitor/server/monitorFlowServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
@@ -156,6 +157,32 @@ export async function POST(req: NextRequest) {
         success: execRes.success,
         message: `Đã thực thi Flow Action [${actionName}] cho ${execRes.total} thành viên: ${execRes.successCount} thành công, ${execRes.failCount} thất bại, ${execRes.skippedCount} bỏ qua.`,
         ...execRes,
+      });
+    }
+
+    // 3. ACTION: PULL_COURSES (Kéo dữ liệu ĐKMH mới nhất từ QLDTTX cho cả lớp)
+    if (action === 'PULL_COURSES') {
+      const pullRes = await pullClassCourseRegistrations(normMonitor, normClass);
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'PULL_CLASS_COURSE_REGISTRATION',
+        targetType: 'MONITOR_FLOW',
+        targetId: normClass,
+        description: `Kéo dữ liệu ĐKMH trực tiếp từ QLDTTX cho lớp ${normClass}: ${pullRes.pulledCount} tài khoản thành công`,
+        metadata: { classCode: normClass, monitorUsername: normMonitor, pulledCount: pullRes.pulledCount },
+      });
+
+      const updatedFlowData = await getMonitorFlowList(normMonitor, normClass);
+
+      return NextResponse.json({
+        success: true,
+        message: `Đã đồng bộ kéo dữ liệu ĐKMH mới nhất cho ${pullRes.pulledCount} tài khoản trong lớp ${normClass}!`,
+        pulledCount: pullRes.pulledCount,
+        ...updatedFlowData,
       });
     }
 
