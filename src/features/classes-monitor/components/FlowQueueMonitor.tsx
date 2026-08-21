@@ -428,7 +428,7 @@ export default function FlowQueueMonitor({
         </div>
 
         {/* Table List */}
-        <div className="overflow-x-auto max-h-[60vh]">
+        <div className="overflow-x-auto">
           {isLoading ? (
             <div className="py-20 flex flex-col items-center justify-center gap-3">
               <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
@@ -442,7 +442,7 @@ export default function FlowQueueMonitor({
             </div>
           ) : (
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider sticky top-0 z-10 border-b border-slate-200">
+              <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="px-3.5 py-3 text-center w-12">STT</th>
                   <th className="px-3.5 py-3">Thành Viên Nhận Flow</th>

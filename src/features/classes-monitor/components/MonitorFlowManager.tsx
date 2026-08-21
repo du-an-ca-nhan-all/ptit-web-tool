@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Users,
   GitFork,
@@ -51,6 +51,7 @@ import ImportFlowStudentsModal from './ImportFlowStudentsModal';
 interface MonitorFlowManagerProps {
   currentUser: LoginUser;
   availableClasses?: string[];
+  initialClassCode?: string;
   onNavigateTab?: (tab: string, subTab?: string) => void;
 }
 
@@ -60,8 +61,10 @@ type CompareFilter = 'ALL' | 'ACTIVE_FLOW' | 'NEEDS_ATTENTION' | 'MATCHED_100' |
 export default function MonitorFlowManager({
   currentUser,
   availableClasses = [],
+  initialClassCode,
   onNavigateTab,
 }: MonitorFlowManagerProps) {
+  const defaultClass = initialClassCode || currentUser.lop || availableClasses[0] || '';
   const {
     selectedClass,
     setSelectedClass,
@@ -86,7 +89,14 @@ export default function MonitorFlowManager({
     executeFlow,
     pullAllCourses,
     importFlowConfigs,
-  } = useMonitorFlow(currentUser, currentUser.lop || availableClasses[0] || '');
+  } = useMonitorFlow(currentUser, defaultClass);
+
+  // Sync with initialClassCode from URL if changed
+  useEffect(() => {
+    if (initialClassCode && initialClassCode !== selectedClass) {
+      setSelectedClass(initialClassCode);
+    }
+  }, [initialClassCode, setSelectedClass, selectedClass]);
 
   // Sub-tabs: Default to 'ALL_COMPARE' so users instantly see the all-in-one comparison
   const [activeSubTab, setActiveSubTab] = useState<MainSubTab>('ALL_COMPARE');
@@ -152,7 +162,7 @@ export default function MonitorFlowManager({
   }, [students, searchQuery, compareFilter]);
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+    <div className="p-4 md:p-8 max-w-7xl 2xl:max-w-[1700px] mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Toast Notifications */}
       {successMsg && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-3xl text-emerald-800 text-xs sm:text-sm font-bold flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">
@@ -526,7 +536,7 @@ export default function MonitorFlowManager({
             </div>
 
             {/* Matrix Table */}
-            <div className="overflow-x-auto max-h-[70vh]">
+            <div className="overflow-x-auto">
               {isLoading ? (
                 <div className="py-24 flex flex-col items-center justify-center gap-3">
                   <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
@@ -540,7 +550,7 @@ export default function MonitorFlowManager({
                 </div>
               ) : (
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 text-slate-700 font-bold sticky top-0 z-20 shadow-xs border-b border-slate-200">
+                  <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
                     <tr>
                       {/* Fixed Left Columns */}
                       <th className="px-3.5 py-3 text-center w-10 bg-slate-50 border-r border-slate-200">STT</th>
@@ -824,7 +834,7 @@ export default function MonitorFlowManager({
                   </tbody>
 
                   {/* Summary Footer Row */}
-                  <tfoot className="bg-slate-100/90 text-slate-700 font-bold border-t-2 border-slate-300 sticky bottom-0 z-10 text-[11px]">
+                  <tfoot className="bg-slate-100/90 text-slate-700 font-bold border-t-2 border-slate-300 text-[11px]">
                     <tr>
                       <td colSpan={4} className="px-4 py-3 text-right font-black uppercase text-slate-600 border-r border-slate-200">
                         Tổng Số Thành Viên Đã Khớp Môn:

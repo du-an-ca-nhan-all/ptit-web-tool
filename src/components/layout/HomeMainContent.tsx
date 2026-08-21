@@ -286,6 +286,7 @@ export default function HomeMainContent({
         <MonitorFlowManager
           currentUser={effectiveUser!}
           availableClasses={classes}
+          initialClassCode={monitorClass}
           onNavigateTab={(tab, subTab) =>
             handleTabChange(tab as NavigationTab, subTab as ProfileSubTab)
           }
