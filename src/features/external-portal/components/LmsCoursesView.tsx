@@ -5,10 +5,8 @@ import {
   BookOpen,
   RefreshCw,
   Search,
-  CheckCircle2,
   AlertCircle,
   ExternalLink,
-  Sparkles,
   Award,
   Layers,
   CheckCircle,
@@ -24,6 +22,7 @@ import {
   X,
   Flame,
   GraduationCap,
+  ListOrdered,
 } from 'lucide-react';
 import { LoginUser } from '@/src/features/auth/types/auth.types';
 import { LmsCourseOverviewItem, LmsDashboardOverview, LmsSectionItem } from '../server/lmsServerService';
@@ -38,7 +37,6 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,16 +44,13 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
   const [selectedSemester, setSelectedSemester] = useState('ALL');
   const [sortBy, setSortBy] = useState<'PROGRESS_DESC' | 'PROGRESS_ASC' | 'NAME_ASC' | 'GRADE_DESC'>('PROGRESS_ASC');
 
-  // Course Details & Auto-Study Modal
+  // Course Details Modal
   const [activeCourseDetails, setActiveCourseDetails] = useState<{
     course: LmsCourseOverviewItem;
     sections: LmsSectionItem[];
     totalActivities: number;
   } | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-
-  // Auto-Study State
-  const [autoStudyingCourseId, setAutoStudyingCourseId] = useState<string | null>(null);
 
   const fetchLmsCourses = async () => {
     setIsLoading(true);
@@ -106,41 +101,6 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
       alert('Lỗi kết nối máy chủ');
     } finally {
       setIsLoadingDetails(false);
-    }
-  };
-
-  // Run Auto-Study for a course
-  const handleAutoStudyCourse = async (courseId: string, courseTitle: string) => {
-    if (!confirm(`Bạn có muốn tự động xem và hoàn thành các bài giảng / hoạt động trong môn "${courseTitle}"?`)) {
-      return;
-    }
-
-    setAutoStudyingCourseId(courseId);
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    try {
-      const res = await fetch('/api/lms/courses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'AUTO_STUDY', courseId }),
-      });
-      const json = await res.json();
-
-      if (res.ok && json.success) {
-        setSuccessMsg(json.message || 'Tự động học hoàn tất thành công!');
-        fetchLmsCourses();
-        if (activeCourseDetails && activeCourseDetails.course.id === courseId) {
-          handleOpenCourseDetails(activeCourseDetails.course);
-        }
-        setTimeout(() => setSuccessMsg(''), 5000);
-      } else {
-        setErrorMsg(json.error || 'Tự động học thất bại');
-      }
-    } catch (err) {
-      setErrorMsg('Lỗi kết nối máy chủ khi tự động học');
-    } finally {
-      setAutoStudyingCourseId(null);
     }
   };
 
@@ -272,18 +232,6 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Toast notifications */}
-      {successMsg && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-xs sm:text-sm font-bold flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>{successMsg}</span>
-          </div>
-          <button onClick={() => setSuccessMsg('')} className="p-1 text-emerald-600 hover:text-emerald-800 cursor-pointer">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
       {errorMsg && (
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-900 text-xs sm:text-sm font-bold flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">
           <div className="flex items-center gap-2.5">
@@ -512,7 +460,6 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {filteredCourses.map((course) => {
-            const isAutoStudying = autoStudyingCourseId === course.id;
             const isFinished = course.progressPercent === 100;
             const progressColor = isFinished
               ? 'bg-emerald-500'
@@ -619,48 +566,25 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
                 </div>
 
                 {/* Course Action Buttons */}
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                  {/* Auto-Study Button */}
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => handleAutoStudyCourse(course.id, course.courseName || course.fullName)}
-                    disabled={isAutoStudying || isFinished}
-                    className={`px-3 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 ${
-                      isFinished
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white shadow-xs active:scale-95'
-                    }`}
-                    title="Tự động duyệt và hoàn thành các bài học trong môn học"
+                    onClick={() => handleOpenCourseDetails(course)}
+                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   >
-                    {isAutoStudying ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : isFinished ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    ) : (
-                      <Sparkles className="w-3.5 h-3.5" />
-                    )}
-                    <span>{isAutoStudying ? 'Đang Học...' : isFinished ? 'Đạt 100%' : 'Tự Động Học'}</span>
+                    <ListOrdered className="w-3.5 h-3.5" />
+                    <span>Xem Chi Tiết Bài Học</span>
                   </button>
 
-                  {/* Open Details / LMS Link Button */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenCourseDetails(course)}
-                      className="flex-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
-                    >
-                      <span>Chi Tiết</span>
-                    </button>
-                    <a
-                      href={course.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 rounded-xl transition-colors cursor-pointer shrink-0"
-                      title="Mở môn học trên LMS"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
+                  <a
+                    href={course.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 rounded-2xl transition-colors cursor-pointer shrink-0"
+                    title="Mở môn học trên hệ thống LMS"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
                 </div>
               </div>
             );
@@ -724,9 +648,9 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
                           href={act.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-2 bg-white hover:bg-sky-50 rounded-xl border border-slate-200/60 flex items-center justify-between gap-2 text-xs transition-colors group"
+                          className="p-2.5 bg-white hover:bg-sky-50 rounded-xl border border-slate-200/60 flex items-center justify-between gap-2 text-xs transition-colors group"
                         >
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-2.5 min-w-0">
                             {getActivityIcon(act.type)}
                             <span className="font-medium text-slate-700 group-hover:text-sky-700 truncate">
                               {act.name}
@@ -745,20 +669,15 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
 
             {/* Modal Footer */}
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() =>
-                  handleAutoStudyCourse(
-                    activeCourseDetails.course.id,
-                    activeCourseDetails.course.courseName || activeCourseDetails.course.fullName
-                  )
-                }
-                disabled={autoStudyingCourseId === activeCourseDetails.course.id}
-                className="px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
+              <a
+                href={activeCourseDetails.course.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Tự Động Học Môn Này</span>
-              </button>
+                <span>Mở Trên LMS</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
 
               <button
                 type="button"

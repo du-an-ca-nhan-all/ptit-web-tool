@@ -4,7 +4,6 @@ import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import {
   fetchLmsDashboardOverview,
   fetchLmsCourseSections,
-  studyCourseOnLMS,
   getValidLmsTokenOrRefresh,
 } from '@/src/features/external-portal/server/lmsServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
@@ -118,7 +117,7 @@ export async function POST(req: NextRequest) {
       existingToken: lmsAccount.token,
     });
 
-    // 1. ACTION: Lấy chi tiết hoạt động trong khóa học
+    // ACTION: Lấy chi tiết hoạt động trong khóa học
     if (action === 'COURSE_ACTIVITIES') {
       if (!courseId) {
         return NextResponse.json({ error: 'Thiếu mã khóa học (courseId)' }, { status: 400 });
@@ -131,36 +130,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. ACTION: Tự động học / xem bài học (AUTO_STUDY)
-    if (action === 'AUTO_STUDY') {
-      if (!courseId) {
-        return NextResponse.json({ error: 'Thiếu mã khóa học (courseId)' }, { status: 400 });
-      }
-
-      const result = await studyCourseOnLMS(String(courseId), validToken);
-
-      await logActivity({
-        req,
-        userId: authUser.id,
-        username: authUser.username,
-        userRole: authUser.role,
-        action: 'LMS_AUTO_STUDY',
-        targetType: 'LMS_COURSE',
-        targetId: String(courseId),
-        description: `Tự động học môn học "${result.courseTitle}" trên LMS: hoàn thành ${result.completedActivities}/${result.totalActivities} hoạt động`,
-        metadata: { courseId, completedActivities: result.completedActivities, totalActivities: result.totalActivities },
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: `Đã tự động hoàn tất ${result.completedActivities}/${result.totalActivities} hoạt động trong môn học "${result.courseTitle}"!`,
-        result,
-      });
-    }
-
     return NextResponse.json({ error: 'Action không hợp lệ' }, { status: 400 });
   } catch (error: any) {
     console.error('LMS Action Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
