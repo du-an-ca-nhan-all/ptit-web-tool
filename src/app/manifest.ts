@@ -1,0 +1,121 @@
+import type { MetadataRoute } from 'next';
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'PTIT EduSync - Cổng Tiện Ích Sinh Viên & Học Vụ',
+    short_name: 'PTIT EduSync',
+    description: 'Hệ thống tiện ích sinh viên, tra cứu lịch thi, đối chiếu đăng ký môn học và công cụ lớp trưởng PTIT',
+    start_url: '/',
+    scope: '/',
+    id: '/',
+    display: 'standalone',
+    display_override: ['standalone', 'minimal-ui', 'window-controls-overlay'],
+    background_color: '#0F172A',
+    theme_color: '#0F172A',
+    orientation: 'portrait-primary',
+    categories: ['education', 'utilities', 'productivity'],
+    lang: 'vi-VN',
+    dir: 'ltr',
+    prefer_related_applications: false,
+    icons: [
+      {
+        src: '/favicon-16x16.png',
+        sizes: '16x16',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/favicon-32x32.png',
+        sizes: '32x32',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/apple-touch-icon.png',
+        sizes: '180x180',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/icon.svg',
+        sizes: 'any',
+        type: 'image/svg+xml',
+        purpose: 'any',
+      },
+    ],
+    shortcuts: [
+      {
+        name: 'Tra cứu lịch thi',
+        short_name: 'Lịch thi',
+        description: 'Xem lịch thi và phòng thi PTIT',
+        url: '/?tab=exam-schedule',
+        icons: [
+          {
+            src: '/icon-192.png',
+            sizes: '192x192',
+          },
+        ],
+      },
+      {
+        name: 'Quản lý lớp học',
+        short_name: 'Lớp học',
+        description: 'Xem danh sách và tiện ích sinh viên trong lớp',
+        url: '/?tab=members',
+        icons: [
+          {
+            src: '/icon-192.png',
+            sizes: '192x192',
+          },
+        ],
+      },
+      {
+        name: 'Đối chiếu môn học',
+        short_name: 'Đối chiếu TKB',
+        description: 'Đối chiếu môn học đăng ký với danh sách thi',
+        url: '/?tab=course-compare',
+        icons: [
+          {
+            src: '/icon-192.png',
+            sizes: '192x192',
+          },
+        ],
+      },
+      {
+        name: 'Bảng điều khiển',
+        short_name: 'Dashboard',
+        description: 'Xem thống kê hoạt động và dữ liệu học vụ',
+        url: '/?tab=dashboard',
+        icons: [
+          {
+            src: '/icon-192.png',
+            sizes: '192x192',
+          },
+        ],
+      },
+    ],
+  };
+}

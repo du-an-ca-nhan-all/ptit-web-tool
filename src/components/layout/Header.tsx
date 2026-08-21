@@ -14,10 +14,12 @@ import {
   Layers,
   Power,
   Bell,
+  Download,
 } from 'lucide-react';
 import { LoginUser, ExamBatchItem } from '../../types';
 import { NavigationTab } from '../../types/navigation';
 import { AnnouncementDrawer, AnnouncementItem } from '../../features/announcements';
+import { usePWAContext } from '../pwa/PWAProvider';
 
 interface HeaderProps {
   activeTab: NavigationTab;
@@ -71,6 +73,7 @@ export default function Header({
   announcements = [],
 }: HeaderProps) {
   const [isAnnouncementDrawerOpen, setIsAnnouncementDrawerOpen] = React.useState(false);
+  const { isInstalled, openInstallModal } = usePWAContext();
 
   const getHeaderTitle = () => {
     switch (activeTab) {
@@ -262,6 +265,18 @@ export default function Header({
           >
             <UserCheck className="w-4 h-4 text-purple-600" />
             <span className="hidden sm:inline">Đăng Nhập Như...</span>
+          </button>
+        )}
+
+        {/* PWA Install Button */}
+        {!isInstalled && (
+          <button
+            onClick={openInstallModal}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+            title="Cài đặt ứng dụng PTIT EduSync về máy"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Cài App</span>
           </button>
         )}
 
