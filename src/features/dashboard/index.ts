@@ -1,0 +1,11 @@
+export * from './types/dashboard.types';
+export { default as DashboardOverview } from './components/DashboardOverview';
+export { default as StudentHeroBanner } from './components/StudentHeroBanner';
+export { default as NextExamCountdownCard } from './components/NextExamCountdownCard';
+export { default as AcademicSnapshotCards } from './components/AcademicSnapshotCards';
+export { default as ClassMonitorDashboardCard } from './components/ClassMonitorDashboardCard';
+export { default as AdminSystemHealthCard } from './components/AdminSystemHealthCard';
+export { default as UpcomingScheduleList } from './components/UpcomingScheduleList';
+export { default as RecentAnnouncementsWidget } from './components/RecentAnnouncementsWidget';
+export { default as QuickActionGrid } from './components/QuickActionGrid';
+export { useDashboardData } from './hooks/useDashboardData';

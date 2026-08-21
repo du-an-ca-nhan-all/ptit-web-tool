@@ -24,6 +24,7 @@ import {
   Send,
   ShieldCheck,
   Phone,
+  LayoutDashboard,
 } from 'lucide-react';
 import { LoginUser } from '../../types';
 import { NavigationTab } from '../../types/navigation';
@@ -89,6 +90,20 @@ export default function Sidebar({
               <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
               <span>Sinh Viên & Tra Cứu</span>
             </div>
+
+            {/* Tổng Quan / Dashboard */}
+            {currentUser && (
+              <button
+                onClick={() => onTabChange('dashboard')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'dashboard'
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4 text-sky-400" /> Tổng Quan
+              </button>
+            )}
 
             {/* Hồ sơ cá nhân */}
             {currentUser && (

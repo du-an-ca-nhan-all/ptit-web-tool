@@ -1,6 +1,7 @@
 import { SortKey, SortDirection } from '../features/exam-schedule/types/exam.types';
 
 export type NavigationTab =
+  | 'dashboard'
   | 'schedule'
   | 'personal_schedule'
   | 'profile'
@@ -55,6 +56,7 @@ export interface InitialHomeState {
 }
 
 export const VALID_NAVIGATION_TABS: NavigationTab[] = [
+  'dashboard',
   'schedule',
   'personal_schedule',
   'profile',
@@ -100,6 +102,9 @@ export const PROFILE_SUBTAB_MAP: Record<string, ProfileSubTab> = {
 };
 
 export const PATH_TO_TAB_MAP: Record<string, NavigationTab> = {
+  dashboard: 'dashboard',
+  tongquan: 'dashboard',
+  'tong-quan': 'dashboard',
   profile: 'profile',
   'personal-schedule': 'personal_schedule',
   personal_schedule: 'personal_schedule',
@@ -185,6 +190,9 @@ export const getNavigationPath = (
 ): string => {
   let basePath = '/';
   switch (tab) {
+    case 'dashboard':
+      basePath = '/dashboard';
+      break;
     case 'profile':
       switch (profileSubTab) {
         case 'SCHEDULE':
@@ -288,7 +296,7 @@ export const getNavigationPath = (
 export const getInitialHomeState = (): InitialHomeState => {
   if (typeof window === 'undefined') {
     return {
-      tab: 'personal_schedule',
+      tab: 'dashboard',
       profileSubTab: 'OVERVIEW',
       search: '',
       classCode: '',
@@ -308,7 +316,7 @@ export const getInitialHomeState = (): InitialHomeState => {
   const pathname = window.location.pathname.replace(/^\/+|\/+$/g, '');
   const segments = pathname ? pathname.split('/') : [];
 
-  let tab: NavigationTab = 'personal_schedule';
+  let tab: NavigationTab = 'dashboard';
   let profileSubTab: ProfileSubTab = 'OVERVIEW';
 
   if (segments.length > 0) {

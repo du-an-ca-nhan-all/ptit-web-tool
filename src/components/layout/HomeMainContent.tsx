@@ -35,6 +35,7 @@ import {
 } from '../../features/announcements';
 import { ActivityLogsManager } from '../../features/activity-logs';
 import { DatabaseBackupManager } from '../../features/database-backup';
+import { DashboardOverview } from '../../features/dashboard';
 import Footer from './Footer';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
 import { NavigationTab, ProfileSubTab, TabChangeOptions } from '../../types/navigation';
@@ -170,7 +171,14 @@ export default function HomeMainContent({
         onNavigateTab={(tab) => handleTabChange(tab as NavigationTab)}
       />
 
-      {isLoading ? (
+      {activeTab === 'dashboard' && effectiveUser ? (
+        <DashboardOverview
+          currentUser={effectiveUser}
+          onNavigateTab={(tab, subTab, options) =>
+            handleTabChange(tab as NavigationTab, subTab as ProfileSubTab, options)
+          }
+        />
+      ) : isLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3">
           <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-sm text-slate-500 font-medium">Đang tải dữ liệu từ máy chủ...</p>

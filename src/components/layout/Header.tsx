@@ -74,6 +74,8 @@ export default function Header({
 
   const getHeaderTitle = () => {
     switch (activeTab) {
+      case 'dashboard':
+        return 'Tổng Quan';
       case 'schedule':
         return 'Lịch Thi Tổng';
       case 'personal_schedule':
