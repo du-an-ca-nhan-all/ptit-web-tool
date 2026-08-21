@@ -3,6 +3,7 @@ import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { AVAILABLE_EXTERNAL_SYSTEMS } from '@/src/types';
 import { loginAndGetToken, validateToken, getValidTokenOrRefresh } from '@/src/features/external-portal/server/qldttxServerService';
+import { loginLMS, validateLmsToken, getValidLmsTokenOrRefresh } from '@/src/features/external-portal/server/lmsServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 async function getAuthUser(req: NextRequest) {
@@ -168,19 +169,31 @@ export async function POST(req: NextRequest) {
       }
 
       const targetSysKey = systemKey || 'QLDTTX_PTTC1';
+      const whereCondition = targetSysKey === 'ALL' ? {} : { systemKey: targetSysKey };
       const allAccounts = await prisma.externalAccount.findMany({
-        where: { systemKey: targetSysKey },
+        where: whereCondition,
       });
       let successCount = 0;
       let failCount = 0;
 
       for (const acc of allAccounts) {
         try {
-          const { token: freshToken } = await getValidTokenOrRefresh({
-            username: acc.extUsername,
-            password: acc.extPassword,
-            existingToken: acc.token,
-          });
+          let freshToken: string;
+          if (acc.systemKey === 'LMS_PTTC1') {
+            const res = await getValidLmsTokenOrRefresh({
+              username: acc.extUsername,
+              password: acc.extPassword,
+              existingToken: acc.token,
+            });
+            freshToken = res.token;
+          } else {
+            const res = await getValidTokenOrRefresh({
+              username: acc.extUsername,
+              password: acc.extPassword,
+              existingToken: acc.token,
+            });
+            freshToken = res.token;
+          }
 
           await prisma.externalAccount.update({
             where: { id: acc.id },
@@ -188,7 +201,7 @@ export async function POST(req: NextRequest) {
               token: freshToken,
               status: 'CONNECTED',
               lastSyncAt: new Date(),
-              syncMessage: 'Đã lấy và xác thực Token QLDTTX thành công.',
+              syncMessage: `Đã lấy và xác thực Session/Token ${acc.systemKey} thành công.`,
             },
           });
           successCount++;
@@ -289,7 +302,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Test logging in to QLDTTX to verify credentials and extract access token
+      // Test logging in to external system to verify credentials and extract access token
       let fetchedToken: string | null = null;
       let status = 'CONNECTED';
       let syncMessage = `Đã lưu cấu hình tài khoản ${finalSystemName} thành công!`;
@@ -319,6 +332,36 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(
             {
               error: `Kiểm tra kết nối thất bại: ${tokenErr.message}. Vui lòng kiểm tra lại Tên đăng nhập và Mật khẩu chính xác trước khi lưu cấu hình.`,
+            },
+            { status: 400 }
+          );
+        }
+      } else if (systemKey === 'LMS_PTTC1') {
+        try {
+          const lmsRes = await loginLMS({
+            username: cleanUsername,
+            password: cleanPassword,
+          });
+          fetchedToken = lmsRes.token;
+          syncMessage = 'Đã xác thực và lưu phiên kết nối LMS PTTC1 thành công!';
+        } catch (tokenErr: any) {
+          console.warn(`LMS login failed for ${cleanUsername} during SAVE:`, tokenErr.message);
+
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'SAVE_EXTERNAL_ACCOUNT_FAILED',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Lưu cấu hình LMS cho ${effectiveUsername} thất bại do đăng nhập không thành công: ${tokenErr.message}`,
+            metadata: { effectiveUsername, systemKey, error: tokenErr.message },
+          });
+
+          return NextResponse.json(
+            {
+              error: `Kiểm tra kết nối LMS thất bại: ${tokenErr.message}. Vui lòng kiểm tra lại Tên đăng nhập và Mật khẩu LMS trước khi lưu.`,
             },
             { status: 400 }
           );
@@ -364,7 +407,7 @@ export async function POST(req: NextRequest) {
         action: 'SAVE_EXTERNAL_ACCOUNT',
         targetType: 'EXTERNAL_ACCOUNT',
         targetId: effectiveUsername,
-        description: `Lưu cấu hình liên kết ${finalSystemName} cho ${effectiveUsername} thành công${fetchedToken ? ' (Đã cấp Token)' : ''}`,
+        description: `Lưu cấu hình liên kết ${finalSystemName} cho ${effectiveUsername} thành công${fetchedToken ? ' (Đã cấp Token/Session)' : ''}`,
         metadata: { effectiveUsername, systemKey, status, hasToken: !!fetchedToken },
       });
 
@@ -436,8 +479,53 @@ export async function POST(req: NextRequest) {
               { status: 400 }
             );
           }
+        } else if (systemKey === 'LMS_PTTC1') {
+          try {
+            const lmsRes = await loginLMS({
+              username: cleanInputUser,
+              password: cleanInputPass,
+            });
+
+            await logActivity({
+              req,
+              userId: authUser.id,
+              username: authUser.username,
+              userRole: authUser.role,
+              action: 'TEST_EXTERNAL_ACCOUNT_CREDENTIALS',
+              targetType: 'EXTERNAL_ACCOUNT',
+              targetId: effectiveUsername,
+              description: `Kiểm tra kết nối tài khoản LMS (${cleanInputUser}) thành công`,
+              metadata: { effectiveUsername, targetSystemUser: cleanInputUser },
+            });
+
+            return NextResponse.json({
+              success: true,
+              message: `Kiểm tra kết nối tới Hệ thống học tập trực tuyến (LMS) thành công! Đăng nhập chính xác.`,
+              token: lmsRes.token,
+              sesskey: lmsRes.sesskey,
+            });
+          } catch (testErr: any) {
+            await logActivity({
+              req,
+              userId: authUser.id,
+              username: authUser.username,
+              userRole: authUser.role,
+              action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
+              targetType: 'EXTERNAL_ACCOUNT',
+              targetId: effectiveUsername,
+              description: `Kiểm tra kết nối LMS (${cleanInputUser}) thất bại: ${testErr.message}`,
+              metadata: { effectiveUsername, targetSystemUser: cleanInputUser, error: testErr.message },
+            });
+
+            return NextResponse.json(
+              {
+                error: `Kiểm tra kết nối LMS thất bại: ${testErr.message}`,
+              },
+              { status: 400 }
+            );
+          }
         } else {
-          // For LMS_PTTC1 or other external systems
+          // For other external systems
           await logActivity({
             req,
             userId: authUser.id,
@@ -545,8 +633,78 @@ export async function POST(req: NextRequest) {
             { status: 400 }
           );
         }
+      } else if (existing.systemKey === 'LMS_PTTC1') {
+        try {
+          const { token: validToken, isNew, sesskey } = await getValidLmsTokenOrRefresh({
+            username: existing.extUsername,
+            password: existing.extPassword,
+            existingToken: existing.token,
+          });
+
+          const updated = await prisma.externalAccount.update({
+            where: { id: existing.id },
+            data: {
+              token: validToken,
+              status: 'CONNECTED',
+              lastSyncAt: new Date(),
+              syncMessage: isNew
+                ? `Đã đăng nhập và cấp Session LMS mới lúc ${new Date().toLocaleTimeString('vi-VN')}`
+                : `Session LMS hiện tại còn sống lúc ${new Date().toLocaleTimeString('vi-VN')}`,
+            },
+          });
+
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'TEST_EXTERNAL_ACCOUNT',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Kiểm tra/làm mới session LMS cho ${effectiveUsername}: Thành công (${isNew ? 'Cấp session mới' : 'Session hợp lệ'})`,
+            metadata: { effectiveUsername, isNew },
+          });
+
+          return NextResponse.json({
+            success: true,
+            message: isNew
+              ? `Đã đăng nhập và lấy Session LMS mới thành công cho ${existing.extUsername}!`
+              : `Session LMS hiện tại còn sống và hợp lệ!`,
+            token: updated.token,
+            sesskey,
+            isNew,
+            lastSyncAt: updated.lastSyncAt?.toISOString(),
+          });
+        } catch (loginErr: any) {
+          await prisma.externalAccount.update({
+            where: { id: existing.id },
+            data: {
+              status: 'ERROR',
+              syncMessage: `Lỗi kết nối LMS: ${loginErr.message}`,
+            },
+          });
+
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Kiểm tra kết nối LMS cho ${effectiveUsername} thất bại: ${loginErr.message}`,
+            metadata: { effectiveUsername, error: loginErr.message },
+          });
+
+          return NextResponse.json(
+            {
+              error: `Không thể kết nối LMS: ${loginErr.message}`,
+            },
+            { status: 400 }
+          );
+        }
       } else {
-        // Other systems (e.g. LMS_PTTC1)
+        // Other systems
         const updated = await prisma.externalAccount.update({
           where: { id: existing.id },
           data: {

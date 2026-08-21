@@ -201,7 +201,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
 
   // Batch Get Tokens / Test all accounts
   const handleBatchGetTokens = async () => {
-    if (!confirm('Bạn có chắc muốn lấy và xác thực Token cho toàn bộ các tài khoản đã liên kết?')) return;
+    const sysLabel = selectedSystem === 'ALL' ? 'toàn bộ các hệ thống' : selectedSystem;
+    if (!confirm(`Bạn có chắc muốn lấy và xác thực Session/Token cho ${sysLabel}?`)) return;
     setIsBatchTesting(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -209,7 +210,10 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       const res = await fetch('/api/external-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'BATCH_GET_TOKENS' }),
+        body: JSON.stringify({
+          action: 'BATCH_GET_TOKENS',
+          systemKey: selectedSystem === 'ALL' ? 'ALL' : selectedSystem,
+        }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -233,11 +237,11 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       return;
     }
     if (!formData.extUsername.trim()) {
-      setErrorMsg('Vui lòng nhập Tên đăng nhập QLDTTX trước khi kiểm tra');
+      setErrorMsg(`Vui lòng nhập Tên đăng nhập ${formData.systemName} trước khi kiểm tra`);
       return;
     }
     if (!formData.extPassword.trim()) {
-      setErrorMsg('Vui lòng nhập Mật khẩu QLDTTX trước khi kiểm tra');
+      setErrorMsg(`Vui lòng nhập Mật khẩu ${formData.systemName} trước khi kiểm tra`);
       return;
     }
 
@@ -432,8 +436,12 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
 
   const connectedCount = accounts.filter((a) => a.status === 'CONNECTED').length;
   const hasTokenCount = accounts.filter((a) => !!a.token).length;
-  const qldttxCount = accounts.filter((a) => a.systemKey === 'QLDTTX_PTTC1').length;
-  const lmsCount = accounts.filter((a) => a.systemKey === 'LMS_PTTC1').length;
+  const qldttxAccounts = accounts.filter((a) => a.systemKey === 'QLDTTX_PTTC1');
+  const qldttxCount = qldttxAccounts.length;
+  const qldttxTokenCount = qldttxAccounts.filter((a) => !!a.token).length;
+  const lmsAccounts = accounts.filter((a) => a.systemKey === 'LMS_PTTC1');
+  const lmsCount = lmsAccounts.length;
+  const lmsTokenCount = lmsAccounts.filter((a) => !!a.token).length;
   const coveragePercent = totalStudents > 0 ? ((accounts.length / totalStudents) * 100).toFixed(1) : '0';
 
   return (
@@ -502,14 +510,14 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             onClick={handleBatchGetTokens}
             disabled={isBatchTesting || accounts.length === 0}
             className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-amber-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Lấy và xác thực Token cho toàn bộ tài khoản QLDTTX"
+            title="Lấy và xác thực Session/Token cho toàn bộ tài khoản"
           >
             {isBatchTesting ? (
               <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <Zap className="w-3.5 h-3.5" />
             )}
-            <span>Lấy Token QLDTTX</span>
+            <span>Lấy Session/Token</span>
           </button>
 
           <button
@@ -570,7 +578,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Cổng QLDTTX (PTTC1)</div>
             <div className="text-2xl font-black text-emerald-600 mt-0.5">
               {qldttxCount}{' '}
-              <span className="text-xs font-normal text-slate-400">({hasTokenCount} Token)</span>
+              <span className="text-xs font-normal text-slate-400">({qldttxTokenCount} Token)</span>
             </div>
             <div className="text-[11px] text-emerald-700 font-bold mt-0.5">Sẵn sàng crawl/đồng bộ</div>
           </div>
@@ -582,7 +590,10 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
           </div>
           <div>
             <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">LMS Học Tập Trực Tuyến</div>
-            <div className="text-2xl font-black text-sky-600 mt-0.5">{lmsCount}</div>
+            <div className="text-2xl font-black text-sky-600 mt-0.5">
+              {lmsCount}{' '}
+              <span className="text-xs font-normal text-slate-400">({lmsTokenCount} Session)</span>
+            </div>
             <div className="text-[11px] text-sky-700 font-bold mt-0.5">Tài khoản lms.pttc1.edu.vn</div>
           </div>
         </div>
@@ -807,14 +818,12 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                         </div>
                       </td>
                       <td className="px-4 py-3.5">
-                        {acc.systemKey !== 'QLDTTX_PTTC1' ? (
-                          <span className="text-slate-400 text-[11px] italic">Không yêu cầu</span>
-                        ) : acc.token ? (
+                        {acc.token ? (
                           <div className="flex items-center gap-1.5">
                             <span
                               onClick={() => setViewingTokenAccount(acc)}
                               className="font-mono text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-1 rounded-lg truncate max-w-[140px] cursor-pointer hover:bg-emerald-100 transition-colors"
-                              title="Bấm để xem toàn bộ Token"
+                              title="Bấm để xem toàn bộ Session / Token"
                             >
                               {acc.token.replace(/^Bearer\s+/i, '').substring(0, 16)}...
                             </span>
@@ -822,7 +831,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                               type="button"
                               onClick={() => handleCopyToken(acc.token!, acc.id)}
                               className="p-1 text-slate-400 hover:text-emerald-700 rounded-md transition-colors cursor-pointer"
-                              title="Sao chép Token"
+                              title="Sao chép Session / Token"
                             >
                               {isCopied ? (
                                 <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
@@ -851,21 +860,23 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Get / Refresh Token button (QLDTTX only) */}
-                          {acc.systemKey === 'QLDTTX_PTTC1' && (
-                            <button
-                              onClick={() => handleGetTokenSingle(acc)}
-                              disabled={isCurrentTesting}
-                              className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                              title="Lấy / Làm mới Token từ QLDTTX"
-                            >
-                              {isCurrentTesting ? (
-                                <div className="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <Zap className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          )}
+                          {/* Get / Refresh Token button */}
+                          <button
+                            onClick={() => handleGetTokenSingle(acc)}
+                            disabled={isCurrentTesting}
+                            className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                            title={
+                              acc.systemKey === 'LMS_PTTC1'
+                                ? 'Lấy / Làm mới Session LMS'
+                                : 'Lấy / Làm mới Token QLDTTX'
+                            }
+                          >
+                            {isCurrentTesting ? (
+                              <div className="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Zap className="w-3.5 h-3.5" />
+                            )}
+                          </button>
 
                           {/* Edit button */}
                           <button
