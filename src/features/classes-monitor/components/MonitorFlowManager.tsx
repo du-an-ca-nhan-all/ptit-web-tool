@@ -55,7 +55,7 @@ interface MonitorFlowManagerProps {
   onNavigateTab?: (tab: string, subTab?: string) => void;
 }
 
-type MainSubTab = 'ALL_COMPARE' | 'FLOW_CONFIG' | 'MONITOR_COURSES' | 'FLOW_QUEUE';
+type MainSubTab = 'FLOW_CONFIG' | 'MONITOR_COURSES' | 'ALL_COMPARE' | 'FLOW_QUEUE';
 type CompareFilter = 'ALL' | 'ACTIVE_FLOW' | 'NEEDS_ATTENTION' | 'MATCHED_100' | 'NOT_LINKED';
 
 export default function MonitorFlowManager({
@@ -98,8 +98,8 @@ export default function MonitorFlowManager({
     }
   }, [initialClassCode, setSelectedClass, selectedClass]);
 
-  // Sub-tabs: Default to 'ALL_COMPARE' so users instantly see the all-in-one comparison
-  const [activeSubTab, setActiveSubTab] = useState<MainSubTab>('ALL_COMPARE');
+  // Sub-tabs: Default to 'FLOW_CONFIG' (Tab 1)
+  const [activeSubTab, setActiveSubTab] = useState<MainSubTab>('FLOW_CONFIG');
 
   // Matrix Filter
   const [compareFilter, setCompareFilter] = useState<CompareFilter>('ALL');
@@ -287,23 +287,6 @@ export default function MonitorFlowManager({
       {/* Main Sub-tabs Navigation */}
       <div className="flex items-center gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200 w-full sm:w-fit overflow-x-auto">
         <button
-          onClick={() => setActiveSubTab('ALL_COMPARE')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all shrink-0 cursor-pointer ${
-            activeSubTab === 'ALL_COMPARE'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Table className="w-4 h-4 text-indigo-600" />
-          <span>Bảng So Sánh Toàn Bộ Thành Viên Flow</span>
-          {monitorCourses.length > 0 && (
-            <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded-md text-[10px] font-black">
-              {students.length} bạn
-            </span>
-          )}
-        </button>
-
-        <button
           onClick={() => setActiveSubTab('FLOW_CONFIG')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all shrink-0 cursor-pointer ${
             activeSubTab === 'FLOW_CONFIG'
@@ -331,6 +314,23 @@ export default function MonitorFlowManager({
         </button>
 
         <button
+          onClick={() => setActiveSubTab('ALL_COMPARE')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all shrink-0 cursor-pointer ${
+            activeSubTab === 'ALL_COMPARE'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Table className="w-4 h-4 text-indigo-600" />
+          <span>Bảng So Sánh Môn Học Cả Lớp</span>
+          {monitorCourses.length > 0 && (
+            <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded-md text-[10px] font-black">
+              {students.length} bạn
+            </span>
+          )}
+        </button>
+
+        <button
           onClick={() => setActiveSubTab('FLOW_QUEUE')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all shrink-0 cursor-pointer ${
             activeSubTab === 'FLOW_QUEUE'
@@ -344,7 +344,7 @@ export default function MonitorFlowManager({
       </div>
 
       {/* ========================================================================= */}
-      {/* SUBTAB 1 (PRIMARY): ALL-IN-ONE COMPARISON MATRIX TABLE FOR ALL MEMBERS */}
+      {/* SUBTAB 3: ALL-IN-ONE COMPARISON MATRIX TABLE FOR ALL MEMBERS */}
       {/* ========================================================================= */}
       {activeSubTab === 'ALL_COMPARE' && (
         <div className="space-y-6 animate-in fade-in duration-200">
@@ -877,7 +877,7 @@ export default function MonitorFlowManager({
       )}
 
       {/* ========================================================================= */}
-      {/* SUBTAB 2: FLOW CONFIGURATION & DETAILED SETTINGS */}
+      {/* SUBTAB 1: FLOW CONFIGURATION & DETAILED SETTINGS */}
       {/* ========================================================================= */}
       {activeSubTab === 'FLOW_CONFIG' && (
         <div className="space-y-6 animate-in fade-in duration-200">
@@ -1128,7 +1128,7 @@ export default function MonitorFlowManager({
       )}
 
       {/* ========================================================================= */}
-      {/* SUBTAB 3: MONITOR'S REGISTERED COURSES (DANH SÁCH MÔN CỦA LỚP TRƯỞNG) */}
+      {/* SUBTAB 2: MONITOR'S REGISTERED COURSES (DANH SÁCH MÔN CỦA LỚP TRƯỞNG) */}
       {/* ========================================================================= */}
       {activeSubTab === 'MONITOR_COURSES' && (
         <div className="space-y-6 animate-in fade-in duration-200">
