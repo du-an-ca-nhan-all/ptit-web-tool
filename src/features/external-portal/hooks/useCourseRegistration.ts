@@ -287,9 +287,16 @@ export function useCourseRegistration(currentUser: LoginUser) {
   const runSniperStep = useCallback(async () => {
     if (!isSniperActiveRef.current) return;
 
-    const targets = sniperTargetsRef.current;
+    // Filter only targets that are not finished
+    const targets = sniperTargetsRef.current.filter((t) => t.status !== 'SUCCESS');
     if (targets.length === 0) {
-      addSniperLog('warning', 'Hàng đợi trống. Đang chờ thêm môn học mục tiêu...');
+      setIsSniperActive(false);
+      isSniperActiveRef.current = false;
+      if (sniperTimerRef.current) {
+        clearInterval(sniperTimerRef.current);
+        sniperTimerRef.current = null;
+      }
+      addSniperLog('warning', 'Hàng đợi trống hoặc tất cả môn đã hoàn thành. Sniper Bot tự động dừng.');
       return;
     }
 
@@ -354,6 +361,11 @@ export function useCourseRegistration(currentUser: LoginUser) {
       setSniperStats((prev) => ({ ...prev, slotsFound: prev.slotsFound + availableList.length }));
 
       for (const item of availableList) {
+        if (!isSniperActiveRef.current) break;
+
+        const itemMaMonUpper = (item.ma_mon || '').toUpperCase();
+        const itemIdToHocStr = String(item.id_to_hoc || '');
+
         addSniperLog(
           'slot',
           `🔥 PHÁT HIỆN SLOT TRỐNG! Môn: ${item.ten_mon} (${item.ma_mon}) - Nhóm ${item.nhom_to} (Còn: ${item.sl_cl}/${item.sl_cp})`
@@ -376,22 +388,78 @@ export function useCourseRegistration(currentUser: LoginUser) {
         const regData = await regRes.json();
         if (regRes.ok && regData.success) {
           playAlertSound('success');
-          addSniperLog('success', `🎉 ĐĂNG KÝ THÀNH CÔNG môn [${item.ten_mon}] - Nhóm ${item.nhom_to}!`);
+          addSniperLog(
+            'success',
+            `🎉 ĐĂNG KÝ THÀNH CÔNG môn [${item.ten_mon}] - Nhóm ${item.nhom_to}! Đã xóa khỏi hàng đợi.`
+          );
           setSniperStats((prev) => ({ ...prev, successCount: prev.successCount + 1 }));
 
-          // Cập nhật trạng thái mục tiêu
-          setSniperTargets((prev) =>
-            prev.map((t) =>
-              t.maMon?.toUpperCase() === item.ma_mon?.toUpperCase() ? { ...t, status: 'SUCCESS' } : t
-            )
-          );
+          // Loại bỏ môn học đã đăng ký thành công khỏi danh sách canh slot
+          const updatedTargets = sniperTargetsRef.current.filter((t) => {
+            const targetMaMonUpper = (t.maMon || '').toUpperCase();
+            const targetIdToHocStr = t.idToHoc ? String(t.idToHoc) : '';
+            const isMatched =
+              targetMaMonUpper === itemMaMonUpper ||
+              (targetIdToHocStr && targetIdToHocStr === itemIdToHocStr);
+            return !isMatched;
+          });
+
+          sniperTargetsRef.current = updatedTargets;
+          setSniperTargets(updatedTargets);
 
           await fetchPortalData(true);
+
+          // Nếu đã hoàn thành tất cả môn mục tiêu -> Tự động dừng Sniper Bot
+          if (updatedTargets.length === 0) {
+            setIsSniperActive(false);
+            isSniperActiveRef.current = false;
+            if (sniperTimerRef.current) {
+              clearInterval(sniperTimerRef.current);
+              sniperTimerRef.current = null;
+            }
+            addSniperLog('success', '🎯 ĐÃ HOÀN TẤT TẤT CẢ MỤC TIÊU! Sniper Bot đã tự động dừng.');
+            return;
+          }
         } else {
-          addSniperLog(
-            'error',
-            `[-] Đăng ký tổ học [${item.id_to_hoc}] thất bại: ${regData.message || regData.error || 'Bị hụt slot'}`
-          );
+          const msg = (regData.message || regData.error || '').toLowerCase();
+          const isAlreadyRegistered =
+            msg.includes('đã đăng ký') ||
+            msg.includes('đã có trong danh sách') ||
+            msg.includes('trùng lịch') ||
+            msg.includes('đã tồn tại');
+
+          if (isAlreadyRegistered) {
+            addSniperLog(
+              'info',
+              `ℹ️ [${item.ten_mon}]: ${regData.message || 'Môn học đã tồn tại trong danh sách'}. Đã xóa khỏi hàng đợi.`
+            );
+            const updatedTargets = sniperTargetsRef.current.filter((t) => {
+              const targetMaMonUpper = (t.maMon || '').toUpperCase();
+              const targetIdToHocStr = t.idToHoc ? String(t.idToHoc) : '';
+              const isMatched =
+                targetMaMonUpper === itemMaMonUpper ||
+                (targetIdToHocStr && targetIdToHocStr === itemIdToHocStr);
+              return !isMatched;
+            });
+            sniperTargetsRef.current = updatedTargets;
+            setSniperTargets(updatedTargets);
+
+            if (updatedTargets.length === 0) {
+              setIsSniperActive(false);
+              isSniperActiveRef.current = false;
+              if (sniperTimerRef.current) {
+                clearInterval(sniperTimerRef.current);
+                sniperTimerRef.current = null;
+              }
+              addSniperLog('success', '🎯 ĐÃ HOÀN TẤT TẤT CẢ MỤC TIÊU! Sniper Bot đã tự động dừng.');
+              return;
+            }
+          } else {
+            addSniperLog(
+              'error',
+              `[-] Đăng ký tổ học [${item.id_to_hoc}] thất bại: ${regData.message || regData.error || 'Bị hụt slot'}`
+            );
+          }
         }
       }
     } catch (err: any) {
