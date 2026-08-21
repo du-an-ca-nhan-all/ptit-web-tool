@@ -17,6 +17,7 @@ import {
   ClassMembers,
   MonitorsList,
   AllStudentsList,
+  MonitorFlowManager,
 } from '../../features/classes-monitor';
 import {
   AllMonitorsEnvelopes,
@@ -280,6 +281,14 @@ export default function HomeMainContent({
           onSelectStudentSchedule={(studentId) => {
             handleTabChange('schedule', undefined, { search: studentId });
           }}
+        />
+      ) : activeTab === 'monitor_flow' && (isAdmin || canAccessMonitorTools) ? (
+        <MonitorFlowManager
+          currentUser={effectiveUser!}
+          availableClasses={classes}
+          onNavigateTab={(tab, subTab) =>
+            handleTabChange(tab as NavigationTab, subTab as ProfileSubTab)
+          }
         />
       ) : activeTab === 'monitor' ? (
         <ClassMonitorTools

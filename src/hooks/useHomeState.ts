@@ -153,6 +153,7 @@ export function useHomeState() {
       }
       const monitorOnlyTabs: NavigationTab[] = [
         'members',
+        'monitor_flow',
         'monitor',
         'envelope',
         'envelope_all',
@@ -243,6 +244,7 @@ export function useHomeState() {
         'user_registrations',
         'database_backup',
         'members',
+        'monitor_flow',
         'monitor',
         'envelope',
         'envelope_all',

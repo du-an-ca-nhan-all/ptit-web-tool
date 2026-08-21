@@ -27,6 +27,7 @@ import {
   LayoutDashboard,
   Download,
   Zap,
+  GitFork,
 } from 'lucide-react';
 import { LoginUser } from '../../types';
 import { NavigationTab } from '../../types/navigation';
@@ -242,6 +243,18 @@ export default function Sidebar({
                 }`}
               >
                 <Users className="w-4 h-4 text-amber-400" /> Danh Sách & Điểm Danh
+              </button>
+
+              {/* Cấu hình Flow Action */}
+              <button
+                onClick={() => onTabChange('monitor_flow')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'monitor_flow'
+                    ? 'bg-amber-600/20 text-amber-400 border border-amber-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <GitFork className="w-4 h-4 text-amber-400" /> Cấu Hình Flow Lớp Trưởng
               </button>
 
               {/* Phân Công Phong Bì */}

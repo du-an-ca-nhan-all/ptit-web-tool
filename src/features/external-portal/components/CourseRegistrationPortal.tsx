@@ -35,6 +35,7 @@ import {
   FileText,
   User,
   Users,
+  GitFork,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import { useCourseRegistration, SniperTarget } from '../hooks/useCourseRegistration';
@@ -290,6 +291,17 @@ export default function CourseRegistrationPortal({
             >
               <Globe className="w-3.5 h-3.5" />
               <span>Liên Kết Tài Khoản QLDTTX</span>
+            </button>
+          )}
+
+          {(currentUser.isMonitor || currentUser.isAdmin) && onNavigateTab && (
+            <button
+              onClick={() => onNavigateTab('monitor_flow')}
+              className="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-2xl transition-colors border border-amber-200 flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Quản lý cấu hình Flow Action ĐKMH theo Lớp trưởng"
+            >
+              <GitFork className="w-3.5 h-3.5 text-amber-600" />
+              <span>Flow Action Lớp</span>
             </button>
           )}
 

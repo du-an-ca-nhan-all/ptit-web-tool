@@ -22,7 +22,8 @@ export type NavigationTab =
   | 'announcements_admin'
   | 'all_students'
   | 'course_compare'
-  | 'course_registration';
+  | 'course_registration'
+  | 'monitor_flow';
 
 export type ProfileSubTab =
   | 'OVERVIEW'
@@ -80,6 +81,7 @@ export const VALID_NAVIGATION_TABS: NavigationTab[] = [
   'all_students',
   'course_compare',
   'course_registration',
+  'monitor_flow',
 ];
 
 export const PROFILE_SUBTAB_MAP: Record<string, ProfileSubTab> = {
@@ -132,6 +134,9 @@ export const PATH_TO_TAB_MAP: Record<string, NavigationTab> = {
   students: 'all_students',
   'all-students': 'all_students',
   all_students: 'all_students',
+  'monitor-flow': 'monitor_flow',
+  monitor_flow: 'monitor_flow',
+  flow: 'monitor_flow',
   members: 'members',
   envelope: 'envelope_all',
   'envelope-all': 'envelope_all',
@@ -156,6 +161,9 @@ export const PATH_TO_TAB_MAP: Record<string, NavigationTab> = {
 export const MONITOR_SUBPATH_MAP: Record<string, NavigationTab> = {
   members: 'members',
   danhsach: 'members',
+  flow: 'monitor_flow',
+  'monitor-flow': 'monitor_flow',
+  monitor_flow: 'monitor_flow',
   envelope: 'envelope_all',
   phongbi: 'envelope_all',
   'envelope-all': 'envelope_all',
@@ -257,6 +265,9 @@ export const getNavigationPath = (
       break;
     case 'members':
       basePath = '/monitor/members';
+      break;
+    case 'monitor_flow':
+      basePath = '/monitor/flow';
       break;
     case 'envelope':
     case 'envelope_all':

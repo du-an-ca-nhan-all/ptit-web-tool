@@ -93,6 +93,8 @@ export default function Header({
         return 'So Sánh ĐKMH';
       case 'members':
         return 'Danh Sách sinh viên trong Lớp';
+      case 'monitor_flow':
+        return 'Cấu Hình Flow Lớp Trưởng';
       case 'batches':
         return 'Quản Lý Đợt Thi';
       case 'telegram_admin':

@@ -492,3 +492,35 @@ model StudentLmsRecord {
   @@index([username])
   @@index([lastPulledAt])
 }
+
+// 22. Bảng MonitorFlowConfig: Cấu hình danh sách sinh viên flow action theo Lớp trưởng
+model MonitorFlowConfig {
+  id                  Int       @id @default(autoincrement())
+  classCode           String    // Mã lớp (Ví dụ: D25TXCN11-K)
+  monitorUsername     String    // Mã SV của Lớp trưởng (người được flow theo)
+  followerUsername    String    // Mã SV của thành viên trong lớp flow theo lớp trưởng
+  
+  isEnabled           Boolean   @default(false) // Mặc định tắt flow cho sinh viên này
+  
+  // Quyền / action được flow theo:
+  allowRegisterCourse Boolean   @default(true) // Cho phép tự động flow đăng ký môn học
+  allowCancelCourse   Boolean   @default(true) // Cho phép tự động flow hủy môn học
+  
+  autoSyncOnAction    Boolean   @default(false) // Tự động kích hoạt khi lớp trưởng đăng ký/hủy trên cổng ĐKMH
+  
+  note                String?   // Ghi chú
+  lastActionAt        DateTime? // Lần gần nhất thực hiện flow action
+  lastActionType      String?   // 'REGISTER' | 'CANCEL' | 'SYNC_ALL'
+  lastActionResult    String?   // 'SUCCESS' | 'PARTIAL' | 'FAILED'
+  lastActionMessage   String?   // Thông báo chi tiết kết quả
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([monitorUsername, followerUsername])
+  @@index([classCode])
+  @@index([monitorUsername])
+  @@index([followerUsername])
+  @@index([isEnabled])
+}
+
