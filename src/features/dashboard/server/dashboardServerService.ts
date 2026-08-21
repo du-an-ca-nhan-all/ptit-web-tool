@@ -271,6 +271,7 @@ export async function getDashboardData(username: string): Promise<DashboardData 
         prisma.user.count({
           where: {
             student: { maLop: studentLop },
+            passwordHash: { notIn: ['', 'NONE', 'null', 'undefined'] },
           },
         }),
         prisma.examRecord.findMany({
@@ -310,7 +311,11 @@ export async function getDashboardData(username: string): Promise<DashboardData 
       recentActivityLogsCount,
     ] = await Promise.all([
       prisma.student.count(),
-      prisma.user.count(),
+      prisma.user.count({
+        where: {
+          passwordHash: { notIn: ['', 'NONE', 'null', 'undefined'] },
+        },
+      }),
       prisma.examBatch.count({ where: { isActive: true } }),
       prisma.registrationRequest.count({ where: { status: 'PENDING' } }),
       getGlobalConfig<TelegramBotConfigValue>(GLOBAL_CONFIG_KEYS.TELEGRAM_BOT),
