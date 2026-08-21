@@ -1,23 +1,54 @@
 /**
  * PTIT LMS (https://lms.pttc1.edu.vn/) Authentication & Management Service
- * Hỗ trợ tự động đăng nhập LMS PTTC1, quản lý phiên/cookie và đồng bộ hoạt động học tập.
+ * Hỗ trợ tự động đăng nhập LMS PTTC1, quản lý phiên/cookie, đồng bộ khóa học,
+ * tiến độ hoàn thành, điểm quá trình và tự động học (auto-study activities).
  */
 
 export const LMS_BASE_URL = 'https://lms.pttc1.edu.vn';
 export const LMS_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-export interface LmsCourseItem {
+export interface LmsCourseOverviewItem {
   id: string;
-  title: string;
+  courseCode: string;
+  courseName: string;
+  fullName: string;
+  instructor?: string;
+  instructorImg?: string;
+  category?: string;
+  progressPercent: number;
+  completedActivities: number;
+  totalActivities: number;
+  grade?: string | null;
   url: string;
+  isCompleted: boolean;
+}
+
+export interface LmsDashboardOverview {
+  userFullName: string;
+  username: string;
+  stats: {
+    enrolledCourses: number;
+    completedActivities: number;
+    completedCourses: number;
+    dueActivities: number;
+  };
+  courses: LmsCourseOverviewItem[];
+  lastSyncAt: string;
 }
 
 export interface LmsActivityItem {
   id: string;
   type: string;
+  name: string;
   url: string;
-  title?: string;
+  isCompleted?: boolean;
+}
+
+export interface LmsSectionItem {
+  id?: string;
+  title: string;
+  activities: LmsActivityItem[];
 }
 
 export interface LmsLoginResult {
@@ -221,50 +252,237 @@ export async function getValidLmsTokenOrRefresh(account: {
 }
 
 /**
- * Lấy danh sách khóa học của người dùng từ LMS
+ * Phân tích mã môn và tên môn học từ chuỗi tiêu đề Moodle
+ * Ví dụ: "INT1450 - Quản lý dự án phần mềm - 2503 - Nhóm 7"
  */
-export async function getMyCoursesFromLMS(tokenOrCookies: string): Promise<LmsCourseItem[]> {
-  const res = await fetch(`${LMS_BASE_URL}/my/courses.php`, {
+function parseCourseTitle(rawTitle: string): { courseCode: string; courseName: string; category: string } {
+  const clean = rawTitle.replace(/^Tên khóa học\s+/i, '').replace(/Khoá học\s+/i, '').replace(/Actions for course\s+/i, '').trim();
+  const parts = clean.split('-').map((s) => s.trim());
+
+  if (parts.length >= 3) {
+    return {
+      courseCode: parts[0],
+      courseName: parts[1],
+      category: parts.slice(2).join(' - '),
+    };
+  } else if (parts.length === 2) {
+    return {
+      courseCode: parts[0],
+      courseName: parts[1],
+      category: '',
+    };
+  }
+  return {
+    courseCode: clean.slice(0, 10),
+    courseName: clean,
+    category: '',
+  };
+}
+
+/**
+ * Lấy toàn bộ dữ liệu Tổng quan LMS: Số liệu thống kê, danh sách khóa học, tiến độ % và bảng điểm quá trình
+ */
+export async function fetchLmsDashboardOverview(account: {
+  username: string;
+  password?: string;
+  token?: string | null;
+}): Promise<LmsDashboardOverview> {
+  let validToken = account.token;
+  if (!validToken && account.password) {
+    const refreshed = await getValidLmsTokenOrRefresh({
+      username: account.username,
+      password: account.password,
+      existingToken: account.token,
+    });
+    validToken = refreshed.token;
+  }
+
+  if (!validToken) {
+    throw new Error('Chưa có Session Token hoặc Mật khẩu kết nối LMS');
+  }
+
+  const jar = new CookieJar(validToken);
+
+  // 1. Fetch Dashboard /my/ for user name and overall stats
+  const myRes = await fetch(`${LMS_BASE_URL}/my/`, {
     headers: {
-      Cookie: tokenOrCookies,
+      Cookie: jar.getCookieHeader(),
       'User-Agent': LMS_USER_AGENT,
     },
   });
-  const html = await res.text();
 
-  const courses: LmsCourseItem[] = [];
-  const courseRegex = /href="https:\/\/lms\.pttc1\.edu\.vn\/course\/view\.php\?id=(\d+)"[^>]*>([\s\S]*?)<\/a>/g;
-  let match: RegExpExecArray | null;
-  const seen = new Set<string>();
+  if (myRes.status === 303 || myRes.status === 302) {
+    // Session expired -> retry with password if available
+    if (account.password) {
+      const refreshed = await loginLMS({ username: account.username, password: account.password });
+      validToken = refreshed.token;
+      jar.loadFromCookieString(validToken);
+    }
+  }
 
-  while ((match = courseRegex.exec(html)) !== null) {
-    const id = match[1];
-    const rawTitle = match[2].replace(/<[^>]+>/g, '').trim();
-    if (id && rawTitle && !seen.has(id) && !rawTitle.includes('img')) {
-      seen.add(id);
+  const myHtml = await myRes.text();
+
+  // Extract user full name
+  const nameMatch = myHtml.match(/Chào mừng quay trở lại,\s*([^!]+)!/i) || myHtml.match(/class="usertext[^>]*>([^<]+)/i);
+  const userFullName = nameMatch ? nameMatch[1].trim() : account.username;
+
+  // Extract stats
+  const enrolledMatch = myHtml.match(/(\d+)\s*<\/div>\s*<[^>]+>\s*Khóa học đã đăng ký/i) || myHtml.match(/(\d+)\s*Khóa học đã đăng ký/i);
+  const completedActMatch = myHtml.match(/(\d+)\s*<\/div>\s*<[^>]+>\s*Hoạt động đã hoàn thành/i) || myHtml.match(/(\d+)\s*Hoạt động đã hoàn thành/i);
+  const completedCoursesMatch = myHtml.match(/(\d+)\s*<\/div>\s*<[^>]+>\s*Khóa học đã hoàn thành/i) || myHtml.match(/(\d+)\s*Khóa học đã hoàn thành/i);
+  const dueActMatch = myHtml.match(/(\d+)\s*<\/div>\s*<[^>]+>\s*Hoạt động đến hạn/i) || myHtml.match(/(\d+)\s*Hoạt động đến hạn/i);
+
+  const stats = {
+    enrolledCourses: enrolledMatch ? parseInt(enrolledMatch[1]) : 0,
+    completedActivities: completedActMatch ? parseInt(completedActMatch[1]) : 0,
+    completedCourses: completedCoursesMatch ? parseInt(completedCoursesMatch[1]) : 0,
+    dueActivities: dueActMatch ? parseInt(dueActMatch[1]) : 0,
+  };
+
+  // 2. Fetch Grades Overview /grade/report/overview/index.php
+  const gradeMap = new Map<string, string>();
+  try {
+    const gradeRes = await fetch(`${LMS_BASE_URL}/grade/report/overview/index.php`, {
+      headers: {
+        Cookie: jar.getCookieHeader(),
+        'User-Agent': LMS_USER_AGENT,
+      },
+    });
+    if (gradeRes.ok) {
+      const gradeHtml = await gradeRes.text();
+      // Match course link and grade cell
+      const gradeRowRegex = /href="https:\/\/lms\.pttc1\.edu\.vn\/course\/user\.php\?mode=grade&amp;id=(\d+)[^>]*>([\s\S]*?)<\/a>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/g;
+      let gMatch: RegExpExecArray | null;
+      while ((gMatch = gradeRowRegex.exec(gradeHtml)) !== null) {
+        const cId = gMatch[1];
+        const rawGrade = gMatch[3].replace(/<[^>]+>/g, '').trim();
+        if (rawGrade && rawGrade !== '-') {
+          gradeMap.set(cId, rawGrade);
+        }
+      }
+    }
+  } catch {
+    // Ignore grade overview error
+  }
+
+  // 3. Fetch Courses & Progress from /my/courses.php
+  const coursesRes = await fetch(`${LMS_BASE_URL}/my/courses.php`, {
+    headers: {
+      Cookie: jar.getCookieHeader(),
+      'User-Agent': LMS_USER_AGENT,
+    },
+  });
+  const coursesHtml = await coursesRes.text();
+
+  // Extract each course box / card HTML
+  const courses: LmsCourseOverviewItem[] = [];
+  const courseCardRegex = /<div[^>]*data-course-id="(\d+)"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/g;
+  let cMatch: RegExpExecArray | null;
+  const seenIds = new Set<string>();
+
+  while ((cMatch = courseCardRegex.exec(coursesHtml)) !== null) {
+    const id = cMatch[1];
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+
+    const cardContent = cMatch[2];
+
+    // Extract title
+    const titleMatch = cardContent.match(/class="[^"]*coursename[^"]*"[^>]*>([\s\S]*?)<\/a>/i) ||
+      cardContent.match(/href="https:\/\/lms\.pttc1\.edu\.vn\/course\/view\.php\?id=\d+"[^>]*>([\s\S]*?)<\/a>/i);
+    const rawFullName = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : `Khóa học ${id}`;
+    const { courseCode, courseName, category } = parseCourseTitle(rawFullName);
+
+    // Extract instructor
+    const teacherMatch = cardContent.match(/class="[^"]*course-instructors[^"]*"[^>]*>([\s\S]*?)<\/h6>/i) ||
+      cardContent.match(/title="([^"]+)"[^>]*>\s*<img/i);
+    const instructor = teacherMatch ? teacherMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+
+    // Extract progress activities
+    const actProgressMatch = cardContent.match(/(\d+)\s+trong\s+(\d+)\s+hoạt động đã hoàn thành/i);
+    const completedActivities = actProgressMatch ? parseInt(actProgressMatch[1]) : 0;
+    const totalActivities = actProgressMatch ? parseInt(actProgressMatch[2]) : 0;
+
+    // Extract progress %
+    const percentMatch = cardContent.match(/aria-valuenow="(\d+)"/i) || cardContent.match(/(\d+)%\s+Khóa học đã hoàn thành/i);
+    const progressPercent = percentMatch ? parseInt(percentMatch[1]) : totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0;
+
+    const grade = gradeMap.get(id) || null;
+
+    courses.push({
+      id,
+      courseCode,
+      courseName,
+      fullName: rawFullName,
+      instructor,
+      category,
+      progressPercent,
+      completedActivities,
+      totalActivities,
+      grade,
+      url: `${LMS_BASE_URL}/course/view.php?id=${id}`,
+      isCompleted: progressPercent === 100,
+    });
+  }
+
+  // Fallback: If regex didn't catch cards (e.g. format variations), parse course links
+  if (courses.length === 0) {
+    const fallbackRegex = /href="https:\/\/lms\.pttc1\.edu\.vn\/course\/view\.php\?id=(\d+)"[^>]*>([\s\S]*?)<\/a>/g;
+    let fbMatch: RegExpExecArray | null;
+    while ((fbMatch = fallbackRegex.exec(coursesHtml)) !== null) {
+      const id = fbMatch[1];
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+
+      const rawFullName = fbMatch[2].replace(/<[^>]+>/g, '').trim();
+      if (!rawFullName || rawFullName.includes('img')) continue;
+
+      const { courseCode, courseName, category } = parseCourseTitle(rawFullName);
+      const grade = gradeMap.get(id) || null;
+
       courses.push({
         id,
-        title: rawTitle,
+        courseCode,
+        courseName,
+        fullName: rawFullName,
+        category,
+        progressPercent: 0,
+        completedActivities: 0,
+        totalActivities: 0,
+        grade,
         url: `${LMS_BASE_URL}/course/view.php?id=${id}`,
+        isCompleted: false,
       });
     }
   }
 
-  return courses;
+  // Update total stats if parsed
+  if (stats.enrolledCourses === 0 && courses.length > 0) {
+    stats.enrolledCourses = courses.length;
+    stats.completedCourses = courses.filter((c) => c.isCompleted).length;
+    stats.completedActivities = courses.reduce((acc, c) => acc + c.completedActivities, 0);
+  }
+
+  return {
+    userFullName,
+    username: account.username,
+    stats,
+    courses,
+    lastSyncAt: new Date().toISOString(),
+  };
 }
 
 /**
- * Tự động duyệt và trigger xem các hoạt động trong một khóa học cụ thể trên LMS
+ * Lấy chi tiết các chương (sections) và hoạt động học tập (activities) trong một khóa học LMS
  */
-export async function studyCourseOnLMS(
+export async function fetchLmsCourseSections(
   courseId: string,
   tokenOrCookies: string
 ): Promise<{
   courseId: string;
   courseTitle: string;
+  sections: LmsSectionItem[];
   totalActivities: number;
-  completedActivities: number;
-  activities: LmsActivityItem[];
 }> {
   const jar = new CookieJar(tokenOrCookies);
   const courseUrl = `${LMS_BASE_URL}/course/view.php?id=${courseId}`;
@@ -280,19 +498,96 @@ export async function studyCourseOnLMS(
   const titleMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<title>([\s\S]*?)<\/title>/i);
   const courseTitle = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : `Môn học ${courseId}`;
 
-  const actRegex = /href="(https:\/\/lms\.pttc1\.edu\.vn\/mod\/([a-z0-9_]+)\/view\.php\?id=(\d+))"/g;
+  const sections: LmsSectionItem[] = [];
+  const sectionRegex = /<li[^>]*class="[^"]*section[^"]*"[^>]*>([\s\S]*?)<\/li>/g;
+  let secMatch: RegExpExecArray | null;
+  let totalAct = 0;
+
+  while ((secMatch = sectionRegex.exec(html)) !== null) {
+    const secHtml = secMatch[1];
+    const secTitleMatch = secHtml.match(/class="[^"]*sectionname[^"]*"[^>]*>([\s\S]*?)<\/(?:h3|a)>/i);
+    const secTitle = secTitleMatch ? secTitleMatch[1].replace(/<[^>]+>/g, '').trim() : 'Chung';
+
+    const actRegex = /href="(https:\/\/lms\.pttc1\.edu\.vn\/mod\/([a-z0-9_]+)\/view\.php\?id=(\d+))"[^>]*>([\s\S]*?)<\/a>/g;
+    let actMatch: RegExpExecArray | null;
+    const activities: LmsActivityItem[] = [];
+    const seenActId = new Set<string>();
+
+    while ((actMatch = actRegex.exec(secHtml)) !== null) {
+      const fullUrl = actMatch[1];
+      const modType = actMatch[2];
+      const actId = actMatch[3];
+      const actName = actMatch[4].replace(/<[^>]+>/g, '').trim();
+
+      if (!seenActId.has(actId) && actName) {
+        seenActId.add(actId);
+        activities.push({
+          id: actId,
+          type: modType,
+          name: actName,
+          url: fullUrl,
+        });
+        totalAct++;
+      }
+    }
+
+    if (activities.length > 0) {
+      sections.push({
+        title: secTitle,
+        activities,
+      });
+    }
+  }
+
+  return {
+    courseId,
+    courseTitle,
+    sections,
+    totalActivities: totalAct,
+  };
+}
+
+/**
+ * Tự động duyệt và trigger xem các hoạt động bài học trong một khóa học cụ thể trên LMS (Auto-Study)
+ */
+export async function studyCourseOnLMS(
+  courseId: string,
+  tokenOrCookies: string
+): Promise<{
+  courseId: string;
+  courseTitle: string;
+  totalActivities: number;
+  completedActivities: number;
+  activities: { id: string; type: string; name: string; url: string; status: 'SUCCESS' | 'ERROR' }[];
+}> {
+  const jar = new CookieJar(tokenOrCookies);
+  const courseUrl = `${LMS_BASE_URL}/course/view.php?id=${courseId}`;
+
+  const res = await fetch(courseUrl, {
+    headers: {
+      Cookie: jar.getCookieHeader(),
+      'User-Agent': LMS_USER_AGENT,
+    },
+  });
+  const html = await res.text();
+
+  const titleMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<title>([\s\S]*?)<\/title>/i);
+  const courseTitle = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : `Môn học ${courseId}`;
+
+  const actRegex = /href="(https:\/\/lms\.pttc1\.edu\.vn\/mod\/([a-z0-9_]+)\/view\.php\?id=(\d+))"[^>]*>([\s\S]*?)<\/a>/g;
   let match: RegExpExecArray | null;
-  const activities: LmsActivityItem[] = [];
+  const activities: { id: string; type: string; name: string; url: string; status: 'SUCCESS' | 'ERROR' }[] = [];
   const seenAct = new Set<string>();
 
   while ((match = actRegex.exec(html)) !== null) {
     const fullUrl = match[1];
     const modType = match[2];
     const actId = match[3];
+    const rawName = match[4].replace(/<[^>]+>/g, '').trim();
 
-    if (!seenAct.has(actId)) {
+    if (!seenAct.has(actId) && rawName) {
       seenAct.add(actId);
-      activities.push({ id: actId, type: modType, url: fullUrl });
+      activities.push({ id: actId, type: modType, name: rawName, url: fullUrl, status: 'SUCCESS' });
     }
   }
 
@@ -308,13 +603,16 @@ export async function studyCourseOnLMS(
         redirect: 'follow',
       });
       jar.updateFromResponse(actRes);
-      if (actRes.ok) completedCount++;
+      if (actRes.ok) {
+        act.status = 'SUCCESS';
+        completedCount++;
+      }
     } catch {
-      // Tiếp tục các activity khác nếu có 1 request lỗi
+      act.status = 'ERROR';
     }
 
     if (i < activities.length - 1) {
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 250));
     }
   }
 

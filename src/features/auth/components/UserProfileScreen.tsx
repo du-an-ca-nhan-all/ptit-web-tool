@@ -10,6 +10,7 @@ import {
   CalendarDays,
   ShieldCheck,
   Lock,
+  BookOpen,
 } from 'lucide-react';
 import { LoginUser, ExamRecord } from '../types/auth.types';
 import { ProfileSubTab } from '../../../types/navigation';
@@ -19,7 +20,7 @@ import { ProfileSecurityTab } from './Profile/ProfileSecurityTab';
 import { ProfileExternalAccountsTab } from './Profile/ProfileExternalAccountsTab';
 import { ProfileExamScheduleTab } from './Profile/ProfileExamScheduleTab';
 import { TelegramConfigSection } from '../../telegram';
-import { StudentTimetableCalendar, StudentGradesView } from '../../external-portal';
+import { StudentTimetableCalendar, StudentGradesView, LmsCoursesView } from '../../external-portal';
 
 export interface UserProfileScreenProps {
   currentUser: LoginUser & { student?: any };
@@ -433,6 +434,21 @@ export default function UserProfileScreen({
         </button>
 
         <button
+          onClick={() => setActiveSubTab('LMS')}
+          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
+            activeSubTab === 'LMS'
+              ? 'bg-sky-600 text-white shadow-xs shadow-sky-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span>Học Tập LMS</span>
+          {configuredCount > 0 && (
+            <span className="w-2 h-2 rounded-full bg-sky-400 ring-2 ring-white"></span>
+          )}
+        </button>
+
+        <button
           onClick={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
           className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
             activeSubTab === 'EXTERNAL_ACCOUNTS'
@@ -441,7 +457,7 @@ export default function UserProfileScreen({
           }`}
         >
           <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          <span>Liên Kết QLĐT Từ Xa</span>
+          <span>Liên Kết Cổng Trường</span>
           {configuredCount > 0 && (
             <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white"></span>
           )}
@@ -521,6 +537,14 @@ export default function UserProfileScreen({
       {/* SUB-TAB: STUDENT GRADES & ACADEMIC ANALYTICS */}
       {activeSubTab === 'GRADES' && (
         <StudentGradesView
+          currentUser={currentUser}
+          onNavigateToExternalAccounts={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
+        />
+      )}
+
+      {/* SUB-TAB: LMS COURSES & LEARNING PROGRESS */}
+      {activeSubTab === 'LMS' && (
+        <LmsCoursesView
           currentUser={currentUser}
           onNavigateToExternalAccounts={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
         />

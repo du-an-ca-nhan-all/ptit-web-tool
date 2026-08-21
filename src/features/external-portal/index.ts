@@ -6,4 +6,6 @@ export { default as StudentTimetableCalendar } from './components/StudentTimetab
 export { default as CourseCompare } from './components/CourseCompare';
 export { default as StudentCourseRegistration } from './components/StudentCourseRegistration';
 export { default as AdminExternalAccounts } from './components/AdminExternalAccounts';
+export { default as LmsCoursesView } from './components/LmsCoursesView';
+
 

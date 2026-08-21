@@ -27,6 +27,7 @@ export type ProfileSubTab =
   | 'OVERVIEW'
   | 'SCHEDULE'
   | 'GRADES'
+  | 'LMS'
   | 'EXTERNAL_ACCOUNTS'
   | 'TELEGRAM'
   | 'EXAMS'
@@ -89,6 +90,10 @@ export const PROFILE_SUBTAB_MAP: Record<string, ProfileSubTab> = {
   grades: 'GRADES',
   bangdiem: 'GRADES',
   ketquahoctap: 'GRADES',
+  lms: 'LMS',
+  lmscourses: 'LMS',
+  'lms-courses': 'LMS',
+  hoctructuyen: 'LMS',
   externalaccounts: 'EXTERNAL_ACCOUNTS',
   external_accounts: 'EXTERNAL_ACCOUNTS',
   'external-accounts': 'EXTERNAL_ACCOUNTS',

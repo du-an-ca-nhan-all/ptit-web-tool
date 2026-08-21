@@ -13,6 +13,7 @@ import {
   ChevronRight,
   CalendarDays,
   Globe,
+  BookOpen,
 } from 'lucide-react';
 import { LoginUser } from '../../types/auth.types';
 
@@ -262,12 +263,23 @@ export function ProfileOverviewTab({
           </button>
 
           <button
+            onClick={() => onSelectSubTab('LMS')}
+            className="w-full p-2.5 sm:p-3 bg-slate-50 hover:bg-sky-50 active:scale-98 border border-slate-200 rounded-xl sm:rounded-2xl text-left flex items-center justify-between transition-all cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <BookOpen className="w-4 h-4 text-sky-600 shrink-0" />
+              <span className="text-xs font-bold text-slate-700 group-hover:text-sky-700 truncate">Học Tập & Tiến Độ LMS</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-sky-600 shrink-0 ml-1" />
+          </button>
+
+          <button
             onClick={() => onSelectSubTab('EXTERNAL_ACCOUNTS')}
             className="w-full p-2.5 sm:p-3 bg-slate-50 hover:bg-indigo-50 active:scale-98 border border-slate-200 rounded-xl sm:rounded-2xl text-left flex items-center justify-between transition-all cursor-pointer group"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <Globe className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700 truncate">Cấu Hình Tài Khoản QLDTTX</span>
+              <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700 truncate">Liên Kết Cổng Đào Tạo & LMS</span>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
           </button>
