@@ -15,8 +15,10 @@ import {
   ShieldCheck,
   Loader2,
   Send,
+  Download,
 } from 'lucide-react';
 import { LoginUser, ExamRecord } from '../types/auth.types';
+import { usePWAContext } from '../../../components/pwa/PWAProvider';
 
 interface LoginScreenProps {
   users?: LoginUser[];
@@ -25,6 +27,7 @@ interface LoginScreenProps {
 }
 
 export default function LoginScreen({ users = [], records = [], onLogin }: LoginScreenProps) {
+  const { isInstalled, openInstallModal } = usePWAContext();
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
 
   // Login form state
@@ -205,6 +208,20 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
       {/* Dynamic Background Blurs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none translate-x-1/2 translate-y-1/2" />
+
+      {/* PWA Install Button on Login Screen */}
+      {!isInstalled && (
+        <button
+          type="button"
+          onClick={openInstallModal}
+          className="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-full text-xs font-semibold backdrop-blur-md transition-all cursor-pointer shadow-lg active:scale-95"
+          title="Cài đặt PTIT EduSync về thiết bị"
+        >
+          <Download className="w-3.5 h-3.5 text-sky-400" />
+          <span className="hidden sm:inline">Cài Đặt App</span>
+          <span className="sm:hidden">Cài App</span>
+        </button>
+      )}
 
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200/80 relative z-10 animate-in zoom-in-95 duration-300">
         {/* Header with Switcher Tabs */}

@@ -25,9 +25,11 @@ import {
   ShieldCheck,
   Phone,
   LayoutDashboard,
+  Download,
 } from 'lucide-react';
 import { LoginUser } from '../../types';
 import { NavigationTab } from '../../types/navigation';
+import { usePWAContext } from '../pwa/PWAProvider';
 
 interface SidebarProps {
   activeTab: NavigationTab;
@@ -50,6 +52,8 @@ export default function Sidebar({
   canAccessMonitorTools,
   isAdmin,
 }: SidebarProps) {
+  const { isInstalled, openInstallModal } = usePWAContext();
+
   return (
     <>
       {isMobileMenuOpen && (
@@ -354,6 +358,19 @@ export default function Sidebar({
             </div>
           )}
         </nav>
+
+        {/* PWA Install Button if not installed */}
+        {!isInstalled && (
+          <div className="px-3 pb-2">
+            <button
+              onClick={openInstallModal}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/30 transition-all cursor-pointer active:scale-98"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Cài Đặt App (PWA)</span>
+            </button>
+          </div>
+        )}
 
         {/* SECTION BOTTOM: ADMIN CONTACT & SUPPORT */}
         <div className="p-3 mx-3 mb-3 mt-auto rounded-2xl bg-slate-900/90 border border-slate-800 text-xs flex flex-col gap-2 shadow-inner shrink-0">
