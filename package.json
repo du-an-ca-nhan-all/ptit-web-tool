@@ -14,6 +14,7 @@
     "db:migrate:status": "prisma migrate status",
     "db:migrate:from-sqlite": "tsx scripts/migrate-sqlite-to-postgres.ts",
     "db:clone:prod-to-dev": "tsx scripts/clone-prod-to-dev-logic.ts --force ",
+    "db:fix-dates": "tsx scripts/fix-exam-dates.ts",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "lint": "tsc --noEmit"
