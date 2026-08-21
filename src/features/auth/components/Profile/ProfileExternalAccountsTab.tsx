@@ -15,6 +15,8 @@ import {
   Lock,
   ExternalLink,
   Trash2,
+  BookOpen,
+  GraduationCap,
 } from 'lucide-react';
 import { LoginUser } from '../../types/auth.types';
 
@@ -62,10 +64,10 @@ export function ProfileExternalAccountsTab({
           </div>
           <div className="min-w-0">
             <h3 className="text-base sm:text-lg font-black text-slate-800">
-              Liên Kết Hệ Thống Quản Lý Đào Tạo Từ Xa
+              Liên Kết Các Hệ Thống Đào Tạo & Học Tập Trực Tuyến
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Cổng kết nối: <strong className="text-indigo-600 font-mono">https://qldttx.pttc1.edu.vn/</strong>
+              Cổng kết nối: <strong className="text-indigo-600 font-mono">qldttx.pttc1.edu.vn</strong> • <strong className="text-sky-600 font-mono">lms.pttc1.edu.vn</strong>
             </p>
           </div>
         </div>
@@ -85,7 +87,7 @@ export function ProfileExternalAccountsTab({
         <div>
           <p className="font-bold text-blue-900 mb-1">Cơ chế đồng bộ an toàn</p>
           <p className="text-slate-600">
-            Thông tin đăng nhập được lưu trữ mã hóa và chỉ dùng để tự động đồng bộ lịch thi, đăng ký môn học và thời khóa biểu từ cổng đào tạo của nhà trường.
+            Thông tin đăng nhập được lưu trữ an toàn và chỉ dùng để tự động đồng bộ lịch thi, kết quả học tập và tài nguyên học trực tuyến từ cổng trường.
           </p>
         </div>
       </div>
@@ -130,7 +132,13 @@ export function ProfileExternalAccountsTab({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h4 className="font-black text-slate-800 text-sm sm:text-base flex items-center gap-2">
-                        <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 shrink-0" />
+                        {sys.iconKey === 'BookOpen' ? (
+                          <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600 shrink-0" />
+                        ) : sys.iconKey === 'GraduationCap' ? (
+                          <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 shrink-0" />
+                        )}
                         <span className="truncate">{sys.systemName}</span>
                       </h4>
                       {sys.isConfigured ? (
@@ -166,7 +174,7 @@ export function ProfileExternalAccountsTab({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-3 border-t border-slate-100">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
-                      <UserIcon className="w-3.5 h-3.5 text-slate-400" /> Tên đăng nhập (Mã SV trên QLDTTX)
+                      <UserIcon className="w-3.5 h-3.5 text-slate-400" /> Tên đăng nhập ({sys.systemName})
                     </label>
                     <input
                       type="text"
@@ -182,7 +190,7 @@ export function ProfileExternalAccountsTab({
                           },
                         }))
                       }
-                      placeholder={sys.placeholderUser || 'Nhập mã sinh viên'}
+                      placeholder={sys.placeholderUser || 'Nhập mã sinh viên / tên đăng nhập'}
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 text-base sm:text-xs font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                   </div>
@@ -206,7 +214,7 @@ export function ProfileExternalAccountsTab({
                             },
                           }))
                         }
-                        placeholder={sys.hasPassword ? '•••••••• (Nhập lại để cập nhật)' : 'Nhập mật khẩu QLDTTX'}
+                        placeholder={sys.hasPassword ? '•••••••• (Nhập lại để cập nhật)' : `Nhập mật khẩu ${sys.systemName}`}
                         className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 pr-10 text-base sm:text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
                       <button
@@ -243,7 +251,7 @@ export function ProfileExternalAccountsTab({
                     <div className="flex-1">
                       <strong className="font-bold block text-rose-950">Kiểm tra kết nối thất bại!</strong>
                       <span className="text-[11px] text-rose-700">
-                        {form.testMessage || 'Tên đăng nhập hoặc mật khẩu không chính xác trên cổng QLDTTX.'}
+                        {form.testMessage || `Tên đăng nhập hoặc mật khẩu không chính xác trên cổng ${sys.systemName}.`}
                       </span>
                     </div>
                   </div>

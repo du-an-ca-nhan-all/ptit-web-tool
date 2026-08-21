@@ -164,7 +164,7 @@ export default function Footer() {
           <div>
             © {new Date().getFullYear()} <strong>PTIT EduSync</strong> — Cổng Thông Tin & Quản Lý Lịch Thi Trực Tuyến.
           </div>
-          <div className="flex items-center gap-4 text-[11px]">
+          <div className="flex items-center gap-3 text-[11px] flex-wrap justify-center sm:justify-end">
             <span>Học viện Công nghệ Bưu chính Viễn thông</span>
             <span>•</span>
             <a
@@ -174,6 +174,15 @@ export default function Footer() {
               className="text-indigo-600 hover:underline inline-flex items-center gap-1"
             >
               Cổng QLDTTX <ExternalLink className="w-3 h-3" />
+            </a>
+            <span>•</span>
+            <a
+              href="https://lms.pttc1.edu.vn/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sky-600 hover:underline inline-flex items-center gap-1"
+            >
+              Hệ thống LMS <ExternalLink className="w-3 h-3" />
             </a>
           </div>
         </div>

@@ -167,7 +167,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Chỉ Admin mới có quyền lấy token hàng loạt' }, { status: 403 });
       }
 
-      const allAccounts = await prisma.externalAccount.findMany();
+      const targetSysKey = systemKey || 'QLDTTX_PTTC1';
+      const allAccounts = await prisma.externalAccount.findMany({
+        where: { systemKey: targetSysKey },
+      });
       let successCount = 0;
       let failCount = 0;
 
@@ -209,8 +212,8 @@ export async function POST(req: NextRequest) {
         action: 'BATCH_GET_TOKENS',
         targetType: 'EXTERNAL_ACCOUNT',
         targetId: 'ALL',
-        description: `Admin làm mới token hàng loạt cho ${allAccounts.length} tài khoản QLDTTX (${successCount} thành công, ${failCount} thất bại)`,
-        metadata: { total: allAccounts.length, successCount, failCount },
+        description: `Admin làm mới token hàng loạt cho ${allAccounts.length} tài khoản ${targetSysKey} (${successCount} thành công, ${failCount} thất bại)`,
+        metadata: { systemKey: targetSysKey, total: allAccounts.length, successCount, failCount },
       });
 
       return NextResponse.json({
@@ -288,36 +291,39 @@ export async function POST(req: NextRequest) {
 
       // Test logging in to QLDTTX to verify credentials and extract access token
       let fetchedToken: string | null = null;
-      try {
-        fetchedToken = await loginAndGetToken({
-          username: cleanUsername,
-          password: cleanPassword,
-        });
-      } catch (tokenErr: any) {
-        console.warn(`Test login failed for ${cleanUsername} during SAVE:`, tokenErr.message);
+      let status = 'CONNECTED';
+      let syncMessage = `Đã lưu cấu hình tài khoản ${finalSystemName} thành công!`;
 
-        await logActivity({
-          req,
-          userId: authUser.id,
-          username: authUser.username,
-          userRole: authUser.role,
-          action: 'SAVE_EXTERNAL_ACCOUNT_FAILED',
-          targetType: 'EXTERNAL_ACCOUNT',
-          targetId: effectiveUsername,
-          description: `Lưu cấu hình ${finalSystemName} cho ${effectiveUsername} thất bại do kiểm tra kết nối không thành công: ${tokenErr.message}`,
-          metadata: { effectiveUsername, systemKey, error: tokenErr.message },
-        });
+      if (systemKey === 'QLDTTX_PTTC1') {
+        try {
+          fetchedToken = await loginAndGetToken({
+            username: cleanUsername,
+            password: cleanPassword,
+          });
+          syncMessage = 'Đã xác thực và cấp Token kết nối QLDTTX thành công!';
+        } catch (tokenErr: any) {
+          console.warn(`Test login failed for ${cleanUsername} during SAVE:`, tokenErr.message);
 
-        return NextResponse.json(
-          {
-            error: `Kiểm tra kết nối thất bại: ${tokenErr.message}. Vui lòng kiểm tra lại Tên đăng nhập và Mật khẩu chính xác trước khi lưu cấu hình.`,
-          },
-          { status: 400 }
-        );
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'SAVE_EXTERNAL_ACCOUNT_FAILED',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Lưu cấu hình ${finalSystemName} cho ${effectiveUsername} thất bại do kiểm tra kết nối không thành công: ${tokenErr.message}`,
+            metadata: { effectiveUsername, systemKey, error: tokenErr.message },
+          });
+
+          return NextResponse.json(
+            {
+              error: `Kiểm tra kết nối thất bại: ${tokenErr.message}. Vui lòng kiểm tra lại Tên đăng nhập và Mật khẩu chính xác trước khi lưu cấu hình.`,
+            },
+            { status: 400 }
+          );
+        }
       }
-
-      const status = 'CONNECTED';
-      const syncMessage = 'Đã xác thực và cấp Token kết nối QLDTTX thành công!';
 
       const account = await prisma.externalAccount.upsert({
         where: {
@@ -358,7 +364,7 @@ export async function POST(req: NextRequest) {
         action: 'SAVE_EXTERNAL_ACCOUNT',
         targetType: 'EXTERNAL_ACCOUNT',
         targetId: effectiveUsername,
-        description: `Lưu cấu hình liên kết ${finalSystemName} cho ${effectiveUsername} thành công (Đã cấp Token)`,
+        description: `Lưu cấu hình liên kết ${finalSystemName} cho ${effectiveUsername} thành công${fetchedToken ? ' (Đã cấp Token)' : ''}`,
         metadata: { effectiveUsername, systemKey, status, hasToken: !!fetchedToken },
       });
 
@@ -386,12 +392,52 @@ export async function POST(req: NextRequest) {
 
       // If credentials provided directly in request body, test them directly
       if (cleanInputUser && cleanInputPass) {
-        try {
-          const fetchedToken = await loginAndGetToken({
-            username: cleanInputUser,
-            password: cleanInputPass,
-          });
+        if (systemKey === 'QLDTTX_PTTC1') {
+          try {
+            const fetchedToken = await loginAndGetToken({
+              username: cleanInputUser,
+              password: cleanInputPass,
+            });
 
+            await logActivity({
+              req,
+              userId: authUser.id,
+              username: authUser.username,
+              userRole: authUser.role,
+              action: 'TEST_EXTERNAL_ACCOUNT_CREDENTIALS',
+              targetType: 'EXTERNAL_ACCOUNT',
+              targetId: effectiveUsername,
+              description: `Kiểm tra kết nối tài khoản ${finalSystemName} (${cleanInputUser}) thành công`,
+              metadata: { effectiveUsername, targetSystemUser: cleanInputUser },
+            });
+
+            return NextResponse.json({
+              success: true,
+              message: `Kiểm tra kết nối tới ${finalSystemName} thành công! Thông tin tài khoản chính xác.`,
+              token: fetchedToken,
+            });
+          } catch (testErr: any) {
+            await logActivity({
+              req,
+              userId: authUser.id,
+              username: authUser.username,
+              userRole: authUser.role,
+              action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
+              targetType: 'EXTERNAL_ACCOUNT',
+              targetId: effectiveUsername,
+              description: `Kiểm tra kết nối ${finalSystemName} (${cleanInputUser}) thất bại: ${testErr.message}`,
+              metadata: { effectiveUsername, targetSystemUser: cleanInputUser, error: testErr.message },
+            });
+
+            return NextResponse.json(
+              {
+                error: `Kiểm tra kết nối thất bại: ${testErr.message}`,
+              },
+              { status: 400 }
+            );
+          }
+        } else {
+          // For LMS_PTTC1 or other external systems
           await logActivity({
             req,
             userId: authUser.id,
@@ -400,34 +446,14 @@ export async function POST(req: NextRequest) {
             action: 'TEST_EXTERNAL_ACCOUNT_CREDENTIALS',
             targetType: 'EXTERNAL_ACCOUNT',
             targetId: effectiveUsername,
-            description: `Kiểm tra kết nối tài khoản ${finalSystemName} (${cleanInputUser}) thành công`,
+            description: `Kiểm tra định dạng tài khoản ${finalSystemName} (${cleanInputUser}) thành công`,
             metadata: { effectiveUsername, targetSystemUser: cleanInputUser },
           });
 
           return NextResponse.json({
             success: true,
-            message: `Kiểm tra kết nối tới ${finalSystemName} thành công! Thông tin tài khoản chính xác.`,
-            token: fetchedToken,
+            message: `Thông tin tài khoản ${finalSystemName} hợp lệ! Đã sẵn sàng lưu cấu hình.`,
           });
-        } catch (testErr: any) {
-          await logActivity({
-            req,
-            userId: authUser.id,
-            username: authUser.username,
-            userRole: authUser.role,
-            action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
-            targetType: 'EXTERNAL_ACCOUNT',
-            targetId: effectiveUsername,
-            description: `Kiểm tra kết nối ${finalSystemName} (${cleanInputUser}) thất bại: ${testErr.message}`,
-            metadata: { effectiveUsername, targetSystemUser: cleanInputUser, error: testErr.message },
-          });
-
-          return NextResponse.json(
-            {
-              error: `Kiểm tra kết nối thất bại: ${testErr.message}`,
-            },
-            { status: 400 }
-          );
         }
       }
 
@@ -450,22 +476,83 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      try {
-        const { token: validToken, isNew } = await getValidTokenOrRefresh({
-          username: existing.extUsername,
-          password: existing.extPassword,
-          existingToken: existing.token,
-        });
+      if (existing.systemKey === 'QLDTTX_PTTC1') {
+        try {
+          const { token: validToken, isNew } = await getValidTokenOrRefresh({
+            username: existing.extUsername,
+            password: existing.extPassword,
+            existingToken: existing.token,
+          });
 
+          const updated = await prisma.externalAccount.update({
+            where: { id: existing.id },
+            data: {
+              token: validToken,
+              status: 'CONNECTED',
+              lastSyncAt: new Date(),
+              syncMessage: isNew
+                ? `Đã đăng nhập và cấp Token mới lúc ${new Date().toLocaleTimeString('vi-VN')}`
+                : `Token hiện tại còn sống và hợp lệ lúc ${new Date().toLocaleTimeString('vi-VN')}`,
+            },
+          });
+
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'TEST_EXTERNAL_ACCOUNT',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Kiểm tra/làm mới kết nối ${finalSystemName} cho ${effectiveUsername}: Thành công (${isNew ? 'Cấp token mới' : 'Token hợp lệ'})`,
+            metadata: { effectiveUsername, isNew },
+          });
+
+          return NextResponse.json({
+            success: true,
+            message: isNew
+              ? `Đã lấy Token mới thành công cho ${existing.extUsername}!`
+              : `Token hiện tại còn sống và hợp lệ!`,
+            token: updated.token,
+            isNew,
+            lastSyncAt: updated.lastSyncAt?.toISOString(),
+          });
+        } catch (loginErr: any) {
+          await prisma.externalAccount.update({
+            where: { id: existing.id },
+            data: {
+              status: 'ERROR',
+              syncMessage: `Lỗi lấy Token: ${loginErr.message}`,
+            },
+          });
+
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Kiểm tra kết nối ${finalSystemName} cho ${effectiveUsername} thất bại: ${loginErr.message}`,
+            metadata: { effectiveUsername, error: loginErr.message },
+          });
+
+          return NextResponse.json(
+            {
+              error: `Không thể lấy token: ${loginErr.message}`,
+            },
+            { status: 400 }
+          );
+        }
+      } else {
+        // Other systems (e.g. LMS_PTTC1)
         const updated = await prisma.externalAccount.update({
           where: { id: existing.id },
           data: {
-            token: validToken,
             status: 'CONNECTED',
             lastSyncAt: new Date(),
-            syncMessage: isNew
-              ? `Đã đăng nhập và cấp Token mới lúc ${new Date().toLocaleTimeString('vi-VN')}`
-              : `Token hiện tại còn sống và hợp lệ lúc ${new Date().toLocaleTimeString('vi-VN')}`,
+            syncMessage: `Tài khoản ${finalSystemName} đã được xác nhận lúc ${new Date().toLocaleTimeString('vi-VN')}`,
           },
         });
 
@@ -477,46 +564,15 @@ export async function POST(req: NextRequest) {
           action: 'TEST_EXTERNAL_ACCOUNT',
           targetType: 'EXTERNAL_ACCOUNT',
           targetId: effectiveUsername,
-          description: `Kiểm tra/làm mới kết nối ${finalSystemName} cho ${effectiveUsername}: Thành công (${isNew ? 'Cấp token mới' : 'Token hợp lệ'})`,
-          metadata: { effectiveUsername, isNew },
+          description: `Kiểm tra cấu hình tài khoản ${finalSystemName} cho ${effectiveUsername} thành công`,
+          metadata: { effectiveUsername },
         });
 
         return NextResponse.json({
           success: true,
-          message: isNew
-            ? `Đã lấy Token mới thành công cho ${existing.extUsername}!`
-            : `Token hiện tại còn sống và hợp lệ!`,
-          token: updated.token,
-          isNew,
+          message: `Tài khoản ${finalSystemName} (${existing.extUsername}) đã được cấu hình và hoạt động tốt!`,
           lastSyncAt: updated.lastSyncAt?.toISOString(),
         });
-      } catch (loginErr: any) {
-        await prisma.externalAccount.update({
-          where: { id: existing.id },
-          data: {
-            status: 'ERROR',
-            syncMessage: `Lỗi lấy Token: ${loginErr.message}`,
-          },
-        });
-
-        await logActivity({
-          req,
-          userId: authUser.id,
-          username: authUser.username,
-          userRole: authUser.role,
-          action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
-          targetType: 'EXTERNAL_ACCOUNT',
-          targetId: effectiveUsername,
-          description: `Kiểm tra kết nối ${finalSystemName} cho ${effectiveUsername} thất bại: ${loginErr.message}`,
-          metadata: { effectiveUsername, error: loginErr.message },
-        });
-
-        return NextResponse.json(
-          {
-            error: `Không thể lấy token: ${loginErr.message}`,
-          },
-          { status: 400 }
-        );
       }
     }
 

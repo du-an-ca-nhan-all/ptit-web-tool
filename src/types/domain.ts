@@ -131,7 +131,17 @@ export interface ExternalAccountItem {
   updatedAt?: string;
 }
 
-export const AVAILABLE_EXTERNAL_SYSTEMS = [
+export interface ExternalSystemConfig {
+  key: string;
+  name: string;
+  url: string;
+  description: string;
+  placeholderUser: string;
+  badgeColor: string;
+  iconKey: string;
+}
+
+export const AVAILABLE_EXTERNAL_SYSTEMS: ExternalSystemConfig[] = [
   {
     key: 'QLDTTX_PTTC1',
     name: 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
@@ -140,6 +150,15 @@ export const AVAILABLE_EXTERNAL_SYSTEMS = [
     placeholderUser: 'Nhập mã sinh viên (Ví dụ: K25DTCN402)',
     badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     iconKey: 'GraduationCap',
+  },
+  {
+    key: 'LMS_PTTC1',
+    name: 'Hệ thống học tập trực tuyến',
+    url: 'https://lms.pttc1.edu.vn/',
+    description: 'Hệ thống học tập trực tuyến (LMS) của Học viện Công nghệ Bưu chính Viễn thông Cơ sở 1.',
+    placeholderUser: 'Nhập mã sinh viên / tên đăng nhập LMS (Ví dụ: K25DTCN402)',
+    badgeColor: 'bg-sky-50 text-sky-700 border-sky-200',
+    iconKey: 'BookOpen',
   },
 ];
 

@@ -27,8 +27,9 @@ import {
   CheckCheck,
   FileKey,
   Lock,
+  BookOpen,
 } from 'lucide-react';
-import { LoginUser } from '../../../types';
+import { LoginUser, AVAILABLE_EXTERNAL_SYSTEMS } from '../../../types';
 
 interface ExternalAccountAdminItem {
   id: number;
@@ -61,6 +62,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClass, setSelectedClass] = useState('ALL');
+  const [selectedSystem, setSelectedSystem] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CONNECTED' | 'ERROR' | 'HAS_TOKEN'>('ALL');
   const [visiblePasswords, setVisiblePasswords] = useState<{ [id: number]: boolean }>({});
 
@@ -79,9 +81,9 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
     username: '',
     extUsername: '',
     extPassword: '',
-    systemKey: 'QLDTTX_PTTC1',
-    systemName: 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
-    systemUrl: 'https://qldttx.pttc1.edu.vn/',
+    systemKey: AVAILABLE_EXTERNAL_SYSTEMS[0]?.key || 'QLDTTX_PTTC1',
+    systemName: AVAILABLE_EXTERNAL_SYSTEMS[0]?.name || 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
+    systemUrl: AVAILABLE_EXTERNAL_SYSTEMS[0]?.url || 'https://qldttx.pttc1.edu.vn/',
   });
   const [showModalPass, setShowModalPass] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -142,15 +144,18 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       // Class
       const matchClass = selectedClass === 'ALL' || a.maLop === selectedClass;
 
+      // System
+      const matchSystem = selectedSystem === 'ALL' || a.systemKey === selectedSystem;
+
       // Status
       let matchStatus = true;
       if (statusFilter === 'CONNECTED') matchStatus = a.status === 'CONNECTED';
       else if (statusFilter === 'ERROR') matchStatus = a.status === 'ERROR';
       else if (statusFilter === 'HAS_TOKEN') matchStatus = !!a.token;
 
-      return matchSearch && matchClass && matchStatus;
+      return matchSearch && matchClass && matchStatus && matchSystem;
     });
-  }, [accounts, searchQuery, selectedClass, statusFilter]);
+  }, [accounts, searchQuery, selectedClass, selectedSystem, statusFilter]);
 
   // Toggle single password visibility
   const toggleShowPassword = (id: number) => {
@@ -427,6 +432,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
 
   const connectedCount = accounts.filter((a) => a.status === 'CONNECTED').length;
   const hasTokenCount = accounts.filter((a) => !!a.token).length;
+  const qldttxCount = accounts.filter((a) => a.systemKey === 'QLDTTX_PTTC1').length;
+  const lmsCount = accounts.filter((a) => a.systemKey === 'LMS_PTTC1').length;
   const coveragePercent = totalStudents > 0 ? ((accounts.length / totalStudents) * 100).toFixed(1) : '0';
 
   return (
@@ -466,14 +473,14 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
-                  Quản Lý Tài Khoản & Token QLĐT Từ Xa
+                  Quản Lý Tài Khoản Cổng Đào Tạo & LMS
                 </h1>
                 <span className="bg-rose-500 text-white text-xs font-black px-2.5 py-0.5 rounded-full shadow-xs">
                   Admin
                 </span>
               </div>
               <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-                Cổng liên kết: <strong className="text-indigo-600 font-mono">https://qldttx.pttc1.edu.vn/</strong> (Học viện PTIT Cơ sở 1)
+                Cổng liên kết: <strong className="text-indigo-600 font-mono">qldttx.pttc1.edu.vn</strong> • <strong className="text-sky-600 font-mono">lms.pttc1.edu.vn</strong> (PTIT Cơ sở 1)
               </p>
             </div>
           </div>
@@ -495,14 +502,14 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             onClick={handleBatchGetTokens}
             disabled={isBatchTesting || accounts.length === 0}
             className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-amber-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Lấy và xác thực Token cho toàn bộ tài khoản"
+            title="Lấy và xác thực Token cho toàn bộ tài khoản QLDTTX"
           >
             {isBatchTesting ? (
               <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <Zap className="w-3.5 h-3.5" />
             )}
-            <span>Lấy Token Hàng Loạt</span>
+            <span>Lấy Token QLDTTX</span>
           </button>
 
           <button
@@ -521,9 +528,9 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 username: '',
                 extUsername: '',
                 extPassword: '',
-                systemKey: 'QLDTTX_PTTC1',
-                systemName: 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
-                systemUrl: 'https://qldttx.pttc1.edu.vn/',
+                systemKey: AVAILABLE_EXTERNAL_SYSTEMS[0]?.key || 'QLDTTX_PTTC1',
+                systemName: AVAILABLE_EXTERNAL_SYSTEMS[0]?.name || 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
+                systemUrl: AVAILABLE_EXTERNAL_SYSTEMS[0]?.url || 'https://qldttx.pttc1.edu.vn/',
               });
               setModalTestStatus('IDLE');
               setModalTestError('');
@@ -546,12 +553,12 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">SV Đã Liên Kết</div>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Tài Khoản Đã Liên Kết</div>
             <div className="text-2xl font-black text-slate-800 mt-0.5">
               {accounts.length}{' '}
               <span className="text-xs font-normal text-slate-400">/ {totalStudents} SV</span>
             </div>
-            <div className="text-[11px] text-indigo-600 font-bold mt-0.5">Tỷ lệ: {coveragePercent}%</div>
+            <div className="text-[11px] text-indigo-600 font-bold mt-0.5">Tỷ lệ SV: {coveragePercent}%</div>
           </div>
         </div>
 
@@ -560,23 +567,23 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             <FileKey className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Đã Cấp Token</div>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Cổng QLDTTX (PTTC1)</div>
             <div className="text-2xl font-black text-emerald-600 mt-0.5">
-              {hasTokenCount}{' '}
-              <span className="text-xs font-normal text-slate-400">/ {accounts.length}</span>
+              {qldttxCount}{' '}
+              <span className="text-xs font-normal text-slate-400">({hasTokenCount} Token)</span>
             </div>
             <div className="text-[11px] text-emerald-700 font-bold mt-0.5">Sẵn sàng crawl/đồng bộ</div>
           </div>
         </div>
 
         <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Layers className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+            <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Số Lớp Quản Lý</div>
-            <div className="text-2xl font-black text-blue-600 mt-0.5">{classList.length}</div>
-            <div className="text-[11px] text-slate-400 font-medium mt-0.5">Lớp có SV cấu hình</div>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">LMS Học Tập Trực Tuyến</div>
+            <div className="text-2xl font-black text-sky-600 mt-0.5">{lmsCount}</div>
+            <div className="text-[11px] text-sky-700 font-bold mt-0.5">Tài khoản lms.pttc1.edu.vn</div>
           </div>
         </div>
 
@@ -585,16 +592,25 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             <Server className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Cổng QLĐT Mục Tiêu</div>
-            <div className="text-sm font-black text-slate-800 truncate mt-0.5">QLDTTX PTTC1</div>
-            <a
-              href="https://qldttx.pttc1.edu.vn/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] text-indigo-600 hover:underline flex items-center gap-1 font-mono font-semibold"
-            >
-              qldttx.pttc1.edu.vn <ExternalLink className="w-2.5 h-2.5" />
-            </a>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Cổng Mục Tiêu</div>
+            <div className="flex flex-col gap-0.5 mt-0.5">
+              <a
+                href="https://qldttx.pttc1.edu.vn/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-indigo-600 hover:underline flex items-center gap-1 font-mono font-semibold"
+              >
+                qldttx.pttc1.edu.vn <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+              <a
+                href="https://lms.pttc1.edu.vn/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-sky-600 hover:underline flex items-center gap-1 font-mono font-semibold"
+              >
+                lms.pttc1.edu.vn <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -625,6 +641,23 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+            {/* System filter */}
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-2xl px-3 py-1.5 text-xs shadow-2xs">
+              <span className="text-slate-400 font-bold">Hệ thống:</span>
+              <select
+                value={selectedSystem}
+                onChange={(e) => setSelectedSystem(e.target.value)}
+                className="bg-transparent font-bold text-slate-700 outline-none cursor-pointer"
+              >
+                <option value="ALL">Tất cả hệ thống</option>
+                {AVAILABLE_EXTERNAL_SYSTEMS.map((sys) => (
+                  <option key={sys.key} value={sys.key}>
+                    {sys.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Class filter */}
             <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-2xl px-3 py-1.5 text-xs shadow-2xs">
               <span className="text-slate-400 font-bold">Lớp:</span>
@@ -702,6 +735,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                   <th className="px-4 py-3.5 text-center w-12">STT</th>
                   <th className="px-4 py-3.5">Sinh Viên</th>
                   <th className="px-4 py-3.5">Lớp</th>
+                  <th className="px-4 py-3.5">Hệ Thống</th>
                   <th className="px-4 py-3.5">Tên Đăng Nhập</th>
                   <th className="px-4 py-3.5">Mật Khẩu</th>
                   <th className="px-4 py-3.5">Access Token</th>
@@ -740,6 +774,19 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                         </span>
                       </td>
                       <td className="px-4 py-3.5">
+                        {acc.systemKey === 'LMS_PTTC1' ? (
+                          <span className="inline-flex items-center gap-1.5 font-bold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
+                            <BookOpen className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                            <span>LMS PTTC1</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                            <Globe className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>Cổng QLDTTX</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
                         <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
                           {acc.extUsername}
                         </span>
@@ -760,7 +807,9 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                         </div>
                       </td>
                       <td className="px-4 py-3.5">
-                        {acc.token ? (
+                        {acc.systemKey !== 'QLDTTX_PTTC1' ? (
+                          <span className="text-slate-400 text-[11px] italic">Không yêu cầu</span>
+                        ) : acc.token ? (
                           <div className="flex items-center gap-1.5">
                             <span
                               onClick={() => setViewingTokenAccount(acc)}
@@ -802,19 +851,21 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Get / Refresh Token button */}
-                          <button
-                            onClick={() => handleGetTokenSingle(acc)}
-                            disabled={isCurrentTesting}
-                            className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                            title="Lấy / Làm mới Token từ QLDTTX"
-                          >
-                            {isCurrentTesting ? (
-                              <div className="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Zap className="w-3.5 h-3.5" />
-                            )}
-                          </button>
+                          {/* Get / Refresh Token button (QLDTTX only) */}
+                          {acc.systemKey === 'QLDTTX_PTTC1' && (
+                            <button
+                              onClick={() => handleGetTokenSingle(acc)}
+                              disabled={isCurrentTesting}
+                              className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                              title="Lấy / Làm mới Token từ QLDTTX"
+                            >
+                              {isCurrentTesting ? (
+                                <div className="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Zap className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
 
                           {/* Edit button */}
                           <button
@@ -958,13 +1009,19 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             <div className="p-6 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                  <Globe className="w-5 h-5 text-white" />
+                  {formData.systemKey === 'LMS_PTTC1' ? (
+                    <BookOpen className="w-5 h-5 text-white" />
+                  ) : (
+                    <Globe className="w-5 h-5 text-white" />
+                  )}
                 </div>
                 <div>
                   <h3 className="text-lg font-black tracking-tight">
-                    {modalMode === 'ADD' ? 'Thêm Cấu Hình Tài Khoản QLDTTX' : 'Chỉnh Sửa Tài Khoản QLDTTX'}
+                    {modalMode === 'ADD'
+                      ? `Thêm Cấu Hình Tài Khoản ${formData.systemKey === 'LMS_PTTC1' ? 'LMS' : 'QLDTTX'}`
+                      : `Chỉnh Sửa Tài Khoản ${formData.systemKey === 'LMS_PTTC1' ? 'LMS' : 'QLDTTX'}`}
                   </h3>
-                  <p className="text-xs text-indigo-100 mt-0.5">https://qldttx.pttc1.edu.vn/</p>
+                  <p className="text-xs text-indigo-100 mt-0.5 font-mono">{formData.systemUrl}</p>
                 </div>
               </div>
               <button
@@ -976,6 +1033,38 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             </div>
 
             <form onSubmit={handleSaveModal} className="p-6 flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Hệ thống kết nối
+                </label>
+                <select
+                  value={formData.systemKey}
+                  onChange={(e) => {
+                    const sel = AVAILABLE_EXTERNAL_SYSTEMS.find((s) => s.key === e.target.value);
+                    if (sel) {
+                      setFormData({
+                        ...formData,
+                        systemKey: sel.key,
+                        systemName: sel.name,
+                        systemUrl: sel.url,
+                      });
+                      setModalTestStatus('IDLE');
+                      setModalTestError('');
+                      setLastTestedModalUser('');
+                      setLastTestedModalPass('');
+                    }
+                  }}
+                  disabled={modalMode === 'EDIT'}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-60"
+                >
+                  {AVAILABLE_EXTERNAL_SYSTEMS.map((sys) => (
+                    <option key={sys.key} value={sys.key}>
+                      {sys.name} ({sys.url})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Mã sinh viên trong hệ thống (MaSV)
@@ -997,7 +1086,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Tên đăng nhập trên QLDTTX (Mã SV / Username)
+                  Tên đăng nhập trên {formData.systemName} (Mã SV / Username)
                 </label>
                 <input
                   type="text"
@@ -1014,7 +1103,9 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Mật khẩu trên QLDTTX</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Mật khẩu trên {formData.systemName}
+                </label>
                 <div className="relative">
                   <input
                     type={showModalPass ? 'text' : 'password'}
@@ -1024,7 +1115,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                       setModalTestStatus('IDLE');
                       setModalTestError('');
                     }}
-                    placeholder="Nhập mật khẩu tài khoản QLDTTX"
+                    placeholder={`Nhập mật khẩu tài khoản ${formData.systemKey === 'LMS_PTTC1' ? 'LMS' : 'QLDTTX'}`}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 pr-10 text-sm font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                     required
                   />

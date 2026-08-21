@@ -209,16 +209,29 @@ export function ProfileOverviewTab({
             Cổng tiện ích học tập, đối chiếu môn học & tra cứu lịch thi trực tuyến PTIT EduSync. Dữ liệu được đồng bộ trực tiếp từ cổng trường.
           </div>
 
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600">
-            <span>Cổng QLĐT:</span>
-            <a
-              href="https://qldttx.pttc1.edu.vn/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:underline font-mono flex items-center gap-1"
-            >
-              qldttx.pttc1.edu.vn <ExternalLink className="w-3 h-3" />
-            </a>
+          <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5 text-xs font-bold">
+            <div className="flex items-center justify-between text-indigo-600">
+              <span>Cổng QLĐT:</span>
+              <a
+                href="https://qldttx.pttc1.edu.vn/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline font-mono flex items-center gap-1"
+              >
+                qldttx.pttc1.edu.vn <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+            <div className="flex items-center justify-between text-sky-600">
+              <span>Cổng LMS:</span>
+              <a
+                href="https://lms.pttc1.edu.vn/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline font-mono flex items-center gap-1"
+              >
+                lms.pttc1.edu.vn <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
           </div>
         </div>
 
