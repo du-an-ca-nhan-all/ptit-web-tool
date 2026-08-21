@@ -261,7 +261,7 @@ export default function UserProfileScreen({
       return;
     }
     if (!targetPass && !sys.hasPassword) {
-      setErrorMsg('Vui lòng nhập mật khẩu tài khoản QLDTTX trước khi kiểm tra');
+      setErrorMsg('Vui lòng nhập mật khẩu tài khoản trước khi kiểm tra');
       return;
     }
 
