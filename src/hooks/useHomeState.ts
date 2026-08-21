@@ -265,8 +265,23 @@ export function useHomeState() {
     }
   }, [userRoles, setActiveRole, currentUser, activeRole, activeTab, handleTabChange]);
 
+const TABS_REQUIRING_EXAM_RECORDS: NavigationTab[] = [
+  'schedule',
+  'personal_schedule',
+  'members',
+  'monitor',
+  'envelope',
+  'envelope_all',
+  'settlement',
+];
+
   // Load data from API for active batch
   const loadDataFromApi = useCallback(async (batchCodeArg?: string) => {
+    if (!TABS_REQUIRING_EXAM_RECORDS.includes(activeTab)) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       let currentBatchCode = batchCodeArg;
@@ -290,6 +305,8 @@ export function useHomeState() {
 
       if (activeTab === 'personal_schedule' && effectiveUser?.username) {
         params.set('maSV', effectiveUser.username);
+      } else if ((activeTab === 'members' || activeTab === 'monitor') && monitorClass && monitorClass !== 'ALL') {
+        params.set('classCode', monitorClass);
       }
 
       const isPagedTab = activeTab === 'schedule' || activeTab === 'personal_schedule';
@@ -314,7 +331,7 @@ export function useHomeState() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeBatch, filters, sortConfig, activeTab, effectiveUser, page, pageSize]);
+  }, [activeBatch, filters, sortConfig, activeTab, effectiveUser, monitorClass, page, pageSize]);
 
   // Toggle postponement
   const handleToggleExamPostpone = useCallback(
@@ -464,7 +481,7 @@ export function useHomeState() {
 
   // Load records when active batch or filters change
   useEffect(() => {
-    if (activeBatch) {
+    if (activeBatch && TABS_REQUIRING_EXAM_RECORDS.includes(activeTab)) {
       loadDataFromApi();
     }
   }, [activeBatch, filters, sortConfig, page, pageSize, activeTab, loadDataFromApi]);

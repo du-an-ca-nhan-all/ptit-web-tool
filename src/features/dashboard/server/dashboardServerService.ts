@@ -34,16 +34,22 @@ function parseExamDateTime(ngayThi?: string | null, gioThi?: string | null): Dat
 export async function getDashboardData(username: string): Promise<DashboardData | null> {
   const cleanUsername = username.trim().toUpperCase();
 
-  // 1. Fetch user & student profile
-  const user = await prisma.user.findUnique({
-    where: { username: cleanUsername },
-    include: {
-      student: true,
-      gradeRecord: true,
-      telegramConfig: true,
-      externalAccounts: true,
-    },
-  });
+  // 1. Fetch user profile & active batch concurrently
+  const [user, activeBatch] = await Promise.all([
+    prisma.user.findUnique({
+      where: { username: cleanUsername },
+      include: {
+        student: true,
+        gradeRecord: true,
+        telegramConfig: true,
+        externalAccounts: true,
+      },
+    }),
+    prisma.examBatch.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
 
   if (!user) return null;
 
@@ -51,14 +57,9 @@ export async function getDashboardData(username: string): Promise<DashboardData 
   const isMonitor = checkIsMonitor(user.role);
   const roles = getUserRoles(user.role);
   const studentLop = user.student?.maLop || null;
+  const now = new Date();
 
-  // 2. Fetch active exam batch
-  const activeBatch = await prisma.examBatch.findFirst({
-    where: { isActive: true },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  // 3. Fetch personal exam records
+  // 2. Prepare personal exam records filter
   const whereExam: any = { maSV: cleanUsername };
   if (activeBatch) {
     whereExam.OR = [
@@ -68,13 +69,139 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     ];
   }
 
-  const rawExams = await prisma.examRecord.findMany({
+  // Account checks
+  const qldttxAccount = user.externalAccounts?.find(
+    (a) => a.systemKey === 'QLDTTX_PTTC1' || (a.systemUrl && a.systemUrl.includes('qldttx'))
+  );
+  const lmsAccount = user.externalAccounts?.find(
+    (a) => a.systemKey === 'LMS_PTTC1' || (a.systemUrl && a.systemUrl.includes('lms.pttc1.edu.vn'))
+  );
+
+  // 3. Define concurrent background tasks
+  const rawExamsPromise = prisma.examRecord.findMany({
     where: whereExam,
     include: { examBatch: true },
   });
 
+  const timetablePromise = getStudentTimetableCalendar(cleanUsername, { forceRefresh: false }).catch(
+    (err) => {
+      console.warn('[getDashboardData] Lỗi đọc TKB sinh viên:', err);
+      return null;
+    }
+  );
+
+  const lmsPromise = lmsAccount
+    ? getOrFetchStudentLmsOverview(cleanUsername, { forceRefresh: false }).catch((err) => {
+        console.warn('[getDashboardData] Lỗi đọc dữ liệu LMS sinh viên:', err);
+        return null;
+      })
+    : Promise.resolve(null);
+
+  const classMonitorPromise =
+    isMonitor && studentLop
+      ? Promise.all([
+          prisma.student.count({ where: { maLop: studentLop } }),
+          prisma.user.count({
+            where: {
+              student: { maLop: studentLop },
+              passwordHash: { notIn: ['', 'NONE', 'null', 'undefined'] },
+            },
+          }),
+          prisma.examRecord.findMany({
+            where: {
+              student: { maLop: studentLop },
+              ...(activeBatch ? { batchCode: activeBatch.code } : {}),
+            },
+            distinct: ['maSV'],
+            select: { maSV: true },
+          }),
+          prisma.roomEnvelopeConfirmation.count({
+            where: { assignedClass: studentLop },
+          }),
+        ]).then(([totalClassStudents, activeAccountsCount, studentsWithExams, envelopesAssigned]) => ({
+          isMonitor,
+          classCode: studentLop,
+          totalClassStudents,
+          activeAccountsCount,
+          studentsWithExamsCount: studentsWithExams.length,
+          envelopesAssignedCount: envelopesAssigned,
+          totalClassRoomsCount: envelopesAssigned,
+        }))
+      : Promise.resolve(undefined);
+
+  const adminHealthPromise = isAdmin
+    ? (async () => {
+        const oneDayAgo = new Date(Date.now() - 24 * 3600 * 1000);
+        const [
+          totalStudents,
+          totalUsers,
+          totalActiveBatches,
+          pendingRegistrationsCount,
+          telegramBotConfig,
+          recentActivityLogsCount,
+        ] = await Promise.all([
+          prisma.student.count(),
+          prisma.user.count({
+            where: {
+              passwordHash: { notIn: ['', 'NONE', 'null', 'undefined'] },
+            },
+          }),
+          prisma.examBatch.count({ where: { isActive: true } }),
+          prisma.registrationRequest.count({ where: { status: 'PENDING' } }),
+          getGlobalConfig<TelegramBotConfigValue>(GLOBAL_CONFIG_KEYS.TELEGRAM_BOT),
+          prisma.activityLog.count({ where: { createdAt: { gte: oneDayAgo } } }),
+        ]);
+
+        return {
+          isAdmin: true,
+          totalStudents,
+          totalUsers,
+          totalActiveBatches,
+          pendingRegistrationsCount,
+          isTelegramBotConfigured: Boolean(telegramBotConfig && telegramBotConfig.botToken),
+          telegramBotUsername: telegramBotConfig?.botUsername || null,
+          recentActivityLogsCount,
+          activeBatchName: activeBatch?.name || null,
+        };
+      })()
+    : Promise.resolve(undefined);
+
+  const announcementsPromise = prisma.announcement.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        { targetRole: 'ALL' },
+        { targetRole: user.role },
+        ...roles.map((r) => ({ targetRole: r })),
+      ],
+      AND: [
+        {
+          OR: [{ targetClass: null }, { targetClass: '' }, ...(studentLop ? [{ targetClass: studentLop }] : [])],
+        },
+        {
+          OR: [{ startDate: null }, { startDate: { lte: now } }],
+        },
+        {
+          OR: [{ endDate: null }, { endDate: { gte: now } }],
+        },
+      ],
+    },
+    orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+    take: 5,
+  });
+
+  // 4. Await all concurrent tasks
+  const [rawExams, timetableRes, lmsData, classMonitorSummary, adminSystemHealth, announcementsList] =
+    await Promise.all([
+      rawExamsPromise,
+      timetablePromise,
+      lmsPromise,
+      classMonitorPromise,
+      adminHealthPromise,
+      announcementsPromise,
+    ]);
+
   // Parse & sort upcoming exams
-  const now = new Date();
   const parsedExamsList = rawExams.map((ex) => {
     const examDt = parseExamDateTime(ex.ngayThi, ex.gioThi);
     const diffMs = examDt ? examDt.getTime() - now.getTime() : -1;
@@ -153,7 +280,7 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     isPostponed: e.isPostponed,
   }));
 
-  // 4. Academic Summary
+  // Academic Summary
   const gradeRecord = user.gradeRecord;
   const academicSummary = {
     hasData: Boolean(gradeRecord),
@@ -169,7 +296,7 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     lastSyncAt: gradeRecord?.lastPulledAt ? gradeRecord.lastPulledAt.toISOString() : null,
   };
 
-  // 5. Timetable & Schedule Summary
+  // Timetable & Schedule Summary
   let timetableSummary = {
     hasData: false,
     semesterName: undefined as string | undefined,
@@ -180,73 +307,65 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     lastSyncAt: null as string | null,
   };
 
-  try {
+  if (timetableRes && timetableRes.success && Array.isArray(timetableRes.events) && timetableRes.events.length > 0) {
     const today = new Date();
     const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
       today.getDate()
     ).padStart(2, '0')}`;
 
-    const timetableRes = await getStudentTimetableCalendar(cleanUsername, { forceRefresh: false });
-    if (timetableRes && timetableRes.success && Array.isArray(timetableRes.events) && timetableRes.events.length > 0) {
-      const todayEvts = timetableRes.events
-        .filter((e) => e.date === todayIso)
-        .map((e) => ({
-          id: e.id,
-          date: e.date,
-          dayOfWeekStr: e.dayOfWeekStr,
-          subjectName: e.subjectName,
-          subjectCode: e.subjectCode,
-          group: e.group,
-          classCode: e.classCode,
-          periodStr: e.periodStr,
-          startTime: e.startTime,
-          endTime: e.endTime,
-          room: e.room,
-          onlineLink: e.onlineLink,
-          lecturer: e.lecturer,
-          shift: e.shift,
-          isToday: true,
-        }));
+    const todayEvts = timetableRes.events
+      .filter((e) => e.date === todayIso)
+      .map((e) => ({
+        id: e.id,
+        date: e.date,
+        dayOfWeekStr: e.dayOfWeekStr,
+        subjectName: e.subjectName,
+        subjectCode: e.subjectCode,
+        group: e.group,
+        classCode: e.classCode,
+        periodStr: e.periodStr,
+        startTime: e.startTime,
+        endTime: e.endTime,
+        room: e.room,
+        onlineLink: e.onlineLink,
+        lecturer: e.lecturer,
+        shift: e.shift,
+        isToday: true,
+      }));
 
-      const upcomingEvts = timetableRes.events
-        .filter((e) => e.date > todayIso)
-        .slice(0, 5)
-        .map((e) => ({
-          id: e.id,
-          date: e.date,
-          dayOfWeekStr: e.dayOfWeekStr,
-          subjectName: e.subjectName,
-          subjectCode: e.subjectCode,
-          group: e.group,
-          classCode: e.classCode,
-          periodStr: e.periodStr,
-          startTime: e.startTime,
-          endTime: e.endTime,
-          room: e.room,
-          onlineLink: e.onlineLink,
-          lecturer: e.lecturer,
-          shift: e.shift,
-          isToday: false,
-        }));
+    const upcomingEvts = timetableRes.events
+      .filter((e) => e.date > todayIso)
+      .slice(0, 5)
+      .map((e) => ({
+        id: e.id,
+        date: e.date,
+        dayOfWeekStr: e.dayOfWeekStr,
+        subjectName: e.subjectName,
+        subjectCode: e.subjectCode,
+        group: e.group,
+        classCode: e.classCode,
+        periodStr: e.periodStr,
+        startTime: e.startTime,
+        endTime: e.endTime,
+        room: e.room,
+        onlineLink: e.onlineLink,
+        lecturer: e.lecturer,
+        shift: e.shift,
+        isToday: false,
+      }));
 
-      timetableSummary = {
-        hasData: true,
-        semesterName: timetableRes.semesterName,
-        totalSubjects: timetableRes.uniqueSubjectsCount,
-        totalEvents: timetableRes.totalEvents,
-        todayEvents: todayEvts,
-        upcomingEvents: upcomingEvts,
-        lastSyncAt: timetableRes.lastSyncAt,
-      };
-    }
-  } catch (err) {
-    console.warn('[getDashboardData] Lỗi đọc TKB sinh viên:', err);
+    timetableSummary = {
+      hasData: true,
+      semesterName: timetableRes.semesterName,
+      totalSubjects: timetableRes.uniqueSubjectsCount,
+      totalEvents: timetableRes.totalEvents,
+      todayEvents: todayEvts,
+      upcomingEvents: upcomingEvts,
+      lastSyncAt: timetableRes.lastSyncAt,
+    };
   }
 
-  // 6. External Account Status (QLDTTX)
-  const qldttxAccount = user.externalAccounts?.find(
-    (a) => a.systemKey === 'QLDTTX_PTTC1' || (a.systemUrl && a.systemUrl.includes('qldttx'))
-  );
+  // External Account Status (QLDTTX)
   const externalAccountStatus = {
     isConfigured: Boolean(qldttxAccount),
     isConnected: qldttxAccount?.status === 'CONNECTED',
@@ -254,10 +373,7 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     systemName: qldttxAccount?.systemName || 'Cổng QLDTTX (PTTC1)',
   };
 
-  // 6b. LMS Account Status & Learning Progress Summary
-  const lmsAccount = user.externalAccounts?.find(
-    (a) => a.systemKey === 'LMS_PTTC1' || (a.systemUrl && a.systemUrl.includes('lms.pttc1.edu.vn'))
-  );
+  // LMS Account Status & Learning Progress Summary
   const lmsAccountStatus = {
     isConfigured: Boolean(lmsAccount),
     isConnected: lmsAccount?.status === 'CONNECTED',
@@ -266,93 +382,86 @@ export async function getDashboardData(username: string): Promise<DashboardData 
   };
 
   let lmsSummary: LmsDashboardSummary | undefined = undefined;
-  if (lmsAccount) {
-    try {
-      const lmsData = await getOrFetchStudentLmsOverview(cleanUsername, { forceRefresh: false });
-      if (lmsData && lmsData.isConfigured !== false) {
-        const courses = lmsData.courses || [];
-        const totalCourses = lmsData.stats?.enrolledCourses ?? courses.length;
-        const completedCourses =
-          lmsData.stats?.completedCourses ?? courses.filter((c) => c.progressPercent === 100).length;
-        const inProgressCourses = courses.filter((c) => c.progressPercent > 0 && c.progressPercent < 100).length;
-        const notStartedCourses = courses.filter((c) => c.progressPercent === 0).length;
-        const completedActivities =
-          lmsData.stats?.completedActivities ??
-          courses.reduce((sum, c) => sum + (c.completedActivities || 0), 0);
-        const dueActivities = lmsData.stats?.dueActivities ?? 0;
-        const totalActivities = completedActivities + dueActivities;
+  if (lmsAccount && lmsData && lmsData.isConfigured !== false) {
+    const courses = lmsData.courses || [];
+    const totalCourses = lmsData.stats?.enrolledCourses ?? courses.length;
+    const completedCourses =
+      lmsData.stats?.completedCourses ?? courses.filter((c) => c.progressPercent === 100).length;
+    const inProgressCourses = courses.filter((c) => c.progressPercent > 0 && c.progressPercent < 100).length;
+    const notStartedCourses = courses.filter((c) => c.progressPercent === 0).length;
+    const completedActivities =
+      lmsData.stats?.completedActivities ??
+      courses.reduce((sum, c) => sum + (c.completedActivities || 0), 0);
+    const dueActivities = lmsData.stats?.dueActivities ?? 0;
+    const totalActivities = completedActivities + dueActivities;
 
-        let overallProgressPercent = 0;
-        if (totalActivities > 0) {
-          overallProgressPercent = Math.min(100, Math.round((completedActivities / totalActivities) * 100));
-        } else if (courses.length > 0) {
-          const avgProgress = courses.reduce((sum, c) => sum + (c.progressPercent || 0), 0) / courses.length;
-          overallProgressPercent = Math.min(100, Math.round(avgProgress));
-        }
-
-        // Highlight courses: prioritize in-progress courses (lowest progress first), then not started, then completed
-        const highlightCourses = [...courses]
-          .sort((a, b) => {
-            const aInProg = a.progressPercent > 0 && a.progressPercent < 100;
-            const bInProg = b.progressPercent > 0 && b.progressPercent < 100;
-            if (aInProg && !bInProg) return -1;
-            if (!aInProg && bInProg) return 1;
-            if (a.progressPercent === 100 && b.progressPercent < 100) return 1;
-            if (b.progressPercent === 100 && a.progressPercent < 100) return -1;
-            return a.progressPercent - b.progressPercent;
-          })
-          .slice(0, 4);
-
-        lmsSummary = {
-          isConfigured: true,
-          hasLinkedAccount: true,
-          userFullName: lmsData.userFullName || undefined,
-          totalCourses,
-          completedCourses,
-          inProgressCourses,
-          notStartedCourses,
-          completedActivities,
-          dueActivities,
-          totalActivities,
-          overallProgressPercent,
-          courses: courses.map((c) => ({
-            id: c.id,
-            courseCode: c.courseCode,
-            courseName: c.courseName,
-            fullName: c.fullName,
-            progressPercent: c.progressPercent,
-            completedActivities: c.completedActivities,
-            totalActivities: c.totalActivities,
-            grade: c.grade || null,
-            isCompleted: c.isCompleted || c.progressPercent === 100,
-            category: c.category,
-            url: c.url,
-          })),
-          highlightCourses: highlightCourses.map((c) => ({
-            id: c.id,
-            courseCode: c.courseCode,
-            courseName: c.courseName,
-            fullName: c.fullName,
-            progressPercent: c.progressPercent,
-            completedActivities: c.completedActivities,
-            totalActivities: c.totalActivities,
-            grade: c.grade || null,
-            isCompleted: c.isCompleted || c.progressPercent === 100,
-            category: c.category,
-            url: c.url,
-          })),
-          lastSyncAt: lmsData.lastSyncAt || null,
-          isCachedDb: lmsData.isCachedDb,
-          isLiveSync: lmsData.isLiveSync,
-          syncWarning: lmsData.syncWarning,
-        };
-      }
-    } catch (lmsErr) {
-      console.warn('[getDashboardData] Lỗi đọc dữ liệu LMS sinh viên:', lmsErr);
+    let overallProgressPercent = 0;
+    if (totalActivities > 0) {
+      overallProgressPercent = Math.min(100, Math.round((completedActivities / totalActivities) * 100));
+    } else if (courses.length > 0) {
+      const avgProgress = courses.reduce((sum, c) => sum + (c.progressPercent || 0), 0) / courses.length;
+      overallProgressPercent = Math.min(100, Math.round(avgProgress));
     }
+
+    // Highlight courses: prioritize in-progress courses (lowest progress first), then not started, then completed
+    const highlightCourses = [...courses]
+      .sort((a, b) => {
+        const aInProg = a.progressPercent > 0 && a.progressPercent < 100;
+        const bInProg = b.progressPercent > 0 && b.progressPercent < 100;
+        if (aInProg && !bInProg) return -1;
+        if (!aInProg && bInProg) return 1;
+        if (a.progressPercent === 100 && b.progressPercent < 100) return 1;
+        if (b.progressPercent === 100 && a.progressPercent < 100) return -1;
+        return a.progressPercent - b.progressPercent;
+      })
+      .slice(0, 4);
+
+    lmsSummary = {
+      isConfigured: true,
+      hasLinkedAccount: true,
+      userFullName: lmsData.userFullName || undefined,
+      totalCourses,
+      completedCourses,
+      inProgressCourses,
+      notStartedCourses,
+      completedActivities,
+      dueActivities,
+      totalActivities,
+      overallProgressPercent,
+      courses: courses.map((c) => ({
+        id: c.id,
+        courseCode: c.courseCode,
+        courseName: c.courseName,
+        fullName: c.fullName,
+        progressPercent: c.progressPercent,
+        completedActivities: c.completedActivities,
+        totalActivities: c.totalActivities,
+        grade: c.grade || null,
+        isCompleted: c.isCompleted || c.progressPercent === 100,
+        category: c.category,
+        url: c.url,
+      })),
+      highlightCourses: highlightCourses.map((c) => ({
+        id: c.id,
+        courseCode: c.courseCode,
+        courseName: c.courseName,
+        fullName: c.fullName,
+        progressPercent: c.progressPercent,
+        completedActivities: c.completedActivities,
+        totalActivities: c.totalActivities,
+        grade: c.grade || null,
+        isCompleted: c.isCompleted || c.progressPercent === 100,
+        category: c.category,
+        url: c.url,
+      })),
+      lastSyncAt: lmsData.lastSyncAt || null,
+      isCachedDb: lmsData.isCachedDb,
+      isLiveSync: lmsData.isLiveSync,
+      syncWarning: lmsData.syncWarning,
+    };
   }
 
-  // 6c. Telegram Sync Status
+  // Telegram Sync Status
   const telConfig = user.telegramConfig;
   const telegramStatus = {
     isConfigured: Boolean(telConfig && telConfig.chatId),
@@ -361,104 +470,7 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     botUsername: telConfig?.botUsername || null,
   };
 
-  // 7. Class Monitor Summary (STRICTLY only for users with lop_truong role)
-  let classMonitorSummary = undefined;
-  if (isMonitor && studentLop) {
-    const [totalClassStudents, activeAccountsCount, studentsWithExams, envelopesAssigned] =
-      await Promise.all([
-        prisma.student.count({ where: { maLop: studentLop } }),
-        prisma.user.count({
-          where: {
-            student: { maLop: studentLop },
-            passwordHash: { notIn: ['', 'NONE', 'null', 'undefined'] },
-          },
-        }),
-        prisma.examRecord.findMany({
-          where: {
-            student: { maLop: studentLop },
-            ...(activeBatch ? { batchCode: activeBatch.code } : {}),
-          },
-          distinct: ['maSV'],
-          select: { maSV: true },
-        }),
-        prisma.roomEnvelopeConfirmation.count({
-          where: { assignedClass: studentLop },
-        }),
-      ]);
-
-    classMonitorSummary = {
-      isMonitor,
-      classCode: studentLop,
-      totalClassStudents,
-      activeAccountsCount,
-      studentsWithExamsCount: studentsWithExams.length,
-      envelopesAssignedCount: envelopesAssigned,
-      totalClassRoomsCount: envelopesAssigned,
-    };
-  }
-
-  // 8. Admin System Health (if Admin)
-  let adminSystemHealth = undefined;
-  if (isAdmin) {
-    const oneDayAgo = new Date(Date.now() - 24 * 3600 * 1000);
-    const [
-      totalStudents,
-      totalUsers,
-      totalActiveBatches,
-      pendingRegistrationsCount,
-      telegramBotConfig,
-      recentActivityLogsCount,
-    ] = await Promise.all([
-      prisma.student.count(),
-      prisma.user.count({
-        where: {
-          passwordHash: { notIn: ['', 'NONE', 'null', 'undefined'] },
-        },
-      }),
-      prisma.examBatch.count({ where: { isActive: true } }),
-      prisma.registrationRequest.count({ where: { status: 'PENDING' } }),
-      getGlobalConfig<TelegramBotConfigValue>(GLOBAL_CONFIG_KEYS.TELEGRAM_BOT),
-      prisma.activityLog.count({ where: { createdAt: { gte: oneDayAgo } } }),
-    ]);
-
-    adminSystemHealth = {
-      isAdmin: true,
-      totalStudents,
-      totalUsers,
-      totalActiveBatches,
-      pendingRegistrationsCount,
-      isTelegramBotConfigured: Boolean(telegramBotConfig && telegramBotConfig.botToken),
-      telegramBotUsername: telegramBotConfig?.botUsername || null,
-      recentActivityLogsCount,
-      activeBatchName: activeBatch?.name || null,
-    };
-  }
-
-  // 9. Active Announcements
-  const announcementsList = await prisma.announcement.findMany({
-    where: {
-      isActive: true,
-      OR: [
-        { targetRole: 'ALL' },
-        { targetRole: user.role },
-        ...(roles.map((r) => ({ targetRole: r }))),
-      ],
-      AND: [
-        {
-          OR: [{ targetClass: null }, { targetClass: '' }, ...(studentLop ? [{ targetClass: studentLop }] : [])],
-        },
-        {
-          OR: [{ startDate: null }, { startDate: { lte: now } }],
-        },
-        {
-          OR: [{ endDate: null }, { endDate: { gte: now } }],
-        },
-      ],
-    },
-    orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
-    take: 5,
-  });
-
+  // Map Active Announcements
   const activeAnnouncements: AnnouncementItem[] = announcementsList.map((a) => ({
     id: a.id,
     title: a.title,
