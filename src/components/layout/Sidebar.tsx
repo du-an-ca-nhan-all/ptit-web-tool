@@ -63,7 +63,7 @@ export default function Sidebar({
         />
       )}
       <aside
-        className={`fixed md:relative inset-y-0 left-0 z-50 w-64 bg-[#0F172A] flex flex-col shrink-0 transition-transform duration-300 md:translate-x-0 ${
+        className={`fixed md:relative inset-y-0 left-0 z-50 w-64 bg-[#0F172A] flex flex-col shrink-0 transition-transform duration-300 md:translate-x-0 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

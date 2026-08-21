@@ -101,7 +101,7 @@ export default function AnnouncementDrawer({
       <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
         <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300">
           {/* Drawer Header */}
-          <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between gap-3 shadow-sm">
+          <div className="p-4 sm:p-5 pt-[calc(env(safe-area-inset-top,0px)+1rem)] bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between gap-3 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-white/10 backdrop-blur-md rounded-xl text-sky-400">
                 <Bell className="w-5 h-5" />

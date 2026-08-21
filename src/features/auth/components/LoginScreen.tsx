@@ -204,7 +204,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900/95 p-4 font-sans relative overflow-hidden">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-slate-900/95 p-4 font-sans relative overflow-hidden pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]">
       {/* Dynamic Background Blurs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none translate-x-1/2 translate-y-1/2" />
@@ -214,7 +214,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
         <button
           type="button"
           onClick={openInstallModal}
-          className="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-full text-xs font-semibold backdrop-blur-md transition-all cursor-pointer shadow-lg active:scale-95"
+          className="absolute top-[calc(env(safe-area-inset-top,0px)+1rem)] right-4 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-full text-xs font-semibold backdrop-blur-md transition-all cursor-pointer shadow-lg active:scale-95"
           title="Cài đặt PTIT EduSync về thiết bị"
         >
           <Download className="w-3.5 h-3.5 text-sky-400" />

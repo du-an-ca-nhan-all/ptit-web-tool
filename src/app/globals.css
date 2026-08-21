@@ -3,5 +3,8 @@
 @layer base {
   body {
     @apply bg-[#F1F5F9] text-slate-800 antialiased;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: auto;
   }
 }

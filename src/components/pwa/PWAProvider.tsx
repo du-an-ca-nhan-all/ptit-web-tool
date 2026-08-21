@@ -69,7 +69,7 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
       {!pwa.isOnline && (
         <aside
           aria-label="Thông báo trạng thái ngoại tuyến"
-          className="fixed top-0 inset-x-0 z-50 bg-amber-600 text-white px-4 py-2 text-xs font-medium shadow-md flex items-center justify-between"
+          className="fixed top-0 inset-x-0 z-50 bg-amber-600 text-white px-4 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)] pb-2 text-xs font-medium shadow-md flex items-center justify-between"
         >
           <div className="flex items-center gap-2 max-w-4xl mx-auto w-full">
             <WifiOff className="w-4 h-4 flex-shrink-0 animate-pulse" />
@@ -84,7 +84,7 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
       {showOnlineToast && (
         <aside
           aria-label="Thông báo khôi phục kết nối"
-          className="fixed bottom-5 right-5 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-medium"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] right-5 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-medium"
         >
           <span className="w-2 h-2 rounded-full bg-emerald-200 animate-ping" />
           <span>Đã khôi phục kết nối Internet!</span>
@@ -95,7 +95,7 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
       {pwa.isUpdateAvailable && (
         <aside
           aria-label="Thông báo cập nhật phiên bản"
-          className="fixed bottom-5 left-5 right-5 md:left-auto md:right-5 md:max-w-md z-50 bg-[#1E293B] border border-blue-500/40 text-slate-100 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] left-5 right-5 md:left-auto md:right-5 md:max-w-md z-50 bg-[#1E293B] border border-blue-500/40 text-slate-100 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3"
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center flex-shrink-0">
@@ -119,7 +119,7 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
       {showInstallBanner && !pwa.isInstalled && (
         <aside
           aria-label="Gợi ý cài đặt ứng dụng"
-          className="fixed bottom-5 left-5 right-5 md:left-auto md:right-5 md:max-w-sm z-40 bg-[#0F172A]/95 border border-slate-700/80 text-slate-100 p-3.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] left-5 right-5 md:left-auto md:right-5 md:max-w-sm z-40 bg-[#0F172A]/95 border border-slate-700/80 text-slate-100 p-3.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3"
         >
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-blue-600 p-0.5 flex-shrink-0 flex items-center justify-center shadow">

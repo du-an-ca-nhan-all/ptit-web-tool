@@ -118,7 +118,7 @@ export default function Header({
   };
 
   return (
-    <header className="h-20 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between shrink-0">
+    <header className="min-h-16 md:min-h-20 h-[calc(4.5rem+env(safe-area-inset-top,0px))] md:h-20 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between shrink-0 pt-[env(safe-area-inset-top,0px)]">
       <div className="flex items-center gap-4 md:gap-6">
         <button
           className="flex items-center justify-center p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg md:hidden"

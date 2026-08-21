@@ -40,7 +40,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#F1F5F9] font-sans text-slate-800 overflow-hidden relative">
+    <div className="flex h-[100dvh] w-full bg-[#F1F5F9] font-sans text-slate-800 overflow-hidden relative">
       <Sidebar
         activeTab={state.activeTab}
         onTabChange={state.handleTabChange}
