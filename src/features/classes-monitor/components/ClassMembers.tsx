@@ -207,7 +207,7 @@ export default function ClassMembers({
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const res = await fetch('/api/monitors', {
+      const res = await fetch('/api/class-monitors', {
         method: 'POST',
         headers,
         body: JSON.stringify({

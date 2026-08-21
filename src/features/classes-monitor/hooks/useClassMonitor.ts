@@ -34,11 +34,12 @@ export function useClassMonitor(initialClass?: string) {
         if (params?.classCode) query.set('classCode', params.classCode);
 
         const qs = query.toString();
-        const url = qs ? `/api/monitors?${qs}` : '/api/monitors';
+        const url = qs ? `/api/class-monitors?${qs}` : '/api/class-monitors';
         const res = await fetch(url);
         const data = await res.json();
-        if (res.ok && data.users) {
-          setLoginUsers(data.users);
+        const monitorList = data.monitors || data.users || [];
+        if (res.ok && Array.isArray(monitorList)) {
+          setLoginUsers(monitorList);
         }
       } catch (err) {
         console.error('Error fetching monitors data:', err);
