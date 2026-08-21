@@ -218,6 +218,9 @@ export const getNavigationPath = (
         case 'SECURITY':
           basePath = '/profile/Security';
           break;
+        case 'LMS':
+          basePath = '/profile/Lms';
+          break;
         case 'OVERVIEW':
         default:
           basePath = '/profile/Overview';
@@ -355,7 +358,7 @@ export const getInitialHomeState = (): InitialHomeState => {
   const querySubTab = (searchParams.get('subTab') || hashParams.get('subTab'))?.toUpperCase() as ProfileSubTab;
   if (
     querySubTab &&
-    ['OVERVIEW', 'SCHEDULE', 'GRADES', 'EXTERNAL_ACCOUNTS', 'TELEGRAM', 'EXAMS', 'SECURITY'].includes(querySubTab)
+    ['OVERVIEW', 'SCHEDULE', 'GRADES', 'LMS', 'EXTERNAL_ACCOUNTS', 'TELEGRAM', 'EXAMS', 'SECURITY'].includes(querySubTab)
   ) {
     profileSubTab = querySubTab;
   }

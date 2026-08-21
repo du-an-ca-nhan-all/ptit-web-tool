@@ -3,8 +3,9 @@ import { parseDateString } from '@/src/lib/date-utils';
 import { checkIsAdmin, checkIsMonitor, getUserRoles } from '@/src/lib/auth';
 import { getGlobalConfig, GLOBAL_CONFIG_KEYS, TelegramBotConfigValue } from '@/src/lib/globalConfig';
 import { getStudentTimetableCalendar } from '@/src/features/external-portal/server/studentTimetableServerService';
+import { getOrFetchStudentLmsOverview } from '@/src/features/external-portal/server/lmsServerService';
 import { AnnouncementItem } from '@/src/features/announcements';
-import { DashboardData } from '../types/dashboard.types';
+import { DashboardData, LmsDashboardSummary } from '../types/dashboard.types';
 
 /**
  * Calculates time difference and exam status relative to now
@@ -40,9 +41,7 @@ export async function getDashboardData(username: string): Promise<DashboardData 
       student: true,
       gradeRecord: true,
       telegramConfig: true,
-      externalAccounts: {
-        where: { systemKey: 'QLDTTX_PTTC1' },
-      },
+      externalAccounts: true,
     },
   });
 
@@ -244,16 +243,116 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     console.warn('[getDashboardData] Lỗi đọc TKB sinh viên:', err);
   }
 
-  // 6. External Account Status
-  const extAccount = user.externalAccounts?.[0];
+  // 6. External Account Status (QLDTTX)
+  const qldttxAccount = user.externalAccounts?.find(
+    (a) => a.systemKey === 'QLDTTX_PTTC1' || (a.systemUrl && a.systemUrl.includes('qldttx'))
+  );
   const externalAccountStatus = {
-    isConfigured: Boolean(extAccount),
-    isConnected: extAccount?.status === 'CONNECTED',
-    lastSyncAt: extAccount?.lastSyncAt ? extAccount.lastSyncAt.toISOString() : null,
-    systemName: extAccount?.systemName || 'Cổng QLDTTX (PTTC1)',
+    isConfigured: Boolean(qldttxAccount),
+    isConnected: qldttxAccount?.status === 'CONNECTED',
+    lastSyncAt: qldttxAccount?.lastSyncAt ? qldttxAccount.lastSyncAt.toISOString() : null,
+    systemName: qldttxAccount?.systemName || 'Cổng QLDTTX (PTTC1)',
   };
 
-  // 6. Telegram Sync Status
+  // 6b. LMS Account Status & Learning Progress Summary
+  const lmsAccount = user.externalAccounts?.find(
+    (a) => a.systemKey === 'LMS_PTTC1' || (a.systemUrl && a.systemUrl.includes('lms.pttc1.edu.vn'))
+  );
+  const lmsAccountStatus = {
+    isConfigured: Boolean(lmsAccount),
+    isConnected: lmsAccount?.status === 'CONNECTED',
+    lastSyncAt: lmsAccount?.lastSyncAt ? lmsAccount.lastSyncAt.toISOString() : null,
+    systemName: lmsAccount?.systemName || 'Hệ thống học tập trực tuyến (LMS PTTC1)',
+  };
+
+  let lmsSummary: LmsDashboardSummary | undefined = undefined;
+  if (lmsAccount) {
+    try {
+      const lmsData = await getOrFetchStudentLmsOverview(cleanUsername, { forceRefresh: false });
+      if (lmsData && lmsData.isConfigured !== false) {
+        const courses = lmsData.courses || [];
+        const totalCourses = lmsData.stats?.enrolledCourses ?? courses.length;
+        const completedCourses =
+          lmsData.stats?.completedCourses ?? courses.filter((c) => c.progressPercent === 100).length;
+        const inProgressCourses = courses.filter((c) => c.progressPercent > 0 && c.progressPercent < 100).length;
+        const notStartedCourses = courses.filter((c) => c.progressPercent === 0).length;
+        const completedActivities =
+          lmsData.stats?.completedActivities ??
+          courses.reduce((sum, c) => sum + (c.completedActivities || 0), 0);
+        const dueActivities = lmsData.stats?.dueActivities ?? 0;
+        const totalActivities = completedActivities + dueActivities;
+
+        let overallProgressPercent = 0;
+        if (totalActivities > 0) {
+          overallProgressPercent = Math.min(100, Math.round((completedActivities / totalActivities) * 100));
+        } else if (courses.length > 0) {
+          const avgProgress = courses.reduce((sum, c) => sum + (c.progressPercent || 0), 0) / courses.length;
+          overallProgressPercent = Math.min(100, Math.round(avgProgress));
+        }
+
+        // Highlight courses: prioritize in-progress courses (lowest progress first), then not started, then completed
+        const highlightCourses = [...courses]
+          .sort((a, b) => {
+            const aInProg = a.progressPercent > 0 && a.progressPercent < 100;
+            const bInProg = b.progressPercent > 0 && b.progressPercent < 100;
+            if (aInProg && !bInProg) return -1;
+            if (!aInProg && bInProg) return 1;
+            if (a.progressPercent === 100 && b.progressPercent < 100) return 1;
+            if (b.progressPercent === 100 && a.progressPercent < 100) return -1;
+            return a.progressPercent - b.progressPercent;
+          })
+          .slice(0, 4);
+
+        lmsSummary = {
+          isConfigured: true,
+          hasLinkedAccount: true,
+          userFullName: lmsData.userFullName || undefined,
+          totalCourses,
+          completedCourses,
+          inProgressCourses,
+          notStartedCourses,
+          completedActivities,
+          dueActivities,
+          totalActivities,
+          overallProgressPercent,
+          courses: courses.map((c) => ({
+            id: c.id,
+            courseCode: c.courseCode,
+            courseName: c.courseName,
+            fullName: c.fullName,
+            progressPercent: c.progressPercent,
+            completedActivities: c.completedActivities,
+            totalActivities: c.totalActivities,
+            grade: c.grade || null,
+            isCompleted: c.isCompleted || c.progressPercent === 100,
+            category: c.category,
+            url: c.url,
+          })),
+          highlightCourses: highlightCourses.map((c) => ({
+            id: c.id,
+            courseCode: c.courseCode,
+            courseName: c.courseName,
+            fullName: c.fullName,
+            progressPercent: c.progressPercent,
+            completedActivities: c.completedActivities,
+            totalActivities: c.totalActivities,
+            grade: c.grade || null,
+            isCompleted: c.isCompleted || c.progressPercent === 100,
+            category: c.category,
+            url: c.url,
+          })),
+          lastSyncAt: lmsData.lastSyncAt || null,
+          isCachedDb: lmsData.isCachedDb,
+          isLiveSync: lmsData.isLiveSync,
+          syncWarning: lmsData.syncWarning,
+        };
+      }
+    } catch (lmsErr) {
+      console.warn('[getDashboardData] Lỗi đọc dữ liệu LMS sinh viên:', lmsErr);
+    }
+  }
+
+  // 6c. Telegram Sync Status
   const telConfig = user.telegramConfig;
   const telegramStatus = {
     isConfigured: Boolean(telConfig && telConfig.chatId),
@@ -396,9 +495,11 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     upcomingExams,
     academicSummary,
     timetableSummary,
+    lmsSummary,
     classMonitorSummary,
     adminSystemHealth,
     externalAccountStatus,
+    lmsAccountStatus,
     telegramStatus,
     activeAnnouncements,
     activeBatch: activeBatch

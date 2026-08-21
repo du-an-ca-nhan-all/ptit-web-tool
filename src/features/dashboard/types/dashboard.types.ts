@@ -104,6 +104,40 @@ export interface TimetableSummary {
   lastSyncAt?: string | null;
 }
 
+export interface LmsCourseHighlightItem {
+  id: string;
+  courseCode: string;
+  courseName: string;
+  fullName: string;
+  progressPercent: number;
+  completedActivities: number;
+  totalActivities: number;
+  grade?: string | null;
+  isCompleted: boolean;
+  category?: string;
+  url?: string;
+}
+
+export interface LmsDashboardSummary {
+  isConfigured: boolean;
+  hasLinkedAccount: boolean;
+  userFullName?: string;
+  totalCourses: number;
+  completedCourses: number;
+  inProgressCourses: number;
+  notStartedCourses: number;
+  completedActivities: number;
+  dueActivities: number;
+  totalActivities: number;
+  overallProgressPercent: number;
+  courses: LmsCourseHighlightItem[];
+  highlightCourses: LmsCourseHighlightItem[];
+  lastSyncAt?: string | null;
+  isCachedDb?: boolean;
+  isLiveSync?: boolean;
+  syncWarning?: string;
+}
+
 export interface DashboardData {
   user: LoginUser;
   nextExam: NextExamCountdown;
@@ -121,9 +155,11 @@ export interface DashboardData {
   }>;
   academicSummary: AcademicSummary;
   timetableSummary: TimetableSummary;
+  lmsSummary?: LmsDashboardSummary;
   classMonitorSummary?: ClassMonitorSummary;
   adminSystemHealth?: AdminSystemHealth;
   externalAccountStatus: ExternalAccountStatus;
+  lmsAccountStatus?: ExternalAccountStatus;
   telegramStatus: TelegramSyncStatus;
   activeAnnouncements: AnnouncementItem[];
   activeBatch?: ExamBatchItem | null;

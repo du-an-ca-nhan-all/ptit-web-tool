@@ -8,6 +8,7 @@ import StudentHeroBanner from './StudentHeroBanner';
 import NextExamCountdownCard from './NextExamCountdownCard';
 import PersonalTimetableCard from './PersonalTimetableCard';
 import AcademicSnapshotCards from './AcademicSnapshotCards';
+import LmsProgressDashboardCard from './LmsProgressDashboardCard';
 import UpcomingScheduleList from './UpcomingScheduleList';
 import ClassMonitorDashboardCard from './ClassMonitorDashboardCard';
 import AdminSystemHealthCard from './AdminSystemHealthCard';
@@ -72,6 +73,7 @@ export default function DashboardOverview({
       <StudentHeroBanner
         user={data.user}
         externalAccountStatus={data.externalAccountStatus}
+        lmsAccountStatus={data.lmsAccountStatus}
         telegramStatus={data.telegramStatus}
         activeBatchName={data.activeBatch?.name}
         onRefresh={refresh}
@@ -95,10 +97,14 @@ export default function DashboardOverview({
         />
       )}
 
-      {/* 4. Main Stats Grid (Exam Countdown, Timetable & Today's Classes, Academic Snapshot) */}
+      {/* 4. Main Stats Grid (Exam Countdown, Timetable & Today's Classes, Academic Snapshot, LMS Learning Progress) */}
       <div
         className={`grid grid-cols-1 gap-6 ${
-          data.nextExam.hasExam ? 'lg:grid-cols-3' : 'lg:grid-cols-2'
+          data.nextExam.hasExam && data.lmsSummary?.isConfigured
+            ? 'md:grid-cols-2'
+            : data.nextExam.hasExam || data.lmsSummary?.isConfigured
+            ? 'lg:grid-cols-3'
+            : 'lg:grid-cols-2'
         }`}
       >
         {data.nextExam.hasExam && (
@@ -119,6 +125,14 @@ export default function DashboardOverview({
           onNavigateToGrades={() => onNavigateTab('profile', 'GRADES')}
           onNavigateToExternalAccounts={() => onNavigateTab('profile', 'EXTERNAL_ACCOUNTS')}
         />
+
+        {data.lmsSummary && data.lmsSummary.isConfigured && (
+          <LmsProgressDashboardCard
+            summary={data.lmsSummary}
+            onNavigateToLms={() => onNavigateTab('profile', 'LMS')}
+            onNavigateToExternalAccounts={() => onNavigateTab('profile', 'EXTERNAL_ACCOUNTS')}
+          />
+        )}
       </div>
 
       {/* 5. Upcoming Schedule List */}

@@ -4,6 +4,7 @@ export { default as StudentHeroBanner } from './components/StudentHeroBanner';
 export { default as NextExamCountdownCard } from './components/NextExamCountdownCard';
 export { default as PersonalTimetableCard } from './components/PersonalTimetableCard';
 export { default as AcademicSnapshotCards } from './components/AcademicSnapshotCards';
+export { default as LmsProgressDashboardCard } from './components/LmsProgressDashboardCard';
 export { default as ClassMonitorDashboardCard } from './components/ClassMonitorDashboardCard';
 export { default as AdminSystemHealthCard } from './components/AdminSystemHealthCard';
 export { default as UpcomingScheduleList } from './components/UpcomingScheduleList';

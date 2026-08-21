@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
+  BookOpen,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import { ExternalAccountStatus, TelegramSyncStatus } from '../types/dashboard.types';
@@ -19,6 +20,7 @@ import { ExternalAccountStatus, TelegramSyncStatus } from '../types/dashboard.ty
 interface StudentHeroBannerProps {
   user: LoginUser;
   externalAccountStatus: ExternalAccountStatus;
+  lmsAccountStatus?: ExternalAccountStatus;
   telegramStatus: TelegramSyncStatus;
   activeBatchName?: string | null;
   onRefresh: () => void;
@@ -29,6 +31,7 @@ interface StudentHeroBannerProps {
 export default function StudentHeroBanner({
   user,
   externalAccountStatus,
+  lmsAccountStatus,
   telegramStatus,
   activeBatchName,
   onRefresh,
@@ -147,13 +150,42 @@ export default function StudentHeroBanner({
               )}
             </button>
 
+            {/* LMS Status */}
+            {lmsAccountStatus && (
+              <button
+                type="button"
+                onClick={() => onNavigateTab('profile', 'LMS')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                  lmsAccountStatus.isConnected
+                    ? 'bg-sky-500/10 text-sky-400 border-sky-500/30 hover:bg-sky-500/20'
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                }`}
+                title={
+                  lmsAccountStatus.isConnected
+                    ? 'Đã kết nối Hệ thống LMS (Moodle PTTC1)'
+                    : 'Chưa liên kết tài khoản LMS (Bấm để liên kết)'
+                }
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>
+                  LMS:{' '}
+                  <strong>{lmsAccountStatus.isConnected ? 'Đã kết nối' : 'Chưa liên kết'}</strong>
+                </span>
+                {lmsAccountStatus.isConnected ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
+                )}
+              </button>
+            )}
+
             {/* Telegram Status */}
             <button
               type="button"
               onClick={() => onNavigateTab('profile', 'TELEGRAM')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
                 telegramStatus.isEnabled
-                  ? 'bg-sky-500/10 text-sky-400 border-sky-500/30 hover:bg-sky-500/20'
+                  ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/20'
                   : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
               }`}
               title={

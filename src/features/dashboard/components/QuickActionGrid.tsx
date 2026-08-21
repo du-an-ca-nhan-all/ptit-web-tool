@@ -48,6 +48,15 @@ export default function QuickActionGrid({ onNavigateTab }: QuickActionGridProps)
       onClick: () => onNavigateTab('registered_courses'),
     },
     {
+      title: 'Học Tập Trực Tuyến LMS',
+      desc: 'Theo dõi tiến độ bài giảng & điểm quá trình Moodle',
+      icon: <GraduationCap className="w-5 h-5 text-sky-500" />,
+      bg: 'bg-sky-50/70 hover:bg-sky-50 border-sky-100 hover:border-sky-200',
+      badge: 'LMS PTTC1',
+      badgeColor: 'bg-sky-100 text-sky-700',
+      onClick: () => onNavigateTab('profile', 'LMS'),
+    },
+    {
       title: 'So Sánh ĐKMH',
       desc: 'Đối chiếu môn học giữa tài khoản chính & phụ',
       icon: <ArrowLeftRight className="w-5 h-5 text-cyan-500" />,
