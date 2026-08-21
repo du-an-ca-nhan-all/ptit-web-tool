@@ -78,6 +78,7 @@ interface HomeMainContentProps {
   handleToggleExamPostpone: (record: ExamRecord, newStatus: boolean) => Promise<void>;
   loadDataFromApi: (batchCode?: string) => Promise<void>;
   fetchMonitorsData: () => Promise<void>;
+  isLoadingMonitors?: boolean;
   fetchCourseCompareData: () => void;
   courseCompareData: { main: any; subAccount: any; allSubAccounts?: any[] } | null;
   isAdmin: boolean;
@@ -136,6 +137,7 @@ export default function HomeMainContent({
   handleToggleExamPostpone,
   loadDataFromApi,
   fetchMonitorsData,
+  isLoadingMonitors = false,
   fetchCourseCompareData,
   courseCompareData,
   isAdmin,
@@ -231,7 +233,7 @@ export default function HomeMainContent({
           users={loginUsers}
           currentUser={effectiveUser}
           onReload={fetchMonitorsData}
-          isLoading={isLoading}
+          isLoading={isLoadingMonitors || isLoading}
           onClassClick={(classCode) => {
             handleTabChange('members', undefined, { monitorClass: classCode });
             setIsClassGroupOpen(true);

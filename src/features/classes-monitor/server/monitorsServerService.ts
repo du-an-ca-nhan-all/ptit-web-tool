@@ -47,17 +47,55 @@ export const monitorsServerService = {
   },
 
   /**
-   * Lấy danh sách users và monitors
+   * Lấy danh sách users và monitors (hỗ trợ phân trang và tìm kiếm)
    */
-  async getMonitorsAndUsers(includeAll: boolean = false) {
-    const where: any = includeAll
-      ? {}
-      : {
-          OR: [
-            { role: { contains: 'lop_truong', mode: 'insensitive' } },
-            { role: { contains: 'admin', mode: 'insensitive' } },
-          ],
-        };
+  async getMonitorsAndUsers(
+    params?:
+      | {
+          includeAll?: boolean;
+          page?: number;
+          limit?: number;
+          search?: string;
+          classCode?: string;
+        }
+      | boolean
+  ) {
+    const opts = typeof params === 'boolean' ? { includeAll: params } : params || {};
+    const { includeAll = false, page, limit, search, classCode } = opts;
+
+    const andConditions: any[] = [];
+
+    if (!includeAll) {
+      andConditions.push({
+        OR: [
+          { role: { contains: 'lop_truong', mode: 'insensitive' } },
+          { role: { contains: 'admin', mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    if (classCode && classCode !== 'ALL') {
+      andConditions.push({
+        student: { maLop: { equals: classCode.trim(), mode: 'insensitive' } },
+      });
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      andConditions.push({
+        OR: [
+          { username: { contains: q, mode: 'insensitive' } },
+          { student: { hoTen: { contains: q, mode: 'insensitive' } } },
+          { student: { ten: { contains: q, mode: 'insensitive' } } },
+          { student: { soDienThoai: { contains: q, mode: 'insensitive' } } },
+          { student: { maLop: { contains: q, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    const where: any = andConditions.length > 0 ? { AND: andConditions } : {};
+
+    const total = await prisma.user.count({ where });
 
     const usersRaw = await prisma.user.findMany({
       where,
@@ -65,6 +103,7 @@ export const monitorsServerService = {
         student: true,
       },
       orderBy: [{ student: { maLop: 'asc' } }, { username: 'asc' }],
+      ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
     });
 
     const users = usersRaw.map((u) => ({
@@ -80,7 +119,14 @@ export const monitorsServerService = {
 
     const monitors = users.filter((u) => u.isMonitor);
 
-    return { users, monitors };
+    return {
+      users,
+      monitors,
+      total,
+      page: page || 1,
+      limit: limit || (page ? 20 : total),
+      totalPages: limit ? Math.max(1, Math.ceil(total / limit)) : 1,
+    };
   },
 
   /**

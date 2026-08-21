@@ -55,6 +55,7 @@ export function useHomeState() {
     setConfirmClassCode,
     isClassGroupOpen,
     setIsClassGroupOpen,
+    isLoadingMonitors,
     fetchMonitorsData,
   } = useClassMonitor(initialState.monitorClass);
 
@@ -597,6 +598,7 @@ const TABS_REQUIRING_EXAM_RECORDS: NavigationTab[] = [
     setConfirmClassCode,
     isClassGroupOpen,
     setIsClassGroupOpen,
+    isLoadingMonitors,
     fetchMonitorsData,
 
     // External Portal & Course Compare

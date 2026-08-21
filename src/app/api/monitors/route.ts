@@ -19,8 +19,22 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const includeAll = searchParams.get('all') === 'true';
+    const page = searchParams.has('page')
+      ? Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+      : undefined;
+    const limit = searchParams.has('limit')
+      ? Math.max(1, parseInt(searchParams.get('limit') || '20', 10))
+      : undefined;
+    const search = searchParams.get('search') || searchParams.get('q') || undefined;
+    const classCode = searchParams.get('classCode') || searchParams.get('maLop') || undefined;
 
-    const data = await monitorsServerService.getMonitorsAndUsers(includeAll);
+    const data = await monitorsServerService.getMonitorsAndUsers({
+      includeAll,
+      page,
+      limit,
+      search,
+      classCode,
+    });
     return NextResponse.json(data);
   } catch (error: any) {
     console.error('Monitors API error:', error);

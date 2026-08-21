@@ -23,20 +23,31 @@ export function useClassMonitor(initialClass?: string) {
   const [isClassGroupOpen, setIsClassGroupOpen] = useState(false);
   const [isLoadingMonitors, setIsLoadingMonitors] = useState(false);
 
-  const fetchMonitorsData = useCallback(async () => {
-    try {
-      setIsLoadingMonitors(true);
-      const res = await fetch('/api/monitors?all=true');
-      const data = await res.json();
-      if (res.ok && data.users) {
-        setLoginUsers(data.users);
+  const fetchMonitorsData = useCallback(
+    async (params?: { page?: number; limit?: number; search?: string; classCode?: string }) => {
+      try {
+        setIsLoadingMonitors(true);
+        const query = new URLSearchParams();
+        if (params?.page) query.set('page', String(params.page));
+        if (params?.limit) query.set('limit', String(params.limit));
+        if (params?.search) query.set('search', params.search);
+        if (params?.classCode) query.set('classCode', params.classCode);
+
+        const qs = query.toString();
+        const url = qs ? `/api/monitors?${qs}` : '/api/monitors';
+        const res = await fetch(url);
+        const data = await res.json();
+        if (res.ok && data.users) {
+          setLoginUsers(data.users);
+        }
+      } catch (err) {
+        console.error('Error fetching monitors data:', err);
+      } finally {
+        setIsLoadingMonitors(false);
       }
-    } catch (err) {
-      console.error('Error fetching monitors data:', err);
-    } finally {
-      setIsLoadingMonitors(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   return {
     monitorClass,

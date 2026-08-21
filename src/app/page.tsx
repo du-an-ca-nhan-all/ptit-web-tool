@@ -133,6 +133,7 @@ export default function Home() {
           handleToggleExamPostpone={state.handleToggleExamPostpone}
           loadDataFromApi={state.loadDataFromApi}
           fetchMonitorsData={state.fetchMonitorsData}
+          isLoadingMonitors={state.isLoadingMonitors}
           fetchCourseCompareData={state.fetchCourseCompareData}
           courseCompareData={state.courseCompareData}
           isAdmin={state.isAdmin}
