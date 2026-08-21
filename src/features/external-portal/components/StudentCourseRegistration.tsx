@@ -298,6 +298,18 @@ export default function StudentCourseRegistration({
             </button>
           )}
 
+          {/* Quick Navigate to Course Registration */}
+          {onNavigateTab && (
+            <button
+              onClick={() => onNavigateTab('course_registration')}
+              className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              title="Đi đến Cổng Đăng Ký Môn Học"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
+              <span>Cổng ĐKMH (QLHT)</span>
+            </button>
+          )}
+
           {/* Quick Navigate to Course Compare */}
           {onNavigateTab && (
             <button

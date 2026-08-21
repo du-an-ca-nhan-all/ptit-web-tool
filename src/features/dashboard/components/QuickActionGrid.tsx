@@ -12,6 +12,7 @@ import {
   Shield,
   Layers,
   ArrowRight,
+  Zap,
 } from 'lucide-react';
 
 interface QuickActionGridProps {
@@ -20,6 +21,15 @@ interface QuickActionGridProps {
 
 export default function QuickActionGrid({ onNavigateTab }: QuickActionGridProps) {
   const actions = [
+    {
+      title: 'Đăng Ký Môn Học (QLHT)',
+      desc: 'Cổng ĐKMH trực tiếp & Auto Canh Slot (Sniper)',
+      icon: <Zap className="w-5 h-5 text-amber-500 fill-current" />,
+      bg: 'bg-amber-50/70 hover:bg-amber-50 border-amber-200 hover:border-amber-300',
+      badge: 'Auto ĐKMH',
+      badgeColor: 'bg-amber-100 text-amber-800 font-black',
+      onClick: () => onNavigateTab('course_registration'),
+    },
     {
       title: 'Lịch Thi Cá Nhân',
       desc: 'Tra cứu môn thi, SBD, phòng thi & đếm ngược',

@@ -85,6 +85,10 @@ export default function Header({
         return 'Lịch Thi Cá Nhân';
       case 'monitors_list':
         return 'Danh Sách Lớp Trưởng';
+      case 'course_registration':
+        return 'Đăng Ký Môn Học (QLHT)';
+      case 'registered_courses':
+        return 'Môn Học Đã Đăng Ký';
       case 'course_compare':
         return 'So Sánh ĐKMH';
       case 'members':

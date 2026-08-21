@@ -26,6 +26,7 @@ import {
   Phone,
   LayoutDashboard,
   Download,
+  Zap,
 } from 'lucide-react';
 import { LoginUser } from '../../types';
 import { NavigationTab } from '../../types/navigation';
@@ -148,6 +149,20 @@ export default function Sidebar({
                 }`}
               >
                 <CalendarDays className="w-4 h-4 text-indigo-400" /> Lịch Thi Tổng Hợp
+              </button>
+            )}
+
+            {/* Đăng ký môn học (QLHT / QLDTTX) */}
+            {currentUser && (
+              <button
+                onClick={() => onTabChange('course_registration')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'course_registration'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold shadow-sm shadow-amber-500/10'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Zap className="w-4 h-4 text-amber-400 fill-current" /> Đăng Ký Môn Học (QLHT)
               </button>
             )}
 

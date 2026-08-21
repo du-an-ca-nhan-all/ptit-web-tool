@@ -21,7 +21,8 @@ export type NavigationTab =
   | 'database_backup'
   | 'announcements_admin'
   | 'all_students'
-  | 'course_compare';
+  | 'course_compare'
+  | 'course_registration';
 
 export type ProfileSubTab =
   | 'OVERVIEW'
@@ -78,6 +79,7 @@ export const VALID_NAVIGATION_TABS: NavigationTab[] = [
   'announcements_admin',
   'all_students',
   'course_compare',
+  'course_registration',
 ];
 
 export const PROFILE_SUBTAB_MAP: Record<string, ProfileSubTab> = {
@@ -117,6 +119,11 @@ export const PATH_TO_TAB_MAP: Record<string, NavigationTab> = {
   courses: 'registered_courses',
   'registered-courses': 'registered_courses',
   registered_courses: 'registered_courses',
+  dkmh: 'course_registration',
+  'dang-ky-mon-hoc': 'course_registration',
+  'course-registration': 'course_registration',
+  'course-register': 'course_registration',
+  course_registration: 'course_registration',
   'course-compare': 'course_compare',
   course_compare: 'course_compare',
   monitors: 'monitors_list',
@@ -235,6 +242,9 @@ export const getNavigationPath = (
       break;
     case 'registered_courses':
       basePath = '/courses';
+      break;
+    case 'course_registration':
+      basePath = '/course-registration';
       break;
     case 'course_compare':
       basePath = '/course-compare';

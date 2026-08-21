@@ -25,6 +25,7 @@ import {
 import {
   CourseCompare,
   StudentCourseRegistration,
+  CourseRegistrationPortal,
   AdminExternalAccounts,
 } from '../../features/external-portal';
 import { AdminTelegramBotManager } from '../../features/telegram';
@@ -200,6 +201,13 @@ export default function HomeMainContent({
             setCurrentUser(updatedUser);
             localStorage.setItem('currentUser', JSON.stringify(updatedUser));
           }}
+        />
+      ) : activeTab === 'course_registration' && effectiveUser ? (
+        <CourseRegistrationPortal
+          currentUser={effectiveUser}
+          onNavigateTab={(tab, subTab) =>
+            handleTabChange(tab as NavigationTab, subTab as ProfileSubTab)
+          }
         />
       ) : activeTab === 'registered_courses' && effectiveUser ? (
         <StudentCourseRegistration
