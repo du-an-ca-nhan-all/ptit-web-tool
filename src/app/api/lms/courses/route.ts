@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import {
-  fetchLmsDashboardOverview,
+  getOrFetchStudentLmsOverview,
   fetchLmsCourseSections,
   getValidLmsTokenOrRefresh,
 } from '@/src/features/external-portal/server/lmsServerService';
@@ -21,7 +21,7 @@ async function getAuthUser(req: NextRequest) {
 }
 
 // GET /api/lms/courses
-// Lấy dữ liệu tổng quan, danh sách khóa học, tiến độ % và điểm quá trình từ LMS
+// Lấy dữ liệu tổng quan, danh sách khóa học, tiến độ % và điểm quá trình từ LMS (có Cache DB & quy tắc 24h)
 export async function GET(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -30,45 +30,37 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
+    const refresh = searchParams.get('refresh') === 'true';
     const targetUsername = (authUser.isAdmin && searchParams.get('username')) || authUser.username;
 
-    // Tìm tài khoản LMS đã liên kết
-    const lmsAccount = await prisma.externalAccount.findUnique({
-      where: {
-        username_systemKey: {
-          username: targetUsername,
-          systemKey: 'LMS_PTTC1',
-        },
-      },
+    // Lấy dữ liệu từ Cache DB hoặc kéo mới từ LMS
+    const result = await getOrFetchStudentLmsOverview(targetUsername, {
+      forceRefresh: refresh,
     });
 
-    if (!lmsAccount || !lmsAccount.extUsername) {
+    if (result.isConfigured === false) {
       return NextResponse.json({
         isConfigured: false,
         message: 'Bạn chưa liên kết tài khoản Hệ thống học tập trực tuyến (LMS PTTC1).',
       });
     }
 
-    // Lấy dữ liệu tổng quan từ LMS
-    const overview = await fetchLmsDashboardOverview({
-      username: lmsAccount.extUsername,
-      password: lmsAccount.extPassword,
-      token: lmsAccount.token,
-    });
-
-    // Cập nhật lại thời gian đồng bộ
-    await prisma.externalAccount.update({
-      where: { id: lmsAccount.id },
-      data: {
-        lastSyncAt: new Date(),
-        status: 'CONNECTED',
-      },
-    });
+    if (refresh) {
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: 'LMS_REFRESH_COURSES',
+        targetType: 'LMS_COURSES',
+        targetId: targetUsername,
+        description: `Làm mới dữ liệu khóa học từ LMS PTTC1 (${result.courses?.length || 0} môn học)`,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({
       success: true,
-      isConfigured: true,
-      ...overview,
+      ...result,
     });
   } catch (error: any) {
     console.error('Fetch LMS Courses Error:', error);
@@ -82,7 +74,7 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/lms/courses
-// Hỗ trợ các hành động: AUTO_STUDY, COURSE_ACTIVITIES
+// Hỗ trợ các hành động: COURSE_ACTIVITIES
 export async function POST(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -94,12 +86,10 @@ export async function POST(req: NextRequest) {
     const { action, courseId, targetUsername } = body;
     const effectiveUsername = (authUser.isAdmin && targetUsername) || authUser.username;
 
-    const lmsAccount = await prisma.externalAccount.findUnique({
+    const lmsAccount = await prisma.externalAccount.findFirst({
       where: {
-        username_systemKey: {
-          username: effectiveUsername,
-          systemKey: 'LMS_PTTC1',
-        },
+        username: effectiveUsername,
+        systemUrl: { contains: 'lms.pttc1.edu.vn' },
       },
     });
 
@@ -136,4 +126,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-

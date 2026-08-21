@@ -35,6 +35,9 @@ model User {
   // Quan hệ 1-1 với StudentQldtExamRecord
   qldtExamRecord   StudentQldtExamRecord?
   
+  // Quan hệ 1-1 với StudentLmsRecord
+  lmsRecord        StudentLmsRecord?
+  
   // Quan hệ 1-N với ActivityLog
   activityLogs     ActivityLog[]
   
@@ -464,4 +467,28 @@ model Announcement {
   @@index([startDate])
   @@index([endDate])
   @@index([createdAt])
+}
+
+// 21. Bảng StudentLmsRecord: Lưu trữ và cache toàn bộ khóa học, tiến độ % và điểm quá trình từ Cổng LMS PTTC1
+model StudentLmsRecord {
+  id                  Int       @id @default(autoincrement())
+  username            String    @unique // Mã sinh viên (User.username)
+  user                User?     @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  userFullName        String?   // Tên đầy đủ hiển thị trên LMS
+  
+  // Dữ liệu JSON thô đầy đủ từ LMS ({ stats, courses, userFullName, lastSyncAt })
+  rawData             String    // JSON string chứa toàn bộ dữ liệu khóa học và tiến độ
+  
+  totalEnrolled       Int?      @default(0) // Tổng số môn đã đăng ký
+  totalCompleted      Int?      @default(0) // Tổng số môn đã hoàn thành (100%)
+  completedActivities Int?      @default(0) // Tổng số hoạt động đã hoàn thành
+  dueActivities       Int?      @default(0) // Tổng số hoạt động còn lại
+  
+  lastPulledAt        DateTime? @default(now()) // Thời điểm kéo dữ liệu từ LMS
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([username])
+  @@index([lastPulledAt])
 }

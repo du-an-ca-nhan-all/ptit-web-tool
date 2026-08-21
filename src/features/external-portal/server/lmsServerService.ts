@@ -1,8 +1,11 @@
 /**
  * PTIT LMS (https://lms.pttc1.edu.vn/) Authentication & Management Service
  * Hỗ trợ tự động đăng nhập LMS PTTC1, quản lý phiên/cookie, đồng bộ đầy đủ
- * 100% khóa học (đang học, đã học xong, chưa học), tiến độ %, điểm quá trình và auto-study.
+ * 100% khóa học (đang học, đã học xong, chưa học), tiến độ %, điểm quá trình,
+ * và lưu trữ Cache trong Database (với quy tắc hết hạn 24h & không ghi đè nếu lỗi).
  */
+
+import { prisma } from '@/src/lib/prisma';
 
 export const LMS_BASE_URL = 'https://lms.pttc1.edu.vn';
 export const LMS_USER_AGENT =
@@ -35,6 +38,9 @@ export interface LmsDashboardOverview {
   };
   courses: LmsCourseOverviewItem[];
   lastSyncAt: string;
+  isCachedDb?: boolean;
+  isLiveSync?: boolean;
+  syncWarning?: string;
 }
 
 export interface LmsActivityItem {
@@ -284,8 +290,8 @@ function parseCourseTitle(rawTitle: string): { courseCode: string; courseName: s
 }
 
 /**
- * Lấy toàn bộ dữ liệu Tổng quan LMS: Số liệu thống kê, danh sách 100% khóa học (kể cả đã học xong),
- * tiến độ hoàn thành chính xác và bảng điểm quá trình.
+ * Lấy toàn bộ dữ liệu Tổng quan LMS trực tiếp từ cổng học tập:
+ * Số liệu thống kê, danh sách 100% khóa học (kể cả đã học xong), tiến độ % chính xác và bảng điểm quá trình.
  */
 export async function fetchLmsDashboardOverview(account: {
   username: string;
@@ -650,6 +656,160 @@ export async function fetchLmsDashboardOverview(account: {
 }
 
 /**
+ * Quản lý Cache và Lấy Dữ Liệu Khóa Học LMS:
+ * - Khi chưa có cache: Pull dữ liệu từ LMS và lưu vào DB.
+ * - Khi có cache còn mới (< 24h) và người dùng không yêu cầu forceRefresh: Trả về Cache tức thì (tiết kiệm tài nguyên).
+ * - Khi cache quá 24h hoặc người dùng ấn "Cập nhật mới nhất": Thử tải về dữ liệu mới từ LMS.
+ * - NẾU TẢI VỀ BỊ LỖI: KHÔNG GHI ĐÈ, giữ nguyên cache cũ và hiển thị thông báo.
+ */
+export async function getOrFetchStudentLmsOverview(
+  username: string,
+  options?: { forceRefresh?: boolean }
+): Promise<LmsDashboardOverview & { isConfigured: boolean; hasLinkedAccount: boolean }> {
+  const cleanUsername = username.trim().toUpperCase();
+
+  // 1. Kiểm tra tài khoản liên kết LMS trong ExternalAccount
+  const extAccount = await prisma.externalAccount.findFirst({
+    where: {
+      username: cleanUsername,
+      systemUrl: { contains: 'lms.pttc1.edu.vn' },
+    },
+  });
+
+  if (!extAccount) {
+    return {
+      isConfigured: false,
+      hasLinkedAccount: false,
+      userFullName: cleanUsername,
+      username: cleanUsername,
+      stats: { enrolledCourses: 0, completedActivities: 0, completedCourses: 0, dueActivities: 0 },
+      courses: [],
+      lastSyncAt: new Date().toISOString(),
+    };
+  }
+
+  // 2. Kiểm tra Cache trong Database (bảng StudentLmsRecord)
+  let cachedDb: any = null;
+  try {
+    const rawRecord: any = await prisma.$queryRawUnsafe(
+      `SELECT * FROM "StudentLmsRecord" WHERE "username" = $1 LIMIT 1`,
+      cleanUsername
+    );
+    if (Array.isArray(rawRecord) && rawRecord.length > 0) {
+      cachedDb = rawRecord[0];
+    }
+  } catch (e) {
+    console.warn('[getOrFetchStudentLmsOverview] Đọc cache StudentLmsRecord thất bại:', e);
+  }
+
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const isCacheFresh =
+    cachedDb &&
+    cachedDb.lastPulledAt &&
+    Date.now() - new Date(cachedDb.lastPulledAt).getTime() < ONE_DAY_MS;
+
+  // Nếu KHÔNG yêu cầu forceRefresh và Cache còn hạn (< 24h) -> Trả về Cache ngay lập tức
+  if (!options?.forceRefresh && isCacheFresh && cachedDb?.rawData) {
+    try {
+      const parsed = JSON.parse(cachedDb.rawData);
+      return {
+        ...parsed,
+        isConfigured: true,
+        hasLinkedAccount: true,
+        isCachedDb: true,
+        isLiveSync: false,
+        lastSyncAt: cachedDb.lastPulledAt
+          ? new Date(cachedDb.lastPulledAt).toISOString()
+          : parsed.lastSyncAt || new Date().toISOString(),
+      };
+    } catch (e) {
+      console.warn('[getOrFetchStudentLmsOverview] Parse cache failed, chuyển sang kéo mới từ LMS:', e);
+    }
+  }
+
+  // 3. Tải dữ liệu mới từ LMS (khi forceRefresh, cache hết hạn hoặc chưa có cache)
+  try {
+    const freshOverview = await fetchLmsDashboardOverview({
+      username: extAccount.extUsername || cleanUsername,
+      password: extAccount.extPassword || undefined,
+      token: extAccount.token,
+    });
+
+    // Lưu / Cập nhật vào DB Cache
+    try {
+      const now = new Date();
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "StudentLmsRecord" ("username", "userFullName", "rawData", "totalEnrolled", "totalCompleted", "completedActivities", "dueActivities", "lastPulledAt", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $8)
+         ON CONFLICT ("username") DO UPDATE SET
+           "userFullName" = EXCLUDED."userFullName",
+           "rawData" = EXCLUDED."rawData",
+           "totalEnrolled" = EXCLUDED."totalEnrolled",
+           "totalCompleted" = EXCLUDED."totalCompleted",
+           "completedActivities" = EXCLUDED."completedActivities",
+           "dueActivities" = EXCLUDED."dueActivities",
+           "lastPulledAt" = EXCLUDED."lastPulledAt",
+           "updatedAt" = EXCLUDED."updatedAt"`,
+        cleanUsername,
+        freshOverview.userFullName,
+        JSON.stringify(freshOverview),
+        freshOverview.stats.enrolledCourses,
+        freshOverview.stats.completedCourses,
+        freshOverview.stats.completedActivities,
+        freshOverview.stats.dueActivities,
+        now
+      );
+
+      // Cập nhật lastSyncAt trong ExternalAccount
+      await prisma.externalAccount
+        .update({
+          where: { id: extAccount.id },
+          data: {
+            lastSyncAt: now,
+            status: 'CONNECTED',
+            syncMessage: 'Đồng bộ khóa học thành công từ LMS.',
+          },
+        })
+        .catch(() => {});
+    } catch (saveErr) {
+      console.warn('[getOrFetchStudentLmsOverview] Lưu cache StudentLmsRecord thất bại:', saveErr);
+    }
+
+    return {
+      ...freshOverview,
+      isConfigured: true,
+      hasLinkedAccount: true,
+      isCachedDb: false,
+      isLiveSync: true,
+    };
+  } catch (fetchErr: any) {
+    console.warn('[getOrFetchStudentLmsOverview] Tải dữ liệu LMS thất bại:', fetchErr);
+
+    // NGUYÊN TẮC QUAN TRỌNG: Nếu tải về bị lỗi -> KHÔNG GHI ĐÈ! Trả về dữ liệu Cache cũ nếu có
+    if (cachedDb && cachedDb.rawData) {
+      try {
+        const parsed = JSON.parse(cachedDb.rawData);
+        const syncDateStr = new Date(cachedDb.lastPulledAt || cachedDb.updatedAt).toLocaleString('vi-VN');
+        return {
+          ...parsed,
+          isConfigured: true,
+          hasLinkedAccount: true,
+          isCachedDb: true,
+          isLiveSync: false,
+          syncWarning: `Không thể kết nối đến LMS (${fetchErr.message || 'Lỗi mạng'}). Đang hiển thị dữ liệu đã lưu lúc ${syncDateStr}.`,
+          lastSyncAt: cachedDb.lastPulledAt
+            ? new Date(cachedDb.lastPulledAt).toISOString()
+            : parsed.lastSyncAt || new Date().toISOString(),
+        };
+      } catch (parseErr) {}
+    }
+
+    // Nếu chưa từng có cache và tải lỗi -> throw Error để UI xử lý
+    throw fetchErr;
+  }
+}
+
+/**
  * Lấy chi tiết các chương (sections) và hoạt động học tập (activities) trong một khóa học LMS
  */
 export async function fetchLmsCourseSections(
@@ -724,4 +884,3 @@ export async function fetchLmsCourseSections(
     totalActivities: totalAct,
   };
 }
-

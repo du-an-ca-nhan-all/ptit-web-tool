@@ -23,6 +23,9 @@ import {
   Flame,
   GraduationCap,
   ListOrdered,
+  Database,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { LoginUser } from '@/src/features/auth/types/auth.types';
 import { LmsCourseOverviewItem, LmsDashboardOverview, LmsSectionItem } from '../server/lmsServerService';
@@ -36,7 +39,9 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
   const [data, setData] = useState<LmsDashboardOverview | null>(null);
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,30 +57,41 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
   } | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
-  const fetchLmsCourses = async () => {
-    setIsLoading(true);
+  const fetchLmsCourses = async (forceRefresh: boolean = false) => {
+    if (forceRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     setErrorMsg('');
+
     try {
-      const res = await fetch('/api/lms/courses');
+      const url = forceRefresh ? '/api/lms/courses?refresh=true' : '/api/lms/courses';
+      const res = await fetch(url);
       const json = await res.json();
 
       if (res.ok && json.isConfigured !== false) {
         setIsConfigured(true);
         setData(json);
+        if (forceRefresh) {
+          setSuccessMsg('Đã cập nhật dữ liệu mới nhất từ LMS thành công!');
+          setTimeout(() => setSuccessMsg(''), 4000);
+        }
       } else if (json.isConfigured === false) {
         setIsConfigured(false);
       } else {
         setErrorMsg(json.error || 'Không thể tải dữ liệu khóa học từ LMS');
       }
     } catch (err: any) {
-      setErrorMsg('Lỗi kết nối máy chủ');
+      setErrorMsg('Lỗi kết nối máy chủ khi tải dữ liệu LMS');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchLmsCourses();
+    fetchLmsCourses(false);
   }, []);
 
   // Fetch course activities modal
@@ -177,6 +193,23 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
     return list;
   }, [data?.courses, searchQuery, statusFilter, selectedSemester, sortBy]);
 
+  // Format last sync date
+  const formattedSyncTime = useMemo(() => {
+    if (!data?.lastSyncAt) return '';
+    try {
+      const d = new Date(data.lastSyncAt);
+      return d.toLocaleString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '';
+    }
+  }, [data?.lastSyncAt]);
+
   // Render activity type icon
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -232,6 +265,18 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Toast notifications */}
+      {successMsg && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-xs sm:text-sm font-bold flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg('')} className="p-1 text-emerald-600 hover:text-emerald-800 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {errorMsg && (
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-900 text-xs sm:text-sm font-bold flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">
           <div className="flex items-center gap-2.5">
@@ -241,6 +286,14 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
           <button onClick={() => setErrorMsg('')} className="p-1 text-rose-600 hover:text-rose-800 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* Sync Warning banner if LMS fetch failed and cached data was safely preserved */}
+      {data?.syncWarning && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-xs sm:text-sm font-medium flex items-center gap-3 shadow-xs">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+          <span>{data.syncWarning}</span>
         </div>
       )}
 
@@ -258,6 +311,15 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
               <span className="bg-sky-100 text-sky-800 text-xs font-black px-2.5 py-0.5 rounded-full border border-sky-200">
                 PTTC1 LMS
               </span>
+              {data?.isCachedDb ? (
+                <span className="bg-slate-100 text-slate-600 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-slate-200 inline-flex items-center gap-1">
+                  <Database className="w-3 h-3 text-slate-500" /> Đã lưu Cache {formattedSyncTime && `(${formattedSyncTime})`}
+                </span>
+              ) : data?.isLiveSync ? (
+                <span className="bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200 inline-flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-emerald-600" /> Trực tiếp từ LMS
+                </span>
+              ) : null}
             </div>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Sinh viên: <strong className="text-slate-800">{data?.userFullName || currentUser.fullName}</strong> • Cổng học tập:{' '}
@@ -273,14 +335,16 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
           </div>
         </div>
 
+        {/* Refresh button */}
         <button
           type="button"
-          onClick={fetchLmsCourses}
-          disabled={isLoading}
-          className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95 shrink-0"
+          onClick={() => fetchLmsCourses(true)}
+          disabled={isLoading || isRefreshing}
+          className="px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95 shrink-0"
+          title="Tải dữ liệu mới nhất trực tiếp từ LMS PTTC1"
         >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>Đồng Bộ LMS</span>
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span>{isRefreshing ? 'Đang Tải Từ LMS...' : 'Cập Nhật Mới Nhất'}</span>
         </button>
       </div>
 
@@ -447,7 +511,7 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
       {isLoading ? (
         <div className="py-20 flex flex-col items-center justify-center gap-3">
           <div className="w-8 h-8 border-3 border-sky-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-slate-500 font-bold">Đang tải và đồng bộ toàn bộ khóa học từ LMS PTTC1...</p>
+          <p className="text-xs text-slate-500 font-bold">Đang tải dữ liệu khóa học...</p>
         </div>
       ) : filteredCourses.length === 0 ? (
         <div className="py-16 bg-white rounded-3xl border border-slate-200 text-center flex flex-col items-center justify-center gap-3">
