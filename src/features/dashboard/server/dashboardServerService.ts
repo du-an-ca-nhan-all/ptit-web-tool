@@ -2,6 +2,8 @@ import { prisma } from '@/src/lib/prisma';
 import { parseDateString } from '@/src/lib/date-utils';
 import { checkIsAdmin, checkIsMonitor, getUserRoles } from '@/src/lib/auth';
 import { getGlobalConfig, GLOBAL_CONFIG_KEYS, TelegramBotConfigValue } from '@/src/lib/globalConfig';
+import { getStudentTimetableCalendar } from '@/src/features/external-portal/server/studentTimetableServerService';
+import { AnnouncementItem } from '@/src/features/announcements';
 import { DashboardData } from '../types/dashboard.types';
 
 /**
@@ -165,7 +167,81 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     lastSyncAt: gradeRecord?.lastPulledAt ? gradeRecord.lastPulledAt.toISOString() : null,
   };
 
-  // 5. External Account Status
+  // 5. Timetable & Schedule Summary
+  let timetableSummary = {
+    hasData: false,
+    semesterName: undefined as string | undefined,
+    totalSubjects: 0,
+    totalEvents: 0,
+    todayEvents: [] as any[],
+    upcomingEvents: [] as any[],
+    lastSyncAt: null as string | null,
+  };
+
+  try {
+    const today = new Date();
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+      today.getDate()
+    ).padStart(2, '0')}`;
+
+    const timetableRes = await getStudentTimetableCalendar(cleanUsername, { forceRefresh: false });
+    if (timetableRes && timetableRes.success && Array.isArray(timetableRes.events) && timetableRes.events.length > 0) {
+      const todayEvts = timetableRes.events
+        .filter((e) => e.date === todayIso)
+        .map((e) => ({
+          id: e.id,
+          date: e.date,
+          dayOfWeekStr: e.dayOfWeekStr,
+          subjectName: e.subjectName,
+          subjectCode: e.subjectCode,
+          group: e.group,
+          classCode: e.classCode,
+          periodStr: e.periodStr,
+          startTime: e.startTime,
+          endTime: e.endTime,
+          room: e.room,
+          onlineLink: e.onlineLink,
+          lecturer: e.lecturer,
+          shift: e.shift,
+          isToday: true,
+        }));
+
+      const upcomingEvts = timetableRes.events
+        .filter((e) => e.date > todayIso)
+        .slice(0, 5)
+        .map((e) => ({
+          id: e.id,
+          date: e.date,
+          dayOfWeekStr: e.dayOfWeekStr,
+          subjectName: e.subjectName,
+          subjectCode: e.subjectCode,
+          group: e.group,
+          classCode: e.classCode,
+          periodStr: e.periodStr,
+          startTime: e.startTime,
+          endTime: e.endTime,
+          room: e.room,
+          onlineLink: e.onlineLink,
+          lecturer: e.lecturer,
+          shift: e.shift,
+          isToday: false,
+        }));
+
+      timetableSummary = {
+        hasData: true,
+        semesterName: timetableRes.semesterName,
+        totalSubjects: timetableRes.uniqueSubjectsCount,
+        totalEvents: timetableRes.totalEvents,
+        todayEvents: todayEvts,
+        upcomingEvents: upcomingEvts,
+        lastSyncAt: timetableRes.lastSyncAt,
+      };
+    }
+  } catch (err) {
+    console.warn('[getDashboardData] Lỗi đọc TKB sinh viên:', err);
+  }
+
+  // 6. External Account Status
   const extAccount = user.externalAccounts?.[0];
   const externalAccountStatus = {
     isConfigured: Boolean(extAccount),
@@ -276,21 +352,21 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     take: 5,
   });
 
-  const activeAnnouncements = announcementsList.map((a) => ({
+  const activeAnnouncements: AnnouncementItem[] = announcementsList.map((a) => ({
     id: a.id,
     title: a.title,
     content: a.content,
     type: a.type as any,
     displayMode: a.displayMode as any,
-    targetRole: a.targetRole,
-    targetClass: a.targetClass || undefined,
-    linkUrl: a.linkUrl || undefined,
-    linkText: a.linkText || undefined,
+    targetRole: a.targetRole as any,
+    targetClass: a.targetClass,
+    linkUrl: a.linkUrl,
+    linkText: a.linkText,
     isPinned: a.isPinned,
     isActive: a.isActive,
-    startDate: a.startDate ? a.startDate.toISOString() : undefined,
-    endDate: a.endDate ? a.endDate.toISOString() : undefined,
-    author: a.author || undefined,
+    startDate: a.startDate ? a.startDate.toISOString() : null,
+    endDate: a.endDate ? a.endDate.toISOString() : null,
+    author: a.author,
     viewCount: a.viewCount,
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
@@ -311,6 +387,7 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     nextExam,
     upcomingExams,
     academicSummary,
+    timetableSummary,
     classMonitorSummary,
     adminSystemHealth,
     externalAccountStatus,

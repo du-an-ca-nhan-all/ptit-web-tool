@@ -76,6 +76,34 @@ export interface TelegramSyncStatus {
   botUsername?: string | null;
 }
 
+export interface TimetableEventItem {
+  id: string;
+  date: string; // YYYY-MM-DD
+  dayOfWeekStr: string;
+  subjectName: string;
+  subjectCode: string;
+  group?: string;
+  classCode?: string;
+  periodStr: string;
+  startTime: string;
+  endTime: string;
+  room: string;
+  onlineLink?: string;
+  lecturer?: string;
+  shift: 'MORNING' | 'AFTERNOON' | 'EVENING';
+  isToday?: boolean;
+}
+
+export interface TimetableSummary {
+  hasData: boolean;
+  semesterName?: string;
+  totalSubjects: number;
+  totalEvents: number;
+  todayEvents: TimetableEventItem[];
+  upcomingEvents: TimetableEventItem[];
+  lastSyncAt?: string | null;
+}
+
 export interface DashboardData {
   user: LoginUser;
   nextExam: NextExamCountdown;
@@ -92,6 +120,7 @@ export interface DashboardData {
     isPostponed?: boolean;
   }>;
   academicSummary: AcademicSummary;
+  timetableSummary: TimetableSummary;
   classMonitorSummary?: ClassMonitorSummary;
   adminSystemHealth?: AdminSystemHealth;
   externalAccountStatus: ExternalAccountStatus;

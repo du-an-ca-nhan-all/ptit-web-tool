@@ -2,6 +2,7 @@ export * from './types/dashboard.types';
 export { default as DashboardOverview } from './components/DashboardOverview';
 export { default as StudentHeroBanner } from './components/StudentHeroBanner';
 export { default as NextExamCountdownCard } from './components/NextExamCountdownCard';
+export { default as PersonalTimetableCard } from './components/PersonalTimetableCard';
 export { default as AcademicSnapshotCards } from './components/AcademicSnapshotCards';
 export { default as ClassMonitorDashboardCard } from './components/ClassMonitorDashboardCard';
 export { default as AdminSystemHealthCard } from './components/AdminSystemHealthCard';

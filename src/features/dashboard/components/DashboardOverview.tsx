@@ -6,6 +6,7 @@ import { LoginUser } from '../../../types';
 import { useDashboardData } from '../hooks/useDashboardData';
 import StudentHeroBanner from './StudentHeroBanner';
 import NextExamCountdownCard from './NextExamCountdownCard';
+import PersonalTimetableCard from './PersonalTimetableCard';
 import AcademicSnapshotCards from './AcademicSnapshotCards';
 import UpcomingScheduleList from './UpcomingScheduleList';
 import ClassMonitorDashboardCard from './ClassMonitorDashboardCard';
@@ -30,8 +31,9 @@ export default function DashboardOverview({
         {/* Hero skeleton */}
         <div className="h-44 bg-slate-200 rounded-3xl w-full" />
 
-        {/* 2-column grid skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 3-column grid skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="h-72 bg-slate-200 rounded-3xl" />
           <div className="h-72 bg-slate-200 rounded-3xl" />
           <div className="h-72 bg-slate-200 rounded-3xl" />
         </div>
@@ -93,11 +95,17 @@ export default function DashboardOverview({
         />
       )}
 
-      {/* 4. Main 2-Column Stats Grid (Next Exam Countdown & Academic Snapshot) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* 4. Main 3-Column Stats Grid (Exam Countdown, Timetable & Today's Classes, Academic Snapshot) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <NextExamCountdownCard
           countdown={data.nextExam}
           onNavigateToSchedule={() => onNavigateTab('personal_schedule')}
+        />
+
+        <PersonalTimetableCard
+          timetable={data.timetableSummary}
+          onNavigateToSchedule={() => onNavigateTab('profile', 'SCHEDULE')}
+          onNavigateToExternalAccounts={() => onNavigateTab('profile', 'EXTERNAL_ACCOUNTS')}
         />
 
         <AcademicSnapshotCards
