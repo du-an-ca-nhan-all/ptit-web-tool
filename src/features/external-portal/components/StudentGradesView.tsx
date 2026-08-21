@@ -41,7 +41,7 @@ import {
   GpaTrendItem,
   GradeDistributionBucket,
   AcademicTargetGoal,
-} from '../../../lib/studentGradesService';
+} from '../server/studentGradesServerService';
 
 interface StudentGradesViewProps {
   currentUser: LoginUser;

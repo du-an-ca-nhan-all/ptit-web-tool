@@ -13,7 +13,7 @@ import {
   User,
   Clock,
 } from 'lucide-react';
-import { AnnouncementItem } from '../../../lib/announcements';
+import { AnnouncementItem } from '../../../features/announcements';
 
 interface AnnouncementModalProps {
   announcements: AnnouncementItem[];

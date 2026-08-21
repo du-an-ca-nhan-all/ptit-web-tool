@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { prisma } from '../src/lib/prisma';
-import { restoreFromJsonDump, syncPostgresSequences, getDatabaseStats } from '../src/lib/backupService';
+import { restoreFromJsonDump, syncPostgresSequences, getDatabaseStats } from '../src/features/database-backup/server/backupServerService';
 
 /**
  * Script di chuyển dữ liệu từ SQLite (dev.db hoặc file backup JSON) sang PostgreSQL.

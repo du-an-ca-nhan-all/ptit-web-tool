@@ -13,7 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { AnnouncementItem } from '../../../lib/announcements';
+import { AnnouncementItem } from '../../../features/announcements';
 
 interface AnnouncementBannerProps {
   announcements: AnnouncementItem[];

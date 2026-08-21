@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { verifyPassword, createAuthToken, checkIsAdmin, checkIsMonitor, getUserRoles } from '@/src/lib/auth';
-import { logActivity } from '@/src/lib/activityLog';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 export async function POST(req: NextRequest) {
   try {

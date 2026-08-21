@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { hashSHA512 } from '@/src/lib/auth';
-import { logActivity } from '@/src/lib/activityLog';
-import { dispatchNewUserRegistered } from '@/src/lib/telegram-dispatcher';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { dispatchNewUserRegistered } from '@/src/features/telegram/server/telegramDispatcher';
 
 // GET /api/auth/register?username=K25DTCN402
 // Lookup student existence, name, and class for registration auto-display

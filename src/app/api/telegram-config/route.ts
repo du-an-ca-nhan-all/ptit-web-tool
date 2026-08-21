@@ -12,15 +12,15 @@ import {
   saveSystemTelegramBot,
   toggleSystemTelegramBot,
   resolveEffectiveBotToken,
-} from '@/src/lib/telegram-service';
-import { logActivity } from '@/src/lib/activityLog';
+} from '@/src/features/telegram/server/telegramServerService';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { getTelegramAdminConfig, saveTelegramAdminConfig } from '@/src/lib/globalConfig';
 import {
   checkAndDispatchQldtAnnouncements,
   runClassScheduleReminders,
   findNearestStudentClassSchedule,
   dispatchNearestClassScheduleNotification,
-} from '@/src/lib/telegram-dispatcher';
+} from '@/src/features/telegram/server/telegramDispatcher';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Papa from 'papaparse';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
-import { logActivity } from '@/src/lib/activityLog';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 export async function POST(req: NextRequest) {
   try {

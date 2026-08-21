@@ -12,7 +12,7 @@ import {
 } from '../types/navigation';
 import { buildSessions } from '../utils/dataModel';
 import { fetchPricingFromBackend } from '../config/pricingConfig';
-import { AnnouncementItem } from '../lib/announcements';
+import { AnnouncementItem } from '../features/announcements';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { useExamBatches } from '../features/exam-schedule/hooks/useExamBatches';
 import { useClassMonitor } from '../features/classes-monitor/hooks/useClassMonitor';

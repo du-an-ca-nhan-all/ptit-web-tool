@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
-import { getStudentGrades } from '@/src/lib/studentGradesService';
+import { getStudentGrades } from '@/src/features/external-portal/server/studentGradesServerService';
 
 export async function GET(req: NextRequest) {
   try {

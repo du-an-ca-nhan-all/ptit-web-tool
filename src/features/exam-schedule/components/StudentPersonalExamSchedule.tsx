@@ -44,7 +44,7 @@ import ExamRoomMembers from './ExamRoomMembers';
 import {
   StudentQldtExamScheduleResult,
   StudentQldtExamItem,
-} from '../../../lib/studentExamScheduleService';
+} from '@/src/features/external-portal/server/studentExamScheduleServerService';
 
 export type QldtViewLayout = 'GRID' | 'TABLE' | 'TIMELINE' | 'PRINT';
 

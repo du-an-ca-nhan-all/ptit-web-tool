@@ -39,7 +39,7 @@ import Footer from './Footer';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
 import { NavigationTab, ProfileSubTab, TabChangeOptions } from '../../types/navigation';
 import { buildSessions } from '../../utils/dataModel';
-import { AnnouncementItem } from '../../lib/announcements';
+import { AnnouncementItem } from '../../features/announcements';
 
 interface HomeMainContentProps {
   isLoading: boolean;

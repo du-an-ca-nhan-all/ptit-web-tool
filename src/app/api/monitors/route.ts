@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkIsAdmin, getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
-import { logActivity } from '@/src/lib/activityLog';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { monitorsServerService } from '@/src/features/classes-monitor/server/monitorsServerService';
 
 async function getAuthUser(req: NextRequest) {

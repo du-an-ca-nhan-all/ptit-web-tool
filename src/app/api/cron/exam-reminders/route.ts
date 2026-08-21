@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runExamScheduleReminders } from '@/src/lib/telegram-dispatcher';
-import { logActivity } from '@/src/lib/activityLog';
+import { runExamScheduleReminders } from '@/src/features/telegram/server/telegramDispatcher';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 // GET /api/cron/exam-reminders (Dành cho Vercel Cron, GitHub Actions, external cron hoặc Admin gọi)
 export async function GET(req: NextRequest) {

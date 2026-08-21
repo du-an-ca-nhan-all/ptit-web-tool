@@ -12,7 +12,7 @@ import {
 import {
   fetchStudentAnnouncementsFromQLDTTX,
   fetchStudentTimetableFromQLDTTX,
-} from '@/src/lib/qldttx-service';
+} from '@/src/features/external-portal/server/qldttxServerService';
 
 /**
  * Normalizes date string into DD/MM/YYYY format

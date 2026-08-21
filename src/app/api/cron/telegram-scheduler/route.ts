@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { startTelegramScheduler, runTelegramSchedulerTasks } from '@/src/lib/telegram-scheduler';
+import { startTelegramScheduler, runTelegramSchedulerTasks } from '@/src/features/telegram/server/telegramScheduler';
 
 export const dynamic = 'force-dynamic';
 

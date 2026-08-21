@@ -8,7 +8,7 @@ import {
   hashPassword,
   hashSHA512,
 } from '@/src/lib/auth';
-import { logActivity } from '@/src/lib/activityLog';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { NextRequest } from 'next/server';
 
 export interface LoginResult {

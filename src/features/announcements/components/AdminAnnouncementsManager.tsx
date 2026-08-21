@@ -29,7 +29,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
-import { AnnouncementItem } from '../../../lib/announcements';
+import { AnnouncementItem } from '../../../features/announcements';
 
 interface AdminAnnouncementsManagerProps {
   currentUser: LoginUser;

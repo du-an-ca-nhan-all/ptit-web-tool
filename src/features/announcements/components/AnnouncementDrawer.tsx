@@ -14,7 +14,7 @@ import {
   Layers,
   Search,
 } from 'lucide-react';
-import { AnnouncementItem } from '../../../lib/announcements';
+import { AnnouncementItem } from '../../../features/announcements';
 
 interface AnnouncementDrawerProps {
   isOpen: boolean;

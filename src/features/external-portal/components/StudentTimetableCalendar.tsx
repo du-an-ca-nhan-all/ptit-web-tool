@@ -41,7 +41,7 @@ import {
   TimetableCalendarEvent,
   TimetableSubjectSummary,
   StudentTimetableCalendarResult,
-} from '../../../lib/studentTimetableService';
+} from '../server/studentTimetableServerService';
 
 interface StudentTimetableCalendarProps {
   currentUser: LoginUser;

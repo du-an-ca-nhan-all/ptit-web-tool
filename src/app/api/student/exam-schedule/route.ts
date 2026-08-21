@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
-import { getStudentQldtExamSchedule } from '@/src/lib/studentExamScheduleService';
+import { getStudentQldtExamSchedule } from '@/src/features/external-portal/server/studentExamScheduleServerService';
 
 export async function GET(req: NextRequest) {
   try {

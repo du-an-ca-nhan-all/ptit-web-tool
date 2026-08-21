@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   runClassScheduleReminders,
   dispatchNearestClassScheduleNotification,
-} from '@/src/lib/telegram-dispatcher';
-import { logActivity } from '@/src/lib/activityLog';
+} from '@/src/features/telegram/server/telegramDispatcher';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 // GET /api/cron/class-reminders?type=nearest&days=10 OR /api/cron/class-reminders?force=true
 export async function GET(req: NextRequest) {

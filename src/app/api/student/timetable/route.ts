@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
-import { getStudentTimetableCalendar } from '@/src/lib/studentTimetableService';
+import { getStudentTimetableCalendar } from '@/src/features/external-portal/server/studentTimetableServerService';
 import { prisma } from '@/src/lib/prisma';
 
 export async function GET(req: NextRequest) {

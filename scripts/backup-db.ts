@@ -3,7 +3,7 @@ import {
   createLocalBackup,
   getBackupsDirectory,
   sendBackupToTelegram,
-} from '../src/lib/backupService';
+} from '../src/features/database-backup/server/backupServerService';
 
 async function main() {
   console.log('====================================================');

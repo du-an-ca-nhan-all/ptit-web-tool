@@ -9,8 +9,8 @@ import {
   bulkDeleteAnnouncements,
   toggleAnnouncementStatus,
   incrementAnnouncementViews,
-} from '@/src/lib/announcements';
-import { logActivity } from '@/src/lib/activityLog';
+} from '@/src/features/announcements/server/announcementsServerService';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();

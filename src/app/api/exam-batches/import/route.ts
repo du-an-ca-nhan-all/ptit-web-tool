@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Papa from 'papaparse';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
-import { logActivity } from '@/src/lib/activityLog';
-import { dispatchExamScheduleUpdated, dispatchExamBatchImportedToAdmin } from '@/src/lib/telegram-dispatcher';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { dispatchExamScheduleUpdated, dispatchExamBatchImportedToAdmin } from '@/src/features/telegram/server/telegramDispatcher';
 
 // POST /api/exam-batches/import
 // Upload CSV exam schedule specifically for an Exam Batch

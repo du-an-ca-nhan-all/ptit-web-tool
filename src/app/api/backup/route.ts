@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
-import { logActivity } from '@/src/lib/activityLog';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { saveTelegramAdminConfig } from '@/src/lib/globalConfig';
-import { dispatchDatabaseExportOrBackup, dispatchDatabaseRestore } from '@/src/lib/telegram-dispatcher';
+import { dispatchDatabaseExportOrBackup, dispatchDatabaseRestore } from '@/src/features/telegram/server/telegramDispatcher';
 import {
   getDatabaseStats,
   exportDatabaseAsJson,
@@ -22,7 +22,7 @@ import {
   restoreFromSqlDump,
   restoreFromSqliteFile,
   restoreFromJsonDump,
-} from '@/src/lib/backupService';
+} from '@/src/features/database-backup/server/backupServerService';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();

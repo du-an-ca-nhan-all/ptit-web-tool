@@ -3,12 +3,12 @@ import {
   StudentGradesResult,
   StudentCourseGrade,
   SemesterGradeSummary,
-} from '../../../lib/studentGradesService';
+} from '../server/studentGradesServerService';
 import {
   TimetableCalendarEvent,
   TimetableSubjectSummary,
   StudentTimetableCalendarResult,
-} from '../../../lib/studentTimetableService';
+} from '../server/studentTimetableServerService';
 
 export type {
   LoginUser,
