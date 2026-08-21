@@ -188,7 +188,7 @@ export async function saveMonitorFlowConfigs(
  */
 export async function executeMonitorFlowAction(options: {
   monitorUsername: string;
-  classCode: string;
+  classCode?: string;
   flowAction: 'REGISTER' | 'CANCEL' | 'SYNC_ALL_COURSES';
   id_to_hoc?: string;
   id_rs?: string;
@@ -214,24 +214,44 @@ export async function executeMonitorFlowAction(options: {
   }>;
 }> {
   const normMonitor = options.monitorUsername.trim().toUpperCase();
-  const normClass = options.classCode.trim().toUpperCase();
   const svNganh = options.sv_nganh ?? 1;
 
-  // 1. Lấy danh sách thành viên và cấu hình flow
-  const flowList = await getMonitorFlowList(normMonitor, normClass);
-  let targets = flowList.students.filter((s) => s.isEnabled);
+  // 1. Lấy danh sách cấu hình flow đang bật của Lớp trưởng
+  const flowConfigs = await prisma.monitorFlowConfig.findMany({
+    where: {
+      monitorUsername: normMonitor,
+      isEnabled: true,
+      ...(options.classCode ? { classCode: options.classCode.trim().toUpperCase() } : {}),
+      ...(options.flowAction === 'REGISTER' ? { allowRegisterCourse: true } : {}),
+      ...(options.flowAction === 'CANCEL' ? { allowCancelCourse: true } : {}),
+    },
+  });
 
+  let targetConfigs = flowConfigs;
   if (options.targetFollowerUsernames && options.targetFollowerUsernames.length > 0) {
     const filterSet = new Set(options.targetFollowerUsernames.map((u) => u.trim().toUpperCase()));
-    targets = targets.filter((s) => filterSet.has(s.maSV.toUpperCase()));
+    targetConfigs = targetConfigs.filter((c) => filterSet.has(c.followerUsername.toUpperCase()));
   }
 
-  // Lọc theo quyền hành động
-  if (options.flowAction === 'REGISTER') {
-    targets = targets.filter((s) => s.allowRegisterCourse);
-  } else if (options.flowAction === 'CANCEL') {
-    targets = targets.filter((s) => s.allowCancelCourse);
-  }
+  // Lấy thông tin họ tên sinh viên
+  const followerUsernames = targetConfigs.map((c) => c.followerUsername.toUpperCase());
+  const studentsInfo = await prisma.student.findMany({
+    where: {
+      maSV: { in: followerUsernames },
+    },
+    select: {
+      maSV: true,
+      hoTen: true,
+      hoLot: true,
+      ten: true,
+    },
+  });
+
+  const nameMap = new Map<string, string>();
+  studentsInfo.forEach((st) => {
+    const fullName = st.hoTen || `${st.hoLot || ''} ${st.ten || ''}`.trim() || st.maSV;
+    nameMap.set(st.maSV.toUpperCase(), fullName);
+  });
 
   let successCount = 0;
   let failCount = 0;
@@ -255,8 +275,9 @@ export async function executeMonitorFlowAction(options: {
   }
 
   // 3. Thực thi lần lượt cho từng sinh viên
-  for (const student of targets) {
-    const normFollower = student.maSV.toUpperCase();
+  for (const cfg of targetConfigs) {
+    const normFollower = cfg.followerUsername.toUpperCase();
+    const studentName = nameMap.get(normFollower) || normFollower;
 
     // Kiểm tra tài khoản QLDTTX
     const extAcc = await prisma.externalAccount.findFirst({
@@ -268,7 +289,7 @@ export async function executeMonitorFlowAction(options: {
       const msg = 'Chưa cấu hình tài khoản Cổng QLDTTX (không có mật khẩu)';
       executionResults.push({
         username: normFollower,
-        hoTen: student.hoTen,
+        hoTen: studentName,
         success: false,
         status: 'SKIPPED',
         message: msg,
@@ -309,7 +330,7 @@ export async function executeMonitorFlowAction(options: {
           successCount++;
           executionResults.push({
             username: normFollower,
-            hoTen: student.hoTen,
+            hoTen: studentName,
             success: true,
             status: 'SUCCESS',
             message: `Đăng ký thành công tổ [${options.nhom_to || options.id_to_hoc}]`,
@@ -319,7 +340,7 @@ export async function executeMonitorFlowAction(options: {
           failCount++;
           executionResults.push({
             username: normFollower,
-            hoTen: student.hoTen,
+            hoTen: studentName,
             success: false,
             status: 'FAILED',
             message: res.message || 'Đăng ký thất bại (bị trùng lịch hoặc hết slot)',
@@ -350,7 +371,7 @@ export async function executeMonitorFlowAction(options: {
           successCount++;
           executionResults.push({
             username: normFollower,
-            hoTen: student.hoTen,
+            hoTen: studentName,
             success: true,
             status: 'SUCCESS',
             message: `Hủy thành công tổ [${options.nhom_to || options.id_to_hoc}]`,
@@ -359,7 +380,7 @@ export async function executeMonitorFlowAction(options: {
           failCount++;
           executionResults.push({
             username: normFollower,
-            hoTen: student.hoTen,
+            hoTen: studentName,
             success: false,
             status: 'FAILED',
             message: res.message || 'Hủy môn thất bại',
@@ -403,7 +424,7 @@ export async function executeMonitorFlowAction(options: {
         const summaryMsg = `Đã đồng bộ: ${subSuccess} môn thành công, ${subFail} thất bại`;
         executionResults.push({
           username: normFollower,
-          hoTen: student.hoTen,
+          hoTen: studentName,
           success: subSuccess > 0,
           status: isAllOk ? 'SUCCESS' : 'FAILED',
           message: summaryMsg,
@@ -424,7 +445,7 @@ export async function executeMonitorFlowAction(options: {
       const errMsg = err.message || 'Lỗi ngoại lệ khi thực thi Flow';
       executionResults.push({
         username: normFollower,
-        hoTen: student.hoTen,
+        hoTen: studentName,
         success: false,
         status: 'FAILED',
         message: errMsg,
@@ -445,7 +466,7 @@ export async function executeMonitorFlowAction(options: {
   return {
     success: successCount > 0 || (failCount === 0 && skippedCount === 0),
     flowAction: options.flowAction,
-    total: targets.length,
+    total: targetConfigs.length,
     successCount,
     failCount,
     skippedCount,

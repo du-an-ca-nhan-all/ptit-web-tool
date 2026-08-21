@@ -7,6 +7,7 @@ import {
   registerCourseGroupQLDTTX,
   cancelCourseGroupQLDTTX,
 } from '@/src/features/external-portal/server/courseRegistrationServerService';
+import { executeMonitorFlowAction } from '@/src/features/classes-monitor/server/monitorFlowServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 async function getAuthUser(req: NextRequest) {
@@ -302,6 +303,32 @@ export async function POST(req: NextRequest) {
         sv_nganh: Number(sv_nganh) || 1,
       });
 
+      // Nếu người đăng ký là Lớp trưởng và có thành viên đang BẬT Flow Đăng Ký -> Tự động Flow đăng ký cho cả lớp
+      let flowSummary: any = null;
+      if (regResult.success) {
+        const activeFollowers = await prisma.monitorFlowConfig.findMany({
+          where: {
+            monitorUsername: effectiveUsername,
+            isEnabled: true,
+            allowRegisterCourse: true,
+          },
+        });
+
+        if (activeFollowers.length > 0) {
+          try {
+            flowSummary = await executeMonitorFlowAction({
+              monitorUsername: effectiveUsername,
+              flowAction: 'REGISTER',
+              id_to_hoc: String(id_to_hoc),
+              sv_nganh: Number(sv_nganh) || 1,
+              targetFollowerUsernames: activeFollowers.map((f) => f.followerUsername),
+            });
+          } catch (flowErr: any) {
+            console.error('Lỗi khi tự động Flow Đăng Ký cho thành viên:', flowErr);
+          }
+        }
+      }
+
       // Ghi log hoạt động
       await logActivity({
         req,
@@ -312,9 +339,9 @@ export async function POST(req: NextRequest) {
         targetType: 'COURSE_REGISTRATION',
         targetId: String(id_to_hoc),
         description: regResult.success
-          ? `Đăng ký môn học thành công: Tổ học ID [${id_to_hoc}]`
+          ? `Đăng ký môn học thành công: Tổ học ID [${id_to_hoc}]${flowSummary ? ` (Đã Flow cho ${flowSummary.total} thành viên: ${flowSummary.successCount} thành công)` : ''}`
           : `Đăng ký môn học thất bại: Tổ học ID [${id_to_hoc}] - ${regResult.message}`,
-        metadata: { id_to_hoc, result: regResult },
+        metadata: { id_to_hoc, result: regResult, flowSummary },
       });
 
       // Nếu có token mới thì cập nhật
@@ -325,12 +352,18 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      let responseMsg = regResult.message;
+      if (regResult.success && flowSummary && flowSummary.total > 0) {
+        responseMsg = `${regResult.message} • Đã Flow cho ${flowSummary.total} thành viên (${flowSummary.successCount} thành công, ${flowSummary.failCount} thất bại, ${flowSummary.skippedCount} bỏ qua)`;
+      }
+
       return NextResponse.json({
         success: regResult.success,
-        message: regResult.message,
+        message: responseMsg,
         id_rs: regResult.id_rs,
         ket_qua_dang_ky: regResult.ket_qua_dang_ky,
         rawResponse: regResult.rawResponse,
+        flowSummary,
       });
     }
 
@@ -346,6 +379,32 @@ export async function POST(req: NextRequest) {
         sv_nganh: Number(sv_nganh) || 1,
       });
 
+      // Nếu người hủy là Lớp trưởng và có thành viên đang BẬT Flow Hủy Môn -> Tự động Flow hủy cho cả lớp
+      let flowSummary: any = null;
+      if (cancelResult.success) {
+        const activeFollowers = await prisma.monitorFlowConfig.findMany({
+          where: {
+            monitorUsername: effectiveUsername,
+            isEnabled: true,
+            allowCancelCourse: true,
+          },
+        });
+
+        if (activeFollowers.length > 0) {
+          try {
+            flowSummary = await executeMonitorFlowAction({
+              monitorUsername: effectiveUsername,
+              flowAction: 'CANCEL',
+              id_to_hoc: String(id_to_hoc),
+              sv_nganh: Number(sv_nganh) || 1,
+              targetFollowerUsernames: activeFollowers.map((f) => f.followerUsername),
+            });
+          } catch (flowErr: any) {
+            console.error('Lỗi khi tự động Flow Hủy Môn cho thành viên:', flowErr);
+          }
+        }
+      }
+
       await logActivity({
         req,
         userId: authUser.id,
@@ -355,9 +414,9 @@ export async function POST(req: NextRequest) {
         targetType: 'COURSE_REGISTRATION',
         targetId: String(id_to_hoc),
         description: cancelResult.success
-          ? `Hủy môn học thành công: Tổ học ID [${id_to_hoc}]`
+          ? `Hủy môn học thành công: Tổ học ID [${id_to_hoc}]${flowSummary ? ` (Đã Flow hủy cho ${flowSummary.total} thành viên: ${flowSummary.successCount} thành công)` : ''}`
           : `Hủy môn học thất bại: Tổ học ID [${id_to_hoc}] - ${cancelResult.message}`,
-        metadata: { id_to_hoc, result: cancelResult },
+        metadata: { id_to_hoc, result: cancelResult, flowSummary },
       });
 
       if (cancelResult.newToken && cancelResult.newToken !== extAccount.token) {
@@ -367,11 +426,17 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      let responseMsg = cancelResult.message;
+      if (cancelResult.success && flowSummary && flowSummary.total > 0) {
+        responseMsg = `${cancelResult.message} • Đã Flow hủy cho ${flowSummary.total} thành viên (${flowSummary.successCount} thành công, ${flowSummary.failCount} thất bại, ${flowSummary.skippedCount} bỏ qua)`;
+      }
+
       return NextResponse.json({
         success: cancelResult.success,
-        message: cancelResult.message,
+        message: responseMsg,
         id_rs: cancelResult.id_rs,
         rawResponse: cancelResult.rawResponse,
+        flowSummary,
       });
     }
 
