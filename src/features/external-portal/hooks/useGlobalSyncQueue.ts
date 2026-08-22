@@ -303,6 +303,29 @@ export function useGlobalSyncQueue() {
     }
   };
 
+  // Phục hồi các tác vụ bị kẹt RUNNING
+  const recoverStuckQueue = async (batchId?: string) => {
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/global-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'RECOVER_STUCK',
+          batchId: batchId || selectedBatchId || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Lỗi khi khôi phục');
+      setMessage(data.message || 'Đã khôi phục các tác vụ bị kẹt thành công.');
+      await fetchQueueData();
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Lỗi khi khôi phục');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return {
     batches,
     queueItems,
@@ -326,5 +349,6 @@ export function useGlobalSyncQueue() {
     clearCompletedBatches,
     updateConfig,
     resumeWorker,
+    recoverStuckQueue,
   };
 }

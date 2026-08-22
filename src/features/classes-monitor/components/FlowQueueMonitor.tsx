@@ -55,6 +55,7 @@ export default function FlowQueueMonitor({
     retryFailedQueue,
     clearCompletedBatches,
     resumeWorker,
+    recoverStuckQueue,
   } = useFlowQueue(currentUser, selectedClass);
 
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -181,6 +182,25 @@ export default function FlowQueueMonitor({
         </div>
       </div>
 
+      {/* Cảnh báo khi có tác vụ bị kẹt RUNNING do app tắt/khởi động lại */}
+      {!isWorkerRunning && stats.totalRunning > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+            <div className="text-xs">
+              <span className="font-bold">Phát hiện {stats.totalRunning} tác vụ bị gián đoạn</span> (có thể do ứng dụng vừa khởi động lại hoặc tắt đột ngột khi đang chạy).
+            </div>
+          </div>
+          <button
+            onClick={() => recoverStuckQueue(selectedBatchId || undefined)}
+            disabled={isSubmitting}
+            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer disabled:opacity-50"
+          >
+            Khôi Phục & Tiếp Tục
+          </button>
+        </div>
+      )}
+
       {/* Active Batch Progress Card & Controls */}
       {activeBatch && (
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-800 shadow-xl space-y-3 sm:space-y-4">
@@ -217,26 +237,27 @@ export default function FlowQueueMonitor({
 
             {/* Queue Control Buttons */}
             <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
-              {!isWorkerRunning && stats.totalQueued > 0 && (
+              {!isWorkerRunning && (stats.totalQueued > 0 || stats.totalRunning > 0) && (
                 <button
-                  onClick={resumeWorker}
+                  onClick={() => (stats.totalRunning > 0 ? recoverStuckQueue(selectedBatchId || undefined) : resumeWorker())}
                   disabled={isSubmitting}
                   className="px-3 py-2 sm:px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Chạy tiếp hoặc khôi phục tác vụ"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Chạy Tiếp</span>
+                  <span>{stats.totalRunning > 0 ? 'Khôi Phục' : 'Chạy Tiếp'}</span>
                 </button>
               )}
 
-              {stats.totalQueued > 0 && (
+              {(stats.totalQueued > 0 || stats.totalRunning > 0) && (
                 <button
                   onClick={() => cancelPendingQueue(selectedBatchId || undefined)}
                   disabled={isSubmitting}
                   className="px-3 py-2 sm:px-3.5 bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-colors border border-rose-500/30 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="Hủy các tác vụ đang chờ trong Queue"
+                  title="Hủy các tác vụ đang chờ hoặc đang chạy trong Queue"
                 >
                   <X className="w-3.5 h-3.5" />
-                  <span>Hủy Chờ</span>
+                  <span>Hủy Hàng Đợi</span>
                 </button>
               )}
 

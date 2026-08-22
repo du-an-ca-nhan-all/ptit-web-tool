@@ -204,6 +204,95 @@ export async function enqueueFlowAction(options: EnqueueFlowOptions) {
 }
 
 /**
+ * Tự động quét và phục hồi các tác vụ bị kẹt ở trạng thái RUNNING
+ * (Xảy ra khi server/app bị tắt đột ngột, khởi động lại hoặc crash trong lúc đang chạy)
+ */
+export async function recoverStuckFlowQueueItems(options?: {
+  classCode?: string;
+  monitorUsername?: string;
+  batchId?: string;
+  maxStuckMinutes?: number;
+  autoResumeWorker?: boolean;
+}) {
+  const whereClause: any = {
+    status: 'RUNNING',
+  };
+
+  if (options?.classCode) whereClause.classCode = options.classCode.toUpperCase();
+  if (options?.monitorUsername) whereClause.monitorUsername = options.monitorUsername.toUpperCase();
+  if (options?.batchId) whereClause.batchId = options.batchId;
+  if (options?.maxStuckMinutes && options.maxStuckMinutes > 0) {
+    const cutoff = new Date(Date.now() - options.maxStuckMinutes * 60 * 1000);
+    whereClause.OR = [
+      { startedAt: { lte: cutoff } },
+      { startedAt: null },
+    ];
+  }
+
+  const stuckItems = await prisma.monitorFlowQueueItem.findMany({
+    where: whereClause,
+    select: { id: true, batchId: true, attempts: true, maxAttempts: true },
+  });
+
+  if (stuckItems.length === 0) {
+    return { recoveredCount: 0, failedCount: 0, totalStuck: 0 };
+  }
+
+  let recoveredCount = 0;
+  let failedCount = 0;
+
+  const toQueueIds: string[] = [];
+  const toFailIds: string[] = [];
+
+  for (const item of stuckItems) {
+    if (item.attempts >= item.maxAttempts) {
+      toFailIds.push(item.id);
+      failedCount++;
+    } else {
+      toQueueIds.push(item.id);
+      recoveredCount++;
+    }
+  }
+
+  if (toFailIds.length > 0) {
+    await prisma.monitorFlowQueueItem.updateMany({
+      where: { id: { in: toFailIds } },
+      data: {
+        status: 'FAILED',
+        resultMessage: 'Tác vụ bị gián đoạn do ứng dụng bị tắt / khởi động lại (đã vượt quá số lần thử)',
+        finishedAt: new Date(),
+      },
+    });
+  }
+
+  if (toQueueIds.length > 0) {
+    await prisma.monitorFlowQueueItem.updateMany({
+      where: { id: { in: toQueueIds } },
+      data: {
+        status: 'QUEUED',
+        startedAt: null,
+        resultMessage: 'Được phục hồi vào hàng đợi sau khi ứng dụng khởi động lại',
+      },
+    });
+  }
+
+  const affectedBatchIds = [...new Set(stuckItems.map((i) => i.batchId))];
+  for (const bId of affectedBatchIds) {
+    await recalculateBatchCounts(bId);
+  }
+
+  if (options?.autoResumeWorker !== false && toQueueIds.length > 0) {
+    setImmediate(() => {
+      processFlowQueue().catch((err) => {
+        console.error('[FlowQueue] Error auto-resuming worker after recovery:', err);
+      });
+    });
+  }
+
+  return { recoveredCount, failedCount, totalStuck: stuckItems.length };
+}
+
+/**
  * Worker chạy ngầm xử lý các tác vụ trong Hàng Đợi (Queue)
  * Chạy đồng thời với số luồng kiểm soát (Concurrency = 3-4) và delay để tránh quá tải cổng QLDTTX
  */
@@ -212,6 +301,16 @@ let isWorkerRunning = false;
 export async function processFlowQueue(specificBatchId?: string) {
   if (isWorkerRunning) {
     return { status: 'ALREADY_RUNNING' };
+  }
+
+  // Tự động phục hồi các item bị kẹt RUNNING từ lần chạy trước / do server restart
+  try {
+    await recoverStuckFlowQueueItems({
+      batchId: specificBatchId,
+      autoResumeWorker: false,
+    });
+  } catch (recoverErr) {
+    console.error('[FlowQueueWorker] Error recovering stuck items before starting:', recoverErr);
   }
 
   isWorkerRunning = true;
@@ -238,11 +337,15 @@ export async function processFlowQueue(specificBatchId?: string) {
         break;
       }
 
-      // Đánh dấu các item này chuyển sang RUNNING
+      // Đánh dấu các item này chuyển sang RUNNING và tăng số lần thử (attempts)
       const itemIds = queuedItems.map((i) => i.id);
       await prisma.monitorFlowQueueItem.updateMany({
         where: { id: { in: itemIds } },
-        data: { status: 'RUNNING', startedAt: new Date() },
+        data: {
+          status: 'RUNNING',
+          startedAt: new Date(),
+          attempts: { increment: 1 },
+        },
       });
 
       // Cập nhật trạng thái các Batch liên quan
@@ -577,6 +680,21 @@ export async function getFlowQueueStatus(options: {
   if (options.classCode) whereClause.classCode = options.classCode.toUpperCase();
   if (options.monitorUsername) whereClause.monitorUsername = options.monitorUsername.toUpperCase();
 
+  // Nếu worker không chạy nhưng có item RUNNING, tự động khôi phục về QUEUED và khởi động lại worker
+  if (!isWorkerRunning) {
+    const runningCount = await prisma.monitorFlowQueueItem.count({
+      where: { ...whereClause, status: 'RUNNING' },
+    });
+    if (runningCount > 0) {
+      await recoverStuckFlowQueueItems({
+        classCode: options.classCode,
+        monitorUsername: options.monitorUsername,
+        batchId: options.batchId,
+        autoResumeWorker: true,
+      });
+    }
+  }
+
   // 1. Lấy danh sách Batches
   const batches = await prisma.monitorFlowBatch.findMany({
     where: whereClause,
@@ -636,7 +754,7 @@ export async function getFlowQueueStatus(options: {
 }
 
 /**
- * Hủy các tác vụ đang chờ trong Queue
+ * Hủy các tác vụ đang chờ hoặc đang chạy trong Queue
  */
 export async function cancelPendingFlowQueue(options: {
   monitorUsername: string;
@@ -649,7 +767,7 @@ export async function cancelPendingFlowQueue(options: {
   const whereClause: any = {
     monitorUsername: normMonitor,
     classCode: normClass,
-    status: 'QUEUED',
+    status: { in: ['QUEUED', 'RUNNING'] },
   };
 
   if (options.batchId) {
@@ -683,7 +801,7 @@ export async function cancelPendingFlowQueue(options: {
 }
 
 /**
- * Chạy lại các tác vụ bị lỗi (FAILED -> QUEUED)
+ * Chạy lại các tác vụ bị lỗi hoặc bị hủy (FAILED | CANCELLED -> QUEUED)
  */
 export async function retryFailedFlowQueue(options: {
   monitorUsername: string;
@@ -696,7 +814,7 @@ export async function retryFailedFlowQueue(options: {
   const whereClause: any = {
     monitorUsername: normMonitor,
     classCode: normClass,
-    status: 'FAILED',
+    status: { in: ['FAILED', 'CANCELLED'] },
   };
 
   if (options.batchId) {
@@ -712,6 +830,20 @@ export async function retryFailedFlowQueue(options: {
       finishedAt: null,
     },
   });
+
+  // Cập nhật lại các batch
+  const activeBatches = await prisma.monitorFlowBatch.findMany({
+    where: {
+      monitorUsername: normMonitor,
+      classCode: normClass,
+      ...(options.batchId ? { id: options.batchId } : {}),
+    },
+    select: { id: true },
+  });
+
+  for (const b of activeBatches) {
+    await recalculateBatchCounts(b.id);
+  }
 
   // Kích hoạt lại worker
   setImmediate(() => {

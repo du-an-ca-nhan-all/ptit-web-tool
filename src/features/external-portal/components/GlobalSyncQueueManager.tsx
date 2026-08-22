@@ -62,6 +62,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
     clearCompletedBatches,
     updateConfig,
     resumeWorker,
+    recoverStuckQueue,
   } = useGlobalSyncQueue();
 
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -506,6 +507,25 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
         </div>
       </div>
 
+      {/* Cảnh báo khi có tác vụ bị kẹt RUNNING do app tắt/khởi động lại */}
+      {!isWorkerRunning && stats.RUNNING > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-amber-900 dark:text-amber-200">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+            <div className="text-xs">
+              <span className="font-bold">Phát hiện {stats.RUNNING} tác vụ đang ở trạng thái RUNNING</span> nhưng Worker hiện không chạy (có thể do ứng dụng vừa khởi động lại hoặc tắt đột ngột khi đang đồng bộ).
+            </div>
+          </div>
+          <button
+            onClick={() => recoverStuckQueue()}
+            disabled={isSubmitting}
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer disabled:opacity-50"
+          >
+            Khôi Phục & Chạy Tiếp
+          </button>
+        </div>
+      )}
+
       {/* BATCH SELECTOR & QUEUE CONTROLS */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -520,6 +540,17 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {!isWorkerRunning && (stats.QUEUED > 0 || stats.RUNNING > 0) && (
+              <button
+                onClick={() => (stats.RUNNING > 0 ? recoverStuckQueue() : resumeWorker())}
+                disabled={isSubmitting}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                {stats.RUNNING > 0 ? 'Khôi Phục' : 'Chạy Tiếp'}
+              </button>
+            )}
+
             {stats.FAILED > 0 && (
               <button
                 onClick={() => retryFailedQueue()}
@@ -531,14 +562,14 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               </button>
             )}
 
-            {stats.QUEUED > 0 && (
+            {(stats.QUEUED > 0 || stats.RUNNING > 0) && (
               <button
                 onClick={() => cancelPendingQueue()}
                 disabled={isSubmitting}
                 className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <XCircle className="w-3.5 h-3.5 text-slate-500" />
-                Hủy Hàng Đợi ({stats.QUEUED})
+                Hủy Hàng Đợi ({stats.QUEUED + stats.RUNNING})
               </button>
             )}
 

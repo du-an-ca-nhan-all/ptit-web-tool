@@ -7,6 +7,7 @@ import {
   cancelPendingFlowQueue,
   retryFailedFlowQueue,
   clearCompletedFlowBatches,
+  recoverStuckFlowQueueItems,
 } from '@/src/features/classes-monitor/server/monitorFlowQueueServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
@@ -192,6 +193,22 @@ export async function POST(req: NextRequest) {
         success: true,
         message: `Đã dọn dẹp ${clearRes.deletedCount} đợt chạy đã hoàn thành.`,
         ...clearRes,
+      });
+    }
+
+    // 6. ACTION: RECOVER_STUCK (Phục hồi các tác vụ bị kẹt RUNNING)
+    if (action === 'RECOVER_STUCK') {
+      const recRes = await recoverStuckFlowQueueItems({
+        monitorUsername: normMonitor,
+        classCode: normClass,
+        batchId,
+        autoResumeWorker: true,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Đã khôi phục ${recRes.recoveredCount} tác vụ bị kẹt vào lại hàng đợi để tiếp tục xử lý.`,
+        ...recRes,
       });
     }
 

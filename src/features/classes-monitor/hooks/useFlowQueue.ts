@@ -273,6 +273,32 @@ export function useFlowQueue(currentUser: LoginUser, selectedClass: string) {
     }
   }, [selectedClass, currentUser.username, selectedBatchId, fetchQueueData]);
 
+  // Phục hồi các tác vụ bị kẹt RUNNING
+  const recoverStuckQueue = useCallback(async (batchId?: string) => {
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/class-monitors/flow-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'RECOVER_STUCK',
+          classCode: selectedClass,
+          monitorUsername: currentUser.username,
+          batchId: batchId || selectedBatchId || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setMessage(data.message || 'Đã khôi phục các tác vụ bị kẹt thành công.');
+        await fetchQueueData(selectedBatchId || undefined);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Lỗi khi khôi phục tác vụ bị kẹt');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [selectedClass, currentUser.username, selectedBatchId, fetchQueueData]);
+
   return {
     batches,
     queueItems,
@@ -293,5 +319,6 @@ export function useFlowQueue(currentUser: LoginUser, selectedClass: string) {
     retryFailedQueue,
     clearCompletedBatches,
     resumeWorker,
+    recoverStuckQueue,
   };
 }

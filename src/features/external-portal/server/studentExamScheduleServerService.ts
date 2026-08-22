@@ -376,8 +376,17 @@ export function buildQldtExamResultFromRawData(
   };
 }
 
+function getExamUniqueKey(item: any): string {
+  const code = (item.ma_mon || item.maMon || item.MaMH || '').toUpperCase().trim();
+  const sem = (item.hoc_ky || item.hocKy || item.dot_thi || item.dotThi || '').toString().trim();
+  const toThi = (item.to_thi || item.toThi || item.nhom_thi || item.nhomThi || '').toString().trim();
+  if (sem && toThi) return `${code}_${sem}_${toThi}`;
+  if (sem) return `${code}_${sem}`;
+  return code;
+}
+
 /**
- * So sánh và phát hiện biến động lịch thi giữa dữ liệu cũ và dữ liệu mới
+ * So sánh và phát hiện biến động lịch thi giữa dữ liệu cũ và dữ liệu mới (hỗ trợ tất cả các học kỳ)
  */
 export function detectExamScheduleChanges(
   oldRawExams: any[],
@@ -388,23 +397,27 @@ export function detectExamScheduleChanges(
 
   const oldMap = new Map<string, any>();
   oldRawExams.forEach((item) => {
-    const code = (item.ma_mon || item.maMon || item.MaMH || '').toUpperCase().trim();
-    if (code) oldMap.set(code, item);
+    const key = getExamUniqueKey(item);
+    if (key) oldMap.set(key, item);
   });
 
   const newMap = new Map<string, any>();
   newRawExams.forEach((item) => {
-    const code = (item.ma_mon || item.maMon || item.MaMH || '').toUpperCase().trim();
-    if (code) newMap.set(code, item);
+    const key = getExamUniqueKey(item);
+    if (key) newMap.set(key, item);
   });
 
   // 1. Kiểm tra môn thi mới hoặc bị thay đổi trong newRawExams
   newRawExams.forEach((newEx) => {
+    const key = getExamUniqueKey(newEx);
     const code = (newEx.ma_mon || newEx.maMon || newEx.MaMH || '').toUpperCase().trim();
-    if (!code) return;
+    if (!key || !code) return;
 
-    const tenMon = newEx.ten_mon || newEx.tenMon || newEx.TenMH || 'Môn thi';
-    const oldEx = oldMap.get(code);
+    const baseName = newEx.ten_mon || newEx.tenMon || newEx.TenMH || 'Môn thi';
+    const semName = newEx.ten_hoc_ky || (newEx.hoc_ky ? `HK ${newEx.hoc_ky}` : '');
+    const tenMon = semName ? `${baseName} (${semName})` : baseName;
+
+    const oldEx = oldMap.get(key);
 
     if (!oldEx) {
       // Môn thi mới được xếp lịch
@@ -479,11 +492,15 @@ export function detectExamScheduleChanges(
 
   // 2. Kiểm tra môn thi bị huỷ (có trong cũ nhưng biến mất trong mới)
   oldRawExams.forEach((oldEx) => {
+    const key = getExamUniqueKey(oldEx);
     const code = (oldEx.ma_mon || oldEx.maMon || oldEx.MaMH || '').toUpperCase().trim();
-    if (!code) return;
+    if (!key || !code) return;
 
-    if (!newMap.has(code)) {
-      const tenMon = oldEx.ten_mon || oldEx.tenMon || oldEx.TenMH || 'Môn thi';
+    if (!newMap.has(key)) {
+      const baseName = oldEx.ten_mon || oldEx.tenMon || oldEx.TenMH || 'Môn thi';
+      const semName = oldEx.ten_hoc_ky || (oldEx.hoc_ky ? `HK ${oldEx.hoc_ky}` : '');
+      const tenMon = semName ? `${baseName} (${semName})` : baseName;
+
       changes.push({
         maMon: code,
         tenMon,
@@ -500,6 +517,7 @@ export function detectExamScheduleChanges(
 
 /**
  * Lấy lịch thi cá nhân từ Cổng QLDTTX (kết hợp cache DB StudentQldtExamRecord)
+ * Đồng bộ toàn bộ các học kỳ (semesters & all exams) và so sánh biến động
  */
 export async function getStudentQldtExamSchedule(
   username: string,
@@ -552,19 +570,26 @@ export async function getStudentQldtExamSchedule(
 
   const lastPulled = cachedRecord?.lastPulledAt || cachedRecord?.updatedAt;
   const ageMs = lastPulled ? Date.now() - new Date(lastPulled).getTime() : Infinity;
-  const isCacheFresh =
-    cachedRecord &&
-    cachedRecord.rawData &&
-    ageMs < EXAM_AUTO_REFRESH_INTERVAL_MS &&
-    (!options?.semesterId || cachedRecord.semesterId === options.semesterId);
+  const isCacheFresh = cachedRecord && cachedRecord.rawData && ageMs < EXAM_AUTO_REFRESH_INTERVAL_MS;
 
   // Trả về từ DB cache nếu còn hạn và không forceRefresh
   if (!options?.forceRefresh && isCacheFresh) {
     try {
       const parsed = JSON.parse(cachedRecord.rawData);
-      const rawExams = parsed?.exams || parsed?.data?.ds_lich_thi || (Array.isArray(parsed) ? parsed : []) || [];
       const semesters: StudentQldtSemester[] = parsed?.semesters || [];
-      const semId = cachedRecord.semesterId || parsed.currentSemester || currentSemester;
+      const semId = options?.semesterId || cachedRecord.semesterId || parsed.currentSemester || semesters[0]?.hocKy || currentSemester;
+
+      let rawExams: any[] = [];
+      if (parsed?.examsBySemester && parsed.examsBySemester[semId]) {
+        rawExams = parsed.examsBySemester[semId];
+      } else if (Array.isArray(parsed?.allExams)) {
+        rawExams = parsed.allExams.filter((e: any) => Number(e.hoc_ky || e.hocKy) === semId);
+        if (rawExams.length === 0 && !options?.semesterId) {
+          rawExams = parsed.allExams;
+        }
+      } else {
+        rawExams = parsed?.exams || parsed?.data?.ds_lich_thi || (Array.isArray(parsed) ? parsed : []) || [];
+      }
 
       return buildQldtExamResultFromRawData(cleanUsername, rawExams, semId, semesters, {
         isConfigured: true,
@@ -579,35 +604,67 @@ export async function getStudentQldtExamSchedule(
     }
   }
 
-  // 3. Kéo live từ QLDTTX
+  // 3. Kéo live từ QLDTTX (Đồng bộ tất cả học kỳ và toàn bộ ca thi)
   let authErrorDetected = false;
   let authErrorMessage = '';
 
   try {
-    // 3.1 Lấy danh sách học kỳ
+    // 3.1 Lấy danh sách toàn bộ học kỳ từ Cổng QLDTTX
     const semRes = await fetchStudentExamSemestersFromQLDTTX({
       username: extAccount!.extUsername || cleanUsername,
       password: extAccount!.extPassword || undefined,
       token: extAccount!.token,
     });
 
-    const targetHocKy = options?.semesterId || semRes.currentSemester || 20251;
+    const targetHocKy = options?.semesterId || semRes.currentSemester || semRes.semesters[0]?.hocKy || 20251;
+    const semestersToFetch =
+      semRes.semesters && semRes.semesters.length > 0
+        ? semRes.semesters
+        : [{ hocKy: targetHocKy, tenHocKy: `Học kỳ ${targetHocKy}` }];
 
-    // 3.2 Lấy chi tiết lịch thi
-    const examRes = await fetchStudentPersonalExamsFromQLDTTX({
-      username: extAccount!.extUsername || cleanUsername,
-      password: extAccount!.extPassword || undefined,
-      token: semRes.newToken || extAccount!.token,
-      idHocKy: targetHocKy,
-    });
+    // 3.2 Lấy chi tiết lịch thi cho TẤT CẢ các học kỳ
+    const allExamsBySemester: Record<number, any[]> = {};
+    const allRawExamsList: any[] = [];
+    let currentToken = semRes.newToken || extAccount!.token;
+    let firstNoticeNoTuitionFee: string | undefined = undefined;
 
-    const activeToken = examRes.newToken || semRes.newToken;
-    if (activeToken) {
+    for (const sem of semestersToFetch) {
+      try {
+        const examRes = await fetchStudentPersonalExamsFromQLDTTX({
+          username: extAccount!.extUsername || cleanUsername,
+          password: extAccount!.extPassword || undefined,
+          token: currentToken,
+          idHocKy: sem.hocKy,
+        });
+
+        if (examRes.newToken) {
+          currentToken = examRes.newToken;
+        }
+
+        if (examRes.noticeNoTuitionFee && !firstNoticeNoTuitionFee) {
+          firstNoticeNoTuitionFee = examRes.noticeNoTuitionFee;
+        }
+
+        const rawList = (examRes.exams || []).map((ex: any) => ({
+          ...ex,
+          hoc_ky: sem.hocKy,
+          ten_hoc_ky: sem.tenHocKy,
+        }));
+
+        allExamsBySemester[sem.hocKy] = rawList;
+        allRawExamsList.push(...rawList);
+      } catch (semErr) {
+        console.warn(`[getStudentQldtExamSchedule] Lỗi kéo lịch thi học kỳ ${sem.hocKy} cho ${cleanUsername}:`, semErr);
+        allExamsBySemester[sem.hocKy] = [];
+      }
+    }
+
+    if (currentToken && currentToken !== extAccount!.token) {
       await prisma.externalAccount
         .update({
           where: { id: extAccount!.id },
           data: {
-            token: activeToken,
+            token: currentToken,
             lastSyncAt: new Date(),
             status: 'CONNECTED',
             syncMessage: 'Đồng bộ lịch thi thành công từ QLDTTX.',
@@ -616,16 +673,20 @@ export async function getStudentQldtExamSchedule(
         .catch(() => {});
     }
 
+    const currentSemesterExams = allExamsBySemester[targetHocKy] || [];
+
     const payloadToStore = {
       semesters: semRes.semesters,
-      exams: examRes.exams,
+      examsBySemester: allExamsBySemester,
+      allExams: allRawExamsList,
+      exams: currentSemesterExams,
       currentSemester: targetHocKy,
-      noticeNoTuitionFee: examRes.noticeNoTuitionFee,
+      noticeNoTuitionFee: firstNoticeNoTuitionFee,
     };
 
     const resultObj = buildQldtExamResultFromRawData(
       cleanUsername,
-      examRes.exams,
+      currentSemesterExams,
       targetHocKy,
       semRes.semesters,
       {
@@ -633,17 +694,21 @@ export async function getStudentQldtExamSchedule(
         isLiveSync: true,
         isCachedDb: false,
         lastSyncAt: new Date().toISOString(),
-        noticeNoTuitionFee: examRes.noticeNoTuitionFee,
+        noticeNoTuitionFee: firstNoticeNoTuitionFee,
       }
     );
 
-    // 3.3 Phát hiện biến động lịch thi so với cache cũ và gửi thông báo Telegram
+    // 3.3 Phát hiện biến động lịch thi TOÀN BỘ CÁC MÔN so với cache cũ và gửi thông báo Telegram
     if (cachedRecord?.rawData) {
       try {
         const oldParsed = JSON.parse(cachedRecord.rawData);
-        const oldExamsList = oldParsed?.exams || oldParsed?.data?.ds_lich_thi || [];
-        if (Array.isArray(oldExamsList) && oldExamsList.length > 0 && Array.isArray(examRes.exams) && examRes.exams.length > 0) {
-          const detectedDiffs = detectExamScheduleChanges(oldExamsList, examRes.exams);
+        const oldExamsList = oldParsed?.allExams || oldParsed?.exams || oldParsed?.data?.ds_lich_thi || [];
+        if (
+          Array.isArray(oldExamsList) &&
+          oldExamsList.length > 0 &&
+          allRawExamsList.length > 0
+        ) {
+          const detectedDiffs = detectExamScheduleChanges(oldExamsList, allRawExamsList);
           if (detectedDiffs.length > 0) {
             console.log(`🔔 [QLDT Exam Schedule] Phát hiện ${detectedDiffs.length} thay đổi lịch thi cho sinh viên ${cleanUsername}!`);
             
@@ -674,7 +739,7 @@ export async function getStudentQldtExamSchedule(
       }
     }
 
-    // 4. Lưu / Persist vào bảng StudentQldtExamRecord
+    // 4. Lưu / Persist toàn bộ dữ liệu vào bảng StudentQldtExamRecord
     try {
       await prisma.studentQldtExamRecord.upsert({
         where: { username: cleanUsername },
@@ -683,14 +748,14 @@ export async function getStudentQldtExamSchedule(
           rawData: JSON.stringify(payloadToStore),
           semesterId: targetHocKy,
           semesterName: resultObj.semesterName,
-          totalExams: resultObj.totalExams,
+          totalExams: allRawExamsList.length,
           lastPulledAt: new Date(),
         },
         update: {
           rawData: JSON.stringify(payloadToStore),
           semesterId: targetHocKy,
           semesterName: resultObj.semesterName,
-          totalExams: resultObj.totalExams,
+          totalExams: allRawExamsList.length,
           lastPulledAt: new Date(),
         },
       });
@@ -758,9 +823,20 @@ export async function getStudentQldtExamSchedule(
   if (cachedRecord && cachedRecord.rawData) {
     try {
       const parsed = JSON.parse(cachedRecord.rawData);
-      const rawExams = parsed?.exams || parsed?.data?.ds_lich_thi || (Array.isArray(parsed) ? parsed : []) || [];
       const semesters: StudentQldtSemester[] = parsed?.semesters || [];
-      const semId = cachedRecord.semesterId || parsed.currentSemester || currentSemester;
+      const semId = options?.semesterId || cachedRecord.semesterId || parsed.currentSemester || semesters[0]?.hocKy || currentSemester;
+
+      let rawExams: any[] = [];
+      if (parsed?.examsBySemester && parsed.examsBySemester[semId]) {
+        rawExams = parsed.examsBySemester[semId];
+      } else if (Array.isArray(parsed?.allExams)) {
+        rawExams = parsed.allExams.filter((e: any) => Number(e.hoc_ky || e.hocKy) === semId);
+        if (rawExams.length === 0 && !options?.semesterId) {
+          rawExams = parsed.allExams;
+        }
+      } else {
+        rawExams = parsed?.exams || parsed?.data?.ds_lich_thi || (Array.isArray(parsed) ? parsed : []) || [];
+      }
 
       return buildQldtExamResultFromRawData(cleanUsername, rawExams, semId, semesters, {
         isConfigured: true,

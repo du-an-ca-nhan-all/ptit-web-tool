@@ -4,14 +4,47 @@ import {
   runClassScheduleReminders,
 } from './telegramDispatcher';
 import { runDailyAutoBackupScheduler } from '@/src/features/database-backup/server/backupServerService';
-import { runGlobalNightlySyncScheduler } from '@/src/features/external-portal/server/globalSyncQueueServerService';
+import {
+  runGlobalNightlySyncScheduler,
+  recoverStuckGlobalSyncQueueItems,
+} from '@/src/features/external-portal/server/globalSyncQueueServerService';
+import { recoverStuckFlowQueueItems } from '@/src/features/classes-monitor/server/monitorFlowQueueServerService';
 
 let isSchedulerRunning = false;
+
+/**
+ * Tự động quét và phục hồi tất cả các tác vụ bị kẹt RUNNING ở tất cả các Queue
+ * (Thường xảy ra khi app/server bị tắt đột ngột, crash hoặc khởi động lại)
+ */
+export async function recoverAllStuckQueueJobs(maxStuckMinutes?: number) {
+  try {
+    const [flowRes, globalRes] = await Promise.all([
+      recoverStuckFlowQueueItems({ maxStuckMinutes, autoResumeWorker: true }),
+      recoverStuckGlobalSyncQueueItems({ maxStuckMinutes, autoResumeWorker: true }),
+    ]);
+
+    const total = (flowRes?.totalStuck || 0) + (globalRes?.totalStuck || 0);
+    if (total > 0) {
+      console.log(
+        `🔄 [QueueRecovery] Đã phục hồi ${total} tác vụ bị gián đoạn (Flow: ${flowRes.recoveredCount} re-queued, ${flowRes.failedCount} failed | Global: ${globalRes.recoveredCount} re-queued, ${globalRes.failedCount} failed)`
+      );
+    }
+    return { flowRes, globalRes, total };
+  } catch (err) {
+    console.error('[QueueRecovery] Lỗi khi phục hồi các tác vụ bị kẹt:', err);
+    return { error: err };
+  }
+}
 
 /**
  * Chạy tất cả các tác vụ Scheduler & Telegram 1 lần
  */
 export async function runTelegramSchedulerTasks() {
+  // Quét phục hồi các tác vụ bị kẹt quá 5 phút
+  recoverAllStuckQueueJobs(5).catch((err) => {
+    console.error('[Telegram Scheduler] Periodic stuck jobs recovery error:', err);
+  });
+
   runExamScheduleReminders().catch((err) => {
     console.error('[Telegram Scheduler] Periodic exam reminders check error:', err);
   });
@@ -42,6 +75,9 @@ export function startTelegramScheduler() {
   isSchedulerRunning = true;
 
   console.log('⏰ [Telegram Scheduler] Đã khởi động trình quét tự động (5 phút/lần)');
+
+  // Chạy ngay lần đầu phục hồi các job bị kẹt
+  recoverAllStuckQueueJobs().catch(console.error);
 
   // Chạy định kỳ mỗi 5 phút
   setInterval(() => {

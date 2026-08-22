@@ -177,6 +177,91 @@ async function enqueueSingleGlobalJobType(options: EnqueueGlobalSyncOptions) {
 }
 
 /**
+ * Tự động quét và phục hồi các tác vụ bị kẹt ở trạng thái RUNNING trong Global Sync Queue
+ * (Xảy ra khi server/app bị tắt đột ngột, khởi động lại hoặc crash trong lúc đang chạy)
+ */
+export async function recoverStuckGlobalSyncQueueItems(options?: {
+  batchId?: string;
+  maxStuckMinutes?: number;
+  autoResumeWorker?: boolean;
+}) {
+  const whereClause: any = {
+    status: 'RUNNING',
+  };
+
+  if (options?.batchId) whereClause.batchId = options.batchId;
+  if (options?.maxStuckMinutes && options.maxStuckMinutes > 0) {
+    const cutoff = new Date(Date.now() - options.maxStuckMinutes * 60 * 1000);
+    whereClause.OR = [
+      { startedAt: { lte: cutoff } },
+      { startedAt: null },
+    ];
+  }
+
+  const stuckItems = await prisma.globalSyncQueueItem.findMany({
+    where: whereClause,
+    select: { id: true, batchId: true, attempts: true, maxAttempts: true },
+  });
+
+  if (stuckItems.length === 0) {
+    return { recoveredCount: 0, failedCount: 0, totalStuck: 0 };
+  }
+
+  let recoveredCount = 0;
+  let failedCount = 0;
+
+  const toQueueIds: string[] = [];
+  const toFailIds: string[] = [];
+
+  for (const item of stuckItems) {
+    if (item.attempts >= item.maxAttempts) {
+      toFailIds.push(item.id);
+      failedCount++;
+    } else {
+      toQueueIds.push(item.id);
+      recoveredCount++;
+    }
+  }
+
+  if (toFailIds.length > 0) {
+    await prisma.globalSyncQueueItem.updateMany({
+      where: { id: { in: toFailIds } },
+      data: {
+        status: 'FAILED',
+        resultMessage: 'Tác vụ bị gián đoạn do ứng dụng bị tắt / khởi động lại (đã vượt quá số lần thử)',
+        finishedAt: new Date(),
+      },
+    });
+  }
+
+  if (toQueueIds.length > 0) {
+    await prisma.globalSyncQueueItem.updateMany({
+      where: { id: { in: toQueueIds } },
+      data: {
+        status: 'QUEUED',
+        startedAt: null,
+        resultMessage: 'Được phục hồi vào hàng đợi sau khi ứng dụng khởi động lại',
+      },
+    });
+  }
+
+  const affectedBatchIds = [...new Set(stuckItems.map((i) => i.batchId))];
+  for (const bId of affectedBatchIds) {
+    await recalculateGlobalBatchCounts(bId);
+  }
+
+  if (options?.autoResumeWorker !== false && toQueueIds.length > 0) {
+    setImmediate(() => {
+      processGlobalSyncQueue().catch((err) => {
+        console.error('[GlobalSyncQueue] Error auto-resuming worker after recovery:', err);
+      });
+    });
+  }
+
+  return { recoveredCount, failedCount, totalStuck: stuckItems.length };
+}
+
+/**
  * Worker chạy ngầm xử lý các tác vụ trong Hàng Đợi Global Sync
  */
 let isGlobalSyncWorkerRunning = false;
@@ -184,6 +269,16 @@ let isGlobalSyncWorkerRunning = false;
 export async function processGlobalSyncQueue(specificBatchId?: string) {
   if (isGlobalSyncWorkerRunning) {
     return { status: 'ALREADY_RUNNING' };
+  }
+
+  // Tự động phục hồi các item bị kẹt RUNNING từ lần chạy trước / do server restart
+  try {
+    await recoverStuckGlobalSyncQueueItems({
+      batchId: specificBatchId,
+      autoResumeWorker: false,
+    });
+  } catch (recoverErr) {
+    console.error('[GlobalSyncQueueWorker] Error recovering stuck items before starting:', recoverErr);
   }
 
   isGlobalSyncWorkerRunning = true;
@@ -210,11 +305,15 @@ export async function processGlobalSyncQueue(specificBatchId?: string) {
         break;
       }
 
-      // Đánh dấu chuyển sang RUNNING
+      // Đánh dấu chuyển sang RUNNING và tăng số lần thử (attempts)
       const itemIds = queuedItems.map((i) => i.id);
       await prisma.globalSyncQueueItem.updateMany({
         where: { id: { in: itemIds } },
-        data: { status: 'RUNNING', startedAt: new Date() },
+        data: {
+          status: 'RUNNING',
+          startedAt: new Date(),
+          attempts: { increment: 1 },
+        },
       });
 
       // Cập nhật trạng thái Batch liên quan
@@ -771,6 +870,22 @@ export async function getGlobalSyncQueueStatus(options?: {
 }) {
   const limit = options?.limit || 20;
 
+  // Nếu worker không chạy nhưng có item RUNNING, tự động khôi phục về QUEUED và khởi động lại worker
+  if (!isGlobalSyncWorkerRunning) {
+    const runningCount = await prisma.globalSyncQueueItem.count({
+      where: {
+        ...(options?.batchId ? { batchId: options.batchId } : {}),
+        status: 'RUNNING',
+      },
+    });
+    if (runningCount > 0) {
+      await recoverStuckGlobalSyncQueueItems({
+        batchId: options?.batchId,
+        autoResumeWorker: true,
+      });
+    }
+  }
+
   const [batches, activeBatch, queueItems, totalStats] = await Promise.all([
     prisma.globalSyncBatch.findMany({
       orderBy: { createdAt: 'desc' },
@@ -820,11 +935,11 @@ export async function getGlobalSyncQueueStatus(options?: {
 }
 
 /**
- * Hủy các tác vụ đang chờ trong Queue
+ * Hủy các tác vụ đang chờ hoặc đang chạy trong Queue
  */
 export async function cancelPendingGlobalQueue(batchId?: string) {
   const whereClause = {
-    status: 'QUEUED',
+    status: { in: ['QUEUED', 'RUNNING'] },
     ...(batchId ? { batchId } : {}),
   };
 

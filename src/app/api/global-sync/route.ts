@@ -8,6 +8,7 @@ import {
   retryFailedGlobalQueue,
   clearCompletedGlobalBatches,
   runGlobalNightlySyncScheduler,
+  recoverStuckGlobalSyncQueueItems,
 } from '@/src/features/external-portal/server/globalSyncQueueServerService';
 import { setGlobalConfig, GLOBAL_CONFIG_KEYS, GlobalNightlySyncConfigValue } from '@/src/lib/globalConfig';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
@@ -206,7 +207,7 @@ export async function POST(req: NextRequest) {
         action: 'UPDATE_GLOBAL_SYNC_CONFIG',
         targetType: 'GLOBAL_JOB',
         targetId: 'CONFIG',
-        description: `Cập nhật cấu hình tự động đồng bộ dữ liệu ban đêm: Giờ chạy ${newConfig.scheduleTime}`,
+        description: `Cập nhật cấu hình tự động đồng bộ dữ liệu ban đêm`,
         metadata: newConfig,
       });
 
@@ -214,6 +215,20 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'Đã cập nhật cấu hình đồng bộ tự động ban đêm thành công',
         config: newConfig,
+      });
+    }
+
+    // 8. ACTION: RECOVER_STUCK (Phục hồi các tác vụ bị kẹt RUNNING)
+    if (action === 'RECOVER_STUCK') {
+      const recRes = await recoverStuckGlobalSyncQueueItems({
+        batchId,
+        autoResumeWorker: true,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Đã khôi phục ${recRes.recoveredCount} tác vụ bị kẹt vào lại hàng đợi để tiếp tục xử lý.`,
+        ...recRes,
       });
     }
 
