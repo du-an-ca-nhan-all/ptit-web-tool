@@ -515,185 +515,331 @@ export default function AdminRegistrationManager({ currentUser }: AdminRegistrat
             </span>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="py-3.5 px-4 w-10">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.length === requests.length && requests.length > 0}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                    />
-                  </th>
-                  <th className="py-3.5 px-4">Sinh Viên / MSSV</th>
-                  <th className="py-3.5 px-4">Lớp Học</th>
-                  <th className="py-3.5 px-4">SĐT Liên Hệ</th>
-                  <th className="py-3.5 px-4">Thời Gian Gửi</th>
-                  <th className="py-3.5 px-4">Trạng Thái</th>
-                  <th className="py-3.5 px-4">Ghi Chú</th>
-                  <th className="py-3.5 px-4 text-right">Thao Tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {requests.map((item) => {
-                  const isSelected = selectedIds.includes(item.id);
-                  return (
-                    <tr
-                      key={item.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${
-                        isSelected ? 'bg-blue-50/40' : ''
-                      }`}
-                    >
-                      <td className="py-3.5 px-4">
+          <>
+            {/* MOBILE VIEW: Card List (< md) */}
+            <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-3">
+              {requests.map((item) => {
+                const isSelected = selectedIds.includes(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-3.5 rounded-2xl border transition-all ${
+                      isSelected
+                        ? 'bg-blue-50/70 border-blue-300 shadow-sm'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => handleToggleSelect(item.id)}
-                          className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                          className="w-4 h-4 text-blue-600 rounded cursor-pointer shrink-0 mt-0.5"
                         />
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-2xl bg-slate-100 flex items-center justify-center font-bold text-slate-700 text-xs shrink-0">
-                            {item.fullName ? item.fullName.charAt(0) : item.username.charAt(0)}
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800 text-sm">
-                              {item.fullName || 'Chưa rõ họ tên'}
-                            </div>
-                            <div className="font-mono text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded inline-block mt-0.5">
-                              {item.username}
-                            </div>
-                          </div>
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+                          {item.fullName ? item.fullName.charAt(0) : item.username.charAt(0)}
                         </div>
-                      </td>
-
-                      <td className="py-3.5 px-4 font-bold text-slate-700">
-                        {item.lop ? (
-                          <span className="inline-flex items-center gap-1">
-                            <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
-                            {item.lop}
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 text-sm truncate">
+                            {item.fullName || 'Chưa rõ họ tên'}
+                          </div>
+                          <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
+                            {item.username}
                           </span>
-                        ) : (
-                          <span className="text-slate-400 italic">—</span>
-                        )}
-                      </td>
+                        </div>
+                      </div>
 
-                      <td className="py-3.5 px-4 font-mono font-medium text-slate-700">
-                        {item.phoneNumber ? (
-                          <span className="inline-flex items-center gap-1">
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            {item.phoneNumber}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 italic">—</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-slate-500 text-[11px]">
-                        {formatDateTime(item.createdAt)}
-                      </td>
-
-                      <td className="py-3.5 px-4">
+                      {/* Status Tag */}
+                      <div className="shrink-0">
                         {item.status === 'PENDING' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            <Clock className="w-3.5 h-3.5" /> Chờ Duyệt
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            <Clock className="w-3 h-3" /> Chờ Duyệt
                           </span>
                         ) : item.status === 'APPROVED' ? (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Đã Duyệt
-                            </span>
-                            {item.reviewedBy && (
-                              <span className="text-[10px] text-slate-400">
-                                bởi @{item.reviewedBy}
-                              </span>
-                            )}
-                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3" /> Đã Duyệt
+                          </span>
                         ) : (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              <XCircle className="w-3.5 h-3.5" /> Đã Từ Chối
-                            </span>
-                            {item.reviewedBy && (
-                              <span className="text-[10px] text-slate-400">
-                                bởi @{item.reviewedBy}
-                              </span>
-                            )}
-                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            <XCircle className="w-3 h-3" /> Đã Từ Chối
+                          </span>
                         )}
-                      </td>
+                      </div>
+                    </div>
 
-                      <td
-                        className="py-3.5 px-4 text-slate-600 max-w-[200px] truncate"
-                        title={item.note || ''}
-                      >
-                        {item.note || <span className="text-slate-400 italic">—</span>}
-                      </td>
+                    {/* Metadata items */}
+                    <div className="grid grid-cols-2 gap-2 text-xs py-2 border-t border-slate-100 text-slate-600">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Lớp</span>
+                        <span className="font-semibold text-slate-800">
+                          {item.lop || '—'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">SĐT</span>
+                        {item.phoneNumber ? (
+                          <a href={`tel:${item.phoneNumber}`} className="font-mono font-bold text-blue-600 hover:underline">
+                            {item.phoneNumber}
+                          </a>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Thời gian gửi</span>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {formatDateTime(item.createdAt)}
+                        </span>
+                      </div>
+                      {item.note && (
+                        <div className="col-span-2 bg-slate-50 p-2 rounded-xl border border-slate-100 text-[11px] text-slate-600 italic">
+                          Ghi chú: {item.note}
+                        </div>
+                      )}
+                    </div>
 
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {item.status === 'PENDING' && (
-                            <>
-                              <button
-                                onClick={() => handleApprove([item.id])}
-                                disabled={isProcessing}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                title="Phê duyệt kích hoạt tài khoản sinh viên này"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                <span>Duyệt</span>
-                              </button>
+                    {/* Action buttons */}
+                    <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-100">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResetModalUser({
+                              username: item.username,
+                              fullName: item.fullName || item.username,
+                              lop: item.lop || '',
+                            });
+                            setIsResetModalOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 text-slate-600 hover:text-emerald-700 bg-slate-100 hover:bg-emerald-50 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                          title={`Đặt lại mật khẩu cho ${item.username}`}
+                        >
+                          <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Reset MK</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRequest(item.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                          title="Xoá bản ghi"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
 
-                              <button
-                                onClick={() => {
-                                  setRejectingItem(item);
-                                  setRejectReason('');
-                                }}
-                                disabled={isProcessing}
-                                className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                title="Từ chối yêu cầu đăng ký"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                                <span>Từ chối</span>
-                              </button>
-                            </>
-                          )}
-
+                      {item.status === 'PENDING' && (
+                        <div className="flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => {
-                              setResetModalUser({
-                                username: item.username,
-                                fullName: item.fullName || item.username,
-                                lop: item.lop || '',
-                              });
-                              setIsResetModalOpen(true);
+                              setRejectingItem(item);
+                              setRejectReason('');
                             }}
-                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
-                            title={`Đặt lại mật khẩu cho ${item.username}`}
+                            disabled={isProcessing}
+                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
                           >
-                            <KeyRound className="w-4 h-4" />
+                            <X className="w-3.5 h-3.5" />
+                            <span>Từ chối</span>
                           </button>
-
                           <button
-                            onClick={() => handleDeleteRequest(item.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
-                            title="Xoá bản ghi này"
+                            type="button"
+                            onClick={() => handleApprove([item.id])}
+                            disabled={isProcessing}
+                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Duyệt</span>
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* DESKTOP VIEW: Table (>= md) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="py-3.5 px-4 w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.length === requests.length && requests.length > 0}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                      />
+                    </th>
+                    <th className="py-3.5 px-4">Sinh Viên / MSSV</th>
+                    <th className="py-3.5 px-4">Lớp Học</th>
+                    <th className="py-3.5 px-4">SĐT Liên Hệ</th>
+                    <th className="py-3.5 px-4">Thời Gian Gửi</th>
+                    <th className="py-3.5 px-4">Trạng Thái</th>
+                    <th className="py-3.5 px-4">Ghi Chú</th>
+                    <th className="py-3.5 px-4 text-right">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {requests.map((item) => {
+                    const isSelected = selectedIds.includes(item.id);
+                    return (
+                      <tr
+                        key={item.id}
+                        className={`hover:bg-slate-50/80 transition-colors ${
+                          isSelected ? 'bg-blue-50/40' : ''
+                        }`}
+                      >
+                        <td className="py-3.5 px-4">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSelect(item.id)}
+                            className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                          />
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-2xl bg-slate-100 flex items-center justify-center font-bold text-slate-700 text-xs shrink-0">
+                              {item.fullName ? item.fullName.charAt(0) : item.username.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-800 text-sm">
+                                {item.fullName || 'Chưa rõ họ tên'}
+                              </div>
+                              <div className="font-mono text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded inline-block mt-0.5">
+                                {item.username}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-4 font-bold text-slate-700">
+                          {item.lop ? (
+                            <span className="inline-flex items-center gap-1">
+                              <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
+                              {item.lop}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">—</span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4 font-mono font-medium text-slate-700">
+                          {item.phoneNumber ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Phone className="w-3.5 h-3.5 text-slate-400" />
+                              {item.phoneNumber}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">—</span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-slate-500 text-[11px]">
+                          {formatDateTime(item.createdAt)}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          {item.status === 'PENDING' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <Clock className="w-3.5 h-3.5" /> Chờ Duyệt
+                            </span>
+                          ) : item.status === 'APPROVED' ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Đã Duyệt
+                              </span>
+                              {item.reviewedBy && (
+                                <span className="text-[10px] text-slate-400">
+                                  bởi @{item.reviewedBy}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                <XCircle className="w-3.5 h-3.5" /> Đã Từ Chối
+                              </span>
+                              {item.reviewedBy && (
+                                <span className="text-[10px] text-slate-400">
+                                  bởi @{item.reviewedBy}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+
+                        <td
+                          className="py-3.5 px-4 text-slate-600 max-w-[200px] truncate"
+                          title={item.note || ''}
+                        >
+                          {item.note || <span className="text-slate-400 italic">—</span>}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {item.status === 'PENDING' && (
+                              <>
+                                <button
+                                  onClick={() => handleApprove([item.id])}
+                                  disabled={isProcessing}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Phê duyệt kích hoạt tài khoản sinh viên này"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Duyệt</span>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setRejectingItem(item);
+                                    setRejectReason('');
+                                  }}
+                                  disabled={isProcessing}
+                                  className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  title="Từ chối yêu cầu đăng ký"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Từ chối</span>
+                                </button>
+                              </>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setResetModalUser({
+                                  username: item.username,
+                                  fullName: item.fullName || item.username,
+                                  lop: item.lop || '',
+                                });
+                                setIsResetModalOpen(true);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
+                              title={`Đặt lại mật khẩu cho ${item.username}`}
+                            >
+                              <KeyRound className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteRequest(item.id)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                              title="Xoá bản ghi này"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

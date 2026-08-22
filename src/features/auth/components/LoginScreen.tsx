@@ -204,17 +204,17 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
   };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-slate-900/95 p-4 font-sans relative overflow-hidden pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]">
+    <div className="min-h-screen min-h-[100dvh] w-full flex flex-col items-center bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-3 py-4 sm:py-8 sm:px-6 font-sans relative overflow-y-auto overflow-x-hidden pt-[calc(env(safe-area-inset-top,0px)+1rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
       {/* Dynamic Background Blurs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none translate-x-1/2 translate-y-1/2" />
+      <div className="fixed top-1/4 left-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
+      <div className="fixed bottom-1/4 right-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none translate-x-1/2 translate-y-1/2" />
 
       {/* PWA Install Button on Login Screen */}
       {!isInstalled && (
         <button
           type="button"
           onClick={openInstallModal}
-          className="absolute top-[calc(env(safe-area-inset-top,0px)+1rem)] right-4 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-full text-xs font-semibold backdrop-blur-md transition-all cursor-pointer shadow-lg active:scale-95"
+          className="fixed sm:absolute top-[calc(env(safe-area-inset-top,0px)+0.75rem)] right-3 sm:right-4 z-30 flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 active:bg-white/30 text-white border border-white/20 rounded-full text-xs font-semibold backdrop-blur-md transition-all cursor-pointer shadow-lg active:scale-95"
           title="Cài đặt PTIT EduSync về thiết bị"
         >
           <Download className="w-3.5 h-3.5 text-sky-400" />
@@ -223,23 +223,23 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
         </button>
       )}
 
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200/80 relative z-10 animate-in zoom-in-95 duration-300">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200/80 relative z-10 animate-in zoom-in-95 duration-300 my-auto shrink-0">
         {/* Header with Switcher Tabs */}
-        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-950 p-6 text-center text-white relative overflow-hidden">
-          <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-md border border-white/10 text-sky-400 shadow-inner">
-            {mode === 'LOGIN' ? <LogIn className="w-7 h-7" /> : <UserPlus className="w-7 h-7" />}
+        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-950 px-4 py-5 sm:p-6 text-center text-white relative overflow-hidden">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-2.5 sm:mb-3 backdrop-blur-md border border-white/10 text-sky-400 shadow-inner">
+            {mode === 'LOGIN' ? <LogIn className="w-6 h-6 sm:w-7 sm:h-7" /> : <UserPlus className="w-6 h-6 sm:w-7 sm:h-7" />}
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+          <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight">
             PTIT Portal & Quản Lý Thi
           </h1>
-          <p className="text-slate-300 mt-1 text-xs">
+          <p className="text-slate-300 mt-0.5 sm:mt-1 text-xs">
             {mode === 'LOGIN'
               ? 'Đăng nhập vào hệ thống để tra cứu và quản lý'
               : 'Đăng ký kích hoạt tài khoản sinh viên'}
           </p>
 
           {/* Mode Switcher */}
-          <div className="grid grid-cols-2 gap-1 bg-white/10 p-1 rounded-2xl mt-4 border border-white/10 text-xs font-bold">
+          <div className="grid grid-cols-2 gap-1 bg-white/10 p-1 rounded-xl sm:rounded-2xl mt-3.5 sm:mt-4 border border-white/10 text-xs font-bold">
             <button
               type="button"
               onClick={() => {
@@ -248,7 +248,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                 setRegError('');
                 setRegSuccessMsg('');
               }}
-              className={`py-2 rounded-xl transition-all cursor-pointer ${
+              className={`py-2 sm:py-2.5 rounded-lg sm:rounded-xl transition-all cursor-pointer active:scale-[0.98] ${
                 mode === 'LOGIN'
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-slate-300 hover:text-white'
@@ -265,7 +265,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                 setRegSuccessMsg('');
                 if (username && !regUsername) setRegUsername(username);
               }}
-              className={`py-2 rounded-xl transition-all cursor-pointer ${
+              className={`py-2 sm:py-2.5 rounded-lg sm:rounded-xl transition-all cursor-pointer active:scale-[0.98] ${
                 mode === 'REGISTER'
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-slate-300 hover:text-white'
@@ -278,17 +278,17 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
 
         {/* ===================== TAB 1: LOGIN FORM ===================== */}
         {mode === 'LOGIN' && (
-          <div className="p-6 sm:p-8">
+          <div className="p-4 sm:p-7">
             {error && (
-              <div className="bg-rose-50 text-rose-700 p-3.5 rounded-2xl text-xs font-bold mb-5 flex items-center gap-2.5 border border-rose-200">
+              <div className="bg-rose-50 text-rose-700 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl text-xs font-bold mb-4 sm:mb-5 flex items-center gap-2.5 border border-rose-200">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                <span>{error}</span>
+                <span className="leading-snug">{error}</span>
               </div>
             )}
 
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form onSubmit={handleLoginSubmit} className="space-y-3.5 sm:space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                <label className="block text-xs font-bold text-slate-700 mb-1 sm:mb-1.5 uppercase tracking-wider">
                   Mã Sinh Viên / Tên Đăng Nhập
                 </label>
                 <div className="relative">
@@ -299,7 +299,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-2xl bg-slate-50 text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all uppercase"
+                    className="block w-full pl-10 pr-3 py-2.5 sm:py-2.5 border border-slate-300 rounded-xl sm:rounded-2xl bg-slate-50 text-sm sm:text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all uppercase"
                     placeholder="Ví dụ: K25DTCN402 hoặc admin"
                     disabled={isLoading}
                     autoCapitalize="characters"
@@ -308,7 +308,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                <label className="block text-xs font-bold text-slate-700 mb-1 sm:mb-1.5 uppercase tracking-wider">
                   Mật Khẩu
                 </label>
                 <div className="relative">
@@ -319,14 +319,15 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-2xl bg-slate-50 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                    className="block w-full pl-10 pr-10 py-2.5 sm:py-2.5 border border-slate-300 rounded-xl sm:rounded-2xl bg-slate-50 text-sm sm:text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                     placeholder="Nhập mật khẩu..."
                     disabled={isLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                    className="absolute inset-y-0 right-0 w-10 h-full flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -336,7 +337,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-2xl transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/30 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-500/25 mt-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3 px-4 rounded-xl sm:rounded-2xl transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/30 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-500/25 active:scale-[0.99] touch-manipulation mt-2"
               >
                 {isLoading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -348,7 +349,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                 )}
               </button>
 
-              <div className="pt-4 border-t border-slate-100 text-center">
+              <div className="pt-3.5 border-t border-slate-100 text-center">
                 <p className="text-xs text-slate-500">
                   Chưa kích hoạt mật khẩu?{' '}
                   <button
@@ -369,30 +370,33 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
 
         {/* ===================== TAB 2: REGISTER FORM ===================== */}
         {mode === 'REGISTER' && (
-          <div className="p-6 sm:p-8">
+          <div className="p-4 sm:p-7">
             {regSuccessMsg ? (
-              <div className="flex flex-col items-center justify-center py-4 text-center gap-4">
-                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center shadow-xs">
-                  <CheckCircle2 className="w-8 h-8" />
+              <div className="flex flex-col items-center justify-center py-3 text-center gap-3 sm:gap-4">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-emerald-100 text-emerald-600 rounded-2xl sm:rounded-3xl flex items-center justify-center shadow-xs">
+                  <CheckCircle2 className="w-7 h-7 sm:w-8 sm:h-8" />
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-slate-800">Gửi Yêu Cầu Thành Công!</h3>
-                  <p className="text-xs text-slate-600 mt-2 leading-relaxed max-w-sm">
+                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed max-w-sm">
                     {regSuccessMsg}
                   </p>
                 </div>
-                <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 text-left w-full space-y-1">
-                  <div>
-                    Mã SV: <b className="text-slate-900 font-mono">{regUsername}</b>
+                <div className="p-3 sm:p-3.5 bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200 text-xs text-slate-600 text-left w-full space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Mã SV:</span>
+                    <b className="text-slate-900 font-mono text-sm">{regUsername}</b>
                   </div>
                   {studentInfo?.hoTen && (
-                    <div>
-                      Họ tên: <b className="text-slate-900">{studentInfo.hoTen}</b>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Họ tên:</span>
+                      <b className="text-slate-900">{studentInfo.hoTen}</b>
                     </div>
                   )}
                   {studentInfo?.maLop && (
-                    <div>
-                      Lớp: <b className="text-indigo-700 font-bold">{studentInfo.maLop}</b>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Lớp:</span>
+                      <b className="text-indigo-700 font-bold">{studentInfo.maLop}</b>
                     </div>
                   )}
                 </div>
@@ -403,17 +407,17 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                     setUsername(regUsername);
                     setRegSuccessMsg('');
                   }}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-2xl transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl transition-all shadow-md shadow-blue-500/20 cursor-pointer active:scale-[0.99] touch-manipulation"
                 >
                   Quay Lại Màn Hình Đăng Nhập
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+              <form onSubmit={handleRegisterSubmit} className="space-y-3 sm:space-y-3.5">
                 {regError && (
-                  <div className="bg-rose-50 text-rose-700 p-3 rounded-2xl text-xs font-bold flex items-center gap-2 border border-rose-200">
+                  <div className="bg-rose-50 text-rose-700 p-3 rounded-xl sm:rounded-2xl text-xs font-bold flex items-center gap-2 border border-rose-200">
                     <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                    <span>{regError}</span>
+                    <span className="leading-snug">{regError}</span>
                   </div>
                 )}
 
@@ -430,7 +434,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                       type="text"
                       value={regUsername}
                       onChange={(e) => setRegUsername(e.target.value.toUpperCase())}
-                      className="block w-full pl-9 pr-9 py-2 border border-slate-300 rounded-xl bg-slate-50 text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white uppercase"
+                      className="block w-full pl-9 pr-9 py-2 sm:py-2.5 border border-slate-300 rounded-xl bg-slate-50 text-sm sm:text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white uppercase"
                       placeholder="Ví dụ: K25DTCN402"
                       required
                       disabled={isRegistering}
@@ -444,17 +448,17 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
 
                   {/* Student Auto-Lookup Info Card */}
                   {studentInfo && (
-                    <div className="mt-2 p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs flex items-center justify-between animate-in fade-in">
+                    <div className="mt-2 p-2.5 bg-emerald-50/90 border border-emerald-200 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 animate-in fade-in">
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <div>
-                          <div className="font-bold text-slate-800">{studentInfo.hoTen}</div>
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-800 truncate">{studentInfo.hoTen}</div>
                           <div className="text-[11px] text-slate-500">
                             Lớp: <b className="text-indigo-700">{studentInfo.maLop || 'Chưa rõ lớp'}</b>
                           </div>
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded-md">
+                      <span className="self-start sm:self-center text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md shrink-0">
                         Đã xác nhận SV
                       </span>
                     </div>
@@ -463,14 +467,14 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                   {studentLookupError && (
                     <div className="mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2 animate-in fade-in">
                       <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                      <span>{studentLookupError}</span>
+                      <span className="leading-snug">{studentLookupError}</span>
                     </div>
                   )}
                 </div>
 
                 {/* SĐT liên hệ */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Số Điện Thoại Liên Hệ (Tùy chọn)
                   </label>
                   <div className="relative">
@@ -481,7 +485,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                       type="tel"
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
-                      className="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl bg-slate-50 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                      className="block w-full pl-9 pr-3 py-2 sm:py-2.5 border border-slate-300 rounded-xl bg-slate-50 text-sm sm:text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
                       placeholder="0912345678"
                       disabled={isRegistering}
                     />
@@ -489,9 +493,9 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                 </div>
 
                 {/* Password fields */}
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
                       Mật Khẩu Mới <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
@@ -499,7 +503,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                         type={showRegPassword ? 'text' : 'password'}
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
-                        className="block w-full px-3 py-2 border border-slate-300 rounded-xl bg-slate-50 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                        className="block w-full pl-3 pr-9 py-2 sm:py-2.5 border border-slate-300 rounded-xl bg-slate-50 text-sm sm:text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
                         placeholder="Tối thiểu 6 ký tự"
                         required
                         disabled={isRegistering}
@@ -507,7 +511,8 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                       <button
                         type="button"
                         onClick={() => setShowRegPassword(!showRegPassword)}
-                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                        className="absolute inset-y-0 right-0 w-9 h-full flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                        aria-label={showRegPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                       >
                         {showRegPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
@@ -515,7 +520,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
                       Nhập Lại Mật Khẩu <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
@@ -523,15 +528,16 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                         type={showRegConfirm ? 'text' : 'password'}
                         value={regConfirmPassword}
                         onChange={(e) => setRegConfirmPassword(e.target.value)}
-                        className="block w-full px-3 py-2 border border-slate-300 rounded-xl bg-slate-50 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-                        placeholder="Nhập lại..."
+                        className="block w-full pl-3 pr-9 py-2 sm:py-2.5 border border-slate-300 rounded-xl bg-slate-50 text-sm sm:text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                        placeholder="Nhập lại mật khẩu..."
                         required
                         disabled={isRegistering}
                       />
                       <button
                         type="button"
                         onClick={() => setShowRegConfirm(!showRegConfirm)}
-                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                        className="absolute inset-y-0 right-0 w-9 h-full flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                        aria-label={showRegConfirm ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                       >
                         {showRegConfirm ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
@@ -540,22 +546,22 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Ghi Chú (Tùy chọn)
                   </label>
                   <input
                     type="text"
                     value={regNote}
                     onChange={(e) => setRegNote(e.target.value)}
-                    className="block w-full px-3 py-2 border border-slate-300 rounded-xl bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    className="block w-full px-3 py-2 sm:py-2.5 border border-slate-300 rounded-xl bg-slate-50 text-sm sm:text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
                     placeholder="Lý do đăng ký, liên hệ..."
                     disabled={isRegistering}
                   />
                 </div>
 
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
+                <div className="p-2.5 sm:p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
                   <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <span>
+                  <span className="leading-snug">
                     Sau khi đăng ký, yêu cầu sẽ được chuyển tới <strong>Quản trị viên</strong> để xét duyệt và kích hoạt mật khẩu của bạn.
                   </span>
                 </div>
@@ -563,7 +569,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
                 <button
                   type="submit"
                   disabled={isRegistering || Boolean(studentLookupError)}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-xl sm:rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.99] touch-manipulation"
                 >
                   {isRegistering ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -593,7 +599,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
         )}
 
         {/* Bottom Spacing & Admin Contact Information */}
-        <div className="pt-4 pb-4 px-6 bg-slate-50 border-t border-slate-200/80 text-center">
+        <div className="py-4 px-4 sm:px-6 bg-slate-50 border-t border-slate-200/80 text-center">
           <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
             <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
             <span>Hỗ Trợ & Liên Hệ Quản Trị Viên (Admin)</span>
@@ -601,30 +607,30 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
           <p className="text-[11px] text-slate-500 max-w-xs mx-auto mb-2.5 leading-tight">
             Khi cần cấp lại mật khẩu, mở khóa tài khoản hoặc khiếu nại thông tin:
           </p>
-          <div className="flex items-center justify-center gap-2 text-xs font-mono font-bold flex-wrap">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-mono font-bold">
             <a
               href="https://t.me/lethanh9398"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1.5 text-sky-600 hover:text-sky-700 bg-white sm:bg-sky-50 hover:bg-sky-100 border border-sky-200 py-2 px-2.5 rounded-xl transition-colors cursor-pointer shadow-2xs active:scale-95"
             >
-              <Send className="w-3 h-3" />
+              <Send className="w-3.5 h-3.5 shrink-0" />
               <span>@lethanh9398</span>
             </a>
             <a
               href="tel:0966211618"
-              className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1.5 text-emerald-700 hover:text-emerald-800 bg-white sm:bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 py-2 px-2.5 rounded-xl transition-colors cursor-pointer shadow-2xs active:scale-95"
             >
-              <Phone className="w-3 h-3" />
+              <Phone className="w-3.5 h-3.5 shrink-0" />
               <span>0966.211.618</span>
             </a>
             <a
               href="https://www.facebook.com/lethanh9398"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1.5 text-blue-700 hover:text-blue-800 bg-white sm:bg-blue-50 hover:bg-blue-100 border border-blue-200 py-2 px-2.5 rounded-xl transition-colors cursor-pointer shadow-2xs active:scale-95"
             >
-              <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 fill-current shrink-0" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
               </svg>
               <span>FB: lethanh9398</span>
