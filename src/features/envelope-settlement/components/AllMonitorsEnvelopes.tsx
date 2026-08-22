@@ -817,9 +817,9 @@ export default function AllMonitorsEnvelopes({
                             Đã nhận
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-2 py-1 rounded-lg">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-1 rounded-lg">
                             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                            Gợi ý
+                            Chưa nhận
                           </span>
                         )}
                       </div>
@@ -906,13 +906,14 @@ export default function AllMonitorsEnvelopes({
                                 type="button"
                                 onClick={() => handleOpenAssignModal(session, cls)}
                                 disabled={loadingClaimId === session.id}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0 ${
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0 inline-flex items-center gap-1.5 ${
                                   isMyClass
-                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
-                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200'
+                                    : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300'
                                 }`}
                               >
-                                {loadingClaimId === session.id ? 'Đang lưu...' : isMyClass ? 'Nhận đi phong bì' : 'Nhận đi phong bì'}
+                                <Hand className="w-3.5 h-3.5" />
+                                <span>{loadingClaimId === session.id ? 'Đang lưu...' : 'Nhận đi phong bì'}</span>
                               </button>
                             </div>
 
@@ -1212,7 +1213,7 @@ export default function AllMonitorsEnvelopes({
                                       <div className="flex items-center gap-1.5 flex-wrap">
                                         <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
                                           <Sparkles className="w-3 h-3 text-amber-600" />
-                                          Gợi ý
+                                          Chưa nhận
                                         </span>
                                         <span className="font-bold text-slate-800 text-sm truncate">Lớp {cls}</span>
                                         <span className="text-xs text-slate-500 font-semibold shrink-0">
@@ -1233,18 +1234,19 @@ export default function AllMonitorsEnvelopes({
                                       type="button"
                                       onClick={() => handleOpenAssignModal(session, cls)}
                                       disabled={loadingClaimId === session.id}
-                                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0 ${
+                                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0 inline-flex items-center gap-1.5 ${
                                         isMyClass
-                                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
-                                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                          ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200'
+                                          : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300'
                                       }`}
                                       title="Xác nhận nhận phòng thi này hoặc gán sinh viên hỗ trợ"
                                     >
-                                      {loadingClaimId === session.id
-                                        ? 'Đang lưu...'
-                                        : isMyClass
-                                        ? 'Nhận đi phong bì'
-                                        : 'Nhận đi phong bì'}
+                                      <Hand className="w-3.5 h-3.5" />
+                                      <span>
+                                        {loadingClaimId === session.id
+                                          ? 'Đang lưu...'
+                                          : 'Nhận đi phong bì'}
+                                      </span>
                                     </button>
                                   </div>
 
