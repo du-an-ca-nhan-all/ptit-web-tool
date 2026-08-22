@@ -30,7 +30,9 @@ export default function Home() {
       <LoginScreen
         users={state.loginUsers}
         records={state.records}
+        initialError={state.authError}
         onLogin={(user) => {
+          state.setAuthError?.(null);
           state.setCurrentUser(user);
           localStorage.setItem('currentUser', JSON.stringify(user));
           if (user.lop) state.setMonitorClass(user.lop);

@@ -2,6 +2,13 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { LoginUser } from '../types/auth.types';
+import {
+  AUTH_EXPIRED_EVENT,
+  getStoredToken,
+  clearStoredAuth,
+  handleAuthExpired,
+  initAuthInterceptor,
+} from '../../../lib/authClient';
 
 export function useAuth() {
   const [currentUser, setCurrentUser] = useState<LoginUser | null>(() => {
@@ -13,6 +20,70 @@ export function useAuth() {
       return null;
     }
   });
+
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isVerifyingAuth, setIsVerifyingAuth] = useState(true);
+
+  // Initialize global fetch interceptor on client
+  useEffect(() => {
+    initAuthInterceptor();
+  }, []);
+
+  // Listen for auth expiration events
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleExpired = (e: Event) => {
+      const customEvent = e as CustomEvent<{ message?: string }>;
+      setCurrentUser(null);
+      setAuthError(
+        customEvent.detail?.message ||
+          'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.'
+      );
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleExpired);
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpired);
+    };
+  }, []);
+
+  // Validate token on initial mount
+  useEffect(() => {
+    const token = getStoredToken();
+    if (!token) {
+      if (currentUser) {
+        clearStoredAuth();
+        setCurrentUser(null);
+      }
+      setIsVerifyingAuth(false);
+      return;
+    }
+
+    fetch('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (res.status === 401 || !res.ok) {
+          handleAuthExpired('Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.');
+          return;
+        }
+        const data = await res.json();
+        if (data?.user) {
+          setCurrentUser(data.user);
+          localStorage.setItem('currentUser', JSON.stringify(data.user));
+          setAuthError(null);
+        } else {
+          handleAuthExpired('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+        }
+      })
+      .catch((err) => {
+        console.warn('Network issue during auth check:', err);
+      })
+      .finally(() => {
+        setIsVerifyingAuth(false);
+      });
+  }, []);
 
   const userRoles = useMemo(() => {
     if (!currentUser) return [];
@@ -60,7 +131,7 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = getStoredToken();
       if (token) {
         await fetch('/api/auth/logout', {
           method: 'POST',
@@ -68,11 +139,9 @@ export function useAuth() {
         });
       }
     } catch {}
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('currentUser');
-    }
+    clearStoredAuth();
     setCurrentUser(null);
+    setAuthError(null);
   }, []);
 
   return {
@@ -87,5 +156,9 @@ export function useAuth() {
     canAccessMonitorTools,
     canImpersonate,
     logout,
+    authError,
+    setAuthError,
+    isVerifyingAuth,
   };
 }
+

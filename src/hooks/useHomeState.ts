@@ -34,6 +34,10 @@ export function useHomeState() {
     canAccessMonitorTools,
     canImpersonate,
     effectiveUser,
+    authError,
+    setAuthError,
+    isVerifyingAuth,
+    logout,
   } = useAuth();
 
   const {
@@ -527,6 +531,9 @@ const TABS_REQUIRING_EXAM_RECORDS: NavigationTab[] = [
     isMonitor,
     canAccessMonitorTools,
     canImpersonate,
+    authError,
+    setAuthError,
+    isVerifyingAuth,
     isRoleDropdownOpen,
     setIsRoleDropdownOpen,
     handleSelectRole,

@@ -23,10 +23,16 @@ import { usePWAContext } from '../../../components/pwa/PWAProvider';
 interface LoginScreenProps {
   users?: LoginUser[];
   records?: ExamRecord[];
+  initialError?: string | null;
   onLogin: (user: LoginUser) => void;
 }
 
-export default function LoginScreen({ users = [], records = [], onLogin }: LoginScreenProps) {
+export default function LoginScreen({
+  users = [],
+  records = [],
+  initialError,
+  onLogin,
+}: LoginScreenProps) {
   const { isInstalled, openInstallModal } = usePWAContext();
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
 
@@ -34,8 +40,14 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(initialError || '');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialError) {
+      setError(initialError);
+    }
+  }, [initialError]);
 
   // Register form state
   const [regUsername, setRegUsername] = useState('');
