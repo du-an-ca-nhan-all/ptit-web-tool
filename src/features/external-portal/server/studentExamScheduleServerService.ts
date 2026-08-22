@@ -1,5 +1,10 @@
 import { prisma } from '@/src/lib/prisma';
 import { getValidTokenOrRefresh, loginAndGetToken } from './qldttxServerService';
+import {
+  dispatchQldtExamScheduleChanges,
+  QldtExamChangeItem,
+} from '@/src/features/telegram/server/telegramDispatcher';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 export interface StudentQldtExamItem {
   id: string;
@@ -372,6 +377,128 @@ export function buildQldtExamResultFromRawData(
 }
 
 /**
+ * So sánh và phát hiện biến động lịch thi giữa dữ liệu cũ và dữ liệu mới
+ */
+export function detectExamScheduleChanges(
+  oldRawExams: any[],
+  newRawExams: any[]
+): QldtExamChangeItem[] {
+  const changes: QldtExamChangeItem[] = [];
+  if (!Array.isArray(oldRawExams) || !Array.isArray(newRawExams)) return changes;
+
+  const oldMap = new Map<string, any>();
+  oldRawExams.forEach((item) => {
+    const code = (item.ma_mon || item.maMon || item.MaMH || '').toUpperCase().trim();
+    if (code) oldMap.set(code, item);
+  });
+
+  const newMap = new Map<string, any>();
+  newRawExams.forEach((item) => {
+    const code = (item.ma_mon || item.maMon || item.MaMH || '').toUpperCase().trim();
+    if (code) newMap.set(code, item);
+  });
+
+  // 1. Kiểm tra môn thi mới hoặc bị thay đổi trong newRawExams
+  newRawExams.forEach((newEx) => {
+    const code = (newEx.ma_mon || newEx.maMon || newEx.MaMH || '').toUpperCase().trim();
+    if (!code) return;
+
+    const tenMon = newEx.ten_mon || newEx.tenMon || newEx.TenMH || 'Môn thi';
+    const oldEx = oldMap.get(code);
+
+    if (!oldEx) {
+      // Môn thi mới được xếp lịch
+      changes.push({
+        maMon: code,
+        tenMon,
+        type: 'NEW',
+        diffs: [
+          { field: 'ngayThi', label: 'Ngày thi', oldVal: '', newVal: newEx.ngay_thi || newEx.ngayThi || '' },
+          { field: 'gioBatDau', label: 'Giờ thi', oldVal: '', newVal: newEx.gio_bat_dau || newEx.gioBatDau || newEx.GioThi || '' },
+          { field: 'maPhong', label: 'Phòng thi', oldVal: '', newVal: newEx.ma_phong || newEx.maPhong || newEx.MAPTHI || '' },
+          { field: 'hinhThucThi', label: 'Hình thức', oldVal: '', newVal: newEx.hinh_thuc_thi || newEx.hinhThucThi || newEx.MaHTThi || '' },
+          { field: 'diaDiemThi', label: 'Địa điểm', oldVal: '', newVal: (newEx.dia_diem_thi || '').replace(/<br\s*\/?>/gi, ' - ').trim() },
+        ].filter((d) => Boolean(d.newVal)),
+      });
+    } else {
+      // So sánh các trường thông tin quan trọng
+      const diffs: Array<{ field: string; label: string; oldVal: string; newVal: string }> = [];
+
+      const oldDate = (oldEx.ngay_thi || oldEx.ngayThi || oldEx.NgayThi || '').trim();
+      const newDate = (newEx.ngay_thi || newEx.ngayThi || newEx.NgayThi || '').trim();
+      if (oldDate && newDate && oldDate !== newDate) {
+        diffs.push({ field: 'ngayThi', label: 'Ngày thi', oldVal: oldDate, newVal: newDate });
+      }
+
+      const oldTime = (oldEx.gio_bat_dau || oldEx.gioBatDau || oldEx.GioThi || '').trim();
+      const newTime = (newEx.gio_bat_dau || newEx.gioBatDau || newEx.GioThi || '').trim();
+      if (oldTime && newTime && oldTime !== newTime) {
+        diffs.push({ field: 'gioBatDau', label: 'Giờ thi', oldVal: oldTime, newVal: newTime });
+      }
+
+      const oldRoom = (oldEx.ma_phong || oldEx.maPhong || oldEx.MAPTHI || '').trim();
+      const newRoom = (newEx.ma_phong || newEx.maPhong || newEx.MAPTHI || '').trim();
+      if (oldRoom !== newRoom && (oldRoom || newRoom)) {
+        diffs.push({ field: 'maPhong', label: 'Phòng thi', oldVal: oldRoom, newVal: newRoom });
+      }
+
+      const oldAddress = (oldEx.dia_diem_thi || '').replace(/<br\s*\/?>/gi, ' - ').trim();
+      const newAddress = (newEx.dia_diem_thi || '').replace(/<br\s*\/?>/gi, ' - ').trim();
+      if (oldAddress !== newAddress && (oldAddress || newAddress)) {
+        diffs.push({ field: 'diaDiemThi', label: 'Địa điểm thi', oldVal: oldAddress, newVal: newAddress });
+      }
+
+      const oldFormat = (oldEx.hinh_thuc_thi || oldEx.hinhThucThi || oldEx.MaHTThi || '').trim();
+      const newFormat = (newEx.hinh_thuc_thi || newEx.hinhThucThi || newEx.MaHTThi || '').trim();
+      if (oldFormat !== newFormat && (oldFormat || newFormat)) {
+        diffs.push({ field: 'hinhThucThi', label: 'Hình thức thi', oldVal: oldFormat, newVal: newFormat });
+      }
+
+      const oldGroup = (oldEx.to_thi || oldEx.toThi || oldEx.nhom_thi || oldEx.nhomThi || '').trim();
+      const newGroup = (newEx.to_thi || newEx.toThi || newEx.nhom_thi || newEx.nhomThi || '').trim();
+      if (oldGroup !== newGroup && (oldGroup || newGroup)) {
+        diffs.push({ field: 'toThi', label: 'Tổ / Nhóm thi', oldVal: oldGroup, newVal: newGroup });
+      }
+
+      const oldBan = (oldEx.cam_thi || oldEx.camThi || '').trim();
+      const newBan = (newEx.cam_thi || newEx.camThi || '').trim();
+      if (oldBan !== newBan) {
+        diffs.push({ field: 'camThi', label: 'Trạng thái cấm thi', oldVal: oldBan || 'Được thi', newVal: newBan || 'Được thi' });
+      }
+
+      if (diffs.length > 0) {
+        changes.push({
+          maMon: code,
+          tenMon,
+          type: 'MODIFIED',
+          diffs,
+        });
+      }
+    }
+  });
+
+  // 2. Kiểm tra môn thi bị huỷ (có trong cũ nhưng biến mất trong mới)
+  oldRawExams.forEach((oldEx) => {
+    const code = (oldEx.ma_mon || oldEx.maMon || oldEx.MaMH || '').toUpperCase().trim();
+    if (!code) return;
+
+    if (!newMap.has(code)) {
+      const tenMon = oldEx.ten_mon || oldEx.tenMon || oldEx.TenMH || 'Môn thi';
+      changes.push({
+        maMon: code,
+        tenMon,
+        type: 'CANCELLED',
+        diffs: [
+          { field: 'status', label: 'Trạng thái', oldVal: `Lịch ngày ${oldEx.ngay_thi || ''} (${oldEx.gio_bat_dau || ''})`, newVal: 'Đã rút khỏi lịch thi' },
+        ],
+      });
+    }
+  });
+
+  return changes;
+}
+
+/**
  * Lấy lịch thi cá nhân từ Cổng QLDTTX (kết hợp cache DB StudentQldtExamRecord)
  */
 export async function getStudentQldtExamSchedule(
@@ -509,6 +636,43 @@ export async function getStudentQldtExamSchedule(
         noticeNoTuitionFee: examRes.noticeNoTuitionFee,
       }
     );
+
+    // 3.3 Phát hiện biến động lịch thi so với cache cũ và gửi thông báo Telegram
+    if (cachedRecord?.rawData) {
+      try {
+        const oldParsed = JSON.parse(cachedRecord.rawData);
+        const oldExamsList = oldParsed?.exams || oldParsed?.data?.ds_lich_thi || [];
+        if (Array.isArray(oldExamsList) && oldExamsList.length > 0 && Array.isArray(examRes.exams) && examRes.exams.length > 0) {
+          const detectedDiffs = detectExamScheduleChanges(oldExamsList, examRes.exams);
+          if (detectedDiffs.length > 0) {
+            console.log(`🔔 [QLDT Exam Schedule] Phát hiện ${detectedDiffs.length} thay đổi lịch thi cho sinh viên ${cleanUsername}!`);
+            
+            // Gửi Telegram bất đồng bộ (không chặn luồng lưu dữ liệu)
+            dispatchQldtExamScheduleChanges({
+              username: cleanUsername,
+              semesterName: resultObj.semesterName,
+              changes: detectedDiffs,
+            }).catch((dispatchErr) => {
+              console.error(`[QLDT Exam Schedule] Gửi thông báo biến động lịch thi cho ${cleanUsername} thất bại:`, dispatchErr);
+            });
+
+            // Ghi nhật ký hoạt động hệ thống
+            logActivity({
+              userId: null,
+              username: cleanUsername,
+              userRole: 'SYSTEM',
+              action: 'QLDT_EXAM_SCHEDULE_CHANGED',
+              targetType: 'EXAM_SCHEDULE',
+              targetId: cleanUsername,
+              description: `Phát hiện ${detectedDiffs.length} biến động trong lịch thi cá nhân từ Cổng QLDTTX`,
+              metadata: { cleanUsername, changesCount: detectedDiffs.length, changes: detectedDiffs },
+            }).catch(() => {});
+          }
+        }
+      } catch (diffErr) {
+        console.warn(`[getStudentQldtExamSchedule] Lỗi khi so sánh biến động lịch thi cho ${cleanUsername}:`, diffErr);
+      }
+    }
 
     // 4. Lưu / Persist vào bảng StudentQldtExamRecord
     try {

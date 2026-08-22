@@ -68,6 +68,7 @@ export interface GlobalNightlySyncConfigValue {
   timetableJob?: SingleJobScheduleConfig; // Job 1: Đồng bộ Lịch học & TKB (QLHT)
   gradesJob?: SingleJobScheduleConfig; // Job 2: Đồng bộ Điểm & GPA (QLHT)
   lmsJob?: SingleJobScheduleConfig; // Job 3: Đồng bộ Khóa học & Tiến độ (LMS)
+  examsJob?: SingleJobScheduleConfig; // Job 4: Đồng bộ Lịch thi cá nhân (QLHT - Mặc định 07:00)
 
   // Trường mở rộng cho các Job tiếp theo trong tương lai:
   customJobs?: Record<string, SingleJobScheduleConfig>;
@@ -77,6 +78,7 @@ export interface GlobalNightlySyncConfigValue {
   syncTimetable?: boolean;
   syncGrades?: boolean;
   syncLms?: boolean;
+  syncExams?: boolean;
   lastSyncDate?: string | null;
 }
 

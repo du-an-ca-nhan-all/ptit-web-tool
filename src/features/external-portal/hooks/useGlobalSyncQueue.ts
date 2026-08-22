@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { GlobalNightlySyncConfigValue } from '@/src/lib/globalConfig';
+import { GlobalJobType } from '../types/globalSyncQueue.types';
 
 export interface GlobalSyncBatchItem {
   id: string;
@@ -131,7 +132,7 @@ export function useGlobalSyncQueue() {
 
   // Đưa tác vụ vào queue
   const enqueueJob = async (options: {
-    jobType: 'SYNC_TIMETABLE' | 'SYNC_GRADES' | 'SYNC_LMS' | 'SYNC_ALL';
+    jobType: GlobalJobType;
     title?: string;
     targetUsernames?: string[];
   }) => {

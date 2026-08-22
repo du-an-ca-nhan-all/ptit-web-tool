@@ -1,7 +1,5 @@
 export * from './types/externalPortal.types';
-export * from './server/qldttxServerService';
-export * from './server/courseRegistrationServerService';
-export * from './server/lmsServerService';
+export * from './types/globalSyncQueue.types';
 export { default as StudentGradesView } from './components/StudentGradesView';
 export { default as StudentTimetableCalendar } from './components/StudentTimetableCalendar';
 export { default as CourseCompare } from './components/CourseCompare';
@@ -10,6 +8,6 @@ export { default as CourseRegistrationPortal } from './components/CourseRegistra
 export { default as AdminExternalAccounts } from './components/AdminExternalAccounts';
 export { default as GlobalSyncQueueManager } from './components/GlobalSyncQueueManager';
 export { default as LmsCoursesView } from './components/LmsCoursesView';
-export * from './server/globalSyncQueueServerService';
 export * from './hooks/useGlobalSyncQueue';
 export * from './hooks/useCourseRegistration';
+

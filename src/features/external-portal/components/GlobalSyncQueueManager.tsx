@@ -32,7 +32,7 @@ import {
   GlobalSyncBatchItem,
   GlobalSyncJobItem,
 } from '../hooks/useGlobalSyncQueue';
-import { GLOBAL_JOB_DEFINITIONS } from '../server/globalSyncQueueServerService';
+import { GLOBAL_JOB_DEFINITIONS } from '../types/globalSyncQueue.types';
 
 interface GlobalSyncQueueManagerProps {
   currentUser: LoginUser;
@@ -81,6 +81,10 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
       isEnabled: config?.lmsJob?.isEnabled !== false,
       scheduleTime: config?.lmsJob?.scheduleTime || '22:00',
     },
+    examsJob: {
+      isEnabled: config?.examsJob?.isEnabled !== false,
+      scheduleTime: config?.examsJob?.scheduleTime || '07:00',
+    },
   });
 
   const openConfigModal = () => {
@@ -97,6 +101,10 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
       lmsJob: {
         isEnabled: config?.lmsJob?.isEnabled !== false,
         scheduleTime: config?.lmsJob?.scheduleTime || '22:00',
+      },
+      examsJob: {
+        isEnabled: config?.examsJob?.isEnabled !== false,
+        scheduleTime: config?.examsJob?.scheduleTime || '07:00',
       },
     });
     setIsConfigOpen(true);
@@ -214,8 +222,9 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
             <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-3xl">
               Hệ thống tự động chạy ngầm theo giờ hẹn riêng cho từng Job để đồng bộ dữ liệu sinh viên: 
               <strong className="text-indigo-600 font-semibold"> 1. Lịch học & TKB ({config?.timetableJob?.scheduleTime || '22:00'})</strong>, 
-              <strong className="text-emerald-600 font-semibold"> 2. Bảng điểm & GPA ({config?.gradesJob?.scheduleTime || '22:00'})</strong>, và 
-              <strong className="text-purple-600 font-semibold"> 3. Khóa học LMS ({config?.lmsJob?.scheduleTime || '22:00'})</strong>.
+              <strong className="text-emerald-600 font-semibold"> 2. Bảng điểm & GPA ({config?.gradesJob?.scheduleTime || '22:00'})</strong>, 
+              <strong className="text-purple-600 font-semibold"> 3. Khóa học LMS ({config?.lmsJob?.scheduleTime || '22:00'})</strong>, và 
+              <strong className="text-amber-600 font-semibold"> 4. Lịch thi & Ca thi hôm nay ({config?.examsJob?.scheduleTime || '07:00'})</strong>.
             </p>
           </div>
 
@@ -246,8 +255,8 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
           </div>
         </div>
 
-        {/* 3 QUICK ACTION TRIGGER CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100">
+        {/* 5 QUICK ACTION TRIGGER CARDS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-6 pt-6 border-t border-slate-100">
           {/* JOB 1: LỊCH HỌC */}
           <div className="p-4 bg-gradient-to-br from-indigo-50 to-blue-50/50 border border-indigo-100 rounded-2xl flex flex-col justify-between hover:shadow-md transition-all">
             <div>
@@ -267,7 +276,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               </div>
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-indigo-600" />
-                Job 1: Đồng Bộ Lịch Học
+                Job 1: Lịch Học & TKB
               </h4>
               <p className="text-xs text-slate-500 mt-1 line-clamp-2">
                 Kéo TKB học kỳ cho các sinh viên <strong>đã liên kết Cổng QLDTTX (QLHT)</strong>.
@@ -278,7 +287,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               disabled={isSubmitting}
               className="mt-4 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
             >
-              <Zap className="w-3.5 h-3.5" /> Đồng Bộ Lịch Học Ngay
+              <Zap className="w-3.5 h-3.5" /> Đồng Bộ Lịch Học
             </button>
           </div>
 
@@ -301,7 +310,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               </div>
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                 <GraduationCap className="w-4 h-4 text-emerald-600" />
-                Job 2: Đồng Bộ Điểm
+                Job 2: Bảng Điểm & GPA
               </h4>
               <p className="text-xs text-slate-500 mt-1 line-clamp-2">
                 Kéo bảng điểm & GPA cho các sinh viên <strong>đã liên kết Cổng QLDTTX (QLHT)</strong>.
@@ -312,7 +321,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               disabled={isSubmitting}
               className="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
             >
-              <Zap className="w-3.5 h-3.5" /> Đồng Bộ Bảng Điểm Ngay
+              <Zap className="w-3.5 h-3.5" /> Đồng Bộ Điểm Số
             </button>
           </div>
 
@@ -335,7 +344,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               </div>
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                 <BookOpen className="w-4 h-4 text-purple-600" />
-                Job 3: Đồng Bộ LMS
+                Job 3: Khóa Học LMS
               </h4>
               <p className="text-xs text-slate-500 mt-1 line-clamp-2">
                 Kéo tiến độ % môn học cho các sinh viên <strong>đã liên kết LMS PTTC1</strong>.
@@ -346,11 +355,45 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               disabled={isSubmitting}
               className="mt-4 w-full py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
             >
-              <Zap className="w-3.5 h-3.5" /> Đồng Bộ LMS Ngay
+              <Zap className="w-3.5 h-3.5" /> Đồng Bộ LMS
             </button>
           </div>
 
-          {/* ALL 3 JOBS */}
+          {/* JOB 4: LỊCH THI CÁ NHÂN */}
+          <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200 rounded-2xl flex flex-col justify-between hover:shadow-md transition-all">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                  4
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md">
+                    QLHT
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-amber-200 text-amber-900 rounded-md flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5" />
+                    {config?.examsJob?.scheduleTime || '07:00'}
+                  </span>
+                </div>
+              </div>
+              <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-amber-600" />
+                Job 4: Lịch Thi QLDTTX
+              </h4>
+              <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                Đồng bộ lịch thi, phòng thi & báo biến động. Quét 20-30p nếu có ca thi hôm nay.
+              </p>
+            </div>
+            <button
+              onClick={() => enqueueJob({ jobType: 'SYNC_EXAMS' })}
+              disabled={isSubmitting}
+              className="mt-4 w-full py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+            >
+              <Zap className="w-3.5 h-3.5" /> Đồng Bộ Lịch Thi
+            </button>
+          </div>
+
+          {/* ALL 4 JOBS */}
           <div className="p-4 bg-gradient-to-br from-slate-900 to-indigo-950 text-white border border-slate-800 rounded-2xl flex flex-col justify-between hover:shadow-md transition-all">
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -358,7 +401,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                   ★
                 </span>
                 <span className="text-[11px] font-bold px-2 py-0.5 bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 rounded-md">
-                  Tất Cả 3 Job
+                  Tất Cả 4 Job
                 </span>
               </div>
               <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
@@ -366,7 +409,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                 Đồng Bộ Toàn Diện
               </h4>
               <p className="text-xs text-slate-300 mt-1 line-clamp-2">
-                Tự động đồng bộ Lịch học & Điểm (QLHT) và Khóa học (LMS) cho SV tương ứng.
+                Tự động đồng bộ Lịch học, Điểm, Khóa học LMS và Lịch thi cho SV tương ứng.
               </p>
             </div>
             <button
@@ -374,7 +417,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               disabled={isSubmitting}
               className="mt-4 w-full py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
             >
-              <Sparkles className="w-3.5 h-3.5" /> Kích Hoạt Cả 3 Job
+              <Sparkles className="w-3.5 h-3.5" /> Kích Hoạt Cả 4 Job
             </button>
           </div>
         </div>
@@ -900,6 +943,54 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                         className="w-32 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-center"
                       />
                       <span className="text-[11px] text-slate-400">(Giờ Việt Nam HH:mm)</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. JOB LỊCH THI CÁ NHÂN */}
+                <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 hover:border-amber-300 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">Job 4: Đồng Bộ Lịch Thi Cá Nhân & Biến Động (QLDTTX)</div>
+                        <div className="text-[10px] text-slate-500">Quét định kỳ 7h sáng & quét 20-30p nếu có ca thi hôm nay</div>
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={configForm.examsJob.isEnabled}
+                        onChange={(e) =>
+                          setConfigForm({
+                            ...configForm,
+                            examsJob: { ...configForm.examsJob, isEnabled: e.target.checked },
+                          })
+                        }
+                        className="w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                      />
+                      <span>Bật</span>
+                    </label>
+                  </div>
+
+                  {configForm.examsJob.isEnabled && (
+                    <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+                      <label className="text-xs font-medium text-slate-600 shrink-0">Giờ chạy hàng ngày:</label>
+                      <input
+                        type="text"
+                        placeholder="07:00"
+                        value={configForm.examsJob.scheduleTime}
+                        onChange={(e) =>
+                          setConfigForm({
+                            ...configForm,
+                            examsJob: { ...configForm.examsJob, scheduleTime: e.target.value },
+                          })
+                        }
+                        className="w-32 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-center"
+                      />
+                      <span className="text-[11px] text-slate-400">(Giờ Việt Nam HH:mm - Mặc định: 07:00)</span>
                     </div>
                   )}
                 </div>

@@ -2,6 +2,7 @@ import { prisma } from '@/src/lib/prisma';
 import { getStudentTimetableCalendar } from './studentTimetableServerService';
 import { getStudentGrades } from './studentGradesServerService';
 import { getOrFetchStudentLmsOverview } from './lmsServerService';
+import { getStudentQldtExamSchedule } from './studentExamScheduleServerService';
 import {
   getGlobalConfig,
   setGlobalConfig,
@@ -10,52 +11,14 @@ import {
 } from '@/src/lib/globalConfig';
 import { sendTelegramMessage, getSystemTelegramBotConfig } from '@/src/features/telegram/server/telegramServerService';
 
-export type GlobalJobType = 'SYNC_TIMETABLE' | 'SYNC_GRADES' | 'SYNC_LMS' | 'SYNC_ALL';
+import {
+  GlobalJobType,
+  EnqueueGlobalSyncOptions,
+  GLOBAL_JOB_DEFINITIONS,
+} from '../types/globalSyncQueue.types';
 
-export interface EnqueueGlobalSyncOptions {
-  jobType: GlobalJobType;
-  title?: string;
-  triggeredBy?: string; // 'SYSTEM_CRON' | 'ADMIN_MANUAL' | username
-  targetUsernames?: string[];
-  scheduledTime?: string;
-}
-
-/**
- * Định nghĩa nhãn & tiêu đề cho từng loại Job Global
- */
-export const GLOBAL_JOB_DEFINITIONS: Record<
-  string,
-  { key: string; name: string; shortName: string; description: string; icon: string }
-> = {
-  SYNC_TIMETABLE: {
-    key: 'SYNC_TIMETABLE',
-    name: 'Đồng Bộ Lịch Học & Thời Khóa Biểu',
-    shortName: 'Đồng bộ Lịch học',
-    description: 'Kéo thời khóa biểu & lịch học cá nhân từ Cổng QLDTTX cho toàn bộ sinh viên',
-    icon: 'Calendar',
-  },
-  SYNC_GRADES: {
-    key: 'SYNC_GRADES',
-    name: 'Đồng Bộ Điểm & Kết Quả Học Tập',
-    shortName: 'Đồng bộ Điểm số',
-    description: 'Kéo bảng điểm, điểm thành phần & GPA từ Cổng QLDTTX cho toàn bộ sinh viên',
-    icon: 'GraduationCap',
-  },
-  SYNC_LMS: {
-    key: 'SYNC_LMS',
-    name: 'Đồng Bộ Kết Quả Học Tập LMS PTTC1',
-    shortName: 'Đồng bộ LMS',
-    description: 'Kéo danh sách khóa học, tiến độ % và điểm quá trình từ Cổng LMS PTTC1',
-    icon: 'BookOpen',
-  },
-  SYNC_ALL: {
-    key: 'SYNC_ALL',
-    name: 'Đồng Bộ Toàn Diện (Lịch học + Điểm + LMS)',
-    shortName: 'Đồng bộ Tất cả',
-    description: 'Đồng bộ đồng thời cả 3 tác vụ: Lịch học, Điểm số và Khóa học LMS',
-    icon: 'Layers',
-  },
-};
+export type { GlobalJobType, EnqueueGlobalSyncOptions };
+export { GLOBAL_JOB_DEFINITIONS };
 
 /**
  * Đưa tác vụ Global Sync vào hàng đợi (Queue) xử lý ngầm
@@ -64,7 +27,7 @@ export async function enqueueGlobalSyncJob(options: EnqueueGlobalSyncOptions) {
   const triggeredBy = options.triggeredBy || 'ADMIN_MANUAL';
   const scheduledTime = options.scheduledTime || '22:00';
 
-  // Nếu chọn SYNC_ALL -> Tách thành 3 batches riêng biệt
+  // Nếu chọn SYNC_ALL -> Tách thành 4 batches riêng biệt
   if (options.jobType === 'SYNC_ALL') {
     const resTimetable = await enqueueSingleGlobalJobType({
       ...options,
@@ -81,15 +44,21 @@ export async function enqueueGlobalSyncJob(options: EnqueueGlobalSyncOptions) {
       jobType: 'SYNC_LMS',
       title: options.title ? `${options.title} - LMS` : undefined,
     });
+    const resExams = await enqueueSingleGlobalJobType({
+      ...options,
+      jobType: 'SYNC_EXAMS',
+      title: options.title ? `${options.title} - Lịch thi` : undefined,
+    });
 
     return {
       success: true,
-      message: `Đã đưa 3 đợt đồng bộ (Lịch học, Điểm số, LMS) vào hàng đợi ngầm.`,
-      batches: [resTimetable, resGrades, resLms],
+      message: `Đã đưa 4 đợt đồng bộ (Lịch học, Điểm số, LMS, Lịch thi) vào hàng đợi ngầm.`,
+      batches: [resTimetable, resGrades, resLms, resExams],
       totalItems:
         (resTimetable.totalItems || 0) +
         (resGrades.totalItems || 0) +
-        (resLms.totalItems || 0),
+        (resLms.totalItems || 0) +
+        (resExams.totalItems || 0),
     };
   }
 
@@ -407,6 +376,42 @@ async function processSingleGlobalSyncItem(item: any) {
         },
       });
     }
+
+    // 4. TÁC VỤ 4: ĐỒNG BỘ LỊCH THI CÁ NHÂN & QUÉT BIẾN ĐỘNG CA THI (QLDTTX)
+    else if (jobType === 'SYNC_EXAMS' || jobType === 'SYNC_TODAY_EXAMS') {
+      const res = await getStudentQldtExamSchedule(normUsername, { forceRefresh: true });
+      if (res.success) {
+        const isTodayJob = jobType === 'SYNC_TODAY_EXAMS';
+        const msg = isTodayJob
+          ? `Đã kiểm tra ca thi hôm nay (${res.totalExams} môn thi, ${res.upcomingExams.length} môn sắp diễn ra)`
+          : `Đã đồng bộ ${res.totalExams} môn thi (${res.upcomingExams.length} môn sắp thi)`;
+
+        await prisma.globalSyncQueueItem.update({
+          where: { id: item.id },
+          data: {
+            status: 'SUCCESS',
+            resultMessage: msg,
+            resultData: JSON.stringify({
+              totalExams: res.totalExams,
+              upcomingExams: res.upcomingExams.length,
+              pastExams: res.pastExams.length,
+              semesterId: res.semesterId,
+              isTodayJob,
+            }),
+            finishedAt: new Date(),
+          },
+        });
+      } else {
+        await prisma.globalSyncQueueItem.update({
+          where: { id: item.id },
+          data: {
+            status: res.errorType === 'NOT_CONFIGURED' ? 'SKIPPED' : 'FAILED',
+            resultMessage: res.error || 'Lỗi khi kéo lịch thi cá nhân từ Cổng QLDTTX',
+            finishedAt: new Date(),
+          },
+        });
+      }
+    }
   } catch (err: any) {
     const errorMsg = err.message || 'Lỗi không xác định khi thực hiện đồng bộ';
     await prisma.globalSyncQueueItem.update({
@@ -513,6 +518,13 @@ export function getNormalizedGlobalSyncConfig(rawConfig?: GlobalNightlySyncConfi
       lastSyncAt: rawConfig?.lmsJob?.lastSyncAt || null,
       lastStatus: rawConfig?.lmsJob?.lastStatus || null,
     },
+    examsJob: {
+      isEnabled: rawConfig?.examsJob?.isEnabled ?? (rawConfig?.syncExams !== false),
+      scheduleTime: rawConfig?.examsJob?.scheduleTime || '07:00', // 7h sáng hàng ngày
+      lastSyncDate: rawConfig?.examsJob?.lastSyncDate || null,
+      lastSyncAt: rawConfig?.examsJob?.lastSyncAt || null,
+      lastStatus: rawConfig?.examsJob?.lastStatus || null,
+    },
     customJobs: rawConfig?.customJobs || {},
   };
 }
@@ -537,8 +549,99 @@ function isJobDueToRun(
 }
 
 /**
+ * Quét và kiểm tra các sinh viên có ca thi HÔM NAY.
+ * Định kỳ 20 đến 30 phút (ngẫu nhiên hóa theo từng sinh viên) sẽ cho vào hàng đợi Global
+ * để worker quét và kiểm tra dần dần (rate limit), tránh dồn ồ ạt lên máy chủ QLDTTX.
+ */
+export async function checkAndQueueTodayExamsSync(
+  currentDateStr: string,
+  nowVN: Date
+): Promise<{ queuedCount: number; usernames: string[] }> {
+  try {
+    const d = String(nowVN.getDate()).padStart(2, '0');
+    const m = String(nowVN.getMonth() + 1).padStart(2, '0');
+    const y = nowVN.getFullYear();
+    const todayVnStr = `${d}/${m}/${y}`;
+    const todayIsoStr = currentDateStr; // YYYY-MM-DD
+
+    // Lấy toàn bộ danh sách StudentQldtExamRecord đã lưu
+    const allRecords = await prisma.studentQldtExamRecord.findMany({
+      select: {
+        username: true,
+        rawData: true,
+        lastPulledAt: true,
+      },
+    });
+
+    const dueUsernames: string[] = [];
+
+    for (const rec of allRecords) {
+      if (!rec.rawData) continue;
+      try {
+        const parsed = JSON.parse(rec.rawData);
+        const rawExams = parsed?.exams || parsed?.data?.ds_lich_thi || (Array.isArray(parsed) ? parsed : []) || [];
+
+        // Kiểm tra xem sinh viên có môn thi hôm nay không
+        const hasExamToday = rawExams.some((ex: any) => {
+          const examDateStr = (ex.ngay_thi || ex.ngayThi || ex.NgayThi || '').trim();
+          const examDateIso = (ex.dateIso || '').trim();
+          return examDateStr === todayVnStr || examDateIso === todayIsoStr;
+        });
+
+        if (!hasExamToday) continue;
+
+        // Tính chu kỳ quét ngẫu nhiên 20 đến 30 phút (phân bổ ngẫu nhiên theo hash username)
+        let hash = 0;
+        for (let i = 0; i < rec.username.length; i++) {
+          hash = (hash << 5) - hash + rec.username.charCodeAt(i);
+          hash |= 0;
+        }
+        const randomIntervalMinutes = 20 + (Math.abs(hash) % 11); // 20, 21, 22, ..., 30 phút
+        const randomIntervalMs = randomIntervalMinutes * 60 * 1000;
+
+        const lastPulledMs = rec.lastPulledAt ? new Date(rec.lastPulledAt).getTime() : 0;
+        const timeSinceLastPull = Date.now() - lastPulledMs;
+
+        if (timeSinceLastPull >= randomIntervalMs) {
+          // Kiểm tra xem đã có task QUEUED hoặc RUNNING cho user này trong queue chưa
+          const activeTask = await prisma.globalSyncQueueItem.findFirst({
+            where: {
+              username: rec.username,
+              jobType: { in: ['SYNC_EXAMS', 'SYNC_TODAY_EXAMS'] },
+              status: { in: ['QUEUED', 'RUNNING'] },
+            },
+          });
+
+          if (!activeTask) {
+            dueUsernames.push(rec.username);
+          }
+        }
+      } catch {}
+    }
+
+    if (dueUsernames.length > 0) {
+      console.log(
+        `🔥 [Today Exams Sync] Phát hiện ${dueUsernames.length} sinh viên có ca thi hôm nay đến hạn quét lại (20-30 phút):`,
+        dueUsernames
+      );
+      await enqueueSingleGlobalJobType({
+        jobType: 'SYNC_TODAY_EXAMS',
+        title: `Quét biến động ca thi hôm nay (${dueUsernames.length} SV có lịch thi)`,
+        triggeredBy: 'SYSTEM_CRON',
+        targetUsernames: dueUsernames,
+      });
+    }
+
+    return { queuedCount: dueUsernames.length, usernames: dueUsernames };
+  } catch (err: any) {
+    console.error('[checkAndQueueTodayExamsSync] Lỗi quét ca thi hôm nay:', err);
+    return { queuedCount: 0, usernames: [] };
+  }
+}
+
+/**
  * Trình quét tự động chạy ngầm theo giờ hẹn riêng của từng Job (Giờ Việt Nam).
- * Tự động kiểm tra và tạo Batch cho từng Job: Lịch học, Điểm số, LMS, hoặc các Custom Job mở rộng.
+ * Tự động kiểm tra và tạo Batch cho từng Job: Lịch học, Điểm số, LMS, Lịch thi (7h sáng), hoặc ca thi hôm nay (20-30 phút).
  */
 export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boolean; reason?: string; batches?: any[] }> {
   try {
@@ -605,19 +708,45 @@ export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boole
       configModified = true;
     }
 
+    // 4. Job 4: Đồng bộ Lịch thi cá nhân QLDTTX (Cấu hình giờ chạy riêng: config.examsJob - Mặc định 07:00 sáng VN)
+    if (config.examsJob && isJobDueToRun(config.examsJob, currentHour, currentMinute, currentDateStr)) {
+      console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 4 (Lịch thi 7h sáng) lúc ${config.examsJob.scheduleTime} VN...`);
+      const resExams = await enqueueSingleGlobalJobType({
+        jobType: 'SYNC_EXAMS',
+        title: `Tự động đồng bộ Lịch thi (${config.examsJob.scheduleTime} ${currentDateStr})`,
+        triggeredBy: 'SYSTEM_CRON',
+        scheduledTime: config.examsJob.scheduleTime,
+      });
+      batchesCreated.push(resExams);
+      config.examsJob.lastSyncDate = currentDateStr;
+      config.examsJob.lastSyncAt = new Date().toISOString();
+      config.examsJob.lastStatus = resExams.success ? 'SUCCESS' : 'FAILED';
+      configModified = true;
+    }
+
+    // 5. Kiểm tra và quét các ca thi diễn ra HÔM NAY (random 20..30 phút/lần cho từng sinh viên)
+    try {
+      const todayScanRes = await checkAndQueueTodayExamsSync(currentDateStr, nowVN);
+      if (todayScanRes.queuedCount > 0) {
+        configModified = true;
+      }
+    } catch (todayErr) {
+      console.error('[runGlobalNightlySyncScheduler] Lỗi kiểm tra ca thi hôm nay:', todayErr);
+    }
+
     // Cập nhật cấu hình lưu trữ
     if (configModified) {
       await setGlobalConfig(
         GLOBAL_CONFIG_KEYS.GLOBAL_NIGHTLY_SYNC,
         config,
-        'Cấu hình lịch tự động chạy cho từng Job Global (Lịch học, Điểm, LMS)'
+        'Cấu hình lịch tự động chạy cho từng Job Global (Lịch học, Điểm, LMS, Lịch thi)'
       );
     }
 
     if (batchesCreated.length === 0) {
       return {
         executed: false,
-        reason: `Chưa có Job nào đến giờ chạy (Hiện tại: ${currentHour}:${String(currentMinute).padStart(2, '0')} VN)`,
+        reason: `Chưa có Job định kỳ nào đến giờ chạy (Hiện tại: ${currentHour}:${String(currentMinute).padStart(2, '0')} VN)`,
       };
     }
 
