@@ -421,7 +421,7 @@ function normalizeExamRoomStr(item: any): string {
 }
 
 function normalizeExamAddressStr(item: any): string {
-  const raw = item.dia_diem_thi || item.diaDiemThi || item.DiaDiem || '';
+  const raw = item.ghep_phong || item.dia_diem_thi || item.diaDiemThi || item.DiaDiem || '';
   return String(raw)
     .replace(/<br\s*\/?>/gi, ' - ')
     .replace(/\s+/g, ' ')
