@@ -204,7 +204,7 @@ export default function LoginScreen({ users = [], records = [], onLogin }: Login
   };
 
   return (
-    <div className="min-h-screen min-h-[100dvh] w-full flex flex-col items-center bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-3 py-4 sm:py-8 sm:px-6 font-sans relative overflow-y-auto overflow-x-hidden pt-[calc(env(safe-area-inset-top,0px)+1rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+    <div className="fixed inset-0 w-full h-[100dvh] flex flex-col items-center bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-3 py-4 sm:py-8 sm:px-6 font-sans overflow-y-auto overflow-x-hidden pt-[calc(env(safe-area-inset-top,0px)+1rem)] pb-[calc(env(safe-area-inset-bottom,0px)+2rem)]">
       {/* Dynamic Background Blurs */}
       <div className="fixed top-1/4 left-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
       <div className="fixed bottom-1/4 right-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none translate-x-1/2 translate-y-1/2" />

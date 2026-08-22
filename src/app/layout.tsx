@@ -53,7 +53,7 @@ export default function RootLayout({
         <meta name="format-detection" content="telephone=no" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
-      <body className="font-sans antialiased overflow-hidden select-text">
+      <body className="font-sans antialiased select-text">
         <PWAProvider>
           {children}
         </PWAProvider>
