@@ -28,6 +28,7 @@ import {
   Download,
   Zap,
   GitFork,
+  Clock,
 } from 'lucide-react';
 import { LoginUser } from '../../types';
 import { NavigationTab } from '../../types/navigation';
@@ -322,6 +323,18 @@ export default function Sidebar({
                 }`}
               >
                 <Globe className="w-4 h-4 text-indigo-400" /> Tài Khoản QLĐT Từ Xa
+              </button>
+
+              {/* Job Global & Tác Vụ Tự Động */}
+              <button
+                onClick={() => onTabChange('global_jobs')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'global_jobs'
+                    ? 'bg-amber-600/25 text-amber-400 border border-amber-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Clock className="w-4 h-4 text-amber-400" /> Job Global / Tác Vụ Tự Động
               </button>
 
               {/* Bot Telegram Toàn Cục */}

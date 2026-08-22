@@ -44,25 +44,40 @@ export interface BackupTelegramConfigValue {
   lastBackupSentAt?: string | null;
   lastBackupStatus?: 'SUCCESS' | 'FAILED' | null;
   lastBackupError?: string | null;
+  lastBackupFiles?: string[] | null;
   lastTestedAt?: string | null;
   lastTestStatus?: 'SUCCESS' | 'FAILED' | null;
   lastTestError?: string | null;
 }
 
+export interface SingleJobScheduleConfig {
+  isEnabled: boolean; // Bật/Tắt tự động chạy cho riêng job này
+  scheduleTime: string; // Giờ chạy (Ví dụ: '22:00' cho 22h đêm)
+  lastSyncDate?: string | null; // Ngày chạy gần nhất YYYY-MM-DD
+  lastSyncAt?: string | null; // Thời điểm ISO chạy gần nhất
+  lastStatus?: 'SUCCESS' | 'PARTIAL' | 'FAILED' | null;
+}
+
 export interface GlobalNightlySyncConfigValue {
-  isEnabled: boolean; // Bật/Tắt chế độ đồng bộ ban đêm
-  scheduleTime: string; // Giờ chạy (Mặc định: '22:00' - 22h đêm)
-  syncTimetable: boolean; // Job 1: Đồng bộ lịch học & TKB (Mặc định: true)
-  syncGrades: boolean; // Job 2: Đồng bộ điểm & kết quả học tập (Mặc định: true)
-  syncLms: boolean; // Job 3: Đồng bộ kết quả học tập LMS PTTC1 (Mặc định: true)
+  isEnabled: boolean; // Công tắc tổng toàn hệ thống
   concurrency?: number; // Số luồng xử lý đồng thời (Mặc định: 2)
   delayBetweenItemsMs?: number; // Delay giữa các request (ms) (Mặc định: 600)
-  lastSyncDate?: string | null; // YYYY-MM-DD
-  lastTimetableSyncAt?: string | null;
-  lastGradesSyncAt?: string | null;
-  lastLmsSyncAt?: string | null;
-  lastStatus?: 'SUCCESS' | 'PARTIAL' | 'FAILED' | null;
   notifyAdminTelegram?: boolean; // Gửi thông báo tóm tắt qua Telegram sau khi hoàn tất
+
+  // Cấu hình giờ chạy và trạng thái riêng biệt cho từng Job:
+  timetableJob?: SingleJobScheduleConfig; // Job 1: Đồng bộ Lịch học & TKB (QLHT)
+  gradesJob?: SingleJobScheduleConfig; // Job 2: Đồng bộ Điểm & GPA (QLHT)
+  lmsJob?: SingleJobScheduleConfig; // Job 3: Đồng bộ Khóa học & Tiến độ (LMS)
+
+  // Trường mở rộng cho các Job tiếp theo trong tương lai:
+  customJobs?: Record<string, SingleJobScheduleConfig>;
+
+  // Legacy fallback fields
+  scheduleTime?: string;
+  syncTimetable?: boolean;
+  syncGrades?: boolean;
+  syncLms?: boolean;
+  lastSyncDate?: string | null;
 }
 
 export const GLOBAL_CONFIG_KEYS = {

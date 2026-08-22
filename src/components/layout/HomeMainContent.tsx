@@ -28,6 +28,7 @@ import {
   StudentCourseRegistration,
   CourseRegistrationPortal,
   AdminExternalAccounts,
+  GlobalSyncQueueManager,
 } from '../../features/external-portal';
 import { AdminTelegramBotManager } from '../../features/telegram';
 import {
@@ -217,6 +218,8 @@ export default function HomeMainContent({
         />
       ) : activeTab === 'external_accounts_admin' && isAdmin ? (
         <AdminExternalAccounts currentUser={effectiveUser!} />
+      ) : activeTab === 'global_jobs' && isAdmin ? (
+        <GlobalSyncQueueManager currentUser={effectiveUser!} />
       ) : activeTab === 'activity_logs' && isAdmin ? (
         <ActivityLogsManager currentUser={effectiveUser!} />
       ) : activeTab === 'telegram_admin' && isAdmin ? (

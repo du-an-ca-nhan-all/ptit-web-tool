@@ -23,7 +23,8 @@ export type NavigationTab =
   | 'all_students'
   | 'course_compare'
   | 'course_registration'
-  | 'monitor_flow';
+  | 'monitor_flow'
+  | 'global_jobs';
 
 export type ProfileSubTab =
   | 'OVERVIEW'
@@ -82,6 +83,7 @@ export const VALID_NAVIGATION_TABS: NavigationTab[] = [
   'course_compare',
   'course_registration',
   'monitor_flow',
+  'global_jobs',
 ];
 
 export const PROFILE_SUBTAB_MAP: Record<string, ProfileSubTab> = {
@@ -145,6 +147,9 @@ export const PATH_TO_TAB_MAP: Record<string, NavigationTab> = {
   batches: 'batches',
   'external-accounts': 'external_accounts_admin',
   external_accounts_admin: 'external_accounts_admin',
+  'global-jobs': 'global_jobs',
+  global_jobs: 'global_jobs',
+  jobs: 'global_jobs',
   telegram: 'telegram_admin',
   telegram_admin: 'telegram_admin',
   'activity-logs': 'activity_logs',
@@ -180,6 +185,9 @@ export const ADMIN_SUBPATH_MAP: Record<string, NavigationTab> = {
   'external-accounts': 'external_accounts_admin',
   external_accounts: 'external_accounts_admin',
   external_accounts_admin: 'external_accounts_admin',
+  'global-jobs': 'global_jobs',
+  global_jobs: 'global_jobs',
+  jobs: 'global_jobs',
   telegram: 'telegram_admin',
   telegram_admin: 'telegram_admin',
   'activity-logs': 'activity_logs',
@@ -284,6 +292,9 @@ export const getNavigationPath = (
       break;
     case 'external_accounts_admin':
       basePath = '/admin/external-accounts';
+      break;
+    case 'global_jobs':
+      basePath = '/admin/global-jobs';
       break;
     case 'telegram_admin':
       basePath = '/admin/telegram';

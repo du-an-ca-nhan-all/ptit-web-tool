@@ -172,18 +172,30 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 7. ACTION: UPDATE_CONFIG (Cập nhật cài đặt lịch chạy ban đêm)
+    // 7. ACTION: UPDATE_CONFIG (Cập nhật cài đặt lịch chạy riêng cho từng Job)
     if (action === 'UPDATE_CONFIG' && config) {
       const currentConfig = (await getGlobalSyncQueueStatus()).config;
       const newConfig: GlobalNightlySyncConfigValue = {
         ...currentConfig,
         ...config,
+        timetableJob: {
+          ...currentConfig.timetableJob,
+          ...(config.timetableJob || {}),
+        },
+        gradesJob: {
+          ...currentConfig.gradesJob,
+          ...(config.gradesJob || {}),
+        },
+        lmsJob: {
+          ...currentConfig.lmsJob,
+          ...(config.lmsJob || {}),
+        },
       };
 
       await setGlobalConfig(
         GLOBAL_CONFIG_KEYS.GLOBAL_NIGHTLY_SYNC,
         newConfig,
-        'Cấu hình lịch tự động đồng bộ dữ liệu ban đêm (22h: Lịch học, Điểm, LMS)'
+        'Cấu hình lịch tự động chạy cho từng Job Global (Lịch học, Điểm, LMS)'
       );
 
       await logActivity({

@@ -142,6 +142,7 @@ export function useHomeState() {
       const adminOnlyTabs: NavigationTab[] = [
         'batches',
         'external_accounts_admin',
+        'global_jobs',
         'activity_logs',
         'telegram_admin',
         'user_registrations',
@@ -239,10 +240,12 @@ export function useHomeState() {
       const monitorAdminTabs: NavigationTab[] = [
         'batches',
         'external_accounts_admin',
+        'global_jobs',
         'activity_logs',
         'telegram_admin',
         'user_registrations',
         'database_backup',
+        'announcements_admin',
         'members',
         'monitor_flow',
         'monitor',
@@ -257,10 +260,12 @@ export function useHomeState() {
       const adminOnlyTabs: NavigationTab[] = [
         'batches',
         'external_accounts_admin',
+        'global_jobs',
         'activity_logs',
         'telegram_admin',
         'user_registrations',
         'database_backup',
+        'announcements_admin',
       ];
       if (adminOnlyTabs.includes(activeTab)) {
         handleTabChange('members');

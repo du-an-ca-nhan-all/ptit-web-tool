@@ -31,7 +31,6 @@ import {
   Clock,
 } from 'lucide-react';
 import { LoginUser, AVAILABLE_EXTERNAL_SYSTEMS } from '../../../types';
-import GlobalSyncQueueManager from './GlobalSyncQueueManager';
 
 interface ExternalAccountAdminItem {
   id: number;
@@ -58,7 +57,6 @@ interface AdminExternalAccountsProps {
 }
 
 export default function AdminExternalAccounts({ currentUser }: AdminExternalAccountsProps) {
-  const [activeAdminTab, setActiveAdminTab] = useState<'ACCOUNTS' | 'GLOBAL_QUEUE'>('ACCOUNTS');
   const [accounts, setAccounts] = useState<ExternalAccountAdminItem[]>([]);
   const [totalStudents, setTotalStudents] = useState<number>(0);
   const [totalClasses, setTotalClasses] = useState<number>(0);
@@ -498,103 +496,67 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
         </div>
 
         {/* Header Action Buttons */}
-        {activeAdminTab === 'ACCOUNTS' && (
-          <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto">
-            <button
-              onClick={fetchAccounts}
-              disabled={isLoading}
-              className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Tải lại danh sách"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Làm Mới</span>
-            </button>
+        <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto">
+          <button
+            onClick={fetchAccounts}
+            disabled={isLoading}
+            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Tải lại danh sách"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Làm Mới</span>
+          </button>
 
-            <button
-              onClick={handleBatchGetTokens}
-              disabled={isBatchTesting || accounts.length === 0}
-              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-amber-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Lấy và xác thực Session/Token cho toàn bộ tài khoản"
-            >
-              {isBatchTesting ? (
-                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Zap className="w-3.5 h-3.5" />
-              )}
-              <span>Lấy Session/Token</span>
-            </button>
+          <button
+            onClick={handleBatchGetTokens}
+            disabled={isBatchTesting || accounts.length === 0}
+            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-amber-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Lấy và xác thực Session/Token cho toàn bộ tài khoản"
+          >
+            {isBatchTesting ? (
+              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Zap className="w-3.5 h-3.5" />
+            )}
+            <span>Lấy Session/Token</span>
+          </button>
 
-            <button
-              onClick={handleExportCSV}
-              disabled={accounts.length === 0}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-emerald-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Xuất CSV</span>
-            </button>
+          <button
+            onClick={handleExportCSV}
+            disabled={accounts.length === 0}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-emerald-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Xuất CSV</span>
+          </button>
 
-            <button
-              onClick={() => {
-                setModalMode('ADD');
-                setFormData({
-                  username: '',
-                  extUsername: '',
-                  extPassword: '',
-                  systemKey: AVAILABLE_EXTERNAL_SYSTEMS[0]?.key || 'QLDTTX_PTTC1',
-                  systemName: AVAILABLE_EXTERNAL_SYSTEMS[0]?.name || 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
-                  systemUrl: AVAILABLE_EXTERNAL_SYSTEMS[0]?.url || 'https://qldttx.pttc1.edu.vn/',
-                });
-                setModalTestStatus('IDLE');
-                setModalTestError('');
-                setLastTestedModalUser('');
-                setLastTestedModalPass('');
-                setIsModalOpen(true);
-              }}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Thêm / Cấu Hình Cho SV</span>
-            </button>
-          </div>
-        )}
+          <button
+            onClick={() => {
+              setModalMode('ADD');
+              setFormData({
+                username: '',
+                extUsername: '',
+                extPassword: '',
+                systemKey: AVAILABLE_EXTERNAL_SYSTEMS[0]?.key || 'QLDTTX_PTTC1',
+                systemName: AVAILABLE_EXTERNAL_SYSTEMS[0]?.name || 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
+                systemUrl: AVAILABLE_EXTERNAL_SYSTEMS[0]?.url || 'https://qldttx.pttc1.edu.vn/',
+              });
+              setModalTestStatus('IDLE');
+              setModalTestError('');
+              setLastTestedModalUser('');
+              setLastTestedModalPass('');
+              setIsModalOpen(true);
+            }}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Thêm / Cấu Hình Cho SV</span>
+          </button>
+        </div>
       </div>
 
-      {/* Sub-tabs switcher */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-        <button
-          onClick={() => setActiveAdminTab('ACCOUNTS')}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm ${
-            activeAdminTab === 'ACCOUNTS'
-              ? 'bg-slate-900 text-white'
-              : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          Danh Sách Tài Khoản ({accounts.length})
-        </button>
-
-        <button
-          onClick={() => setActiveAdminTab('GLOBAL_QUEUE')}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm ${
-            activeAdminTab === 'GLOBAL_QUEUE'
-              ? 'bg-slate-900 text-white'
-              : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
-          }`}
-        >
-          <Clock className="w-4 h-4 text-amber-500" />
-          Job Global & Đồng Bộ 22h Đêm
-          <span className="px-2 py-0.5 bg-amber-400 text-slate-900 rounded-full text-[10px] font-black">
-            3 Jobs
-          </span>
-        </button>
-      </div>
-
-      {activeAdminTab === 'GLOBAL_QUEUE' ? (
-        <GlobalSyncQueueManager currentUser={currentUser} />
-      ) : (
-        <>
-          {/* Metrics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Metrics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
             <Users className="w-6 h-6" />
@@ -1045,8 +1007,6 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             </div>
           </div>
         </div>
-      )}
-        </>
       )}
 
       {/* Modal Add / Edit Account */}

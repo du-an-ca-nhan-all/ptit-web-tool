@@ -62,10 +62,9 @@ export function useGlobalSyncQueue() {
   });
   const [config, setConfig] = useState<GlobalNightlySyncConfigValue>({
     isEnabled: true,
-    scheduleTime: '22:00',
-    syncTimetable: true,
-    syncGrades: true,
-    syncLms: true,
+    timetableJob: { isEnabled: true, scheduleTime: '22:00' },
+    gradesJob: { isEnabled: true, scheduleTime: '22:00' },
+    lmsJob: { isEnabled: true, scheduleTime: '22:00' },
   });
   const [isWorkerRunning, setIsWorkerRunning] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);

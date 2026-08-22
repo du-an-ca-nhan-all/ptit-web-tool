@@ -109,6 +109,8 @@ export default function Header({
         return 'Duyệt Đăng Ký Tài Khoản';
       case 'external_accounts_admin':
         return 'Tài Khoản QLĐT Từ Xa';
+      case 'global_jobs':
+        return 'Job Global / Tác Vụ Tự Động';
       case 'envelope':
       case 'envelope_all':
         return 'Phân Công Phong Bì';

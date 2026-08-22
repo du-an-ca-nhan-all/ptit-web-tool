@@ -481,8 +481,64 @@ export async function recalculateGlobalBatchCounts(batchId: string) {
 }
 
 /**
- * Trình quét tự động chạy lúc 22:00 đêm hàng ngày (Giờ Việt Nam).
- * Tự động tạo 3 Job: Đồng bộ lịch học, Đồng bộ điểm, Đồng bộ kết quả học tập LMS.
+ * Chuẩn hóa cấu hình Global Job Scheduler (Đảm bảo mỗi Job có cấu hình giờ chạy riêng)
+ */
+export function getNormalizedGlobalSyncConfig(rawConfig?: GlobalNightlySyncConfigValue | null): GlobalNightlySyncConfigValue {
+  const isGlobalEnabled = rawConfig?.isEnabled !== false;
+  const legacyTime = rawConfig?.scheduleTime || '22:00';
+
+  return {
+    isEnabled: isGlobalEnabled,
+    concurrency: rawConfig?.concurrency || 2,
+    delayBetweenItemsMs: rawConfig?.delayBetweenItemsMs || 600,
+    notifyAdminTelegram: rawConfig?.notifyAdminTelegram ?? true,
+    timetableJob: {
+      isEnabled: rawConfig?.timetableJob?.isEnabled ?? (rawConfig?.syncTimetable !== false),
+      scheduleTime: rawConfig?.timetableJob?.scheduleTime || legacyTime,
+      lastSyncDate: rawConfig?.timetableJob?.lastSyncDate || rawConfig?.lastSyncDate || null,
+      lastSyncAt: rawConfig?.timetableJob?.lastSyncAt || null,
+      lastStatus: rawConfig?.timetableJob?.lastStatus || null,
+    },
+    gradesJob: {
+      isEnabled: rawConfig?.gradesJob?.isEnabled ?? (rawConfig?.syncGrades !== false),
+      scheduleTime: rawConfig?.gradesJob?.scheduleTime || legacyTime,
+      lastSyncDate: rawConfig?.gradesJob?.lastSyncDate || rawConfig?.lastSyncDate || null,
+      lastSyncAt: rawConfig?.gradesJob?.lastSyncAt || null,
+      lastStatus: rawConfig?.gradesJob?.lastStatus || null,
+    },
+    lmsJob: {
+      isEnabled: rawConfig?.lmsJob?.isEnabled ?? (rawConfig?.syncLms !== false),
+      scheduleTime: rawConfig?.lmsJob?.scheduleTime || legacyTime,
+      lastSyncDate: rawConfig?.lmsJob?.lastSyncDate || rawConfig?.lastSyncDate || null,
+      lastSyncAt: rawConfig?.lmsJob?.lastSyncAt || null,
+      lastStatus: rawConfig?.lmsJob?.lastStatus || null,
+    },
+    customJobs: rawConfig?.customJobs || {},
+  };
+}
+
+/**
+ * Kiểm tra xem 1 Job đã đến giờ chạy theo cấu hình riêng của nó hay chưa
+ */
+function isJobDueToRun(
+  jobConfig: { isEnabled: boolean; scheduleTime: string; lastSyncDate?: string | null },
+  currentHour: number,
+  currentMinute: number,
+  currentDateStr: string
+): boolean {
+  if (jobConfig.isEnabled === false) return false;
+  if (jobConfig.lastSyncDate === currentDateStr) return false;
+
+  const [targetHourStr, targetMinuteStr] = (jobConfig.scheduleTime || '22:00').split(':');
+  const targetHour = parseInt(targetHourStr || '22', 10);
+  const targetMinute = parseInt(targetMinuteStr || '0', 10);
+
+  return currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute);
+}
+
+/**
+ * Trình quét tự động chạy ngầm theo giờ hẹn riêng của từng Job (Giờ Việt Nam).
+ * Tự động kiểm tra và tạo Batch cho từng Job: Lịch học, Điểm số, LMS, hoặc các Custom Job mở rộng.
  */
 export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boolean; reason?: string; batches?: any[] }> {
   try {
@@ -491,98 +547,88 @@ export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boole
     const currentMinute = nowVN.getMinutes();
     const currentDateStr = `${nowVN.getFullYear()}-${String(nowVN.getMonth() + 1).padStart(2, '0')}-${String(nowVN.getDate()).padStart(2, '0')}`;
 
-    const config = await getGlobalConfig<GlobalNightlySyncConfigValue>(GLOBAL_CONFIG_KEYS.GLOBAL_NIGHTLY_SYNC);
+    const rawConfig = await getGlobalConfig<GlobalNightlySyncConfigValue>(GLOBAL_CONFIG_KEYS.GLOBAL_NIGHTLY_SYNC);
+    const config = getNormalizedGlobalSyncConfig(rawConfig);
 
-    const isAutoEnabled = config?.isEnabled !== false;
-    const scheduleTime = config?.scheduleTime || '22:00';
-    const [targetHourStr, targetMinuteStr] = scheduleTime.split(':');
-    const targetHour = parseInt(targetHourStr || '22', 10);
-    const targetMinute = parseInt(targetMinuteStr || '0', 10);
-
-    if (!isAutoEnabled) {
-      return { executed: false, reason: 'Chế độ đồng bộ tự động ban đêm đang tắt' };
+    if (!config.isEnabled) {
+      return { executed: false, reason: 'Chế độ đồng bộ tự động toàn hệ thống đang TẮT' };
     }
 
-    if (config?.lastSyncDate === currentDateStr) {
-      return { executed: false, reason: `Đã chạy đồng bộ tự động trong ngày hôm nay (${currentDateStr})` };
+    const batchesCreated: any[] = [];
+    let configModified = false;
+
+    // 1. Job 1: Đồng bộ lịch học & TKB (Cấu hình giờ chạy riêng: config.timetableJob)
+    if (config.timetableJob && isJobDueToRun(config.timetableJob, currentHour, currentMinute, currentDateStr)) {
+      console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 1 (Lịch học) lúc ${config.timetableJob.scheduleTime} VN...`);
+      const resTimetable = await enqueueSingleGlobalJobType({
+        jobType: 'SYNC_TIMETABLE',
+        title: `Tự động đồng bộ Lịch học (${config.timetableJob.scheduleTime} ${currentDateStr})`,
+        triggeredBy: 'SYSTEM_CRON',
+        scheduledTime: config.timetableJob.scheduleTime,
+      });
+      batchesCreated.push(resTimetable);
+      config.timetableJob.lastSyncDate = currentDateStr;
+      config.timetableJob.lastSyncAt = new Date().toISOString();
+      config.timetableJob.lastStatus = resTimetable.success ? 'SUCCESS' : 'FAILED';
+      configModified = true;
     }
 
-    const isTimeToSync = currentHour > targetHour || (currentHour === targetHour && currentMinute >= targetMinute);
+    // 2. Job 2: Đồng bộ Điểm & GPA (Cấu hình giờ chạy riêng: config.gradesJob)
+    if (config.gradesJob && isJobDueToRun(config.gradesJob, currentHour, currentMinute, currentDateStr)) {
+      console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 2 (Điểm số) lúc ${config.gradesJob.scheduleTime} VN...`);
+      const resGrades = await enqueueSingleGlobalJobType({
+        jobType: 'SYNC_GRADES',
+        title: `Tự động đồng bộ Bảng điểm (${config.gradesJob.scheduleTime} ${currentDateStr})`,
+        triggeredBy: 'SYSTEM_CRON',
+        scheduledTime: config.gradesJob.scheduleTime,
+      });
+      batchesCreated.push(resGrades);
+      config.gradesJob.lastSyncDate = currentDateStr;
+      config.gradesJob.lastSyncAt = new Date().toISOString();
+      config.gradesJob.lastStatus = resGrades.success ? 'SUCCESS' : 'FAILED';
+      configModified = true;
+    }
 
-    if (!isTimeToSync) {
+    // 3. Job 3: Đồng bộ Kết quả LMS (Cấu hình giờ chạy riêng: config.lmsJob)
+    if (config.lmsJob && isJobDueToRun(config.lmsJob, currentHour, currentMinute, currentDateStr)) {
+      console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 3 (LMS) lúc ${config.lmsJob.scheduleTime} VN...`);
+      const resLms = await enqueueSingleGlobalJobType({
+        jobType: 'SYNC_LMS',
+        title: `Tự động đồng bộ LMS (${config.lmsJob.scheduleTime} ${currentDateStr})`,
+        triggeredBy: 'SYSTEM_CRON',
+        scheduledTime: config.lmsJob.scheduleTime,
+      });
+      batchesCreated.push(resLms);
+      config.lmsJob.lastSyncDate = currentDateStr;
+      config.lmsJob.lastSyncAt = new Date().toISOString();
+      config.lmsJob.lastStatus = resLms.success ? 'SUCCESS' : 'FAILED';
+      configModified = true;
+    }
+
+    // Cập nhật cấu hình lưu trữ
+    if (configModified) {
+      await setGlobalConfig(
+        GLOBAL_CONFIG_KEYS.GLOBAL_NIGHTLY_SYNC,
+        config,
+        'Cấu hình lịch tự động chạy cho từng Job Global (Lịch học, Điểm, LMS)'
+      );
+    }
+
+    if (batchesCreated.length === 0) {
       return {
         executed: false,
-        reason: `Chưa đến giờ đồng bộ đêm (Hiện tại: ${currentHour}:${String(currentMinute).padStart(2, '0')} VN, Lịch hẹn: ${scheduleTime} VN)`,
+        reason: `Chưa có Job nào đến giờ chạy (Hiện tại: ${currentHour}:${String(currentMinute).padStart(2, '0')} VN)`,
       };
     }
 
-    console.log(`⏰ [Global Nightly Sync 22:00 VN] Bắt đầu tự động đồng bộ dữ liệu toàn hệ thống lúc ${scheduleTime}...`);
-
-    const batchesCreated: any[] = [];
-
-    // 1. Job 1: Đồng bộ lịch học
-    if (config?.syncTimetable !== false) {
-      const resTimetable = await enqueueSingleGlobalJobType({
-        jobType: 'SYNC_TIMETABLE',
-        title: `Tự động đồng bộ Lịch học toàn hệ thống (${scheduleTime} ${currentDateStr})`,
-        triggeredBy: 'SYSTEM_CRON',
-        scheduledTime,
-      });
-      batchesCreated.push(resTimetable);
-    }
-
-    // 2. Job 2: Đồng bộ điểm
-    if (config?.syncGrades !== false) {
-      const resGrades = await enqueueSingleGlobalJobType({
-        jobType: 'SYNC_GRADES',
-        title: `Tự động đồng bộ Bảng điểm toàn hệ thống (${scheduleTime} ${currentDateStr})`,
-        triggeredBy: 'SYSTEM_CRON',
-        scheduledTime,
-      });
-      batchesCreated.push(resGrades);
-    }
-
-    // 3. Job 3: Đồng bộ kết quả học tập LMS
-    if (config?.syncLms !== false) {
-      const resLms = await enqueueSingleGlobalJobType({
-        jobType: 'SYNC_LMS',
-        title: `Tự động đồng bộ Kết quả LMS toàn hệ thống (${scheduleTime} ${currentDateStr})`,
-        triggeredBy: 'SYSTEM_CRON',
-        scheduledTime,
-      });
-      batchesCreated.push(resLms);
-    }
-
-    // Cập nhật cấu hình ngày chạy gần nhất
-    const updatedConfig: GlobalNightlySyncConfigValue = {
-      ...(config || {
-        isEnabled: true,
-        scheduleTime: '22:00',
-        syncTimetable: true,
-        syncGrades: true,
-        syncLms: true,
-      }),
-      lastSyncDate: currentDateStr,
-      lastTimetableSyncAt: new Date().toISOString(),
-      lastGradesSyncAt: new Date().toISOString(),
-      lastLmsSyncAt: new Date().toISOString(),
-      lastStatus: 'SUCCESS',
-    };
-
-    await setGlobalConfig(
-      GLOBAL_CONFIG_KEYS.GLOBAL_NIGHTLY_SYNC,
-      updatedConfig,
-      'Cấu hình lịch tự động đồng bộ dữ liệu ban đêm (22h: Lịch học, Điểm, LMS)'
-    );
-
     return {
       executed: true,
-      reason: `Đã kích hoạt thành công ${batchesCreated.length} Job đồng bộ ban đêm lúc ${scheduleTime} VN.`,
+      reason: `Đã kích hoạt thành công ${batchesCreated.length} Job tự động theo lịch hẹn riêng.`,
       batches: batchesCreated,
     };
   } catch (err: any) {
     console.error('[runGlobalNightlySyncScheduler] Lỗi:', err);
-    return { executed: false, reason: err.message || 'Lỗi khi chạy trình quét đồng bộ ban đêm' };
+    return { executed: false, reason: err.message || 'Lỗi khi chạy trình quét đồng bộ' };
   }
 }
 
@@ -631,16 +677,8 @@ export async function getGlobalSyncQueueStatus(options?: {
     statsMap[st.status] = st._count.id;
   });
 
-  const config = await getGlobalConfig<GlobalNightlySyncConfigValue>(
-    GLOBAL_CONFIG_KEYS.GLOBAL_NIGHTLY_SYNC,
-    {
-      isEnabled: true,
-      scheduleTime: '22:00',
-      syncTimetable: true,
-      syncGrades: true,
-      syncLms: true,
-    }
-  );
+  const rawConfig = await getGlobalConfig<GlobalNightlySyncConfigValue>(GLOBAL_CONFIG_KEYS.GLOBAL_NIGHTLY_SYNC);
+  const config = getNormalizedGlobalSyncConfig(rawConfig);
 
   return {
     batches,

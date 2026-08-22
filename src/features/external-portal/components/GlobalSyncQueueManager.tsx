@@ -69,11 +69,38 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
   const [configForm, setConfigForm] = useState({
     isEnabled: config?.isEnabled !== false,
-    scheduleTime: config?.scheduleTime || '22:00',
-    syncTimetable: config?.syncTimetable !== false,
-    syncGrades: config?.syncGrades !== false,
-    syncLms: config?.syncLms !== false,
+    timetableJob: {
+      isEnabled: config?.timetableJob?.isEnabled !== false,
+      scheduleTime: config?.timetableJob?.scheduleTime || '22:00',
+    },
+    gradesJob: {
+      isEnabled: config?.gradesJob?.isEnabled !== false,
+      scheduleTime: config?.gradesJob?.scheduleTime || '22:00',
+    },
+    lmsJob: {
+      isEnabled: config?.lmsJob?.isEnabled !== false,
+      scheduleTime: config?.lmsJob?.scheduleTime || '22:00',
+    },
   });
+
+  const openConfigModal = () => {
+    setConfigForm({
+      isEnabled: config?.isEnabled !== false,
+      timetableJob: {
+        isEnabled: config?.timetableJob?.isEnabled !== false,
+        scheduleTime: config?.timetableJob?.scheduleTime || '22:00',
+      },
+      gradesJob: {
+        isEnabled: config?.gradesJob?.isEnabled !== false,
+        scheduleTime: config?.gradesJob?.scheduleTime || '22:00',
+      },
+      lmsJob: {
+        isEnabled: config?.lmsJob?.isEnabled !== false,
+        scheduleTime: config?.lmsJob?.scheduleTime || '22:00',
+      },
+    });
+    setIsConfigOpen(true);
+  };
 
   // Filtered queue items
   const filteredQueueItems = useMemo(() => {
@@ -165,9 +192,9 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                 <Globe className="w-3.5 h-3.5" />
                 Global Scheduled Sync Jobs
               </span>
-              <span className="px-3 py-1 bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold rounded-full flex items-center gap-1.5 shadow-sm">
+              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-full flex items-center gap-1.5 shadow-sm">
                 <Clock className="w-3.5 h-3.5" />
-                Lịch chạy: {config?.scheduleTime || '22:00'} Đêm (Asia/Ho_Chi_Minh)
+                Lịch riêng từng Job (Tự động 22h / Tùy chỉnh)
               </span>
               {hasActiveJobs ? (
                 <span className="px-3 py-1 bg-emerald-500 text-white text-xs font-bold rounded-full flex items-center gap-1.5 animate-pulse shadow-sm shadow-emerald-500/20">
@@ -182,32 +209,23 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               )}
             </div>
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-              Quản Lý Hàng Đợi & Job Đồng Bộ Global (22h Đêm)
+              Quản Lý Hàng Đợi & Tác Vụ Tự Động Toàn Hệ Thống
             </h2>
             <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-3xl">
-              Hệ thống tự động chạy ngầm lúc 22:00 đêm mỗi ngày để đồng bộ toàn diện dữ liệu sinh viên: 
-              <strong className="text-indigo-600 font-semibold"> 1. Lịch học & Thời khóa biểu</strong>, 
-              <strong className="text-emerald-600 font-semibold"> 2. Bảng điểm & GPA</strong>, và 
-              <strong className="text-purple-600 font-semibold"> 3. Khóa học LMS PTTC1</strong>.
+              Hệ thống tự động chạy ngầm theo giờ hẹn riêng cho từng Job để đồng bộ dữ liệu sinh viên: 
+              <strong className="text-indigo-600 font-semibold"> 1. Lịch học & TKB ({config?.timetableJob?.scheduleTime || '22:00'})</strong>, 
+              <strong className="text-emerald-600 font-semibold"> 2. Bảng điểm & GPA ({config?.gradesJob?.scheduleTime || '22:00'})</strong>, và 
+              <strong className="text-purple-600 font-semibold"> 3. Khóa học LMS ({config?.lmsJob?.scheduleTime || '22:00'})</strong>.
             </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => {
-                setConfigForm({
-                  isEnabled: config?.isEnabled !== false,
-                  scheduleTime: config?.scheduleTime || '22:00',
-                  syncTimetable: config?.syncTimetable !== false,
-                  syncGrades: config?.syncGrades !== false,
-                  syncLms: config?.syncLms !== false,
-                });
-                setIsConfigOpen(true);
-              }}
+              onClick={openConfigModal}
               className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm"
             >
               <Settings className="w-4 h-4 text-slate-600" />
-              Cài Đặt Lịch 22h
+              Cài Đặt Lịch Từng Job
             </button>
             <button
               onClick={() => triggerNightlyScheduler()}
@@ -215,7 +233,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-amber-500/20 disabled:opacity-50"
             >
               <Play className="w-4 h-4" />
-              Chạy Thử Quét 22h
+              Chạy Thử Quét Giờ Hẹn
             </button>
             <button
               onClick={() => fetchQueueData()}
@@ -237,9 +255,15 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                 <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                   1
                 </span>
-                <span className="text-[11px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md">
-                  QLDTTX
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md">
+                    QLHT
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5" />
+                    {config?.timetableJob?.scheduleTime || '22:00'}
+                  </span>
+                </div>
               </div>
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-indigo-600" />
@@ -265,9 +289,15 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                 <span className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                   2
                 </span>
-                <span className="text-[11px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md">
-                  QLDTTX / QLHT
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md">
+                    QLHT
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5" />
+                    {config?.gradesJob?.scheduleTime || '22:00'}
+                  </span>
+                </div>
               </div>
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                 <GraduationCap className="w-4 h-4 text-emerald-600" />
@@ -293,9 +323,15 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                 <span className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                   3
                 </span>
-                <span className="text-[11px] font-bold px-2 py-0.5 bg-purple-100 text-purple-700 rounded-md">
-                  LMS PTTC1
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-700 rounded-md">
+                    LMS
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5" />
+                    {config?.lmsJob?.scheduleTime || '22:00'}
+                  </span>
+                </div>
               </div>
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                 <BookOpen className="w-4 h-4 text-purple-600" />
@@ -681,34 +717,34 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
         </div>
       </div>
 
-      {/* CONFIGURATION MODAL */}
+      {/* CONFIGURATION MODAL (CÀI ĐẶT LỊCH RIÊNG TỪNG JOB) */}
       {isConfigOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-6 animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 space-y-6 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-bold">
                   <Sliders className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">Cài Đặt Lịch Đồng Bộ Ban Đêm</h3>
-                  <p className="text-xs text-slate-500">Cấu hình thời gian và các Job chạy tự động</p>
+                  <h3 className="text-base font-bold text-slate-800">Cài Đặt Lịch Chạy Tự Động Từng Job</h3>
+                  <p className="text-xs text-slate-500">Tùy chỉnh giờ hẹn và bật/tắt độc lập cho từng tác vụ</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsConfigOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveConfig} className="space-y-4">
-              {/* BẬT TẮT CHUNG */}
+            <form onSubmit={handleSaveConfig} className="space-y-5">
+              {/* BẬT TẮT CHUNG TOÀN HỆ THỐNG */}
               <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                 <div>
-                  <div className="text-xs font-bold text-slate-800">Bật Tự Động Đồng Bộ Ban Đêm</div>
-                  <div className="text-[11px] text-slate-500">Tự động kích hoạt hàng ngày theo giờ hẹn</div>
+                  <div className="text-xs font-bold text-slate-800">Bật Hệ Thống Tự Động Toàn Cục</div>
+                  <div className="text-[11px] text-slate-500">Công tắc tổng kích hoạt các Job theo giờ hẹn</div>
                 </div>
                 <input
                   type="checkbox"
@@ -718,84 +754,169 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                 />
               </div>
 
-              {/* GIỜ CHẠY */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Giờ Chạy Tự Động (Giờ Việt Nam)</label>
-                <input
-                  type="text"
-                  placeholder="22:00"
-                  value={configForm.scheduleTime}
-                  onChange={(e) => setConfigForm({ ...configForm, scheduleTime: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <p className="text-[10px] text-slate-400">Định dạng HH:mm (Ví dụ: 22:00 cho 22h đêm)</p>
-              </div>
+              {/* CẤU HÌNH TỪNG JOB ĐỘC LẬP */}
+              <div className="space-y-4">
+                <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">
+                  Cấu Hình Giờ Chạy Riêng Biệt
+                </div>
 
-              {/* DANH SÁCH 3 JOBS */}
-              <div className="space-y-2 pt-2">
-                <label className="text-xs font-bold text-slate-700">Các Job Được Kích Hoạt Lúc 22h:</label>
-
-                <label className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
-                  <div className="flex items-center gap-2.5">
-                    <Calendar className="w-4 h-4 text-indigo-600" />
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">1. Đồng Bộ Lịch Học & Thời Khóa Biểu</div>
-                      <div className="text-[10px] text-slate-500">Kéo TKB học kỳ hiện tại từ QLDTTX</div>
+                {/* 1. JOB LỊCH HỌC */}
+                <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 hover:border-indigo-300 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">Job 1: Đồng Bộ Lịch Học & Thời Khóa Biểu</div>
+                        <div className="text-[10px] text-slate-500">Chỉ quét SV đã liên kết Cổng QLHT</div>
+                      </div>
                     </div>
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={configForm.timetableJob.isEnabled}
+                        onChange={(e) =>
+                          setConfigForm({
+                            ...configForm,
+                            timetableJob: { ...configForm.timetableJob, isEnabled: e.target.checked },
+                          })
+                        }
+                        className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                      />
+                      <span>Bật</span>
+                    </label>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={configForm.syncTimetable}
-                    onChange={(e) => setConfigForm({ ...configForm, syncTimetable: e.target.checked })}
-                    className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
-                  />
-                </label>
 
-                <label className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
-                  <div className="flex items-center gap-2.5">
-                    <GraduationCap className="w-4 h-4 text-emerald-600" />
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">2. Đồng Bộ Điểm & Kết Quả Học Tập</div>
-                      <div className="text-[10px] text-slate-500">Kéo bảng điểm đầy đủ và GPA từ QLDTTX</div>
+                  {configForm.timetableJob.isEnabled && (
+                    <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+                      <label className="text-xs font-medium text-slate-600 shrink-0">Giờ chạy:</label>
+                      <input
+                        type="text"
+                        placeholder="22:00"
+                        value={configForm.timetableJob.scheduleTime}
+                        onChange={(e) =>
+                          setConfigForm({
+                            ...configForm,
+                            timetableJob: { ...configForm.timetableJob, scheduleTime: e.target.value },
+                          })
+                        }
+                        className="w-32 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center"
+                      />
+                      <span className="text-[11px] text-slate-400">(Giờ Việt Nam HH:mm)</span>
                     </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={configForm.syncGrades}
-                    onChange={(e) => setConfigForm({ ...configForm, syncGrades: e.target.checked })}
-                    className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
-                  />
-                </label>
+                  )}
+                </div>
 
-                <label className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
-                  <div className="flex items-center gap-2.5">
-                    <BookOpen className="w-4 h-4 text-purple-600" />
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">3. Đồng Bộ Khóa Học LMS PTTC1</div>
-                      <div className="text-[10px] text-slate-500">Kéo tiến độ % và hoạt động học tập LMS</div>
+                {/* 2. JOB ĐIỂM SỐ */}
+                <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 hover:border-emerald-300 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
+                        <GraduationCap className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">Job 2: Đồng Bộ Điểm & GPA Tích Lũy</div>
+                        <div className="text-[10px] text-slate-500">Chỉ quét SV đã liên kết Cổng QLHT</div>
+                      </div>
                     </div>
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={configForm.gradesJob.isEnabled}
+                        onChange={(e) =>
+                          setConfigForm({
+                            ...configForm,
+                            gradesJob: { ...configForm.gradesJob, isEnabled: e.target.checked },
+                          })
+                        }
+                        className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                      />
+                      <span>Bật</span>
+                    </label>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={configForm.syncLms}
-                    onChange={(e) => setConfigForm({ ...configForm, syncLms: e.target.checked })}
-                    className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
-                  />
-                </label>
+
+                  {configForm.gradesJob.isEnabled && (
+                    <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+                      <label className="text-xs font-medium text-slate-600 shrink-0">Giờ chạy:</label>
+                      <input
+                        type="text"
+                        placeholder="22:00"
+                        value={configForm.gradesJob.scheduleTime}
+                        onChange={(e) =>
+                          setConfigForm({
+                            ...configForm,
+                            gradesJob: { ...configForm.gradesJob, scheduleTime: e.target.value },
+                          })
+                        }
+                        className="w-32 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-center"
+                      />
+                      <span className="text-[11px] text-slate-400">(Giờ Việt Nam HH:mm)</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. JOB LMS */}
+                <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 hover:border-purple-300 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-xs">
+                        <BookOpen className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">Job 3: Đồng Bộ Khóa Học & Tiến Độ LMS</div>
+                        <div className="text-[10px] text-slate-500">Chỉ quét SV đã liên kết LMS PTTC1</div>
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={configForm.lmsJob.isEnabled}
+                        onChange={(e) =>
+                          setConfigForm({
+                            ...configForm,
+                            lmsJob: { ...configForm.lmsJob, isEnabled: e.target.checked },
+                          })
+                        }
+                        className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
+                      />
+                      <span>Bật</span>
+                    </label>
+                  </div>
+
+                  {configForm.lmsJob.isEnabled && (
+                    <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+                      <label className="text-xs font-medium text-slate-600 shrink-0">Giờ chạy:</label>
+                      <input
+                        type="text"
+                        placeholder="22:00"
+                        value={configForm.lmsJob.scheduleTime}
+                        onChange={(e) =>
+                          setConfigForm({
+                            ...configForm,
+                            lmsJob: { ...configForm.lmsJob, scheduleTime: e.target.value },
+                          })
+                        }
+                        className="w-32 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-center"
+                      />
+                      <span className="text-[11px] text-slate-400">(Giờ Việt Nam HH:mm)</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsConfigOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
                 >
                   Hủy Bỏ
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-500/20 disabled:opacity-50"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-500/20 disabled:opacity-50 cursor-pointer"
                 >
                   Lưu Cài Đặt
                 </button>
