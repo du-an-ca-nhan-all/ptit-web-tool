@@ -691,36 +691,34 @@ export async function getOrFetchStudentLmsOverview(
   // 2. Kiểm tra Cache trong Database (bảng StudentLmsRecord)
   let cachedDb: any = null;
   try {
-    const rawRecord: any = await prisma.$queryRawUnsafe(
-      `SELECT * FROM "StudentLmsRecord" WHERE "username" = $1 LIMIT 1`,
-      cleanUsername
-    );
-    if (Array.isArray(rawRecord) && rawRecord.length > 0) {
-      cachedDb = rawRecord[0];
-    }
+    cachedDb = await prisma.studentLmsRecord.findUnique({
+      where: { username: cleanUsername },
+    });
   } catch (e) {
     console.warn('[getOrFetchStudentLmsOverview] Đọc cache StudentLmsRecord thất bại:', e);
   }
 
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const syncTimeCached = cachedDb?.lastPulledAt || cachedDb?.updatedAt || cachedDb?.createdAt || extAccount.lastSyncAt;
   const isCacheFresh =
     cachedDb &&
-    cachedDb.lastPulledAt &&
-    Date.now() - new Date(cachedDb.lastPulledAt).getTime() < ONE_DAY_MS;
+    syncTimeCached &&
+    Date.now() - new Date(syncTimeCached).getTime() < ONE_DAY_MS;
 
   // Nếu KHÔNG yêu cầu forceRefresh và Cache còn hạn (< 24h) -> Trả về Cache ngay lập tức
   if (!options?.forceRefresh && isCacheFresh && cachedDb?.rawData) {
     try {
       const parsed = JSON.parse(cachedDb.rawData);
+      const exactSyncTime = parsed?.lastSyncAt || syncTimeCached;
       return {
         ...parsed,
         isConfigured: true,
         hasLinkedAccount: true,
         isCachedDb: true,
         isLiveSync: false,
-        lastSyncAt: cachedDb.lastPulledAt
-          ? new Date(cachedDb.lastPulledAt).toISOString()
-          : parsed.lastSyncAt || new Date().toISOString(),
+        lastSyncAt: exactSyncTime
+          ? new Date(exactSyncTime).toISOString()
+          : new Date().toISOString(),
       };
     } catch (e) {
       console.warn('[getOrFetchStudentLmsOverview] Parse cache failed, chuyển sang kéo mới từ LMS:', e);
@@ -729,36 +727,37 @@ export async function getOrFetchStudentLmsOverview(
 
   // 3. Tải dữ liệu mới từ LMS (khi forceRefresh, cache hết hạn hoặc chưa có cache)
   try {
+    const now = new Date();
     const freshOverview = await fetchLmsDashboardOverview({
       username: extAccount.extUsername || cleanUsername,
       password: extAccount.extPassword || undefined,
       token: extAccount.token,
     });
 
-    // Lưu / Cập nhật vào DB Cache
+    // Lưu / Cập nhật vào DB Cache bằng Prisma upsert
     try {
-      const now = new Date();
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "StudentLmsRecord" ("username", "userFullName", "rawData", "totalEnrolled", "totalCompleted", "completedActivities", "dueActivities", "lastPulledAt", "createdAt", "updatedAt")
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $8)
-         ON CONFLICT ("username") DO UPDATE SET
-           "userFullName" = EXCLUDED."userFullName",
-           "rawData" = EXCLUDED."rawData",
-           "totalEnrolled" = EXCLUDED."totalEnrolled",
-           "totalCompleted" = EXCLUDED."totalCompleted",
-           "completedActivities" = EXCLUDED."completedActivities",
-           "dueActivities" = EXCLUDED."dueActivities",
-           "lastPulledAt" = EXCLUDED."lastPulledAt",
-           "updatedAt" = EXCLUDED."updatedAt"`,
-        cleanUsername,
-        freshOverview.userFullName,
-        JSON.stringify(freshOverview),
-        freshOverview.stats.enrolledCourses,
-        freshOverview.stats.completedCourses,
-        freshOverview.stats.completedActivities,
-        freshOverview.stats.dueActivities,
-        now
-      );
+      await prisma.studentLmsRecord.upsert({
+        where: { username: cleanUsername },
+        create: {
+          username: cleanUsername,
+          userFullName: freshOverview.userFullName,
+          rawData: JSON.stringify(freshOverview),
+          totalEnrolled: freshOverview.stats.enrolledCourses,
+          totalCompleted: freshOverview.stats.completedCourses,
+          completedActivities: freshOverview.stats.completedActivities,
+          dueActivities: freshOverview.stats.dueActivities,
+          lastPulledAt: now,
+        },
+        update: {
+          userFullName: freshOverview.userFullName,
+          rawData: JSON.stringify(freshOverview),
+          totalEnrolled: freshOverview.stats.enrolledCourses,
+          totalCompleted: freshOverview.stats.completedCourses,
+          completedActivities: freshOverview.stats.completedActivities,
+          dueActivities: freshOverview.stats.dueActivities,
+          lastPulledAt: now,
+        },
+      });
 
       // Cập nhật lastSyncAt trong ExternalAccount
       await prisma.externalAccount
@@ -781,6 +780,7 @@ export async function getOrFetchStudentLmsOverview(
       hasLinkedAccount: true,
       isCachedDb: false,
       isLiveSync: true,
+      lastSyncAt: now.toISOString(),
     };
   } catch (fetchErr: any) {
     console.warn('[getOrFetchStudentLmsOverview] Tải dữ liệu LMS thất bại:', fetchErr);
@@ -789,17 +789,19 @@ export async function getOrFetchStudentLmsOverview(
     if (cachedDb && cachedDb.rawData) {
       try {
         const parsed = JSON.parse(cachedDb.rawData);
-        const syncDateStr = new Date(cachedDb.lastPulledAt || cachedDb.updatedAt).toLocaleString('vi-VN');
+        const fallbackSyncTime = cachedDb.lastPulledAt || cachedDb.updatedAt || cachedDb.createdAt || extAccount.lastSyncAt;
+        const exactSyncTime = parsed?.lastSyncAt || fallbackSyncTime;
+        const formattedDate = exactSyncTime ? new Date(exactSyncTime).toLocaleString('vi-VN') : 'gần nhất';
         return {
           ...parsed,
           isConfigured: true,
           hasLinkedAccount: true,
           isCachedDb: true,
           isLiveSync: false,
-          syncWarning: `Không thể kết nối đến LMS (${fetchErr.message || 'Lỗi mạng'}). Đang hiển thị dữ liệu đã lưu lúc ${syncDateStr}.`,
-          lastSyncAt: cachedDb.lastPulledAt
-            ? new Date(cachedDb.lastPulledAt).toISOString()
-            : parsed.lastSyncAt || new Date().toISOString(),
+          syncWarning: `Không thể kết nối đến LMS (${fetchErr.message || 'Lỗi mạng'}). Đang hiển thị dữ liệu đã lưu lúc ${formattedDate}.`,
+          lastSyncAt: exactSyncTime
+            ? new Date(exactSyncTime).toISOString()
+            : new Date().toISOString(),
         };
       } catch (parseErr) {}
     }

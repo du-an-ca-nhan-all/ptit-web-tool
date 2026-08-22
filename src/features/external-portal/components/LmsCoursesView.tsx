@@ -26,6 +26,7 @@ import {
   Database,
   CheckCircle2,
   AlertTriangle,
+  Clock,
 } from 'lucide-react';
 import { LoginUser } from '@/src/features/auth/types/auth.types';
 import { LmsCourseOverviewItem, LmsDashboardOverview, LmsSectionItem } from '../server/lmsServerService';
@@ -33,6 +34,24 @@ import { LmsCourseOverviewItem, LmsDashboardOverview, LmsSectionItem } from '../
 interface LmsCoursesViewProps {
   currentUser: LoginUser;
   onNavigateToExternalAccounts?: () => void;
+}
+
+// Helper định dạng ngày giờ cập nhật chuẩn: "14:58:20 19/08/2026"
+function formatSyncDateTime(isoString?: string | null): string {
+  if (!isoString) return 'Chưa cập nhật';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return 'Chưa cập nhật';
+    const hours = d.getHours().toString().padStart(2, '0');
+    const mins = d.getMinutes().toString().padStart(2, '0');
+    const secs = d.getSeconds().toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear();
+    return `${hours}:${mins}:${secs} ${day}/${month}/${year}`;
+  } catch {
+    return 'Chưa cập nhật';
+  }
 }
 
 export default function LmsCoursesView({ currentUser, onNavigateToExternalAccounts }: LmsCoursesViewProps) {
@@ -193,23 +212,6 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
     return list;
   }, [data?.courses, searchQuery, statusFilter, selectedSemester, sortBy]);
 
-  // Format last sync date
-  const formattedSyncTime = useMemo(() => {
-    if (!data?.lastSyncAt) return '';
-    try {
-      const d = new Date(data.lastSyncAt);
-      return d.toLocaleString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return '';
-    }
-  }, [data?.lastSyncAt]);
-
   // Render activity type icon
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -312,14 +314,33 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
                 PTTC1 LMS
               </span>
               {data?.isCachedDb ? (
-                <span className="bg-slate-100 text-slate-600 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-slate-200 inline-flex items-center gap-1">
-                  <Database className="w-3 h-3 text-slate-500" /> Đã lưu Cache {formattedSyncTime && `(${formattedSyncTime})`}
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  Đã Lưu CSDL
                 </span>
               ) : data?.isLiveSync ? (
-                <span className="bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200 inline-flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3 text-emerald-600" /> Trực tiếp từ LMS
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Đồng bộ Trực Tuyến
                 </span>
-              ) : null}
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
+                  Dữ Liệu Đã Lưu
+                </span>
+              )}
+
+              {/* Last Update Badge */}
+              {data?.lastSyncAt && (
+                <span
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200"
+                  title="Thời điểm kéo dữ liệu từ Cổng LMS PTTC1 (lms.pttc1.edu.vn)."
+                >
+                  <Clock className="w-3 h-3 text-indigo-600 shrink-0" />
+                  <span>Kéo cuối:</span>
+                  <strong className="font-mono text-slate-900">{formatSyncDateTime(data.lastSyncAt)}</strong>
+                </span>
+              )}
             </div>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Sinh viên: <strong className="text-slate-800">{data?.userFullName || currentUser.fullName}</strong> • Cổng học tập:{' '}

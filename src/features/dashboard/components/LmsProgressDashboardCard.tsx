@@ -125,12 +125,19 @@ export default function LmsProgressDashboardCard({
 
   // Format sync date
   const syncDateDisplay = (() => {
-    if (!lastSyncAt) return 'Đã đồng bộ';
+    if (!lastSyncAt) return 'Chưa cập nhật';
     try {
       const d = new Date(lastSyncAt);
-      return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+      if (isNaN(d.getTime())) return 'Chưa cập nhật';
+      const hours = d.getHours().toString().padStart(2, '0');
+      const mins = d.getMinutes().toString().padStart(2, '0');
+      const secs = d.getSeconds().toString().padStart(2, '0');
+      const day = d.getDate().toString().padStart(2, '0');
+      const month = (d.getMonth() + 1).toString().padStart(2, '0');
+      const year = d.getFullYear();
+      return `${hours}:${mins}:${secs} ${day}/${month}/${year}`;
     } catch {
-      return 'Đã đồng bộ';
+      return 'Chưa cập nhật';
     }
   })();
 
@@ -323,8 +330,10 @@ export default function LmsProgressDashboardCard({
 
       {/* Action Footer */}
       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-        <span className="text-[11px] text-slate-400 truncate" title={syncWarning || undefined}>
-          {isCachedDb ? `Đã lưu đệm (${syncDateDisplay})` : `Đồng bộ lúc ${syncDateDisplay}`}
+        <span className="text-[11px] text-slate-500 font-medium truncate inline-flex items-center gap-1" title={syncWarning || undefined}>
+          <Clock className="w-3 h-3 text-sky-600 shrink-0" />
+          <span>Kéo cuối:</span>
+          <strong className="font-mono text-slate-900">{syncDateDisplay}</strong>
         </span>
         <div className="flex items-center gap-2">
           <a
