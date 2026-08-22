@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, User, Users, Check, Mail, Hand, Search, UserCheck, DollarSign, RotateCcw, Tag } from 'lucide-react';
+import { X, User, Users, Check, Mail, Coffee, Hand, Search, UserCheck, DollarSign, RotateCcw, Tag } from 'lucide-react';
 import { ExamRecord, ExamSession, LoginUser, isUserMonitor } from '../../../types';
 import { EnvelopeAssignment, SaveEnvelopeOptions } from '../../../config/envelopeAssignmentConfig';
 import { getDefaultRoomPrice, formatCurrency } from '../../../config/pricingConfig';
@@ -202,12 +202,12 @@ export default function AssignEnvelopeModal({
         {/* Modal Header */}
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold shadow-2xs">
-              <Mail className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold shadow-2xs">
+              <Coffee className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-bold text-slate-800 text-base leading-tight">
-                Xác Nhận Đi Phong Bì
+                Xác Nhận Phụ Trách Nước Uống & Hỗ Trợ
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 Phòng <strong className="text-rose-600 font-bold">{session.room}</strong> • {session.date} ({session.time})
@@ -234,7 +234,7 @@ export default function AssignEnvelopeModal({
           {/* 1. Select Class */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Lớp Phụ Trách Đi Phong Bì <span className="text-rose-500">*</span>
+              Lớp Phụ Trách Chuẩn Bị Nước / Hỗ Trợ <span className="text-rose-500">*</span>
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {roomClasses.map((c) => {
@@ -264,7 +264,7 @@ export default function AssignEnvelopeModal({
           {/* 2. Assignee: Monitor vs Assistant Student */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Người Trực Tiếp Đi Phong Bì <span className="text-rose-500">*</span>
+              Người Trực Tiếp Chuẩn Bị / Mua Nước <span className="text-rose-500">*</span>
             </label>
 
             <div className="grid grid-cols-2 gap-2 mb-3">
@@ -291,7 +291,7 @@ export default function AssignEnvelopeModal({
                 }`}
               >
                 <Users className="w-4 h-4 text-indigo-600 shrink-0" />
-                <span>Gán SV hỗ trợ đi</span>
+                <span>Gán SV hỗ trợ mua nước</span>
               </button>
             </div>
 
@@ -304,7 +304,7 @@ export default function AssignEnvelopeModal({
                     Lớp trưởng: {classMonitor?.fullName || classMonitor?.username || 'Chưa đăng ký tài khoản'}
                   </p>
                   <p className="text-[11px] text-emerald-700 opacity-90 mt-0.5">
-                    Lớp trưởng sẽ đại diện trực tiếp nhận và gửi phong bì bồi dưỡng cho phòng thi này.
+                    Lớp trưởng sẽ đại diện trực tiếp chuẩn bị nước uống và hỗ trợ cho phòng thi này.
                   </p>
                 </div>
               </div>
@@ -397,7 +397,7 @@ export default function AssignEnvelopeModal({
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                 <DollarSign className="w-3.5 h-3.5 text-amber-600" />
-                <span>Mức Bồi Dưỡng Phòng Thi</span>
+                <span>Định Mức Nước Uống / Kinh Phí Phòng</span>
               </label>
               {isCustomPrice ? (
                 <button
@@ -452,7 +452,7 @@ export default function AssignEnvelopeModal({
 
             {isCustomPrice && (
               <p className="text-[11px] text-amber-800 font-medium">
-                ⚠️ Giá phòng sẽ được lưu tùy chỉnh là <strong>{formatCurrency(currentPriceVal)}</strong> (khác mức chuẩn {formatCurrency(defaultPrice)}).
+                ⚠️ Định mức sẽ được lưu tùy chỉnh là <strong>{formatCurrency(currentPriceVal)}</strong> (khác mức chuẩn {formatCurrency(defaultPrice)}).
               </p>
             )}
           </div>
@@ -466,7 +466,7 @@ export default function AssignEnvelopeModal({
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Ví dụ: Đã hẹn GV trước 15p, sinh viên đi hộ ca 2..."
+              placeholder="Ví dụ: Đã mua nước trước 15p, sinh viên mua nước ca 2..."
               className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-medium text-slate-700"
             />
           </div>

@@ -1211,7 +1211,7 @@ export default function TelegramConfigSection({
                       </span>
                     )}
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Phân công phong bì & bù trừ lớp</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Phân công nước uống & bù trừ lớp</div>
                 </div>
               </label>
 

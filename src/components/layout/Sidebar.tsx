@@ -29,6 +29,7 @@ import {
   Zap,
   GitFork,
   Clock,
+  Coffee,
 } from 'lucide-react';
 import { LoginUser } from '../../types';
 import { NavigationTab } from '../../types/navigation';
@@ -258,7 +259,7 @@ export default function Sidebar({
                 <GitFork className="w-4 h-4 text-amber-400" /> Cấu Hình Flow Lớp Trưởng
               </button>
 
-              {/* Phân Công Phong Bì */}
+              {/* Phân Công Nước Uống & Hỗ Trợ */}
               {hasExamSchedule && (
                 <button
                   onClick={() => onTabChange('envelope_all')}
@@ -268,11 +269,11 @@ export default function Sidebar({
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
                   }`}
                 >
-                  <Mail className="w-4 h-4 text-amber-400" /> Phân Công Phong Bì
+                  <Coffee className="w-4 h-4 text-amber-400" /> Phân Công Nước Uống
                 </button>
               )}
 
-              {/* Bù Trừ Thanh Toán */}
+              {/* Bù Trừ Qũy Nước & Chi Phí */}
               {hasExamSchedule && (
                 <button
                   onClick={() => onTabChange('settlement')}
@@ -282,7 +283,7 @@ export default function Sidebar({
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
                   }`}
                 >
-                  <DollarSign className="w-4 h-4 text-emerald-400" /> Bù Trừ Thanh Toán
+                  <DollarSign className="w-4 h-4 text-emerald-400" /> Bù Trừ Qũy & Chi Phí
                 </button>
               )}
             </div>

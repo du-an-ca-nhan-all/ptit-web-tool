@@ -694,7 +694,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
             Sổ Quỹ Bù Trừ Cá Nhân
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Xem chi tiết công nợ phong bì của lớp bạn với các lớp khác.
+            Xem chi tiết bù trừ kinh phí nước uống & hỗ trợ của lớp bạn với các lớp khác.
           </p>
         </div>
         
@@ -704,10 +704,10 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
               type="button"
               onClick={() => setIsPricingModalOpen(true)}
               className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-              title="Tùy chỉnh định mức giá tiền phòng"
+              title="Tùy chỉnh định mức kinh phí phòng thi"
             >
               <Settings className="w-4 h-4 text-indigo-600" />
-              <span>Cấu hình tiền phòng</span>
+              <span>Cấu hình kinh phí phòng</span>
             </button>
           )}
 
@@ -941,7 +941,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
                 </h4>
                 <div className="space-y-3 text-sm text-slate-700">
                   <div className="flex justify-between items-center">
-                    <span>Tổng định mức phong bì phòng thi:</span>
+                    <span>Tổng định mức kinh phí nước uống:</span>
                     <span className="font-bold text-base">{formatCurrency(activeDetailCalc?.totalRoomPrice ?? selectedDetail.totalRoomPrice)}</span>
                   </div>
                   <div className="flex justify-between items-center">

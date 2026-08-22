@@ -46,7 +46,7 @@ export default function Home() {
         onTabChange={state.handleTabChange}
         isMobileMenuOpen={state.isMobileMenuOpen}
         onCloseMobileMenu={() => state.setIsMobileMenuOpen(false)}
-        currentUser={state.currentUser}
+        currentUser={state.effectiveUser || state.currentUser}
         hasExamSchedule={state.hasExamSchedule}
         canAccessMonitorTools={state.canAccessMonitorTools}
         isAdmin={state.isAdmin}
@@ -82,7 +82,7 @@ export default function Home() {
           baseRecordsCount={state.totalRecords || state.baseRecords?.length || 0}
           searchInput={state.searchInput}
           onSearchChange={state.setSearchInput}
-          currentUser={state.currentUser}
+          currentUser={state.effectiveUser || state.currentUser}
           userRoles={state.userRoles}
           activeRole={state.activeRole}
           isRoleDropdownOpen={state.isRoleDropdownOpen}

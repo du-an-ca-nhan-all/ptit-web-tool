@@ -22,12 +22,13 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const targetUsername = searchParams.get('username')?.trim().toUpperCase() || authUser.username;
+    const requestedRole = searchParams.get('role')?.trim() || null;
 
     // If viewing another student, only Admin or Impersonator can do so
     const finalUsername =
       authUser.isAdmin || authUser.impersonatedBy ? targetUsername : authUser.username;
 
-    const data = await getDashboardData(finalUsername);
+    const data = await getDashboardData(finalUsername, requestedRole);
 
     if (!data) {
       return NextResponse.json(

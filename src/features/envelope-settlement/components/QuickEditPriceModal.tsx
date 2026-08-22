@@ -99,7 +99,7 @@ export default function QuickEditPriceModal({
             </div>
             <div>
               <h3 className="font-bold text-slate-800 text-base leading-tight">
-                Chỉnh Sửa Giá Phòng Thi
+                Chỉnh Sửa Định Mức Kinh Phí Phòng
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 Phòng <strong className="text-rose-600 font-bold">{session.room}</strong> • {session.date} ({session.time})
@@ -121,7 +121,7 @@ export default function QuickEditPriceModal({
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Môn thi</span>
             <span className="font-bold text-slate-800 text-sm leading-snug">{session.subject}</span>
             <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-200/60 text-xs">
-              <span className="text-slate-500">Mức giá mặc định theo quy định:</span>
+              <span className="text-slate-500">Định mức mặc định:</span>
               <span className="font-bold text-slate-700">{formatCurrency(defaultPrice)}</span>
             </div>
           </div>
@@ -129,7 +129,7 @@ export default function QuickEditPriceModal({
           {/* Price input */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Mức Bồi Dưỡng Cho Phòng Này (VNĐ) <span className="text-rose-500">*</span>
+              Định Mức Nước Uống / Kinh Phí Cho Phòng Này (VNĐ) <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <input

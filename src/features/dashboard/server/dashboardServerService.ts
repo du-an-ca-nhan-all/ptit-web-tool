@@ -31,7 +31,10 @@ function parseExamDateTime(ngayThi?: string | null, gioThi?: string | null): Dat
   return baseDate;
 }
 
-export async function getDashboardData(username: string): Promise<DashboardData | null> {
+export async function getDashboardData(
+  username: string,
+  requestedRole?: string | null
+): Promise<DashboardData | null> {
   const cleanUsername = username.trim().toUpperCase();
 
   // 1. Fetch user profile & active batch concurrently
@@ -53,9 +56,12 @@ export async function getDashboardData(username: string): Promise<DashboardData 
 
   if (!user) return null;
 
-  const isAdmin = checkIsAdmin(user.role);
-  const isMonitor = checkIsMonitor(user.role);
-  const roles = getUserRoles(user.role);
+  const allRoles = getUserRoles(user.role);
+  const effectiveRole =
+    requestedRole && allRoles.includes(requestedRole) ? requestedRole : user.role;
+  const isAdmin = checkIsAdmin(effectiveRole);
+  const isMonitor = checkIsMonitor(effectiveRole);
+  const roles = allRoles;
   const studentLop = user.student?.maLop || null;
   const now = new Date();
 
@@ -495,7 +501,7 @@ export async function getDashboardData(username: string): Promise<DashboardData 
     user: {
       id: user.id,
       username: user.username,
-      role: user.role,
+      role: effectiveRole,
       roles,
       isAdmin,
       isMonitor,

@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
     if (!verifyIsMonitorOrAdmin(authUser)) {
-      return NextResponse.json({ error: 'Chỉ Lớp Trưởng hoặc Quản trị viên mới có quyền xác nhận đi phong bì' }, { status: 403 });
+      return NextResponse.json({ error: 'Chỉ Lớp Trưởng hoặc Quản trị viên mới có quyền xác nhận phụ trách nước uống & hỗ trợ' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -224,7 +224,7 @@ export async function POST(req: NextRequest) {
       console.warn('Sync to ExamRoom error:', e);
     }
 
-    // Record activity log
+    // Save activity log
     try {
       await prisma.activityLog.create({
         data: {
@@ -233,9 +233,9 @@ export async function POST(req: NextRequest) {
           action: 'CLAIM_ENVELOPE',
           targetType: 'ROOM_ENVELOPE_CONFIRMATION',
           targetId: targetSessionId,
-          description: `${claimedByName} (${authUser.username}) đã xác nhận đi phong bì phòng ${targetSessionId} cho lớp ${cleanClass}${
+          description: `${claimedByName} (${authUser.username}) đã xác nhận phụ trách nước uống phòng ${targetSessionId} cho lớp ${cleanClass}${
             finalAssistantName ? ` (Gán SV hỗ trợ: ${finalAssistantName} - ${finalAssistantId})` : ''
-          }${finalCustomPrice ? ` (Giá tùy chỉnh: ${finalCustomPrice.toLocaleString()} đ)` : ''}`,
+          }${finalCustomPrice ? ` (Định mức tùy chỉnh: ${finalCustomPrice.toLocaleString()} đ)` : ''}`,
           metadata: JSON.stringify(savedRecord),
         },
       });
@@ -271,7 +271,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Đã xác nhận lớp ${cleanClass} đi phong bì thành công`,
+      message: `Đã xác nhận lớp ${cleanClass} phụ trách nước uống thành công`,
       assignments,
       assignment: assignments[targetSessionId],
     });
@@ -282,12 +282,12 @@ export async function POST(req: NextRequest) {
 }
 
 // DELETE /api/envelope-assignments
-// Hủy xác nhận đi phong bì trong bảng RoomEnvelopeConfirmation
+// Hủy xác nhận phụ trách nước trong bảng RoomEnvelopeConfirmation
 export async function DELETE(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
     if (!verifyIsMonitorOrAdmin(authUser)) {
-      return NextResponse.json({ error: 'Chỉ Lớp Trưởng hoặc Quản trị viên mới có quyền hủy xác nhận phong bì' }, { status: 403 });
+      return NextResponse.json({ error: 'Chỉ Lớp Trưởng hoặc Quản trị viên mới có quyền hủy xác nhận phụ trách' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -297,14 +297,14 @@ export async function DELETE(req: NextRequest) {
     if (clearAll) {
       const isAdmin = checkIsAdmin(authUser.role) || authUser.isAdmin || authUser.activeRole === 'admin';
       if (!isAdmin) {
-        return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền xóa toàn bộ xác nhận phong bì' }, { status: 403 });
+        return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền xóa toàn bộ xác nhận phụ trách' }, { status: 403 });
       }
 
       await prisma.roomEnvelopeConfirmation.deleteMany({});
 
       return NextResponse.json({
         success: true,
-        message: 'Đã xóa toàn bộ xác nhận phong bì, trở về tự động',
+        message: 'Đã xóa toàn bộ xác nhận phụ trách, trở về tự động',
         assignments: {},
       });
     }
@@ -333,7 +333,7 @@ export async function DELETE(req: NextRequest) {
             action: 'CANCEL_ENVELOPE_CLAIM',
             targetType: 'ROOM_ENVELOPE_CONFIRMATION',
             targetId: targetSessionId,
-            description: `${authUser.username} đã hủy xác nhận đi phong bì phòng ${targetSessionId} (Lớp: ${existing.assignedClass})`,
+            description: `${authUser.username} đã hủy xác nhận phụ trách nước phòng ${targetSessionId} (Lớp: ${existing.assignedClass})`,
             metadata: JSON.stringify(existing),
           },
         });
@@ -369,7 +369,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Đã hủy xác nhận đi phong bì, chuyển về tự động tính theo lớp đông SV nhất',
+      message: 'Đã hủy xác nhận phụ trách nước, chuyển về tự động tính theo lớp đông SV nhất',
       assignments,
     });
   } catch (error: any) {

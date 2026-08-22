@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DashboardData } from '../types/dashboard.types';
 
-export function useDashboardData(username?: string) {
+export function useDashboardData(username?: string, role?: string) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +14,9 @@ export function useDashboardData(username?: string) {
     setError(null);
 
     try {
-      const url = `/api/dashboard?username=${encodeURIComponent(username)}`;
+      const url = `/api/dashboard?username=${encodeURIComponent(username)}${
+        role ? `&role=${encodeURIComponent(role)}` : ''
+      }`;
       const res = await fetch(url, { cache: 'no-store' });
       const json = await res.json();
 
@@ -29,7 +31,7 @@ export function useDashboardData(username?: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [username]);
+  }, [username, role]);
 
   useEffect(() => {
     fetchDashboard();

@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from '../../../types';
 import {
   Mail,
+  Coffee,
   Search,
   MapPin,
   DollarSign,
@@ -430,11 +431,11 @@ export default function AllMonitorsEnvelopes({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-slate-800 flex items-center gap-2">
-            <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
-            <span>Phân Công Phong Bì</span>
+            <Coffee className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600 shrink-0" />
+            <span>Phân Công Nước Uống & Hỗ Trợ</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Danh sách tất cả phòng thi. Lớp đông SV nhất được gợi ý phụ trách, các lớp có thể chủ động nhận hoặc gán sinh viên hỗ trợ.
+            Danh sách tất cả phòng thi. Lớp đông SV nhất được gợi ý phụ trách chuẩn bị nước uống & hỗ trợ phòng thi, các lớp có thể chủ động nhận hoặc gán sinh viên hỗ trợ.
           </p>
         </div>
 
@@ -444,10 +445,10 @@ export default function AllMonitorsEnvelopes({
               type="button"
               onClick={() => setIsPricingModalOpen(true)}
               className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs active:scale-95"
-              title="Tùy chỉnh định mức giá tiền phòng"
+              title="Tùy chỉnh định mức kinh phí phòng thi"
             >
               <Settings className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Cấu hình tiền phòng</span>
+              <span>Cấu hình kinh phí phòng</span>
             </button>
           )}
         </div>
@@ -669,7 +670,7 @@ export default function AllMonitorsEnvelopes({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] sm:text-xs text-amber-700 font-bold uppercase tracking-wider truncate">
-              Tổng quỹ bồi dưỡng
+              Tổng kinh phí nước & hỗ trợ
             </p>
             <p className="text-xs sm:text-xl font-extrabold text-amber-950 mt-0.5 leading-none truncate">
               {formatCurrency(totalExpectedMoney)}
@@ -683,7 +684,7 @@ export default function AllMonitorsEnvelopes({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider truncate">
-              Tiến độ nhận phong bì
+              Tiến độ nhận phụ trách
             </p>
             <p className="text-base sm:text-2xl font-extrabold text-emerald-700 mt-0.5 leading-none">
               {claimedCountInDisplayed}{' '}
@@ -800,7 +801,7 @@ export default function AllMonitorsEnvelopes({
                     {/* Pricing */}
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Bồi dưỡng</span>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Kinh phí nước</span>
                         <button
                           type="button"
                           onClick={() => setQuickEditSession(session)}
@@ -839,7 +840,7 @@ export default function AllMonitorsEnvelopes({
                             <div key={cls} className="bg-emerald-50/80 border border-emerald-300 rounded-xl p-3 flex flex-col gap-2">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 font-extrabold text-xs text-emerald-900">
-                                  <Mail className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <Coffee className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                   <span>Lớp phụ trách: <strong className="text-sm">{cls}</strong></span>
                                   {isMyClass && (
                                     <span className="bg-emerald-200 text-emerald-900 text-[10px] px-1.5 py-0.5 rounded font-bold">Lớp bạn</span>
@@ -913,7 +914,7 @@ export default function AllMonitorsEnvelopes({
                                 }`}
                               >
                                 <Hand className="w-3.5 h-3.5" />
-                                <span>{loadingClaimId === session.id ? 'Đang lưu...' : 'Nhận đi phong bì'}</span>
+                                <span>{loadingClaimId === session.id ? 'Đang lưu...' : 'Nhận chuẩn bị nước'}</span>
                               </button>
                             </div>
 
@@ -964,7 +965,7 @@ export default function AllMonitorsEnvelopes({
                     <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider min-w-[240px] align-top">Cơ cấu sinh viên</th>
                     <th className="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-36 whitespace-nowrap align-top">
                       <div className="flex items-center gap-1">
-                        <span>Bồi dưỡng</span>
+                        <span>Kinh phí nước</span>
                         <span className="text-[10px] text-slate-400 font-normal lowercase">(sửa)</span>
                       </div>
                     </th>
@@ -1245,7 +1246,7 @@ export default function AllMonitorsEnvelopes({
                                       <span>
                                         {loadingClaimId === session.id
                                           ? 'Đang lưu...'
-                                          : 'Nhận đi phong bì'}
+                                          : 'Nhận chuẩn bị nước'}
                                       </span>
                                     </button>
                                   </div>

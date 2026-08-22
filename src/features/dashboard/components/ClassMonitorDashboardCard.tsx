@@ -5,7 +5,7 @@ import {
   Crown,
   Users,
   UserCheck,
-  Mail,
+  Coffee,
   DollarSign,
   ArrowRight,
   ShieldCheck,
@@ -53,7 +53,7 @@ export default function ClassMonitorDashboardCard({
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Công cụ hỗ trợ phân công phong bì, điểm danh & quản lý danh sách
+                  Công cụ hỗ trợ điều phối nước uống, điểm danh & quản lý danh sách
                 </p>
               </div>
             </div>
@@ -93,8 +93,8 @@ export default function ClassMonitorDashboardCard({
 
             <div className="p-3 bg-white/90 border border-amber-100 rounded-2xl shadow-xs">
               <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1">
-                <Mail className="w-3.5 h-3.5 text-rose-600" />
-                <span>Đã nhận phong bì</span>
+                <Coffee className="w-3.5 h-3.5 text-rose-600" />
+                <span>Phụ trách nước</span>
               </div>
               <div className="text-xl sm:text-2xl font-black text-rose-700 font-mono">
                 {envelopesAssignedCount} <span className="text-xs font-normal text-slate-400">phòng</span>
@@ -120,8 +120,8 @@ export default function ClassMonitorDashboardCard({
               onClick={() => onNavigateTab('envelope_all')}
               className="px-3 py-1.5 bg-white hover:bg-amber-50 text-slate-800 border border-amber-200 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
-              <Mail className="w-3.5 h-3.5 text-amber-600" />
-              <span>Phân Công Phong Bì</span>
+              <Coffee className="w-3.5 h-3.5 text-amber-600" />
+              <span>Phân Công Nước Uống</span>
             </button>
             <button
               type="button"
@@ -129,7 +129,7 @@ export default function ClassMonitorDashboardCard({
               className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-amber-200 flex items-center gap-1.5 cursor-pointer"
             >
               <DollarSign className="w-3.5 h-3.5" />
-              <span>Bù Trừ Thanh Toán</span>
+              <span>Bù Trừ Qũy & Chi Phí</span>
             </button>
           </div>
         </div>

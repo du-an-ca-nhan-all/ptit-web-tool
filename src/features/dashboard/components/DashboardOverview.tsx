@@ -24,7 +24,8 @@ export default function DashboardOverview({
   currentUser,
   onNavigateTab,
 }: DashboardOverviewProps) {
-  const { data, isLoading, error, refresh } = useDashboardData(currentUser.username);
+  const effectiveRole = currentUser.role || (currentUser as any).activeRole;
+  const { data, isLoading, error, refresh } = useDashboardData(currentUser.username, effectiveRole);
 
   if (isLoading && !data) {
     return (
@@ -67,11 +68,19 @@ export default function DashboardOverview({
 
   if (!data) return null;
 
+  const effectiveUserForBanner = {
+    ...data.user,
+    ...currentUser,
+    role: effectiveRole || data.user.role,
+    isAdmin: Boolean(currentUser.isAdmin),
+    isMonitor: Boolean(currentUser.isMonitor),
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in duration-300">
       {/* 1. Hero Identity Banner */}
       <StudentHeroBanner
-        user={data.user}
+        user={effectiveUserForBanner}
         externalAccountStatus={data.externalAccountStatus}
         lmsAccountStatus={data.lmsAccountStatus}
         telegramStatus={data.telegramStatus}
@@ -81,16 +90,16 @@ export default function DashboardOverview({
         onNavigateTab={onNavigateTab}
       />
 
-      {/* 2. Admin System Health (if Admin) */}
-      {data.adminSystemHealth && (
+      {/* 2. Admin System Health (if Admin role is active) */}
+      {currentUser.isAdmin && data.adminSystemHealth && (
         <AdminSystemHealthCard
           health={data.adminSystemHealth}
           onNavigateTab={onNavigateTab}
         />
       )}
 
-      {/* 3. Class Monitor Tools (Only if Monitor role) */}
-      {data.classMonitorSummary && data.classMonitorSummary.isMonitor && (
+      {/* 3. Class Monitor Tools (Only if Monitor role is active) */}
+      {currentUser.isMonitor && data.classMonitorSummary && data.classMonitorSummary.isMonitor && (
         <ClassMonitorDashboardCard
           summary={data.classMonitorSummary}
           onNavigateTab={onNavigateTab}
@@ -152,7 +161,11 @@ export default function DashboardOverview({
       )}
 
       {/* 7. Quick Shortcuts Action Grid */}
-      <QuickActionGrid onNavigateTab={onNavigateTab} />
+      <QuickActionGrid
+        onNavigateTab={onNavigateTab}
+        isAdmin={currentUser.isAdmin}
+        isMonitor={currentUser.isMonitor}
+      />
     </div>
   );
 }

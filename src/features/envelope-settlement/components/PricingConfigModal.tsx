@@ -68,7 +68,7 @@ export default function PricingConfigModal({ isOpen, onClose, isAdmin }: Pricing
 
     setCommonRoomInput(String(saved.commonRoom));
     setEnglishOralRoomInput(String(saved.englishOralRoom));
-    setSavedMsg('Đã lưu cấu hình giá tiền phòng thành công!');
+    setSavedMsg('Đã lưu cấu hình định mức kinh phí phòng thành công!');
     setTimeout(() => {
       setSavedMsg('');
       onClose();
@@ -76,11 +76,11 @@ export default function PricingConfigModal({ isOpen, onClose, isAdmin }: Pricing
   };
 
   const handleResetToDefault = () => {
-    if (window.confirm('Bạn có chắc muốn khôi phục giá tiền phòng về mặc định (600.000đ cho phòng thường & 2.000.000đ cho tiếng Anh vấn đáp)?')) {
+    if (window.confirm('Bạn có chắc muốn khôi phục định mức kinh phí phòng về mặc định (600.000đ cho phòng thường & 2.000.000đ cho tiếng Anh vấn đáp)?')) {
       const reset = resetPricingConfig();
       setCommonRoomInput(String(reset.commonRoom));
       setEnglishOralRoomInput(String(reset.englishOralRoom));
-      setSavedMsg('Đã khôi phục cài đặt giá về mặc định!');
+      setSavedMsg('Đã khôi phục cài đặt định mức về mặc định!');
       setTimeout(() => setSavedMsg(''), 2500);
     }
   };
@@ -91,7 +91,7 @@ export default function PricingConfigModal({ isOpen, onClose, isAdmin }: Pricing
   };
 
   const handleClearAllOverrides = () => {
-    if (window.confirm('Bạn có chắc muốn xóa toàn bộ mức giá tùy chỉnh của từng phòng thi riêng lẻ và dùng theo giá mặc định?')) {
+    if (window.confirm('Bạn có chắc muốn xóa toàn bộ định mức tùy chỉnh của từng phòng thi riêng lẻ và dùng theo định mức mặc định?')) {
       clearAllSessionPriceOverrides();
       setSessionOverrides({});
     }
@@ -119,8 +119,8 @@ export default function PricingConfigModal({ isOpen, onClose, isAdmin }: Pricing
               <Settings className="w-5 h-5 text-amber-300" />
             </div>
             <div>
-              <h3 className="text-base font-bold">Cấu Hình Giá Tiền Phòng Thi</h3>
-              <p className="text-xs text-blue-100/80">Tùy chỉnh định mức tiền phòng dùng trong phân công & quyết toán</p>
+              <h3 className="text-base font-bold">Cấu Hình Định Mức Kinh Phí Phòng</h3>
+              <p className="text-xs text-blue-100/80">Tùy chỉnh định mức nước uống & hỗ trợ dùng trong phân công & quyết toán</p>
             </div>
           </div>
           <button
@@ -143,7 +143,7 @@ export default function PricingConfigModal({ isOpen, onClose, isAdmin }: Pricing
           <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl text-xs text-blue-900 flex items-start gap-2.5 leading-relaxed">
             <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
             <div>
-              Mặc định hệ thống sử dụng định mức: <b>600.000 ₫</b> cho phòng thi thông thường và <b>2.000.000 ₫</b> cho môn Tiếng Anh thi Vấn đáp. Bạn có thể thay đổi các định mức này bên dưới.
+              Mặc định hệ thống sử dụng định mức nước uống & hỗ trợ: <b>600.000 ₫</b> cho phòng thi thông thường và <b>2.000.000 ₫</b> cho môn Tiếng Anh thi Vấn đáp. Bạn có thể thay đổi các định mức này bên dưới.
             </div>
           </div>
 
@@ -153,7 +153,7 @@ export default function PricingConfigModal({ isOpen, onClose, isAdmin }: Pricing
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <DollarSign className="w-4 h-4 text-blue-600" />
-                  Giá Phòng Thi Thông Thường
+                  Định Mức Nước Uống Phòng Thông Thường
                 </label>
                 <span className="text-xs font-mono font-bold text-blue-700 bg-blue-100/70 px-2.5 py-0.5 rounded-lg border border-blue-200">
                   {formatCurrency(commonRoomNum)}
@@ -195,7 +195,7 @@ export default function PricingConfigModal({ isOpen, onClose, isAdmin }: Pricing
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <Tag className="w-4 h-4 text-purple-600" />
-                  Giá Phòng Tiếng Anh Vấn Đáp (Oral)
+                  Định Mức Nước Uống Tiếng Anh Vấn Đáp (Oral)
                 </label>
                 <span className="text-xs font-mono font-bold text-purple-700 bg-purple-100/70 px-2.5 py-0.5 rounded-lg border border-purple-200">
                   {formatCurrency(englishOralRoomNum)}

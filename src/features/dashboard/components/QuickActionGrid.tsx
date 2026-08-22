@@ -13,14 +13,64 @@ import {
   Layers,
   ArrowRight,
   Zap,
+  Coffee,
+  DollarSign,
+  Globe,
+  Settings,
 } from 'lucide-react';
 
 interface QuickActionGridProps {
   onNavigateTab: (tab: string, subTab?: string) => void;
+  isAdmin?: boolean;
+  isMonitor?: boolean;
 }
 
-export default function QuickActionGrid({ onNavigateTab }: QuickActionGridProps) {
+export default function QuickActionGrid({ onNavigateTab, isAdmin, isMonitor }: QuickActionGridProps) {
   const actions = [
+    ...(isMonitor
+      ? [
+          {
+            title: 'Phân Công Nước Uống',
+            desc: 'Điều phối chuẩn bị nước uống & hỗ trợ phòng thi',
+            icon: <Coffee className="w-5 h-5 text-amber-600" />,
+            bg: 'bg-amber-50/80 hover:bg-amber-50 border-amber-200 hover:border-amber-300',
+            badge: 'Lớp Trưởng',
+            badgeColor: 'bg-amber-100 text-amber-800 font-bold',
+            onClick: () => onNavigateTab('envelope_all'),
+          },
+          {
+            title: 'Bù Trừ Qũy & Chi Phí',
+            desc: 'Quyết toán kinh phí nước uống & chi phí giữa các lớp',
+            icon: <DollarSign className="w-5 h-5 text-emerald-600" />,
+            bg: 'bg-emerald-50/80 hover:bg-emerald-50 border-emerald-200 hover:border-emerald-300',
+            badge: 'Sổ Quỹ',
+            badgeColor: 'bg-emerald-100 text-emerald-800 font-bold',
+            onClick: () => onNavigateTab('settlement'),
+          },
+        ]
+      : []),
+    ...(isAdmin
+      ? [
+          {
+            title: 'Quản Lý Đợt Thi',
+            desc: 'Bật/tắt đợt thi, upload dữ liệu lịch thi mới',
+            icon: <Layers className="w-5 h-5 text-indigo-600" />,
+            bg: 'bg-indigo-50/80 hover:bg-indigo-50 border-indigo-200 hover:border-indigo-300',
+            badge: 'Admin',
+            badgeColor: 'bg-indigo-100 text-indigo-800 font-bold',
+            onClick: () => onNavigateTab('batches'),
+          },
+          {
+            title: 'Tài Khoản QLĐT Từ Xa',
+            desc: 'Quản trị đồng bộ tài khoản sinh viên toàn hệ thống',
+            icon: <Globe className="w-5 h-5 text-sky-600" />,
+            bg: 'bg-sky-50/80 hover:bg-sky-50 border-sky-200 hover:border-sky-300',
+            badge: 'Admin',
+            badgeColor: 'bg-sky-100 text-sky-800 font-bold',
+            onClick: () => onNavigateTab('external_accounts_admin'),
+          },
+        ]
+      : []),
     {
       title: 'Đăng Ký Môn Học (QLHT)',
       desc: 'Cổng ĐKMH trực tiếp & Auto Canh Slot (Sniper)',
