@@ -35,22 +35,7 @@ interface TableStat {
 }
 
 interface DatabaseStats {
-  tables: {
-    users: number;
-    students: number;
-    examBatches: number;
-    examRecords: number;
-    courseRegistrations: number;
-    systemMeta: number;
-    externalAccounts: number;
-    activityLogs: number;
-    telegramConfigs: number;
-    globalConfigs: number;
-    examReminderLogs: number;
-    qldtAnnouncementLogs: number;
-    classScheduleReminderLogs: number;
-    registrationRequests: number;
-  };
+  tables: Record<string, number>;
   tableBreakdown: TableStat[];
   totalRecords: number;
   dbFileSize: number;
@@ -455,7 +440,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Khôi phục toàn bộ 14 bảng dữ liệu hệ thống PostgreSQL từ file sao lưu <b>.sql</b>, <b>.json</b> hoặc file cũ <b>.sqlite / .db</b>
+                Khôi phục toàn bộ {stats?.tableBreakdown?.length ? `${stats.tableBreakdown.length} bảng` : 'các bảng'} dữ liệu hệ thống PostgreSQL từ file sao lưu <b>.sql</b>, <b>.json</b> hoặc file cũ <b>.sqlite / .db</b>
               </p>
             </div>
           </div>
@@ -626,34 +611,36 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
           <div className="text-2xl font-black text-emerald-400 tracking-tight">
             {stats ? stats.totalRecords.toLocaleString('vi-VN') : '...'}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">14 bảng dữ liệu hệ thống</div>
+          <div className="text-[11px] text-slate-400 mt-1">
+            {stats ? `${stats.tableBreakdown.length} bảng dữ liệu hệ thống` : 'Các bảng dữ liệu'}
+          </div>
         </div>
 
-        {/* Students & Users */}
+        {/* Total Tables */}
         <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4.5 backdrop-blur-sm relative overflow-hidden">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5 font-medium">
-            <span>Sinh Viên & Tài Khoản</span>
+            <span>Tổng Số Bảng CSDL</span>
             <Users className="w-4 h-4 text-sky-400" />
           </div>
           <div className="text-2xl font-black text-sky-400 tracking-tight">
-            {stats ? stats.tables.students.toLocaleString('vi-VN') : '...'}
+            {stats?.tableBreakdown?.length || Object.keys(stats?.tables || {}).length}
           </div>
           <div className="text-[11px] text-slate-400 mt-1">
-            {stats ? `${stats.tables.users.toLocaleString('vi-VN')} tài khoản đăng nhập` : '...'}
+            Toàn bộ bảng trong public schema
           </div>
         </div>
 
-        {/* Exam Records */}
+        {/* Server Snapshots & Storage */}
         <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4.5 backdrop-blur-sm relative overflow-hidden">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5 font-medium">
-            <span>Lịch Thi & Ca Thi</span>
+            <span>Bản Sao Lưu Máy Chủ</span>
             <Calendar className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-2xl font-black text-amber-400 tracking-tight">
-            {stats ? stats.tables.examRecords.toLocaleString('vi-VN') : '...'}
+            {localBackups.length}
           </div>
           <div className="text-[11px] text-slate-400 mt-1">
-            {stats ? `${stats.tables.examBatches} đợt thi đã tạo` : '...'}
+            File snapshot trong thư mục backups/
           </div>
         </div>
       </div>
@@ -673,7 +660,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
               </div>
             </div>
             <p className="text-slate-400 text-xs leading-relaxed mb-4">
-              Xuất trực tiếp toàn bộ 14 bảng thành file SQL PostgreSQL đầy đủ. Dễ dàng nạp bằng <code className="text-sky-300 font-mono">psql</code> hoặc phục hồi tức thì trên giao diện Web.
+              Xuất trực tiếp toàn bộ {stats?.tableBreakdown?.length ? `${stats.tableBreakdown.length} bảng` : 'các bảng'} thành file SQL PostgreSQL đầy đủ. Dễ dàng nạp bằng <code className="text-sky-300 font-mono">psql</code> hoặc phục hồi tức thì trên giao diện Web.
             </p>
           </div>
           <button
@@ -698,7 +685,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
               </div>
             </div>
             <p className="text-slate-400 text-xs leading-relaxed mb-4">
-              Xuất toàn bộ 14 bảng dữ liệu cùng metadata thành định dạng JSON chuẩn. Thích hợp cho việc lưu trữ đám mây, phân tích hoặc di chuyển hệ thống.
+              Xuất toàn bộ {stats?.tableBreakdown?.length ? `${stats.tableBreakdown.length} bảng` : 'các bảng'} dữ liệu cùng metadata thành định dạng JSON chuẩn. Thích hợp cho việc lưu trữ đám mây, phân tích hoặc di chuyển hệ thống.
             </p>
           </div>
           <button
@@ -891,7 +878,9 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
           <div className="flex items-center gap-2.5">
             <Layers className="w-5 h-5 text-indigo-400" />
             <div>
-              <h2 className="font-bold text-white text-base">Chi Tiết 14 Bảng Dữ Liệu Trong Database</h2>
+              <h2 className="font-bold text-white text-base">
+                Chi Tiết {stats?.tableBreakdown?.length ? `${stats.tableBreakdown.length} Bảng` : 'Toàn Bộ Bảng'} Dữ Liệu Trong Database
+              </h2>
               <p className="text-xs text-slate-400">
                 Thống kê số lượng bản ghi thực tế được bao gồm trong mỗi lần xuất/sao lưu & phục hồi
               </p>
@@ -913,7 +902,9 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                 <tr key={tbl.name} className="hover:bg-slate-800/40 transition">
                   <td className="py-3 px-4 font-mono font-bold text-indigo-300">
                     {tbl.name}
-                    <div className="text-[11px] font-sans font-normal text-slate-400 mt-0.5">{tbl.label}</div>
+                    {tbl.label && tbl.label !== tbl.name && (
+                      <div className="text-[11px] font-sans font-normal text-slate-400 mt-0.5">{tbl.label}</div>
+                    )}
                   </td>
                   <td className="py-3 px-4 text-slate-400 leading-relaxed">{tbl.description}</td>
                   <td className="py-3 px-4 text-right">

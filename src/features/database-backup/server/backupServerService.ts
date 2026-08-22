@@ -13,23 +13,7 @@ export interface TableStat {
 }
 
 export interface DatabaseStats {
-  tables: {
-    users: number;
-    students: number;
-    examBatches: number;
-    examRecords: number;
-    courseRegistrations: number;
-    systemMeta: number;
-    externalAccounts: number;
-    activityLogs: number;
-    telegramConfigs: number;
-    globalConfigs: number;
-    examReminderLogs: number;
-    qldtAnnouncementLogs: number;
-    classScheduleReminderLogs: number;
-    registrationRequests: number;
-    examRooms: number;
-  };
+  tables: Record<string, number>;
   tableBreakdown: TableStat[];
   totalRecords: number;
   dbFileSize: number;
@@ -43,6 +27,31 @@ export interface LocalBackupFile {
   size: number;
   sizeFormatted: string;
   createdAt: string;
+}
+
+function toCamelCase(str: string): string {
+  if (!str) return str;
+  return str.charAt(0).toLowerCase() + str.slice(1);
+}
+
+function getTableAliases(tableName: string): string[] {
+  const camel = toCamelCase(tableName);
+  const aliases = new Set<string>([tableName, camel]);
+  if (!camel.endsWith('s')) {
+    aliases.add(camel + 's');
+    if (camel.endsWith('ch') || camel.endsWith('sh') || camel.endsWith('x')) {
+      aliases.add(camel + 'es');
+    }
+  }
+  return Array.from(aliases);
+}
+
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
 }
 
 export function formatBytes(bytes: number, decimals = 2): string {
@@ -66,40 +75,170 @@ export function getBackupsDirectory(): string {
   return dir;
 }
 
+/**
+ * 1. Tự động lấy danh sách toàn bộ các bảng trong public schema (Ném lỗi ngay nếu thất bại)
+ */
+export async function getPublicTables(prismaClient = prisma): Promise<string[]> {
+  const rows: any = await prismaClient.$queryRawUnsafe(`
+    SELECT tablename 
+    FROM pg_tables 
+    WHERE schemaname = 'public'
+    ORDER BY tablename ASC;
+  `);
+  if (!Array.isArray(rows)) {
+    throw new Error('Không thể truy vấn danh sách bảng từ pg_tables: Định dạng kết quả không hợp lệ');
+  }
+  if (rows.length === 0) {
+    throw new Error('Không tìm thấy bảng nào trong public schema của cơ sở dữ liệu PostgreSQL');
+  }
+  return rows.map((r: any) => r.tablename);
+}
+
+/**
+ * 2. Đếm số bản ghi cho từng bảng một cách tự động
+ */
+export async function getTableRecordCounts(
+  prismaClient = prisma,
+  tables: string[]
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  for (const table of tables) {
+    try {
+      const res: any = await prismaClient.$queryRawUnsafe(`SELECT COUNT(*)::bigint AS count FROM "public"."${table}";`);
+      counts.set(table, Number(res[0]?.count || 0));
+    } catch (err: any) {
+      console.warn(`[BackupService] Lỗi khi đếm số bản ghi bảng "${table}":`, err.message);
+      counts.set(table, 0);
+    }
+  }
+  return counts;
+}
+
+/**
+ * 3. Phân tích quan hệ Foreign Key & Sắp xếp thứ tự nạp bảng theo Topological Sort
+ *    (Bảng cha được nạp trước, bảng con chứa khoá ngoại được nạp sau)
+ */
+export async function getTableDependencyOrder(
+  prismaClient = prisma,
+  tables: string[]
+): Promise<string[]> {
+  try {
+    const fkRows: any = await prismaClient.$queryRawUnsafe(`
+      SELECT
+        tc.table_name AS child_table,
+        ccu.table_name AS parent_table
+      FROM information_schema.table_constraints AS tc
+      JOIN information_schema.constraint_column_usage AS ccu
+        ON ccu.constraint_name = tc.constraint_name
+        AND ccu.table_schema = tc.table_schema
+      WHERE tc.constraint_type = 'FOREIGN KEY' 
+        AND tc.table_schema = 'public'
+        AND tc.table_name != ccu.table_name;
+    `);
+
+    const inDegree = new Map<string, number>();
+    const dependents = new Map<string, Set<string>>(); // parent -> children
+    const dependencies = new Map<string, Set<string>>(); // child -> parents
+
+    for (const t of tables) {
+      inDegree.set(t, 0);
+      dependents.set(t, new Set());
+      dependencies.set(t, new Set());
+    }
+
+    if (Array.isArray(fkRows)) {
+      for (const { child_table, parent_table } of fkRows) {
+        if (tables.includes(child_table) && tables.includes(parent_table)) {
+          if (!dependencies.get(child_table)!.has(parent_table)) {
+            dependencies.get(child_table)!.add(parent_table);
+            dependents.get(parent_table)!.add(child_table);
+            inDegree.set(child_table, (inDegree.get(child_table) || 0) + 1);
+          }
+        }
+      }
+    }
+
+    // Hàng đợi các bảng không phụ thuộc bảng nào
+    const queue: string[] = [];
+    for (const t of tables) {
+      if (inDegree.get(t) === 0) {
+        queue.push(t);
+      }
+    }
+
+    const sorted: string[] = [];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      sorted.push(current);
+
+      for (const child of dependents.get(current) || []) {
+        const newDeg = (inDegree.get(child) || 1) - 1;
+        inDegree.set(child, newDeg);
+        if (newDeg === 0) {
+          queue.push(child);
+        }
+      }
+    }
+
+    // Bổ sung các bảng còn lại nếu có quan hệ vòng tròn
+    for (const t of tables) {
+      if (!sorted.includes(t)) {
+        sorted.push(t);
+      }
+    }
+
+    return sorted;
+  } catch {
+    return tables;
+  }
+}
+
+/**
+ * 4. Tự động đồng bộ TẤT CẢ auto-increment sequences trên PostgreSQL
+ *    (Dò tìm tự động từ pg_get_serial_sequence, không cần hardcode)
+ */
+export async function syncPostgresSequences(prismaClient = prisma): Promise<number> {
+  try {
+    const seqCols: any = await prismaClient.$queryRawUnsafe(`
+      SELECT 
+        c.table_name, 
+        c.column_name, 
+        pg_get_serial_sequence('"' || c.table_name || '"', c.column_name) AS seq_name
+      FROM information_schema.columns c
+      WHERE c.table_schema = 'public'
+        AND pg_get_serial_sequence('"' || c.table_name || '"', c.column_name) IS NOT NULL;
+    `);
+
+    let count = 0;
+    if (Array.isArray(seqCols)) {
+      for (const { table_name, column_name, seq_name } of seqCols) {
+        if (!seq_name) continue;
+        try {
+          await prismaClient.$executeRawUnsafe(`
+            SELECT setval(
+              $1, 
+              COALESCE((SELECT MAX("${column_name}") FROM "public"."${table_name}"), 1), 
+              (SELECT MAX("${column_name}") IS NOT NULL FROM "public"."${table_name}")
+            );
+          `, seq_name);
+          count++;
+        } catch {
+          // Bỏ qua lỗi cấp quyền nếu có
+        }
+      }
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * 5. Lấy thống kê cơ sở dữ liệu động toàn diện
+ */
 export async function getDatabaseStats(): Promise<DatabaseStats> {
-  const [
-    users,
-    students,
-    examBatches,
-    examRecords,
-    courseRegistrations,
-    systemMeta,
-    externalAccounts,
-    activityLogs,
-    telegramConfigs,
-    globalConfigs,
-    examReminderLogs,
-    qldtAnnouncementLogs,
-    classScheduleReminderLogs,
-    registrationRequests,
-    examRooms,
-  ] = await Promise.all([
-    prisma.user.count().catch(() => 0),
-    prisma.student.count().catch(() => 0),
-    prisma.examBatch.count().catch(() => 0),
-    prisma.examRecord.count().catch(() => 0),
-    prisma.courseRegistration.count().catch(() => 0),
-    prisma.systemMeta.count().catch(() => 0),
-    prisma.externalAccount.count().catch(() => 0),
-    prisma.activityLog.count().catch(() => 0),
-    prisma.telegramConfig.count().catch(() => 0),
-    prisma.globalConfig.count().catch(() => 0),
-    prisma.examReminderLog.count().catch(() => 0),
-    prisma.qldtAnnouncementLog.count().catch(() => 0),
-    prisma.classScheduleReminderLog.count().catch(() => 0),
-    prisma.registrationRequest.count().catch(() => 0),
-    prisma.examRoom.count().catch(() => 0),
-  ]);
+  const tables = await getPublicTables(prisma);
+  const tableCounts = await getTableRecordCounts(prisma, tables);
 
   let dbFileSize = 0;
   let dbLastModified: string | null = null;
@@ -119,46 +258,23 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
     }
   }
 
-  const tableStats = {
-    users,
-    students,
-    examBatches,
-    examRecords,
-    courseRegistrations,
-    systemMeta,
-    externalAccounts,
-    activityLogs,
-    telegramConfigs,
-    globalConfigs,
-    examReminderLogs,
-    qldtAnnouncementLogs,
-    classScheduleReminderLogs,
-    registrationRequests,
-    examRooms,
-  };
+  const tableStats: Record<string, number> = {};
+  let totalRecords = 0;
 
-  const totalRecords = Object.values(tableStats).reduce((sum, val) => sum + val, 0);
+  for (const [tbl, count] of tableCounts.entries()) {
+    tableStats[tbl] = count;
+    totalRecords += count;
+  }
 
-  const tableBreakdown: TableStat[] = [
-    { name: 'Student', label: 'Sinh viên & Hồ sơ', count: students, description: 'Thông tin cá nhân, mã SV, lớp, trạng thái' },
-    { name: 'ExamRecord', label: 'Lịch thi', count: examRecords, description: 'Các bản ghi ca thi, phòng thi, môn thi, đợt thi' },
-    { name: 'ExamBatch', label: 'Đợt thi', count: examBatches, description: 'Danh sách các đợt thi học kỳ' },
-    { name: 'ExamRoom', label: 'Phòng thi & Giá tùy chỉnh', count: examRooms, description: 'Danh sách phòng thi và định mức tiền phòng tùy chỉnh' },
-    { name: 'User', label: 'Tài khoản người dùng', count: users, description: 'Tài khoản xác thực đăng nhập và phân quyền' },
-    { name: 'CourseRegistration', label: 'Đăng ký môn học', count: courseRegistrations, description: 'Dữ liệu kết quả ĐKMH kéo từ cổng QLDTTX' },
-    { name: 'ExternalAccount', label: 'Tài khoản QLDTTX', count: externalAccounts, description: 'Cấu hình đồng bộ cổng ngoài và token' },
-    { name: 'TelegramConfig', label: 'Cấu hình Telegram cá nhân', count: telegramConfigs, description: 'Thiết lập nhận thông báo bot Telegram theo SV' },
-    { name: 'GlobalConfig', label: 'Cấu hình toàn cục hệ thống', count: globalConfigs, description: 'Cấu hình chung hệ thống lưu dạng key-value JSON (Bot Telegram, Backup Telegram, v.v.)' },
-    { name: 'RegistrationRequest', label: 'Yêu cầu đăng ký', count: registrationRequests, description: 'Hồ sơ tài khoản chờ Admin xét duyệt' },
-    { name: 'ActivityLog', label: 'Nhật ký hoạt động', count: activityLogs, description: 'Lịch sử thao tác người dùng và hệ thống' },
-    { name: 'ExamReminderLog', label: 'Nhật ký nhắc lịch thi', count: examReminderLogs, description: 'Lịch sử gửi thông báo nhắc thi' },
-    { name: 'ClassScheduleReminderLog', label: 'Nhật ký nhắc lịch học', count: classScheduleReminderLogs, description: 'Lịch sử gửi thông báo nhắc học' },
-    { name: 'QldtAnnouncementLog', label: 'Nhật ký thông báo QLDTTX', count: qldtAnnouncementLogs, description: 'Lịch sử thông báo từ cổng QLDTTX' },
-    { name: 'SystemMeta', label: 'Cấu hình hệ thống', count: systemMeta, description: 'Thông số và trạng thái khởi tạo hệ thống' },
-  ];
+  const tableBreakdown: TableStat[] = tables.map((tbl) => ({
+    name: tbl,
+    label: tbl,
+    count: tableCounts.get(tbl) || 0,
+    description: `Bảng dữ liệu "${tbl}"`,
+  }));
 
   return {
-    tables: tableStats,
+    tables: tableStats as any,
     tableBreakdown,
     totalRecords,
     dbFileSize,
@@ -167,93 +283,54 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
   };
 }
 
+/**
+ * 6. Xuất toàn bộ cơ sở dữ liệu sang JSON (Tự động quét tất cả bảng & cột)
+ */
 export async function exportDatabaseAsJson(): Promise<{
   metadata: {
     appName: string;
     version: string;
     exportedAt: string;
     database: string;
+    tables: string[];
     stats: DatabaseStats;
   };
-  data: {
-    users: any[];
-    students: any[];
-    examBatches: any[];
-    examRecords: any[];
-    courseRegistrations: any[];
-    systemMeta: any[];
-    externalAccounts: any[];
-    activityLogs: any[];
-    telegramConfigs: any[];
-    globalConfigs: any[];
-    examReminderLogs: any[];
-    qldtAnnouncementLogs: any[];
-    classScheduleReminderLogs: any[];
-    registrationRequests: any[];
-    examRooms: any[];
-  };
+  data: Record<string, any[]>;
 }> {
   const stats = await getDatabaseStats();
+  const tables = await getPublicTables(prisma);
+  const sortedTables = await getTableDependencyOrder(prisma, tables);
 
-  const [
-    users,
-    students,
-    examBatches,
-    examRecords,
-    courseRegistrations,
-    systemMeta,
-    externalAccounts,
-    activityLogs,
-    telegramConfigs,
-    globalConfigs,
-    examReminderLogs,
-    qldtAnnouncementLogs,
-    classScheduleReminderLogs,
-    registrationRequests,
-    examRooms,
-  ] = await Promise.all([
-    prisma.user.findMany({ orderBy: { id: 'asc' } }),
-    prisma.student.findMany({ orderBy: { id: 'asc' } }),
-    prisma.examBatch.findMany({ orderBy: { id: 'asc' } }),
-    prisma.examRecord.findMany({ orderBy: { id: 'asc' } }),
-    prisma.courseRegistration.findMany({ orderBy: { id: 'asc' } }),
-    prisma.systemMeta.findMany({ orderBy: { id: 'asc' } }),
-    prisma.externalAccount.findMany({ orderBy: { id: 'asc' } }),
-    prisma.activityLog.findMany({ orderBy: { id: 'asc' } }),
-    prisma.telegramConfig.findMany({ orderBy: { id: 'asc' } }),
-    prisma.globalConfig.findMany({ orderBy: { id: 'asc' } }),
-    prisma.examReminderLog.findMany({ orderBy: { id: 'asc' } }),
-    prisma.qldtAnnouncementLog.findMany({ orderBy: { id: 'asc' } }),
-    prisma.classScheduleReminderLog.findMany({ orderBy: { id: 'asc' } }),
-    prisma.registrationRequest.findMany({ orderBy: { id: 'asc' } }),
-    prisma.examRoom.findMany({ orderBy: { id: 'asc' } }),
-  ]);
+  const data: Record<string, any[]> = {};
+
+  for (const tableName of sortedTables) {
+    try {
+      const rows: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "public"."${tableName}";`);
+      const rowData = Array.isArray(rows) ? rows : [];
+      data[tableName] = rowData;
+
+      // Tạo thêm alias camelCase và plural để tương thích ngược 100% với code cũ
+      const camel = toCamelCase(tableName);
+      data[camel] = rowData;
+      for (const alias of getTableAliases(tableName)) {
+        data[alias] = rowData;
+      }
+    } catch (err: any) {
+      console.warn(`[BackupService] Lỗi khi đọc dữ liệu bảng ${tableName}:`, err.message);
+      data[tableName] = [];
+    }
+  }
 
   return {
     metadata: {
       appName: 'PTIT Web Tool - Exam & Schedule Portal',
-      version: '1.0.0',
+      version: '2.0.0',
       exportedAt: new Date().toISOString(),
       database: 'PostgreSQL',
+      tables: sortedTables,
       stats,
     },
-    data: {
-      users,
-      students,
-      examBatches,
-      examRecords,
-      courseRegistrations,
-      systemMeta,
-      externalAccounts,
-      activityLogs,
-      telegramConfigs,
-      globalConfigs,
-      examReminderLogs,
-      qldtAnnouncementLogs,
-      classScheduleReminderLogs,
-      registrationRequests,
-      examRooms,
-    },
+    data,
   };
 }
 
@@ -261,193 +338,103 @@ function sqlVal(val: any): string {
   if (val === null || val === undefined) return 'NULL';
   if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
   if (typeof val === 'number') return String(val);
+  if (typeof val === 'bigint') return val.toString();
   if (val instanceof Date) return `'${val.toISOString()}'`;
+  if (Buffer.isBuffer(val)) {
+    return `E'\\\\x${val.toString('hex')}'`;
+  }
+  if (typeof val === 'object') {
+    const jsonStr = JSON.stringify(val);
+    return `'${jsonStr.replace(/'/g, "''")}'`;
+  }
   const str = String(val).replace(/'/g, "''");
   return `'${str}'`;
 }
 
 /**
- * Xuất toàn bộ cơ sở dữ liệu PostgreSQL sang script SQL (.sql)
+ * 7. Xuất toàn bộ cơ sở dữ liệu sang SQL Dump (Tự động 100% bảng, cột & sequences)
  */
 export async function exportDatabaseAsSqlDump(): Promise<string> {
-  const json = await exportDatabaseAsJson();
-  const d = json.data;
-  const lines: string[] = [];
+  const stats = await getDatabaseStats();
+  const tables = await getPublicTables(prisma);
+  const sortedTables = await getTableDependencyOrder(prisma, tables);
 
+  const lines: string[] = [];
   lines.push('-- ================================================================');
-  lines.push('-- PTIT WEB TOOL - POSTGRESQL DATABASE BACKUP (.sql)');
-  lines.push(`-- App: ${json.metadata.appName} (v${json.metadata.version})`);
-  lines.push(`-- Exported At: ${json.metadata.exportedAt}`);
-  lines.push(`-- Total Records: ${json.metadata.stats.totalRecords.toLocaleString('vi-VN')}`);
+  lines.push('-- PTIT WEB TOOL - DYNAMIC POSTGRESQL DATABASE BACKUP (.sql)');
+  lines.push(`-- App: PTIT Web Tool (v2.0.0)`);
+  lines.push(`-- Exported At: ${new Date().toISOString()}`);
+  lines.push(`-- Total Records: ${stats.totalRecords.toLocaleString('vi-VN')}`);
+  lines.push(`-- Total Tables: ${tables.length} (${tables.join(', ')})`);
   lines.push('-- ================================================================');
   lines.push('');
   lines.push('BEGIN;');
   lines.push("SET session_replication_role = 'replica';");
   lines.push('');
 
-  // 1. Truncate tables
-  lines.push('-- 1. Clean existing records in cascade');
-  lines.push('TRUNCATE TABLE "ClassScheduleReminderLog", "QldtAnnouncementLog", "ExamReminderLog", "ActivityLog", "TelegramConfig", "ExternalAccount", "CourseRegistration", "ExamRecord", "ExamBatch", "User", "Student", "RegistrationRequest", "GlobalConfig", "SystemMeta" CASCADE;');
-  lines.push('');
-
-  // 2. SystemMeta
-  if (d.systemMeta?.length) {
-    lines.push(`-- SystemMeta (${d.systemMeta.length} rows)`);
-    for (const r of d.systemMeta) {
-      lines.push(`INSERT INTO "SystemMeta" ("id", "key", "value", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.key)}, ${sqlVal(r.value)}, ${sqlVal(r.updatedAt)});`);
-    }
+  // 1. Truncate theo thứ tự đảo ngược ràng buộc (con trước, cha sau)
+  const cleanTables = [...sortedTables].reverse();
+  const truncateList = cleanTables.map((t) => `"public"."${t}"`).join(', ');
+  if (truncateList) {
+    lines.push('-- 1. Clean existing records in cascade');
+    lines.push(`TRUNCATE TABLE ${truncateList} CASCADE;`);
     lines.push('');
   }
 
-  // 3. GlobalConfig
-  if (d.globalConfigs?.length) {
-    lines.push(`-- GlobalConfig (${d.globalConfigs.length} rows)`);
-    for (const r of d.globalConfigs) {
-      lines.push(`INSERT INTO "GlobalConfig" ("id", "key", "value", "description", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.key)}, ${sqlVal(r.value)}, ${sqlVal(r.description)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
-    }
-    lines.push('');
-  }
+  // 2. Nạp dữ liệu từng bảng động theo thứ tự cha trước con sau
+  for (const tableName of sortedTables) {
+    try {
+      const rows: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "public"."${tableName}";`);
+      if (!Array.isArray(rows) || rows.length === 0) {
+        continue;
+      }
 
-  // 4. Student
-  if (d.students?.length) {
-    lines.push(`-- Student (${d.students.length} rows)`);
-    for (const r of d.students) {
-      lines.push(`INSERT INTO "Student" ("id", "maSV", "hoLot", "ten", "hoTen", "gioiTinh", "ngaySinh", "maLop", "trangThai", "soDienThoai", "ghiChu", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.maSV)}, ${sqlVal(r.hoLot)}, ${sqlVal(r.ten)}, ${sqlVal(r.hoTen)}, ${sqlVal(r.gioiTinh)}, ${sqlVal(r.ngaySinh)}, ${sqlVal(r.maLop)}, ${sqlVal(r.trangThai)}, ${sqlVal(r.soDienThoai)}, ${sqlVal(r.ghiChu)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
-    }
-    lines.push('');
-  }
+      lines.push(`-- Table: "${tableName}" (${rows.length} rows)`);
+      const columns = Object.keys(rows[0]);
+      const quotedCols = columns.map((c) => `"${c}"`).join(', ');
 
-  // 5. User
-  if (d.users?.length) {
-    lines.push(`-- User (${d.users.length} rows)`);
-    for (const r of d.users) {
-      lines.push(`INSERT INTO "User" ("id", "username", "passwordHash", "role", "isActive", "lastLogin", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.passwordHash)}, ${sqlVal(r.role)}, ${sqlVal(r.isActive)}, ${sqlVal(r.lastLogin)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
+      // Nhóm theo chunk 100 dòng cho mỗi câu lệnh INSERT để file gọn và tốc độ nạp nhanh
+      const rowChunks = chunkArray(rows, 100);
+      for (const chunk of rowChunks) {
+        const valuesList = chunk.map((r) => {
+          const vals = columns.map((col) => sqlVal(r[col]));
+          return `(${vals.join(', ')})`;
+        });
+        lines.push(`INSERT INTO "public"."${tableName}" (${quotedCols}) VALUES`);
+        lines.push(`  ${valuesList.join(',\n  ')};`);
+      }
+      lines.push('');
+    } catch (err: any) {
+      console.warn(`[BackupService] Lỗi khi tạo SQL dump cho bảng ${tableName}:`, err.message);
     }
-    lines.push('');
-  }
-
-  // 6. ExamBatch
-  if (d.examBatches?.length) {
-    lines.push(`-- ExamBatch (${d.examBatches.length} rows)`);
-    for (const r of d.examBatches) {
-      lines.push(`INSERT INTO "ExamBatch" ("id", "code", "name", "semester", "academicYear", "startDate", "endDate", "isActive", "description", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.code)}, ${sqlVal(r.name)}, ${sqlVal(r.semester)}, ${sqlVal(r.academicYear)}, ${sqlVal(r.startDate)}, ${sqlVal(r.endDate)}, ${sqlVal(r.isActive)}, ${sqlVal(r.description)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
-    }
-    lines.push('');
-  }
-
-  // 7. ExamRecord
-  if (d.examRecords?.length) {
-    lines.push(`-- ExamRecord (${d.examRecords.length} rows)`);
-    for (const r of d.examRecords) {
-      lines.push(`INSERT INTO "ExamRecord" ("id", "maSV", "batchCode", "nhomThi", "mapThi", "maMH", "tenMH", "maHTThi", "nhomHoc", "toThi", "maLopMH", "ngayThi", "gioThi", "soPhutThi", "maDotThi", "tenDotThi", "isPostponed", "createdAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.maSV)}, ${sqlVal(r.batchCode)}, ${sqlVal(r.nhomThi)}, ${sqlVal(r.mapThi)}, ${sqlVal(r.maMH)}, ${sqlVal(r.tenMH)}, ${sqlVal(r.maHTThi)}, ${sqlVal(r.nhomHoc)}, ${sqlVal(r.toThi)}, ${sqlVal(r.maLopMH)}, ${sqlVal(r.ngayThi)}, ${sqlVal(r.gioThi)}, ${sqlVal(r.soPhutThi)}, ${sqlVal(r.maDotThi)}, ${sqlVal(r.tenDotThi)}, ${sqlVal(r.isPostponed)}, ${sqlVal(r.createdAt)});`);
-    }
-    lines.push('');
-  }
-
-  // 8. CourseRegistration
-  if (d.courseRegistrations?.length) {
-    lines.push(`-- CourseRegistration (${d.courseRegistrations.length} rows)`);
-    for (const r of d.courseRegistrations) {
-      lines.push(`INSERT INTO "CourseRegistration" ("id", "classCode", "username", "data", "totalCourses", "totalCredits", "tuitionFee", "lastPulledAt", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.classCode)}, ${sqlVal(r.username)}, ${sqlVal(r.data)}, ${sqlVal(r.totalCourses)}, ${sqlVal(r.totalCredits)}, ${sqlVal(r.tuitionFee)}, ${sqlVal(r.lastPulledAt)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
-    }
-    lines.push('');
-  }
-
-  // 9. ExternalAccount
-  if (d.externalAccounts?.length) {
-    lines.push(`-- ExternalAccount (${d.externalAccounts.length} rows)`);
-    for (const r of d.externalAccounts) {
-      lines.push(`INSERT INTO "ExternalAccount" ("id", "username", "systemKey", "systemName", "systemUrl", "extUsername", "extPassword", "token", "status", "lastSyncAt", "syncMessage", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.systemKey)}, ${sqlVal(r.systemName)}, ${sqlVal(r.systemUrl)}, ${sqlVal(r.extUsername)}, ${sqlVal(r.extPassword)}, ${sqlVal(r.token)}, ${sqlVal(r.status)}, ${sqlVal(r.lastSyncAt)}, ${sqlVal(r.syncMessage)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
-    }
-    lines.push('');
-  }
-
-  // 10. TelegramConfig
-  if (d.telegramConfigs?.length) {
-    lines.push(`-- TelegramConfig (${d.telegramConfigs.length} rows)`);
-    for (const r of d.telegramConfigs) {
-      lines.push(`INSERT INTO "TelegramConfig" ("id", "username", "botToken", "chatId", "threadId", "isEnabled", "notifyExamSchedule", "notifyClassActivity", "notifyQldtAnnouncements", "qldtCheckInterval", "lastQldtCheckedAt", "notifyClassSchedule", "classReminderBefore", "lastTestedAt", "lastTestStatus", "lastTestError", "botUsername", "botFirstName", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.botToken)}, ${sqlVal(r.chatId)}, ${sqlVal(r.threadId)}, ${sqlVal(r.isEnabled)}, ${sqlVal(r.notifyExamSchedule)}, ${sqlVal(r.notifyClassActivity)}, ${sqlVal(r.notifyQldtAnnouncements)}, ${sqlVal(r.qldtCheckInterval)}, ${sqlVal(r.lastQldtCheckedAt)}, ${sqlVal(r.notifyClassSchedule)}, ${sqlVal(r.classReminderBefore)}, ${sqlVal(r.lastTestedAt)}, ${sqlVal(r.lastTestStatus)}, ${sqlVal(r.lastTestError)}, ${sqlVal(r.botUsername)}, ${sqlVal(r.botFirstName)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
-    }
-    lines.push('');
-  }
-
-  // 11. RegistrationRequest
-  if (d.registrationRequests?.length) {
-    lines.push(`-- RegistrationRequest (${d.registrationRequests.length} rows)`);
-    for (const r of d.registrationRequests) {
-      lines.push(`INSERT INTO "RegistrationRequest" ("id", "username", "fullName", "email", "phoneNumber", "lop", "passwordHash", "status", "note", "reviewedBy", "reviewedAt", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.fullName)}, ${sqlVal(r.email)}, ${sqlVal(r.phoneNumber)}, ${sqlVal(r.lop)}, ${sqlVal(r.passwordHash)}, ${sqlVal(r.status)}, ${sqlVal(r.note)}, ${sqlVal(r.reviewedBy)}, ${sqlVal(r.reviewedAt)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
-    }
-    lines.push('');
-  }
-
-  // 12. ActivityLog
-  if (d.activityLogs?.length) {
-    lines.push(`-- ActivityLog (${d.activityLogs.length} rows)`);
-    for (const r of d.activityLogs) {
-      lines.push(`INSERT INTO "ActivityLog" ("id", "userId", "username", "userRole", "action", "targetType", "targetId", "description", "metadata", "ipAddress", "userAgent", "createdAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.userId)}, ${sqlVal(r.username)}, ${sqlVal(r.userRole)}, ${sqlVal(r.action)}, ${sqlVal(r.targetType)}, ${sqlVal(r.targetId)}, ${sqlVal(r.description)}, ${sqlVal(r.metadata)}, ${sqlVal(r.ipAddress)}, ${sqlVal(r.userAgent)}, ${sqlVal(r.createdAt)});`);
-    }
-    lines.push('');
-  }
-
-  // 13. ExamReminderLog
-  if (d.examReminderLogs?.length) {
-    lines.push(`-- ExamReminderLog (${d.examReminderLogs.length} rows)`);
-    for (const r of d.examReminderLogs) {
-      lines.push(`INSERT INTO "ExamReminderLog" ("id", "username", "examRecordId", "reminderType", "targetDate", "sentAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.examRecordId)}, ${sqlVal(r.reminderType)}, ${sqlVal(r.targetDate)}, ${sqlVal(r.sentAt)});`);
-    }
-    lines.push('');
-  }
-
-  // 14. QldtAnnouncementLog
-  if (d.qldtAnnouncementLogs?.length) {
-    lines.push(`-- QldtAnnouncementLog (${d.qldtAnnouncementLogs.length} rows)`);
-    for (const r of d.qldtAnnouncementLogs) {
-      lines.push(`INSERT INTO "QldtAnnouncementLog" ("id", "username", "announcementId", "title", "publishDate", "sentAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.announcementId)}, ${sqlVal(r.title)}, ${sqlVal(r.publishDate)}, ${sqlVal(r.sentAt)});`);
-    }
-    lines.push('');
-  }
-
-  // 15. ClassScheduleReminderLog
-  if (d.classScheduleReminderLogs?.length) {
-    lines.push(`-- ClassScheduleReminderLog (${d.classScheduleReminderLogs.length} rows)`);
-    for (const r of d.classScheduleReminderLogs) {
-      lines.push(`INSERT INTO "ClassScheduleReminderLog" ("id", "username", "courseCode", "reminderType", "targetDate", "sessionInfo", "sentAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.username)}, ${sqlVal(r.courseCode)}, ${sqlVal(r.reminderType)}, ${sqlVal(r.targetDate)}, ${sqlVal(r.sessionInfo)}, ${sqlVal(r.sentAt)});`);
-    }
-    lines.push('');
-  }
-
-  // 16. ExamRoom
-  if (d.examRooms?.length) {
-    lines.push(`-- ExamRoom (${d.examRooms.length} rows)`);
-    for (const r of d.examRooms) {
-      lines.push(`INSERT INTO "ExamRoom" ("id", "roomKey", "mapThi", "maMH", "tenMH", "ngayThi", "gioThi", "maHTThi", "batchCode", "customPrice", "note", "updatedBy", "createdAt", "updatedAt") VALUES (${sqlVal(r.id)}, ${sqlVal(r.roomKey)}, ${sqlVal(r.mapThi)}, ${sqlVal(r.maMH)}, ${sqlVal(r.tenMH)}, ${sqlVal(r.ngayThi)}, ${sqlVal(r.gioThi)}, ${sqlVal(r.maHTThi)}, ${sqlVal(r.batchCode)}, ${sqlVal(r.customPrice)}, ${sqlVal(r.note)}, ${sqlVal(r.updatedBy)}, ${sqlVal(r.createdAt)}, ${sqlVal(r.updatedAt)});`);
-    }
-    lines.push('');
   }
 
   lines.push("SET session_replication_role = 'origin';");
   lines.push('');
-  lines.push('-- Reset auto-increment sequences');
-  const tablesWithId = [
-    'User',
-    'Student',
-    'ExamBatch',
-    'ExamRecord',
-    'CourseRegistration',
-    'SystemMeta',
-    'ExternalAccount',
-    'ActivityLog',
-    'TelegramConfig',
-    'GlobalConfig',
-    'ExamReminderLog',
-    'QldtAnnouncementLog',
-    'ClassScheduleReminderLog',
-    'RegistrationRequest',
-    'ExamRoom',
-  ];
-  for (const t of tablesWithId) {
-    lines.push(`SELECT setval(pg_get_serial_sequence('"${t}"', 'id'), coalesce(max(id), 1), max(id) IS NOT NULL) FROM "${t}";`);
+  lines.push('-- Reset all auto-increment sequences dynamically');
+
+  try {
+    const seqCols: any = await prisma.$queryRawUnsafe(`
+      SELECT 
+        c.table_name, 
+        c.column_name, 
+        pg_get_serial_sequence('"' || c.table_name || '"', c.column_name) AS seq_name
+      FROM information_schema.columns c
+      WHERE c.table_schema = 'public'
+        AND pg_get_serial_sequence('"' || c.table_name || '"', c.column_name) IS NOT NULL;
+    `);
+
+    if (Array.isArray(seqCols)) {
+      for (const { table_name, column_name, seq_name } of seqCols) {
+        if (seq_name) {
+          lines.push(`SELECT setval('${seq_name}', coalesce(max("${column_name}"), 1), max("${column_name}") IS NOT NULL) FROM "public"."${table_name}";`);
+        }
+      }
+    }
+  } catch {
+    // Silently ignore sequence error in dump generation
   }
+
   lines.push('');
   lines.push('COMMIT;');
   lines.push('');
@@ -636,7 +623,6 @@ export async function saveBackupTelegramConfig(params: {
     throw new Error('Vui lòng nhập Chat ID nhận file backup');
   }
 
-  // If custom token is provided, verify it
   if (botToken && botToken.trim()) {
     const verify = await verifyTelegramBot(botToken.trim());
     if (!verify.success) {
@@ -719,7 +705,6 @@ export async function testBackupTelegramTarget(params?: {
     threadId: threadId ? Number(threadId) : undefined,
   });
 
-  // Update test status in global config
   const existing = await getGlobalConfig<BackupTelegramConfigValue>(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM);
   if (existing) {
     await setGlobalConfig(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM, {
@@ -797,7 +782,7 @@ export async function sendBackupToTelegram(params?: {
       const filename = `ptit-db-${timestamp}.sql`;
       const sizeFormatted = formatBytes(sqlBuffer.length);
 
-      const caption = `🐘 <b>BẢN SAO LƯU DATABASE POSTGRESQL (.sql)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n👥 <b>Sinh viên:</b> ${stats.tables.students.toLocaleString('vi-VN')} | <b>Lịch thi:</b> ${stats.tables.examRecords.toLocaleString('vi-VN')}\n📁 <b>Tài khoản:</b> ${stats.tables.users.toLocaleString('vi-VN')} | <b>Đợt thi:</b> ${stats.tables.examBatches}\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <i>File SQL Dump chuẩn PostgreSQL - Khôi phục tức thì hoặc nạp vào PostgreSQL bằng lệnh psql.</i>`;
+      const caption = `🐘 <b>BẢN SAO LƯU DATABASE POSTGRESQL (.sql)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n📋 <b>Bao gồm:</b> ${stats.tableBreakdown.length} bảng dữ liệu PostgreSQL\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <i>File SQL Dump chuẩn PostgreSQL - Tự động nhận diện toàn bộ cấu trúc bảng & khôi phục tức thì.</i>`;
 
       const sendRes = await sendTelegramDocument(botToken, chatId, sqlBuffer, filename, {
         threadId: threadId ? Number(threadId) : undefined,
@@ -824,7 +809,7 @@ export async function sendBackupToTelegram(params?: {
       const filename = `ptit-db-${timestamp}.json`;
       const sizeFormatted = formatBytes(jsonBuffer.length);
 
-      const caption = `📄 <b>BẢN XUẤT DỮ LIỆU JSON ĐẦY ĐỦ (.json)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n📋 <b>Bao gồm:</b> 14 bảng dữ liệu hệ thống PostgreSQL\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🌐 <i>Dữ liệu JSON có cấu trúc đầy đủ, dễ đọc & di chuyển sang mọi môi trường.</i>`;
+      const caption = `📄 <b>BẢN XUẤT DỮ LIỆU JSON ĐẦY ĐỦ (.json)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n📋 <b>Bao gồm:</b> ${stats.tableBreakdown.length} bảng dữ liệu hệ thống PostgreSQL\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🌐 <i>Dữ liệu JSON có cấu trúc đầy đủ, tự động khớp mọi bảng & cột khi khôi phục.</i>`;
 
       const sendRes = await sendTelegramDocument(botToken, chatId, jsonBuffer, filename, {
         threadId: threadId ? Number(threadId) : undefined,
@@ -845,7 +830,6 @@ export async function sendBackupToTelegram(params?: {
   const isSuccess = filesSent.length > 0;
   const errorMsg = errors.join('; ');
 
-  // Update last sent status in GlobalConfig
   if (storedConfig) {
     await setGlobalConfig(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM, {
       ...storedConfig,
@@ -902,20 +886,20 @@ export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean
       };
     }
 
-    console.log(`⏰ [Auto Backup 10:00 AM VN] Bắt đầu tự động tạo bản sao lưu dữ liệu PostgreSQL lúc ${scheduleTime} sáng...`);
+    console.log(`⏰ [Auto Backup] Bắt đầu tự động tạo bản sao lưu dữ liệu PostgreSQL lúc ${scheduleTime} sáng...`);
 
     // 1. Tạo snapshot lưu cục bộ trên máy chủ
     const createdFiles = await createLocalBackup('all');
-    console.log(`⏰ [Auto Backup 10:00 AM VN] Đã tạo ${createdFiles.length} file snapshot trên máy chủ.`);
+    console.log(`⏰ [Auto Backup] Đã tạo ${createdFiles.length} file snapshot trên máy chủ.`);
 
     // 2. Gửi Telegram nếu có cấu hình
     let telegramResult: any = null;
     if (config?.chatId && config.isEnabled !== false) {
       try {
         telegramResult = await sendBackupToTelegram();
-        console.log(`⏰ [Auto Backup 10:00 AM VN] Đã gửi ${telegramResult.filesSent?.length || 0} file lên Telegram.`);
+        console.log(`⏰ [Auto Backup] Đã gửi ${telegramResult.filesSent?.length || 0} file lên Telegram.`);
       } catch (telErr: any) {
-        console.error(`⏰ [Auto Backup 10:00 AM VN] Lỗi khi gửi file lên Telegram:`, telErr.message);
+        console.error(`⏰ [Auto Backup] Lỗi khi gửi file lên Telegram:`, telErr.message);
       }
     }
 
@@ -950,48 +934,8 @@ export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DATABASE RESTORATION CAPABILITIES (Phục hồi CSDL PostgreSQL)
+// DATABASE RESTORATION CAPABILITIES (Phục hồi CSDL PostgreSQL Động)
 // ─────────────────────────────────────────────────────────────────────────────
-
-async function insertInChunks<T>(
-  items: T[],
-  chunkSize: number,
-  insertFn: (chunk: any[]) => Promise<any>
-) {
-  if (!items || items.length === 0) return;
-  for (let i = 0; i < items.length; i += chunkSize) {
-    const chunk = items.slice(i, i + chunkSize);
-    await insertFn(chunk as any[]);
-  }
-}
-
-export async function syncPostgresSequences(): Promise<void> {
-  const tablesWithId = [
-    'User',
-    'Student',
-    'ExamBatch',
-    'ExamRecord',
-    'CourseRegistration',
-    'SystemMeta',
-    'ExternalAccount',
-    'ActivityLog',
-    'TelegramConfig',
-    'GlobalConfig',
-    'ExamReminderLog',
-    'QldtAnnouncementLog',
-    'ClassScheduleReminderLog',
-    'RegistrationRequest',
-  ];
-  for (const table of tablesWithId) {
-    try {
-      await (prisma as any).$executeRawUnsafe(
-        `SELECT setval(pg_get_serial_sequence('"${table}"', 'id'), coalesce(max(id), 1), max(id) IS NOT NULL) FROM "${table}";`
-      );
-    } catch {
-      // Silently ignore if not running on PostgreSQL
-    }
-  }
-}
 
 /**
  * Phục hồi cơ sở dữ liệu từ file SQL Dump PostgreSQL (.sql)
@@ -1031,14 +975,14 @@ export async function restoreFromSqlDump(
 
   return {
     success: true,
-    message: `Phục hồi cơ sở dữ liệu từ file SQL Dump PostgreSQL thành công! Tổng cộng ${stats.totalRecords.toLocaleString('vi-VN')} bản ghi.`,
+    message: `Phục hồi cơ sở dữ liệu từ file SQL Dump PostgreSQL thành công! Tổng cộng ${stats.totalRecords.toLocaleString('vi-VN')} bản ghi trên ${stats.tableBreakdown.length} bảng.`,
     preRestoreBackupFile: preRestoreName,
     stats,
   };
 }
 
 /**
- * Phục hồi cơ sở dữ liệu từ file JSON dump đầy đủ
+ * Phục hồi cơ sở dữ liệu từ file JSON dump (Tự động nạp động 100% bảng & cột)
  */
 export async function restoreFromJsonDump(
   jsonContent: string | object
@@ -1069,325 +1013,123 @@ export async function restoreFromJsonDump(
   const preRestoreFiles = await createLocalBackup('json');
   const preRestoreName = preRestoreFiles[0]?.name || 'pre-restore-backup.json';
 
-  const parseDate = (d: any) => (d ? new Date(d) : undefined);
+  // 2. Lấy danh sách bảng trong Database đích và sắp xếp theo quan hệ khoá ngoại
+  const dbTables = await getPublicTables(prisma);
+  const sortedTables = await getTableDependencyOrder(prisma, dbTables);
 
-  // 2. Xóa sạch dữ liệu cũ theo thứ tự khóa ngoại an toàn
-  await prisma.classScheduleReminderLog.deleteMany({}).catch(() => {});
-  await prisma.qldtAnnouncementLog.deleteMany({}).catch(() => {});
-  await prisma.examReminderLog.deleteMany({}).catch(() => {});
-  await prisma.activityLog.deleteMany({}).catch(() => {});
-  await prisma.telegramConfig.deleteMany({}).catch(() => {});
-  await prisma.externalAccount.deleteMany({}).catch(() => {});
-  await prisma.courseRegistration.deleteMany({}).catch(() => {});
-  await prisma.examRecord.deleteMany({}).catch(() => {});
-  await prisma.examBatch.deleteMany({}).catch(() => {});
-  await prisma.user.deleteMany({}).catch(() => {});
-  await prisma.student.deleteMany({}).catch(() => {});
-  await prisma.registrationRequest.deleteMany({}).catch(() => {});
-  await prisma.globalConfig.deleteMany({}).catch(() => {});
-  await prisma.systemMeta.deleteMany({}).catch(() => {});
+  // 3. Chuẩn bị map dữ liệu cần nạp cho từng bảng (khớp cả PascalCase, camelCase, alias)
+  const tableRowsMap = new Map<string, any[]>();
 
-  let count = 0;
+  for (const tableName of sortedTables) {
+    let rows: any[] | undefined;
 
-  // 3. Nạp dữ liệu mới theo thứ tự phụ thuộc chính xác
+    if (Array.isArray(data[tableName])) {
+      rows = data[tableName];
+    } else {
+      const aliases = getTableAliases(tableName);
+      for (const alias of aliases) {
+        if (Array.isArray(data[alias])) {
+          rows = data[alias];
+          break;
+        }
+      }
+    }
 
-  // SystemMeta
-  if (Array.isArray(data.systemMeta) && data.systemMeta.length > 0) {
-    const items = data.systemMeta.map((s: any) => ({
-      id: s.id,
-      key: s.key,
-      value: s.value,
-      updatedAt: parseDate(s.updatedAt) || new Date(),
-    }));
-    await insertInChunks(items, 200, (c) => prisma.systemMeta.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
+    if (rows && rows.length > 0) {
+      tableRowsMap.set(tableName, rows);
+    }
   }
 
-  // GlobalConfig
-  if (Array.isArray(data.globalConfigs) && data.globalConfigs.length > 0) {
-    const items = data.globalConfigs.map((g: any) => ({
-      id: g.id,
-      key: g.key,
-      value: g.value,
-      description: g.description ?? null,
-      createdAt: parseDate(g.createdAt) || new Date(),
-      updatedAt: parseDate(g.updatedAt) || new Date(),
-    }));
-    await insertInChunks(items, 200, (c) => prisma.globalConfig.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
+  // Tạm tắt ràng buộc ngoại nếu quyền hạn cho phép
+  let replicaRoleSet = false;
+  try {
+    await prisma.$executeRawUnsafe(`SET session_replication_role = 'replica';`);
+    replicaRoleSet = true;
+  } catch {
+    // Không sao, topological sort sẽ đảm bảo thứ tự
   }
 
-  // Student
-  if (Array.isArray(data.students) && data.students.length > 0) {
-    const items = data.students.map((s: any) => ({
-      id: s.id,
-      maSV: s.maSV,
-      hoLot: s.hoLot ?? null,
-      ten: s.ten ?? null,
-      hoTen: s.hoTen ?? null,
-      gioiTinh: s.gioiTinh ?? null,
-      ngaySinh: s.ngaySinh ?? null,
-      maLop: s.maLop ?? null,
-      trangThai: s.trangThai ?? 'DANG_HOC',
-      soDienThoai: s.soDienThoai ?? null,
-      ghiChu: s.ghiChu ?? null,
-      createdAt: parseDate(s.createdAt) || new Date(),
-      updatedAt: parseDate(s.updatedAt) || new Date(),
-    }));
-    await insertInChunks(items, 300, (c) => prisma.student.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
+  // 4. Xóa sạch dữ liệu cũ theo thứ tự con trước, cha sau
+  const reverseSorted = [...sortedTables].reverse();
+  for (const tableName of reverseSorted) {
+    try {
+      await prisma.$executeRawUnsafe(`DELETE FROM "public"."${tableName}";`);
+    } catch (delErr: any) {
+      console.warn(`[Restore Warning] Không thể xoá bảng "${tableName}":`, delErr.message);
+    }
   }
 
-  // User
-  if (Array.isArray(data.users) && data.users.length > 0) {
-    const items = data.users.map((u: any) => ({
-      id: u.id,
-      username: u.username,
-      passwordHash: u.passwordHash,
-      role: u.role || 'sinh_vien',
-      isActive: u.isActive !== undefined ? Boolean(u.isActive) : true,
-      lastLogin: parseDate(u.lastLogin) || null,
-      createdAt: parseDate(u.createdAt) || new Date(),
-      updatedAt: parseDate(u.updatedAt) || new Date(),
-    }));
-    await insertInChunks(items, 300, (c) => prisma.user.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
+  // 5. Nạp dữ liệu mới theo thứ tự cha trước, con sau (Batch dynamic INSERT an toàn)
+  let totalRestored = 0;
+
+  for (const tableName of sortedTables) {
+    const rows = tableRowsMap.get(tableName);
+    if (!rows || rows.length === 0) continue;
+
+    // Tìm tất cả các cột xuất hiện trong tập dữ liệu của bảng
+    const columnSet = new Set<string>();
+    for (const r of rows) {
+      if (r && typeof r === 'object') {
+        Object.keys(r).forEach((c) => columnSet.add(c));
+      }
+    }
+
+    const columns = Array.from(columnSet);
+    if (columns.length === 0) continue;
+
+    const quotedCols = columns.map((c) => `"${c}"`).join(', ');
+
+    // Giới hạn số tham số dưới 30,000 để tránh tràn giới hạn 65,535 của PostgreSQL
+    const maxParams = 30000;
+    const batchSize = Math.max(1, Math.min(500, Math.floor(maxParams / columns.length)));
+    const chunks = chunkArray(rows, batchSize);
+
+    for (const chunk of chunks) {
+      const placeholders: string[] = [];
+      const flatValues: any[] = [];
+      let pIndex = 1;
+
+      for (const row of chunk) {
+        const rowPlaceholders: string[] = [];
+        for (const col of columns) {
+          rowPlaceholders.push(`$${pIndex++}`);
+          let val = row[col];
+          if (val !== null && val !== undefined && typeof val === 'object' && !(val instanceof Date) && !Buffer.isBuffer(val)) {
+            val = JSON.stringify(val);
+          }
+          flatValues.push(val === undefined ? null : val);
+        }
+        placeholders.push(`(${rowPlaceholders.join(', ')})`);
+      }
+
+      const insertSql = `INSERT INTO "public"."${tableName}" (${quotedCols}) VALUES ${placeholders.join(', ')};`;
+      await prisma.$executeRawUnsafe(insertSql, ...flatValues);
+    }
+
+    totalRestored += rows.length;
   }
 
-  // ExamBatch
-  if (Array.isArray(data.examBatches) && data.examBatches.length > 0) {
-    const items = data.examBatches.map((b: any) => ({
-      id: b.id,
-      code: b.code,
-      name: b.name,
-      semester: b.semester ?? null,
-      academicYear: b.academicYear ?? null,
-      startDate: b.startDate ?? null,
-      endDate: b.endDate ?? null,
-      isActive: b.isActive !== undefined ? Boolean(b.isActive) : true,
-      description: b.description ?? null,
-      createdAt: parseDate(b.createdAt) || new Date(),
-      updatedAt: parseDate(b.updatedAt) || new Date(),
-    }));
-    await insertInChunks(items, 200, (c) => prisma.examBatch.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
+  // Bật lại ràng buộc triggers / foreign keys
+  if (replicaRoleSet) {
+    await prisma.$executeRawUnsafe(`SET session_replication_role = 'origin';`).catch(() => {});
   }
 
-  // ExamRecord
-  if (Array.isArray(data.examRecords) && data.examRecords.length > 0) {
-    const items = data.examRecords.map((r: any) => ({
-      id: r.id,
-      maSV: r.maSV,
-      batchCode: r.batchCode ?? null,
-      nhomThi: r.nhomThi ?? null,
-      mapThi: r.mapThi ?? null,
-      maMH: r.maMH ?? null,
-      tenMH: r.tenMH ?? null,
-      maHTThi: r.maHTThi ?? null,
-      nhomHoc: r.nhomHoc ?? null,
-      toThi: r.toThi ?? null,
-      maLopMH: r.maLopMH ?? null,
-      ngayThi: r.ngayThi ?? null,
-      gioThi: r.gioThi ?? null,
-      soPhutThi: r.soPhutThi ?? null,
-      maDotThi: r.maDotThi ?? null,
-      tenDotThi: r.tenDotThi ?? null,
-      isPostponed: Boolean(r.isPostponed),
-      createdAt: parseDate(r.createdAt) || new Date(),
-    }));
-    await insertInChunks(items, 500, (c) => prisma.examRecord.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
-  }
-
-  // CourseRegistration
-  if (Array.isArray(data.courseRegistrations) && data.courseRegistrations.length > 0) {
-    const items = data.courseRegistrations.map((cr: any) => ({
-      id: cr.id,
-      classCode: cr.classCode,
-      username: cr.username,
-      data: cr.data,
-      totalCourses: cr.totalCourses ?? 0,
-      totalCredits: cr.totalCredits ?? 0,
-      tuitionFee: cr.tuitionFee ?? 0,
-      lastPulledAt: parseDate(cr.lastPulledAt) || new Date(),
-      createdAt: parseDate(cr.createdAt) || new Date(),
-      updatedAt: parseDate(cr.updatedAt) || new Date(),
-    }));
-    await insertInChunks(items, 200, (c) => prisma.courseRegistration.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
-  }
-
-  // ExternalAccount
-  if (Array.isArray(data.externalAccounts) && data.externalAccounts.length > 0) {
-    const items = data.externalAccounts.map((ea: any) => ({
-      id: ea.id,
-      username: ea.username,
-      systemKey: ea.systemKey,
-      systemName: ea.systemName,
-      systemUrl: ea.systemUrl,
-      extUsername: ea.extUsername,
-      extPassword: ea.extPassword,
-      token: ea.token ?? null,
-      status: ea.status || 'CONNECTED',
-      lastSyncAt: parseDate(ea.lastSyncAt) || null,
-      syncMessage: ea.syncMessage ?? null,
-      createdAt: parseDate(ea.createdAt) || new Date(),
-      updatedAt: parseDate(ea.updatedAt) || new Date(),
-    }));
-    await insertInChunks(items, 200, (c) => prisma.externalAccount.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
-  }
-
-  // TelegramConfig
-  if (Array.isArray(data.telegramConfigs) && data.telegramConfigs.length > 0) {
-    const items = data.telegramConfigs.map((tc: any) => ({
-      id: tc.id,
-      username: tc.username,
-      botToken: tc.botToken ?? null,
-      chatId: tc.chatId,
-      threadId: tc.threadId ?? null,
-      isEnabled: tc.isEnabled !== undefined ? Boolean(tc.isEnabled) : true,
-      notifyExamSchedule: tc.notifyExamSchedule !== undefined ? Boolean(tc.notifyExamSchedule) : true,
-      notifyClassActivity: tc.notifyClassActivity !== undefined ? Boolean(tc.notifyClassActivity) : true,
-      notifyQldtAnnouncements: tc.notifyQldtAnnouncements !== undefined ? Boolean(tc.notifyQldtAnnouncements) : true,
-      qldtCheckInterval: Number(tc.qldtCheckInterval) || 2,
-      lastQldtCheckedAt: parseDate(tc.lastQldtCheckedAt) || null,
-      notifyClassSchedule: tc.notifyClassSchedule !== undefined ? Boolean(tc.notifyClassSchedule) : true,
-      classReminderBefore: Number(tc.classReminderBefore) || 30,
-      lastTestedAt: parseDate(tc.lastTestedAt) || null,
-      lastTestStatus: tc.lastTestStatus ?? null,
-      lastTestError: tc.lastTestError ?? null,
-      botUsername: tc.botUsername ?? null,
-      botFirstName: tc.botFirstName ?? null,
-      createdAt: parseDate(tc.createdAt) || new Date(),
-      updatedAt: parseDate(tc.updatedAt) || new Date(),
-    }));
-    await insertInChunks(items, 200, (c) => prisma.telegramConfig.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
-  }
-
-  // RegistrationRequest
-  if (Array.isArray(data.registrationRequests) && data.registrationRequests.length > 0) {
-    const items = data.registrationRequests.map((rr: any) => ({
-      id: rr.id,
-      username: rr.username,
-      fullName: rr.fullName ?? null,
-      email: rr.email ?? null,
-      phoneNumber: rr.phoneNumber ?? null,
-      lop: rr.lop ?? null,
-      passwordHash: rr.passwordHash,
-      status: rr.status || 'PENDING',
-      note: rr.note ?? null,
-      reviewedBy: rr.reviewedBy ?? null,
-      reviewedAt: parseDate(rr.reviewedAt) || null,
-      createdAt: parseDate(rr.createdAt) || new Date(),
-      updatedAt: parseDate(rr.updatedAt) || new Date(),
-    }));
-    await insertInChunks(items, 200, (c) => prisma.registrationRequest.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
-  }
-
-  // ActivityLog
-  if (Array.isArray(data.activityLogs) && data.activityLogs.length > 0) {
-    const items = data.activityLogs.map((al: any) => ({
-      id: al.id,
-      userId: al.userId ?? null,
-      username: al.username ?? null,
-      userRole: al.userRole ?? null,
-      action: al.action,
-      targetType: al.targetType ?? null,
-      targetId: al.targetId ?? null,
-      description: al.description,
-      metadata: al.metadata ?? null,
-      ipAddress: al.ipAddress ?? null,
-      userAgent: al.userAgent ?? null,
-      createdAt: parseDate(al.createdAt) || new Date(),
-    }));
-    await insertInChunks(items, 500, (c) => prisma.activityLog.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
-  }
-
-  // ExamReminderLog
-  if (Array.isArray(data.examReminderLogs) && data.examReminderLogs.length > 0) {
-    const items = data.examReminderLogs.map((er: any) => ({
-      id: er.id,
-      username: er.username,
-      examRecordId: er.examRecordId,
-      reminderType: er.reminderType,
-      targetDate: er.targetDate,
-      sentAt: parseDate(er.sentAt) || new Date(),
-    }));
-    await insertInChunks(items, 300, (c) => prisma.examReminderLog.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
-  }
-
-  // QldtAnnouncementLog
-  if (Array.isArray(data.qldtAnnouncementLogs) && data.qldtAnnouncementLogs.length > 0) {
-    const items = data.qldtAnnouncementLogs.map((qa: any) => ({
-      id: qa.id,
-      username: qa.username,
-      announcementId: qa.announcementId,
-      title: qa.title ?? null,
-      publishDate: qa.publishDate ?? null,
-      sentAt: parseDate(qa.sentAt) || new Date(),
-    }));
-    await insertInChunks(items, 300, (c) => prisma.qldtAnnouncementLog.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
-  }
-
-  // ClassScheduleReminderLog
-  if (Array.isArray(data.classScheduleReminderLogs) && data.classScheduleReminderLogs.length > 0) {
-    const items = data.classScheduleReminderLogs.map((cs: any) => ({
-      id: cs.id,
-      username: cs.username,
-      courseCode: cs.courseCode,
-      reminderType: cs.reminderType,
-      targetDate: cs.targetDate,
-      sessionInfo: cs.sessionInfo ?? null,
-      sentAt: parseDate(cs.sentAt) || new Date(),
-    }));
-    await insertInChunks(items, 300, (c) => prisma.classScheduleReminderLog.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
-  }
-
-  // ExamRoom
-  if (Array.isArray(data.examRooms) && data.examRooms.length > 0) {
-    const items = data.examRooms.map((er: any) => ({
-      id: er.id,
-      roomKey: er.roomKey,
-      mapThi: er.mapThi,
-      maMH: er.maMH ?? null,
-      tenMH: er.tenMH ?? null,
-      ngayThi: er.ngayThi ?? null,
-      gioThi: er.gioThi ?? null,
-      maHTThi: er.maHTThi ?? null,
-      batchCode: er.batchCode ?? null,
-      customPrice: typeof er.customPrice === 'number' ? er.customPrice : 600000,
-      note: er.note ?? null,
-      updatedBy: er.updatedBy ?? null,
-      createdAt: parseDate(er.createdAt) || new Date(),
-      updatedAt: parseDate(er.updatedAt) || new Date(),
-    }));
-    await insertInChunks(items, 200, (c) => prisma.examRoom.createMany({ data: c, skipDuplicates: true }));
-    count += items.length;
-  }
-
-  // Đồng bộ sequence ID trên PostgreSQL sau khi nạp dữ liệu có chỉ định explicit ID
+  // 6. Tự động đồng bộ toàn bộ sequences ID trên PostgreSQL
   await syncPostgresSequences().catch(() => {});
 
   const stats = await getDatabaseStats();
 
   return {
     success: true,
-    message: `Phục hồi cơ sở dữ liệu từ file JSON thành công! Đã nạp ${count.toLocaleString('vi-VN')} bản ghi trên 15 bảng.`,
-    recordsRestored: count,
+    message: `Phục hồi cơ sở dữ liệu từ file JSON thành công! Đã nạp ${totalRestored.toLocaleString('vi-VN')} bản ghi trên ${tableRowsMap.size} bảng.`,
+    recordsRestored: totalRestored,
     preRestoreBackupFile: preRestoreName,
     stats,
   };
 }
 
 /**
- * Phục hồi cơ sở dữ liệu từ file SQLite cũ (.sqlite / .db) và nạp vào PostgreSQL
+ * Phục hồi cơ sở dữ liệu từ file SQLite (.sqlite / .db) và nạp tự động vào PostgreSQL
  */
 export async function restoreFromSqliteFile(
   sourcePathOrBuffer: string | Buffer
@@ -1416,6 +1158,7 @@ export async function restoreFromSqliteFile(
   }
 
   try {
+    // Tự động quét 100% tất cả các bảng trong SQLite không cần hardcode
     const pythonScript = `
 import sqlite3, json, sys
 
@@ -1424,32 +1167,17 @@ conn = sqlite3.connect(db_path)
 conn.row_factory = sqlite3.Row
 cur = conn.cursor()
 
-tables = [
-    ("users", "User"),
-    ("students", "Student"),
-    ("examBatches", "ExamBatch"),
-    ("examRecords", "ExamRecord"),
-    ("courseRegistrations", "CourseRegistration"),
-    ("systemMeta", "SystemMeta"),
-    ("externalAccounts", "ExternalAccount"),
-    ("activityLogs", "ActivityLog"),
-    ("telegramConfigs", "TelegramConfig"),
-    ("globalConfigs", "GlobalConfig"),
-    ("examReminderLogs", "ExamReminderLog"),
-    ("qldtAnnouncementLogs", "QldtAnnouncementLog"),
-    ("classScheduleReminderLogs", "ClassScheduleReminderLog"),
-    ("registrationRequests", "RegistrationRequest"),
-    ("examRooms", "ExamRoom"),
-]
+cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+tables = [row[0] for row in cur.fetchall()]
 
 data = {}
-for key, tbl in tables:
+for tbl in tables:
     try:
         cur.execute(f'SELECT * FROM "{tbl}"')
         rows = [dict(r) for r in cur.fetchall()]
-        data[key] = rows
+        data[tbl] = rows
     except Exception:
-        data[key] = []
+        data[tbl] = []
 
 print(json.dumps({"data": data}))
 conn.close()
@@ -1500,3 +1228,4 @@ export async function restoreFromLocalBackup(filename: string): Promise<{
     throw new Error('Định dạng file sao lưu không được hỗ trợ (chỉ chấp nhận .sql, .json, .sqlite, .db)');
   }
 }
+
