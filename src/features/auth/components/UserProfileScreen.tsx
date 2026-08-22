@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   User as UserIcon,
-  Calendar,
   Award,
   Globe,
   Send,
@@ -18,7 +17,6 @@ import { ProfileHeroBanner } from './Profile/ProfileHeroBanner';
 import { ProfileOverviewTab } from './Profile/ProfileOverviewTab';
 import { ProfileSecurityTab } from './Profile/ProfileSecurityTab';
 import { ProfileExternalAccountsTab } from './Profile/ProfileExternalAccountsTab';
-import { ProfileExamScheduleTab } from './Profile/ProfileExamScheduleTab';
 import { TelegramConfigSection } from '../../telegram';
 import { StudentTimetableCalendar, StudentGradesView, LmsCoursesView } from '../../external-portal';
 
@@ -475,20 +473,6 @@ export default function UserProfileScreen({
           <span>Cấu Hình Telegram</span>
         </button>
 
-        {hasExamSchedule && (
-          <button
-            onClick={() => setActiveSubTab('EXAMS')}
-            className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap ${
-              activeSubTab === 'EXAMS'
-                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>Lịch Thi ({exams.length})</span>
-          </button>
-        )}
-
         <button
           onClick={() => setActiveSubTab('SECURITY')}
           className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap ${
@@ -577,12 +561,7 @@ export default function UserProfileScreen({
         />
       )}
 
-      {/* SUB-TAB 3: EXAM SCHEDULE FOR THIS STUDENT */}
-      {activeSubTab === 'EXAMS' && hasExamSchedule && (
-        <ProfileExamScheduleTab exams={exams} maSV={maSV} />
-      )}
-
-      {/* SUB-TAB 4: SECURITY & SETTINGS */}
+      {/* SUB-TAB: SECURITY & SETTINGS */}
       {activeSubTab === 'SECURITY' && <ProfileSecurityTab />}
     </div>
   );

@@ -33,7 +33,6 @@ export type ProfileSubTab =
   | 'LMS'
   | 'EXTERNAL_ACCOUNTS'
   | 'TELEGRAM'
-  | 'EXAMS'
   | 'SECURITY';
 
 export interface TabChangeOptions {
@@ -105,8 +104,6 @@ export const PROFILE_SUBTAB_MAP: Record<string, ProfileSubTab> = {
   'external-accounts': 'EXTERNAL_ACCOUNTS',
   qldt: 'EXTERNAL_ACCOUNTS',
   telegram: 'TELEGRAM',
-  exams: 'EXAMS',
-  lichthi: 'EXAMS',
   security: 'SECURITY',
   baomat: 'SECURITY',
   matkhau: 'SECURITY',
@@ -228,9 +225,6 @@ export const getNavigationPath = (
           break;
         case 'GRADES':
           basePath = '/profile/Grades';
-          break;
-        case 'EXAMS':
-          basePath = '/profile/Exams';
           break;
         case 'EXTERNAL_ACCOUNTS':
           basePath = '/profile/ExternalAccounts';
@@ -390,7 +384,7 @@ export const getInitialHomeState = (): InitialHomeState => {
   const querySubTab = (searchParams.get('subTab') || hashParams.get('subTab'))?.toUpperCase() as ProfileSubTab;
   if (
     querySubTab &&
-    ['OVERVIEW', 'SCHEDULE', 'GRADES', 'LMS', 'EXTERNAL_ACCOUNTS', 'TELEGRAM', 'EXAMS', 'SECURITY'].includes(querySubTab)
+    ['OVERVIEW', 'SCHEDULE', 'GRADES', 'LMS', 'EXTERNAL_ACCOUNTS', 'TELEGRAM', 'SECURITY'].includes(querySubTab)
   ) {
     profileSubTab = querySubTab;
   }
