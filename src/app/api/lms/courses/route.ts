@@ -89,7 +89,10 @@ export async function POST(req: NextRequest) {
     const lmsAccount = await prisma.externalAccount.findFirst({
       where: {
         username: effectiveUsername,
-        systemUrl: { contains: 'lms.pttc1.edu.vn' },
+        OR: [
+          { systemKey: 'LMS_PTTC1' },
+          { systemUrl: { contains: 'lms.pttc1.edu.vn' } },
+        ],
       },
     });
 
@@ -100,12 +103,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Đảm bảo token còn sống
-    const { token: validToken } = await getValidLmsTokenOrRefresh({
+    // Đảm bảo token còn sống (hoặc tự động đăng nhập lại nếu token hết hạn)
+    const { token: validToken, isNew } = await getValidLmsTokenOrRefresh({
       username: lmsAccount.extUsername,
       password: lmsAccount.extPassword,
       existingToken: lmsAccount.token,
     });
+
+    if (isNew) {
+      await prisma.externalAccount
+        .update({
+          where: { id: lmsAccount.id },
+          data: {
+            token: validToken,
+            lastSyncAt: new Date(),
+            status: 'CONNECTED',
+          },
+        })
+        .catch(() => {});
+    }
 
     // ACTION: Lấy chi tiết hoạt động trong khóa học
     if (action === 'COURSE_ACTIVITIES') {

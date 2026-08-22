@@ -238,7 +238,7 @@ export async function validateLmsToken(token: string): Promise<boolean> {
  */
 export async function getValidLmsTokenOrRefresh(account: {
   username: string;
-  password: string;
+  password?: string;
   existingToken?: string | null;
 }): Promise<{ token: string; isNew: boolean; sesskey?: string }> {
   if (account.existingToken && !account.existingToken.startsWith('ERROR')) {
@@ -248,7 +248,13 @@ export async function getValidLmsTokenOrRefresh(account: {
     }
   }
 
-  // Token hết hạn hoặc chưa có -> Đăng nhập lấy token / cookies mới
+  // Token hết hạn hoặc chưa có -> Đăng nhập lấy token / cookies mới nếu có mật khẩu
+  if (!account.password || !account.password.trim()) {
+    throw new Error(
+      'Phiên đăng nhập LMS đã hết hạn và chưa có mật khẩu để tự động đăng nhập lại. Vui lòng cập nhật mật khẩu LMS trong phần Tài khoản liên kết.'
+    );
+  }
+
   const fresh = await loginLMS({
     username: account.username,
     password: account.password,
@@ -297,18 +303,25 @@ export async function fetchLmsDashboardOverview(account: {
   username: string;
   password?: string;
   token?: string | null;
-}): Promise<LmsDashboardOverview> {
+}): Promise<LmsDashboardOverview & { newToken?: string }> {
   let validToken = account.token;
   let sesskey = '';
+  let accumulatedNewToken: string | undefined;
 
-  if (!validToken && account.password) {
-    const refreshed = await getValidLmsTokenOrRefresh({
+  // 1. Luôn kiểm tra và xác thực token ngay từ đầu (hoặc tự động login lại nếu token chết)
+  if (account.password) {
+    const authResult = await getValidLmsTokenOrRefresh({
       username: account.username,
       password: account.password,
       existingToken: account.token,
     });
-    validToken = refreshed.token;
-    sesskey = refreshed.sesskey || '';
+    validToken = authResult.token;
+    if (authResult.isNew) {
+      accumulatedNewToken = authResult.token;
+    }
+    if (authResult.sesskey) {
+      sesskey = authResult.sesskey;
+    }
   }
 
   if (!validToken) {
@@ -317,44 +330,52 @@ export async function fetchLmsDashboardOverview(account: {
 
   let jar = new CookieJar(validToken);
 
-  // 1. Fetch Dashboard /my/ for user name, sesskey and overall stats
+  // 2. Fetch Dashboard /my/ for user name, sesskey and overall stats
   let myRes = await fetch(`${LMS_BASE_URL}/my/`, {
     headers: {
       Cookie: jar.getCookieHeader(),
       'User-Agent': LMS_USER_AGENT,
     },
+    redirect: 'manual',
   });
 
-  if ((myRes.status === 303 || myRes.status === 302 || myRes.status === 401) && account.password) {
-    // Session expired -> retry with fresh login
-    const refreshed = await loginLMS({ username: account.username, password: account.password });
-    validToken = refreshed.token;
-    sesskey = refreshed.sesskey;
-    jar = new CookieJar(validToken);
-
-    myRes = await fetch(`${LMS_BASE_URL}/my/`, {
-      headers: {
-        Cookie: jar.getCookieHeader(),
-        'User-Agent': LMS_USER_AGENT,
-      },
-    });
+  // Kiểm tra trạng thái phiên: nếu bị 302/303 redirect hoặc status != 200 thì phiên không còn hiệu lực
+  let isSessionValid = myRes.status === 200;
+  let myHtml = '';
+  if (isSessionValid) {
+    myHtml = await myRes.text();
+    isSessionValid = myHtml.includes('logout.php');
   }
 
-  const myHtml = await myRes.text();
+  if (!isSessionValid) {
+    if (account.password) {
+      // Token cũ không hợp lệ -> Đăng nhập lại ngay
+      const fresh = await loginLMS({ username: account.username, password: account.password });
+      validToken = fresh.token;
+      accumulatedNewToken = fresh.token;
+      sesskey = fresh.sesskey;
+      jar = new CookieJar(validToken);
+
+      myRes = await fetch(`${LMS_BASE_URL}/my/`, {
+        headers: {
+          Cookie: jar.getCookieHeader(),
+          'User-Agent': LMS_USER_AGENT,
+        },
+      });
+      myHtml = await myRes.text();
+      if (!myHtml.includes('logout.php')) {
+        throw new Error('Đăng nhập lại LMS thất bại. Vui lòng kiểm tra lại tài khoản và mật khẩu LMS.');
+      }
+    } else {
+      throw new Error(
+        'Phiên đăng nhập LMS đã hết hạn hoặc không hợp lệ. Vui lòng cấu hình mật khẩu LMS để tự động đăng nhập lại.'
+      );
+    }
+  }
 
   if (!sesskey) {
     const sMatch = myHtml.match(/"sesskey":"([^"]+)"/i) || myHtml.match(/sesskey=([a-zA-Z0-9]+)/i);
     sesskey = sMatch ? sMatch[1] : '';
-  }
-
-  // If still no sesskey and password is known, perform fresh login to get sesskey
-  if (!sesskey && account.password) {
-    try {
-      const freshLogin = await loginLMS({ username: account.username, password: account.password });
-      sesskey = freshLogin.sesskey;
-      validToken = freshLogin.token;
-      jar = new CookieJar(validToken);
-    } catch {}
   }
 
   // Extract user full name
@@ -382,7 +403,7 @@ export async function fetchLmsDashboardOverview(account: {
     dueActivities: dueActMatch ? parseInt(dueActMatch[1]) : 0,
   };
 
-  // 2. Fetch Grades Overview /grade/report/overview/index.php
+  // 3. Fetch Grades Overview /grade/report/overview/index.php
   const gradeMap = new Map<string, string>();
   try {
     const gradeRes = await fetch(`${LMS_BASE_URL}/grade/report/overview/index.php`, {
@@ -408,7 +429,7 @@ export async function fetchLmsDashboardOverview(account: {
     // Ignore grade overview error
   }
 
-  // 3. Fetch ALL Courses & Exact Progress via Edwiser RemUI & Moodle AJAX API
+  // 4. Fetch ALL Courses & Exact Progress via Edwiser RemUI & Moodle AJAX API
   const courses: LmsCourseOverviewItem[] = [];
   const seenIds = new Set<string>();
 
@@ -577,7 +598,7 @@ export async function fetchLmsDashboardOverview(account: {
     }
   }
 
-  // 4. HTML Fallback if AJAX endpoints were unreachable
+  // 5. HTML Fallback if AJAX endpoints were unreachable
   if (courses.length === 0) {
     const coursesRes = await fetch(`${LMS_BASE_URL}/my/courses.php`, {
       headers: {
@@ -652,6 +673,7 @@ export async function fetchLmsDashboardOverview(account: {
     stats,
     courses,
     lastSyncAt: new Date().toISOString(),
+    newToken: accumulatedNewToken,
   };
 }
 
@@ -672,11 +694,14 @@ export async function getOrFetchStudentLmsOverview(
   const extAccount = await prisma.externalAccount.findFirst({
     where: {
       username: cleanUsername,
-      systemUrl: { contains: 'lms.pttc1.edu.vn' },
+      OR: [
+        { systemKey: 'LMS_PTTC1' },
+        { systemUrl: { contains: 'lms.pttc1.edu.vn' } },
+      ],
     },
   });
 
-  if (!extAccount) {
+  if (!extAccount || (!extAccount.extPassword && !extAccount.token)) {
     return {
       isConfigured: false,
       hasLinkedAccount: false,
@@ -702,6 +727,7 @@ export async function getOrFetchStudentLmsOverview(
   const syncTimeCached = cachedDb?.lastPulledAt || cachedDb?.updatedAt || cachedDb?.createdAt || extAccount.lastSyncAt;
   const isCacheFresh =
     cachedDb &&
+    cachedDb.rawData &&
     syncTimeCached &&
     Date.now() - new Date(syncTimeCached).getTime() < ONE_DAY_MS;
 
@@ -709,17 +735,20 @@ export async function getOrFetchStudentLmsOverview(
   if (!options?.forceRefresh && isCacheFresh && cachedDb?.rawData) {
     try {
       const parsed = JSON.parse(cachedDb.rawData);
-      const exactSyncTime = parsed?.lastSyncAt || syncTimeCached;
-      return {
-        ...parsed,
-        isConfigured: true,
-        hasLinkedAccount: true,
-        isCachedDb: true,
-        isLiveSync: false,
-        lastSyncAt: exactSyncTime
-          ? new Date(exactSyncTime).toISOString()
-          : new Date().toISOString(),
-      };
+      // Đảm bảo cache có danh sách môn học hợp lệ
+      if (Array.isArray(parsed?.courses) && parsed.courses.length > 0) {
+        const exactSyncTime = parsed?.lastSyncAt || syncTimeCached;
+        return {
+          ...parsed,
+          isConfigured: true,
+          hasLinkedAccount: true,
+          isCachedDb: true,
+          isLiveSync: false,
+          lastSyncAt: exactSyncTime
+            ? new Date(exactSyncTime).toISOString()
+            : new Date().toISOString(),
+        };
+      }
     } catch (e) {
       console.warn('[getOrFetchStudentLmsOverview] Parse cache failed, chuyển sang kéo mới từ LMS:', e);
     }
@@ -733,6 +762,23 @@ export async function getOrFetchStudentLmsOverview(
       password: extAccount.extPassword || undefined,
       token: extAccount.token,
     });
+
+    // Cập nhật token mới vào ExternalAccount nếu có login mới
+    const updateAccountData: any = {
+      lastSyncAt: now,
+      status: 'CONNECTED',
+      syncMessage: `Đồng bộ thành công ${freshOverview.courses.length} khóa học từ LMS.`,
+    };
+    if (freshOverview.newToken) {
+      updateAccountData.token = freshOverview.newToken;
+    }
+
+    await prisma.externalAccount
+      .update({
+        where: { id: extAccount.id },
+        data: updateAccountData,
+      })
+      .catch(() => {});
 
     // Lưu / Cập nhật vào DB Cache bằng Prisma upsert
     try {
@@ -758,18 +804,6 @@ export async function getOrFetchStudentLmsOverview(
           lastPulledAt: now,
         },
       });
-
-      // Cập nhật lastSyncAt trong ExternalAccount
-      await prisma.externalAccount
-        .update({
-          where: { id: extAccount.id },
-          data: {
-            lastSyncAt: now,
-            status: 'CONNECTED',
-            syncMessage: 'Đồng bộ khóa học thành công từ LMS.',
-          },
-        })
-        .catch(() => {});
     } catch (saveErr) {
       console.warn('[getOrFetchStudentLmsOverview] Lưu cache StudentLmsRecord thất bại:', saveErr);
     }
@@ -785,24 +819,46 @@ export async function getOrFetchStudentLmsOverview(
   } catch (fetchErr: any) {
     console.warn('[getOrFetchStudentLmsOverview] Tải dữ liệu LMS thất bại:', fetchErr);
 
+    const errMsg = (fetchErr?.message || '').toLowerCase();
+    if (
+      errMsg.includes('hết hạn') ||
+      errMsg.includes('mật khẩu') ||
+      errMsg.includes('tài khoản') ||
+      errMsg.includes('đăng nhập') ||
+      errMsg.includes('401') ||
+      errMsg.includes('403')
+    ) {
+      await prisma.externalAccount
+        .update({
+          where: { id: extAccount.id },
+          data: {
+            status: 'ERROR',
+            syncMessage: `Lỗi kết nối LMS: ${fetchErr.message}`,
+          },
+        })
+        .catch(() => {});
+    }
+
     // NGUYÊN TẮC QUAN TRỌNG: Nếu tải về bị lỗi -> KHÔNG GHI ĐÈ! Trả về dữ liệu Cache cũ nếu có
     if (cachedDb && cachedDb.rawData) {
       try {
         const parsed = JSON.parse(cachedDb.rawData);
-        const fallbackSyncTime = cachedDb.lastPulledAt || cachedDb.updatedAt || cachedDb.createdAt || extAccount.lastSyncAt;
-        const exactSyncTime = parsed?.lastSyncAt || fallbackSyncTime;
-        const formattedDate = exactSyncTime ? new Date(exactSyncTime).toLocaleString('vi-VN') : 'gần nhất';
-        return {
-          ...parsed,
-          isConfigured: true,
-          hasLinkedAccount: true,
-          isCachedDb: true,
-          isLiveSync: false,
-          syncWarning: `Không thể kết nối đến LMS (${fetchErr.message || 'Lỗi mạng'}). Đang hiển thị dữ liệu đã lưu lúc ${formattedDate}.`,
-          lastSyncAt: exactSyncTime
-            ? new Date(exactSyncTime).toISOString()
-            : new Date().toISOString(),
-        };
+        if (Array.isArray(parsed?.courses) && parsed.courses.length > 0) {
+          const fallbackSyncTime = cachedDb.lastPulledAt || cachedDb.updatedAt || cachedDb.createdAt || extAccount.lastSyncAt;
+          const exactSyncTime = parsed?.lastSyncAt || fallbackSyncTime;
+          const formattedDate = exactSyncTime ? new Date(exactSyncTime).toLocaleString('vi-VN') : 'gần nhất';
+          return {
+            ...parsed,
+            isConfigured: true,
+            hasLinkedAccount: true,
+            isCachedDb: true,
+            isLiveSync: false,
+            syncWarning: `Không thể kết nối đến LMS (${fetchErr.message || 'Lỗi mạng'}). Đang hiển thị dữ liệu đã lưu lúc ${formattedDate}.`,
+            lastSyncAt: exactSyncTime
+              ? new Date(exactSyncTime).toISOString()
+              : new Date().toISOString(),
+          };
+        }
       } catch (parseErr) {}
     }
 

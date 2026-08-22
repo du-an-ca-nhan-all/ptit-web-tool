@@ -93,8 +93,12 @@ export default function LmsCoursesView({ currentUser, onNavigateToExternalAccoun
         setIsConfigured(true);
         setData(json);
         if (forceRefresh) {
-          setSuccessMsg('Đã cập nhật dữ liệu mới nhất từ LMS thành công!');
-          setTimeout(() => setSuccessMsg(''), 4000);
+          if (json.syncWarning) {
+            setErrorMsg(json.syncWarning);
+          } else {
+            setSuccessMsg('Đã cập nhật dữ liệu mới nhất từ LMS thành công!');
+            setTimeout(() => setSuccessMsg(''), 4000);
+          }
         }
       } else if (json.isConfigured === false) {
         setIsConfigured(false);
