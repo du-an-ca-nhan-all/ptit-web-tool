@@ -4,11 +4,12 @@ import {
   runClassScheduleReminders,
 } from './telegramDispatcher';
 import { runDailyAutoBackupScheduler } from '@/src/features/database-backup/server/backupServerService';
+import { runGlobalNightlySyncScheduler } from '@/src/features/external-portal/server/globalSyncQueueServerService';
 
 let isSchedulerRunning = false;
 
 /**
- * Chạy tất cả các tác vụ Telegram 1 lần
+ * Chạy tất cả các tác vụ Scheduler & Telegram 1 lần
  */
 export async function runTelegramSchedulerTasks() {
   runExamScheduleReminders().catch((err) => {
@@ -22,6 +23,9 @@ export async function runTelegramSchedulerTasks() {
   });
   runDailyAutoBackupScheduler().catch((err) => {
     console.error('[Telegram Scheduler] Periodic auto backup check error:', err);
+  });
+  runGlobalNightlySyncScheduler().catch((err) => {
+    console.error('[Global Sync Scheduler] Periodic nightly sync check error:', err);
   });
 }
 

@@ -587,4 +587,63 @@ model MonitorFlowQueueItem {
   @@index([createdAt])
 }
 
+// 25. Bảng GlobalSyncBatch: Phiên thực thi đồng bộ dữ liệu hàng loạt toàn hệ thống
+model GlobalSyncBatch {
+  id              String                @id @default(uuid())
+  jobType         String                // 'SYNC_TIMETABLE' | 'SYNC_GRADES' | 'SYNC_LMS' | 'SYNC_ALL'
+  title           String                // Ví dụ: "Đồng bộ Thời Khóa Biểu tự động ban đêm (22:00)"
+  triggeredBy     String                @default("SYSTEM_CRON") // 'SYSTEM_CRON' | 'ADMIN_MANUAL' | username
+  scheduledTime   String?               // "22:00"
+  
+  totalItems      Int                   @default(0)
+  pendingCount    Int                   @default(0)
+  processingCount Int                   @default(0)
+  successCount    Int                   @default(0)
+  failedCount     Int                   @default(0)
+  cancelledCount  Int                   @default(0)
+  skippedCount    Int                   @default(0)
+  
+  status          String                @default("PENDING") // PENDING | PROCESSING | COMPLETED | CANCELLED | PAUSED | FAILED
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  
+  queueItems      GlobalSyncQueueItem[]
+
+  @@index([jobType])
+  @@index([status])
+  @@index([triggeredBy])
+  @@index([createdAt])
+}
+
+// 26. Bảng GlobalSyncQueueItem: Từng tác vụ trong hàng đợi đồng bộ toàn hệ thống
+model GlobalSyncQueueItem {
+  id              String            @id @default(uuid())
+  batchId         String            // Thuộc batch nào
+  username        String            // Mã sinh viên thực hiện
+  studentName     String?           // Họ tên sinh viên
+  jobType         String            // 'SYNC_TIMETABLE' | 'SYNC_GRADES' | 'SYNC_LMS'
+  
+  status          String            @default("QUEUED") // QUEUED | RUNNING | SUCCESS | FAILED | CANCELLED | SKIPPED
+  attempts        Int               @default(0)
+  maxAttempts     Int               @default(3)
+  
+  resultMessage   String?           // Kết quả hoặc lỗi tóm tắt
+  resultData      String?           // JSON data chi tiết (số môn, GPA, số khóa học, etc.)
+  
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  batch           GlobalSyncBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([username])
+  @@index([jobType])
+  @@index([status])
+  @@index([createdAt])
+}
+
 

@@ -44,16 +44,32 @@ export interface BackupTelegramConfigValue {
   lastBackupSentAt?: string | null;
   lastBackupStatus?: 'SUCCESS' | 'FAILED' | null;
   lastBackupError?: string | null;
-  lastBackupFiles?: string[];
   lastTestedAt?: string | null;
   lastTestStatus?: 'SUCCESS' | 'FAILED' | null;
   lastTestError?: string | null;
+}
+
+export interface GlobalNightlySyncConfigValue {
+  isEnabled: boolean; // Bật/Tắt chế độ đồng bộ ban đêm
+  scheduleTime: string; // Giờ chạy (Mặc định: '22:00' - 22h đêm)
+  syncTimetable: boolean; // Job 1: Đồng bộ lịch học & TKB (Mặc định: true)
+  syncGrades: boolean; // Job 2: Đồng bộ điểm & kết quả học tập (Mặc định: true)
+  syncLms: boolean; // Job 3: Đồng bộ kết quả học tập LMS PTTC1 (Mặc định: true)
+  concurrency?: number; // Số luồng xử lý đồng thời (Mặc định: 2)
+  delayBetweenItemsMs?: number; // Delay giữa các request (ms) (Mặc định: 600)
+  lastSyncDate?: string | null; // YYYY-MM-DD
+  lastTimetableSyncAt?: string | null;
+  lastGradesSyncAt?: string | null;
+  lastLmsSyncAt?: string | null;
+  lastStatus?: 'SUCCESS' | 'PARTIAL' | 'FAILED' | null;
+  notifyAdminTelegram?: boolean; // Gửi thông báo tóm tắt qua Telegram sau khi hoàn tất
 }
 
 export const GLOBAL_CONFIG_KEYS = {
   TELEGRAM_BOT: 'telegram_bot',
   TELEGRAM_ADMIN: 'telegram_admin',
   BACKUP_TELEGRAM: 'backup_telegram',
+  GLOBAL_NIGHTLY_SYNC: 'global_nightly_sync',
 } as const;
 
 /**
