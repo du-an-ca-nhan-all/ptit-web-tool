@@ -46,6 +46,7 @@ import {
 import PricingConfigModal from './PricingConfigModal';
 import AssignEnvelopeModal from './AssignEnvelopeModal';
 import QuickEditPriceModal from './QuickEditPriceModal';
+import RoomStudentsModal from './RoomStudentsModal';
 
 interface AllMonitorsEnvelopesProps {
   sessions?: ExamSession[];
@@ -76,6 +77,13 @@ export default function AllMonitorsEnvelopes({
   const [assigningSession, setAssigningSession] = useState<any | null>(null);
   const [assigningInitialClass, setAssigningInitialClass] = useState<string>('');
   const [quickEditSession, setQuickEditSession] = useState<any | null>(null);
+  const [viewingStudentsSession, setViewingStudentsSession] = useState<any | null>(null);
+  const [viewingStudentsClassFilter, setViewingStudentsClassFilter] = useState<string>('ALL');
+
+  const handleOpenRoomStudents = useCallback((session: any, classFilter = 'ALL') => {
+    setViewingStudentsSession(session);
+    setViewingStudentsClassFilter(classFilter);
+  }, []);
 
   // Load and listen for envelope assignments & pricing updates
   useEffect(() => {
@@ -748,28 +756,42 @@ export default function AllMonitorsEnvelopes({
 
                     {/* Class Student Counts */}
                     <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-2.5">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                        Cơ cấu sinh viên ({session.classCounts.reduce((sum, c) => sum + c.count, 0)} SV)
-                      </p>
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Cơ cấu sinh viên ({session.classCounts.reduce((sum, c) => sum + c.count, 0)} SV)
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenRoomStudents(session)}
+                          className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                          title="Xem toàn bộ danh sách sinh viên trong phòng này"
+                        >
+                          <Users className="w-3 h-3" />
+                          <span>Xem danh sách SV</span>
+                        </button>
+                      </div>
                       <div className="flex flex-wrap gap-1.5">
                         {session.classCounts.map((c) => {
                           const isMonitorClass = monitorClasses.has(c.className);
                           const isMyClass = userClass && c.className.trim().toUpperCase() === userClass.trim().toUpperCase();
                           return (
-                            <span
+                            <button
                               key={c.className}
-                              className={`text-xs px-2 py-0.5 rounded-md font-bold border flex gap-1 items-center ${
+                              type="button"
+                              onClick={() => handleOpenRoomStudents(session, c.className)}
+                              className={`text-xs px-2 py-0.5 rounded-md font-bold border flex gap-1 items-center transition-all cursor-pointer hover:opacity-90 active:scale-95 shadow-2xs ${
                                 isMyClass
-                                  ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                                  ? 'bg-blue-600 text-white border-blue-600'
                                   : isMonitorClass
-                                  ? 'bg-blue-100 text-blue-800 border-blue-200 shadow-2xs'
+                                  ? 'bg-blue-100 text-blue-800 border-blue-200'
                                   : 'bg-white text-slate-600 border-slate-200'
                               }`}
+                              title={`Xem danh sách ${c.count} SV lớp ${c.className}`}
                             >
                               <span>{c.className}</span>
                               <span className={`w-px h-2.5 ${isMyClass ? 'bg-blue-400' : isMonitorClass ? 'bg-blue-300' : 'bg-slate-300'}`}></span>
                               <span className="font-extrabold">{c.count}</span>
-                            </span>
+                            </button>
                           );
                         })}
                       </div>
@@ -890,7 +912,7 @@ export default function AllMonitorsEnvelopes({
                                     : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
                                 }`}
                               >
-                                {loadingClaimId === session.id ? 'Đang lưu...' : isMyClass ? 'Lớp tôi nhận' : 'Nhận phòng này'}
+                                {loadingClaimId === session.id ? 'Đang lưu...' : isMyClass ? 'Nhận đi phong bì' : 'Nhận đi phong bì'}
                               </button>
                             </div>
 
@@ -998,6 +1020,15 @@ export default function AllMonitorsEnvelopes({
                                 </span>
                               )}
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenRoomStudents(session)}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline mt-1.5 w-fit cursor-pointer"
+                              title="Xem danh sách sinh viên trong phòng này"
+                            >
+                              <Users className="w-3 h-3 text-blue-500" />
+                              <span>Xem DS sinh viên ({session.totalStudents || session.classCounts.reduce((sum: number, c: any) => sum + c.count, 0)})</span>
+                            </button>
                           </div>
                         </td>
 
@@ -1008,16 +1039,18 @@ export default function AllMonitorsEnvelopes({
                               const isMonitorClass = monitorClasses.has(c.className);
                               const isMyClass = userClass && c.className.trim().toUpperCase() === userClass.trim().toUpperCase();
                               return (
-                                <span
+                                <button
                                   key={c.className}
-                                  className={`text-xs px-2.5 py-0.5 rounded-md font-bold border flex gap-1.5 items-center ${
+                                  type="button"
+                                  onClick={() => handleOpenRoomStudents(session, c.className)}
+                                  className={`text-xs px-2.5 py-0.5 rounded-md font-bold border flex gap-1.5 items-center transition-all cursor-pointer hover:opacity-90 active:scale-95 shadow-2xs ${
                                     isMyClass
-                                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                                      ? 'bg-blue-600 text-white border-blue-600'
                                       : isMonitorClass
-                                      ? 'bg-blue-100 text-blue-800 border-blue-200 shadow-2xs'
+                                      ? 'bg-blue-100 text-blue-800 border-blue-200'
                                       : 'bg-slate-100 text-slate-600 border-slate-200'
                                   }`}
-                                  title={isMyClass ? 'Lớp của bạn' : isMonitorClass ? 'Lớp có Lớp Trưởng' : 'Lớp chưa đăng ký LT'}
+                                  title={`Bấm để xem danh sách ${c.count} sinh viên lớp ${c.className} trong phòng`}
                                 >
                                   <span>{c.className}</span>
                                   <span
@@ -1026,7 +1059,7 @@ export default function AllMonitorsEnvelopes({
                                     }`}
                                   ></span>
                                   <span>{c.count}</span>
-                                </span>
+                                </button>
                               );
                             })}
                           </div>
@@ -1210,8 +1243,8 @@ export default function AllMonitorsEnvelopes({
                                       {loadingClaimId === session.id
                                         ? 'Đang lưu...'
                                         : isMyClass
-                                        ? 'Lớp tôi nhận'
-                                        : 'Nhận phòng'}
+                                        ? 'Nhận đi phong bì'
+                                        : 'Nhận đi phong bì'}
                                     </button>
                                   </div>
 
@@ -1237,7 +1270,7 @@ export default function AllMonitorsEnvelopes({
                                               title={`Nhận phòng này cho lớp ${c.className}`}
                                             >
                                               <Hand className="w-3 h-3" />
-                                              <span>{isOtherMyClass ? `Lớp tôi (${c.className})` : c.className}</span>
+                                              <span>{isOtherMyClass ? `Nhận cho lớp tôi (${c.className})` : c.className}</span>
                                             </button>
                                           );
                                         })}
@@ -1339,6 +1372,15 @@ export default function AllMonitorsEnvelopes({
         currentAssignment={assigningSession ? envelopeAssignments[assigningSession.id] : undefined}
         onConfirm={handleConfirmAssign}
         isLoading={loadingClaimId === assigningSession?.id}
+      />
+
+      <RoomStudentsModal
+        isOpen={Boolean(viewingStudentsSession)}
+        onClose={() => setViewingStudentsSession(null)}
+        session={viewingStudentsSession}
+        records={records}
+        userClass={userClass}
+        initialClassFilter={viewingStudentsClassFilter}
       />
 
       <QuickEditPriceModal
