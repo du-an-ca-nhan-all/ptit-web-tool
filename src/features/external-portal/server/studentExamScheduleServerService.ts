@@ -376,12 +376,89 @@ export function buildQldtExamResultFromRawData(
   };
 }
 
+function normalizeExamCode(item: any): string {
+  return (item.ma_mon || item.maMon || item.MaMH || '').toUpperCase().trim();
+}
+
+function normalizeExamSemester(item: any): string {
+  const hk = item.hoc_ky !== undefined && item.hoc_ky !== null ? item.hoc_ky : item.hocKy;
+  if (hk !== undefined && hk !== null && String(hk).trim()) return String(hk).trim();
+  const dt = item.dot_thi !== undefined && item.dot_thi !== null ? item.dot_thi : item.dotThi;
+  if (dt !== undefined && dt !== null && String(dt).trim()) return String(dt).trim();
+  return '';
+}
+
+function normalizeExamDateStr(item: any): string {
+  const raw = item.ngay_thi || item.ngayThi || item.NgayThi || item.dateIso || '';
+  if (!raw) return '';
+  const s = String(raw).trim();
+  const parts = s.split(/[-/]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      // YYYY-MM-DD -> DD/MM/YYYY
+      return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+    }
+    // DD/MM/YYYY
+    return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+  }
+  return s;
+}
+
+function normalizeExamTimeStr(item: any): string {
+  const raw = item.gio_bat_dau || item.gioBatDau || item.GioThi || '';
+  if (!raw) return '';
+  const s = String(raw).trim();
+  const parts = s.split(':');
+  if (parts.length >= 2) {
+    return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+  }
+  return s;
+}
+
+function normalizeExamRoomStr(item: any): string {
+  const raw = item.ma_phong || item.maPhong || item.MAPTHI || '';
+  return String(raw).trim().toUpperCase();
+}
+
+function normalizeExamAddressStr(item: any): string {
+  const raw = item.dia_diem_thi || item.diaDiemThi || item.DiaDiem || '';
+  return String(raw)
+    .replace(/<br\s*\/?>/gi, ' - ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeExamFormatStr(item: any): string {
+  const raw = item.hinh_thuc_thi || item.hinhThucThi || item.ghi_chu_htt || item.MaHTThi || '';
+  return String(raw).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function normalizeExamGroupStr(item: any): string {
+  const to = String(item.to_thi || item.toThi || '').trim();
+  const nhom = String(item.nhom_thi || item.nhomThi || '').trim();
+  return `${to}|${nhom}`;
+}
+
+function normalizeExamBanStatus(item: any): boolean {
+  const val = item.cam_thi !== undefined ? item.cam_thi : item.camThi;
+  if (val === true || val === 1 || val === '1') return true;
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    return s === 'cấm thi' || s === 'bị cấm thi' || s === 'true';
+  }
+  return false;
+}
+
 function getExamUniqueKey(item: any): string {
-  const code = (item.ma_mon || item.maMon || item.MaMH || '').toUpperCase().trim();
-  const sem = (item.hoc_ky || item.hocKy || item.dot_thi || item.dotThi || '').toString().trim();
-  const toThi = (item.to_thi || item.toThi || item.nhom_thi || item.nhomThi || '').toString().trim();
-  if (sem && toThi) return `${code}_${sem}_${toThi}`;
-  if (sem) return `${code}_${sem}`;
+  const idNhom = item.id_nhom_thi || item.idNhomThi;
+  const code = normalizeExamCode(item);
+  const sem = normalizeExamSemester(item);
+  
+  if (idNhom && code) return `${code}_id${idNhom}`;
+  if (code && sem) {
+    const grp = normalizeExamGroupStr(item);
+    return `${code}_sem${sem}_grp${grp}`;
+  }
   return code;
 }
 
@@ -410,7 +487,7 @@ export function detectExamScheduleChanges(
   // 1. Kiểm tra môn thi mới hoặc bị thay đổi trong newRawExams
   newRawExams.forEach((newEx) => {
     const key = getExamUniqueKey(newEx);
-    const code = (newEx.ma_mon || newEx.maMon || newEx.MaMH || '').toUpperCase().trim();
+    const code = normalizeExamCode(newEx);
     if (!key || !code) return;
 
     const baseName = newEx.ten_mon || newEx.tenMon || newEx.TenMH || 'Môn thi';
@@ -421,62 +498,83 @@ export function detectExamScheduleChanges(
 
     if (!oldEx) {
       // Môn thi mới được xếp lịch
+      const diffs: Array<{ field: string; label: string; oldVal: string; newVal: string }> = [];
+      const newDate = normalizeExamDateStr(newEx);
+      const newTime = normalizeExamTimeStr(newEx);
+      const newRoom = normalizeExamRoomStr(newEx);
+      const newFormat = newEx.hinh_thuc_thi || newEx.hinhThucThi || '';
+      const newAddress = normalizeExamAddressStr(newEx);
+
+      if (newDate) diffs.push({ field: 'ngayThi', label: 'Ngày thi', oldVal: '', newVal: newDate });
+      if (newTime) diffs.push({ field: 'gioBatDau', label: 'Giờ thi', oldVal: '', newVal: newTime });
+      if (newRoom) diffs.push({ field: 'maPhong', label: 'Phòng thi', oldVal: '', newVal: newRoom });
+      if (newFormat) diffs.push({ field: 'hinhThucThi', label: 'Hình thức', oldVal: '', newVal: newFormat });
+      if (newAddress) diffs.push({ field: 'diaDiemThi', label: 'Địa điểm', oldVal: '', newVal: newAddress });
+
       changes.push({
         maMon: code,
         tenMon,
         type: 'NEW',
-        diffs: [
-          { field: 'ngayThi', label: 'Ngày thi', oldVal: '', newVal: newEx.ngay_thi || newEx.ngayThi || '' },
-          { field: 'gioBatDau', label: 'Giờ thi', oldVal: '', newVal: newEx.gio_bat_dau || newEx.gioBatDau || newEx.GioThi || '' },
-          { field: 'maPhong', label: 'Phòng thi', oldVal: '', newVal: newEx.ma_phong || newEx.maPhong || newEx.MAPTHI || '' },
-          { field: 'hinhThucThi', label: 'Hình thức', oldVal: '', newVal: newEx.hinh_thuc_thi || newEx.hinhThucThi || newEx.MaHTThi || '' },
-          { field: 'diaDiemThi', label: 'Địa điểm', oldVal: '', newVal: (newEx.dia_diem_thi || '').replace(/<br\s*\/?>/gi, ' - ').trim() },
-        ].filter((d) => Boolean(d.newVal)),
+        diffs,
       });
     } else {
-      // So sánh các trường thông tin quan trọng
+      // So sánh các trường thông tin quan trọng sau khi chuẩn hoá
       const diffs: Array<{ field: string; label: string; oldVal: string; newVal: string }> = [];
 
-      const oldDate = (oldEx.ngay_thi || oldEx.ngayThi || oldEx.NgayThi || '').trim();
-      const newDate = (newEx.ngay_thi || newEx.ngayThi || newEx.NgayThi || '').trim();
-      if (oldDate && newDate && oldDate !== newDate) {
-        diffs.push({ field: 'ngayThi', label: 'Ngày thi', oldVal: oldDate, newVal: newDate });
+      const oldDate = normalizeExamDateStr(oldEx);
+      const newDate = normalizeExamDateStr(newEx);
+      if (oldDate !== newDate && (oldDate || newDate)) {
+        diffs.push({ field: 'ngayThi', label: 'Ngày thi', oldVal: oldDate || 'Chưa có', newVal: newDate || 'Chưa có' });
       }
 
-      const oldTime = (oldEx.gio_bat_dau || oldEx.gioBatDau || oldEx.GioThi || '').trim();
-      const newTime = (newEx.gio_bat_dau || newEx.gioBatDau || newEx.GioThi || '').trim();
-      if (oldTime && newTime && oldTime !== newTime) {
-        diffs.push({ field: 'gioBatDau', label: 'Giờ thi', oldVal: oldTime, newVal: newTime });
+      const oldTime = normalizeExamTimeStr(oldEx);
+      const newTime = normalizeExamTimeStr(newEx);
+      if (oldTime !== newTime && (oldTime || newTime)) {
+        diffs.push({ field: 'gioBatDau', label: 'Giờ thi', oldVal: oldTime || 'Chưa có', newVal: newTime || 'Chưa có' });
       }
 
-      const oldRoom = (oldEx.ma_phong || oldEx.maPhong || oldEx.MAPTHI || '').trim();
-      const newRoom = (newEx.ma_phong || newEx.maPhong || newEx.MAPTHI || '').trim();
+      const oldRoom = normalizeExamRoomStr(oldEx);
+      const newRoom = normalizeExamRoomStr(newEx);
       if (oldRoom !== newRoom && (oldRoom || newRoom)) {
-        diffs.push({ field: 'maPhong', label: 'Phòng thi', oldVal: oldRoom, newVal: newRoom });
+        diffs.push({ field: 'maPhong', label: 'Phòng thi', oldVal: oldRoom || 'Chưa xếp', newVal: newRoom || 'Chưa xếp' });
       }
 
-      const oldAddress = (oldEx.dia_diem_thi || '').replace(/<br\s*\/?>/gi, ' - ').trim();
-      const newAddress = (newEx.dia_diem_thi || '').replace(/<br\s*\/?>/gi, ' - ').trim();
+      const oldAddress = normalizeExamAddressStr(oldEx);
+      const newAddress = normalizeExamAddressStr(newEx);
       if (oldAddress !== newAddress && (oldAddress || newAddress)) {
-        diffs.push({ field: 'diaDiemThi', label: 'Địa điểm thi', oldVal: oldAddress, newVal: newAddress });
+        diffs.push({ field: 'diaDiemThi', label: 'Địa điểm thi', oldVal: oldAddress || 'Chưa có', newVal: newAddress || 'Chưa có' });
       }
 
-      const oldFormat = (oldEx.hinh_thuc_thi || oldEx.hinhThucThi || oldEx.MaHTThi || '').trim();
-      const newFormat = (newEx.hinh_thuc_thi || newEx.hinhThucThi || newEx.MaHTThi || '').trim();
+      const oldFormat = normalizeExamFormatStr(oldEx);
+      const newFormat = normalizeExamFormatStr(newEx);
       if (oldFormat !== newFormat && (oldFormat || newFormat)) {
-        diffs.push({ field: 'hinhThucThi', label: 'Hình thức thi', oldVal: oldFormat, newVal: newFormat });
+        const rawOldF = oldEx.hinh_thuc_thi || oldEx.hinhThucThi || 'Trắc nghiệm';
+        const rawNewF = newEx.hinh_thuc_thi || newEx.hinhThucThi || 'Trắc nghiệm';
+        diffs.push({ field: 'hinhThucThi', label: 'Hình thức thi', oldVal: rawOldF, newVal: rawNewF });
       }
 
-      const oldGroup = (oldEx.to_thi || oldEx.toThi || oldEx.nhom_thi || oldEx.nhomThi || '').trim();
-      const newGroup = (newEx.to_thi || newEx.toThi || newEx.nhom_thi || newEx.nhomThi || '').trim();
-      if (oldGroup !== newGroup && (oldGroup || newGroup)) {
-        diffs.push({ field: 'toThi', label: 'Tổ / Nhóm thi', oldVal: oldGroup, newVal: newGroup });
+      const oldGroup = normalizeExamGroupStr(oldEx);
+      const newGroup = normalizeExamGroupStr(newEx);
+      if (oldGroup !== newGroup && (oldGroup !== '|' || newGroup !== '|')) {
+        const [oldTo, oldNhom] = oldGroup.split('|');
+        const [newTo, newNhom] = newGroup.split('|');
+        diffs.push({
+          field: 'toThi',
+          label: 'Tổ / Nhóm thi',
+          oldVal: `Tổ ${oldTo || '0'} - Nhóm ${oldNhom || '0'}`,
+          newVal: `Tổ ${newTo || '0'} - Nhóm ${newNhom || '0'}`,
+        });
       }
 
-      const oldBan = (oldEx.cam_thi || oldEx.camThi || '').trim();
-      const newBan = (newEx.cam_thi || newEx.camThi || '').trim();
+      const oldBan = normalizeExamBanStatus(oldEx);
+      const newBan = normalizeExamBanStatus(newEx);
       if (oldBan !== newBan) {
-        diffs.push({ field: 'camThi', label: 'Trạng thái cấm thi', oldVal: oldBan || 'Được thi', newVal: newBan || 'Được thi' });
+        diffs.push({
+          field: 'camThi',
+          label: 'Trạng thái cấm thi',
+          oldVal: oldBan ? 'Bị cấm thi' : 'Được dự thi',
+          newVal: newBan ? 'Bị cấm thi' : 'Được dự thi',
+        });
       }
 
       if (diffs.length > 0) {
@@ -493,20 +591,27 @@ export function detectExamScheduleChanges(
   // 2. Kiểm tra môn thi bị huỷ (có trong cũ nhưng biến mất trong mới)
   oldRawExams.forEach((oldEx) => {
     const key = getExamUniqueKey(oldEx);
-    const code = (oldEx.ma_mon || oldEx.maMon || oldEx.MaMH || '').toUpperCase().trim();
+    const code = normalizeExamCode(oldEx);
     if (!key || !code) return;
 
     if (!newMap.has(key)) {
       const baseName = oldEx.ten_mon || oldEx.tenMon || oldEx.TenMH || 'Môn thi';
       const semName = oldEx.ten_hoc_ky || (oldEx.hoc_ky ? `HK ${oldEx.hoc_ky}` : '');
       const tenMon = semName ? `${baseName} (${semName})` : baseName;
+      const oldDate = normalizeExamDateStr(oldEx);
+      const oldTime = normalizeExamTimeStr(oldEx);
 
       changes.push({
         maMon: code,
         tenMon,
         type: 'CANCELLED',
         diffs: [
-          { field: 'status', label: 'Trạng thái', oldVal: `Lịch ngày ${oldEx.ngay_thi || ''} (${oldEx.gio_bat_dau || ''})`, newVal: 'Đã rút khỏi lịch thi' },
+          {
+            field: 'status',
+            label: 'Trạng thái',
+            oldVal: oldDate ? `Lịch ngày ${oldDate} (${oldTime || ''})` : 'Đã xếp lịch',
+            newVal: 'Đã rút khỏi lịch thi',
+          },
         ],
       });
     }
