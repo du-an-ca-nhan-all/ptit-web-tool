@@ -1,6 +1,7 @@
 import {
   runExamScheduleReminders,
   checkAndDispatchQldtAnnouncements,
+  checkAndDispatchSlinkAnnouncements,
   runClassScheduleReminders,
 } from './telegramDispatcher';
 import { runDailyAutoBackupScheduler } from '@/src/features/database-backup/server/backupServerService';
@@ -50,6 +51,9 @@ export async function runTelegramSchedulerTasks() {
   });
   checkAndDispatchQldtAnnouncements().catch((err) => {
     console.error('[Telegram Scheduler] Periodic QLDTTX announcements check error:', err);
+  });
+  checkAndDispatchSlinkAnnouncements().catch((err) => {
+    console.error('[Telegram Scheduler] Periodic S-Link announcements check error:', err);
   });
   runClassScheduleReminders().catch((err) => {
     console.error('[Telegram Scheduler] Periodic class schedule check error:', err);

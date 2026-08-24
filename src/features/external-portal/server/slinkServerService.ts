@@ -10,6 +10,7 @@ export const SLINK_BASE_URL = 'https://slink.ptit.edu.vn/';
 export const SLINK_SSO_TOKEN_URL = 'https://gwdu.ptit.edu.vn/sso/realms/ptit/protocol/openid-connect/token';
 export const SLINK_SSO_USERINFO_URL = 'https://gwdu.ptit.edu.vn/sso/realms/ptit/protocol/openid-connect/userinfo';
 export const SLINK_NOTIFICATION_API_URL = 'https://gwdu.ptit.edu.vn/notification/notification/me/page';
+export const SLINK_NOTIFICATION_READ_API_URL = 'https://gwdu.ptit.edu.vn/notification/notification/read';
 
 export const SLINK_CLIENT_ID = 'ptit-connect';
 export const SLINK_USER_AGENT =
@@ -290,6 +291,43 @@ export async function getSlinkNotifications(
   }
 
   return json;
+}
+
+/**
+ * Đánh dấu một thông báo hoặc tất cả thông báo là đã đọc trên PTIT S-Link
+ * @param accessToken - Bearer token hoặc raw access token
+ * @param notificationId - ID (_id) của thông báo (nếu type = 'ONE')
+ * @param type - 'ONE' (1 thông báo) hoặc 'ALL' (tất cả thông báo)
+ */
+export async function markSlinkNotificationAsRead(
+  accessToken: string,
+  notificationId?: string,
+  type: 'ONE' | 'ALL' = 'ONE'
+): Promise<{ success: boolean; data?: any; message?: string }> {
+  const rawToken = accessToken.replace(/^Bearer\s+/i, '').trim();
+  const url = SLINK_NOTIFICATION_READ_API_URL;
+
+  const bodyPayload: any = type === 'ALL'
+    ? { type: 'ALL' }
+    : { type: 'ONE', notificationId: String(notificationId || '') };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${rawToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/plain, */*',
+      'User-Agent': SLINK_USER_AGENT,
+    },
+    body: JSON.stringify(bodyPayload),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Đánh dấu đã đọc thông báo S-Link thất bại (HTTP ${res.status}): ${errText}`);
+  }
+
+  return (await res.json()) as { success: boolean; data?: any };
 }
 
 /**

@@ -62,6 +62,9 @@ interface SubscriberItem {
   notifyQldtAnnouncements?: boolean;
   qldtCheckInterval?: number;
   lastQldtCheckedAt?: string | null;
+  notifySlinkAnnouncements?: boolean;
+  slinkCheckInterval?: number;
+  lastSlinkCheckedAt?: string | null;
   notifyClassSchedule?: boolean;
   classReminderBefore?: number;
   lastTestedAt: string | null;
@@ -1164,6 +1167,11 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
                           {sub.notifyQldtAnnouncements && (
                             <span className="px-1.5 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 rounded text-[10px] font-bold">
                               QLDTTX ({sub.qldtCheckInterval || 2}h)
+                            </span>
+                          )}
+                          {sub.notifySlinkAnnouncements && (
+                            <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold">
+                              S-Link ({sub.slinkCheckInterval || 2}h)
                             </span>
                           )}
                         </div>

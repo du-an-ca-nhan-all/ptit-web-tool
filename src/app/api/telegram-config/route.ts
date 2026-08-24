@@ -17,6 +17,7 @@ import { logActivity } from '@/src/features/activity-logs/server/activityLogServ
 import { getTelegramAdminConfig, saveTelegramAdminConfig } from '@/src/lib/globalConfig';
 import {
   checkAndDispatchQldtAnnouncements,
+  checkAndDispatchSlinkAnnouncements,
   runClassScheduleReminders,
   findNearestStudentClassSchedule,
   dispatchNearestClassScheduleNotification,
@@ -87,6 +88,9 @@ export async function GET(req: NextRequest) {
           notifyQldtAnnouncements: cfg.notifyQldtAnnouncements,
           qldtCheckInterval: cfg.qldtCheckInterval,
           lastQldtCheckedAt: cfg.lastQldtCheckedAt ? cfg.lastQldtCheckedAt.toISOString() : null,
+          notifySlinkAnnouncements: cfg.notifySlinkAnnouncements,
+          slinkCheckInterval: cfg.slinkCheckInterval,
+          lastSlinkCheckedAt: cfg.lastSlinkCheckedAt ? cfg.lastSlinkCheckedAt.toISOString() : null,
           notifyClassSchedule: cfg.notifyClassSchedule,
           classReminderBefore: cfg.classReminderBefore,
           lastTestedAt: cfg.lastTestedAt ? cfg.lastTestedAt.toISOString() : null,
@@ -144,6 +148,24 @@ export async function GET(req: NextRequest) {
       lastSyncAt: extAccount?.lastSyncAt ? extAccount.lastSyncAt.toISOString() : null,
     };
 
+    const slinkAccount = await prisma.externalAccount.findFirst({
+      where: {
+        username: usernameToQuery.toUpperCase(),
+        OR: [
+          { systemKey: 'SLINK_PTIT' },
+          { systemUrl: { contains: 'slink.ptit.edu.vn' } },
+        ],
+      },
+    });
+
+    const isSlinkConfigured = !!(slinkAccount && (slinkAccount.token || slinkAccount.extPassword));
+    const slinkStatus = {
+      isConfigured: isSlinkConfigured,
+      status: slinkAccount?.status || 'DISCONNECTED',
+      syncMessage: slinkAccount?.syncMessage || null,
+      lastSyncAt: slinkAccount?.lastSyncAt ? slinkAccount.lastSyncAt.toISOString() : null,
+    };
+
     const systemBotFull = authUser.isAdmin ? await getSystemTelegramBotConfig() : null;
 
     return NextResponse.json({
@@ -151,6 +173,7 @@ export async function GET(req: NextRequest) {
       systemBot: systemBotPublic,
       systemBotConfig: systemBotFull,
       qldttxStatus,
+      slinkStatus,
       config: config
         ? {
             id: config.id,
@@ -165,6 +188,9 @@ export async function GET(req: NextRequest) {
             notifyQldtAnnouncements: config.notifyQldtAnnouncements,
             qldtCheckInterval: config.qldtCheckInterval,
             lastQldtCheckedAt: config.lastQldtCheckedAt ? config.lastQldtCheckedAt.toISOString() : null,
+            notifySlinkAnnouncements: config.notifySlinkAnnouncements,
+            slinkCheckInterval: config.slinkCheckInterval,
+            lastSlinkCheckedAt: config.lastSlinkCheckedAt ? config.lastSlinkCheckedAt.toISOString() : null,
             notifyClassSchedule: config.notifyClassSchedule,
             classReminderBefore: config.classReminderBefore,
             lastTestedAt: config.lastTestedAt ? config.lastTestedAt.toISOString() : null,
@@ -544,6 +570,8 @@ export async function POST(req: NextRequest) {
       const notifyClassActivity = body.notifyClassActivity !== undefined ? Boolean(body.notifyClassActivity) : true;
       const notifyQldtAnnouncements = body.notifyQldtAnnouncements !== undefined ? Boolean(body.notifyQldtAnnouncements) : true;
       const qldtCheckInterval = [1, 2, 5].includes(Number(body.qldtCheckInterval)) ? Number(body.qldtCheckInterval) : 2;
+      const notifySlinkAnnouncements = body.notifySlinkAnnouncements !== undefined ? Boolean(body.notifySlinkAnnouncements) : true;
+      const slinkCheckInterval = [1, 2, 5].includes(Number(body.slinkCheckInterval)) ? Number(body.slinkCheckInterval) : 2;
       const notifyClassSchedule = body.notifyClassSchedule !== undefined ? Boolean(body.notifyClassSchedule) : true;
       const classReminderBefore = [0, 30, 60].includes(Number(body.classReminderBefore)) ? Number(body.classReminderBefore) : 30;
 
@@ -562,6 +590,20 @@ export async function POST(req: NextRequest) {
       const isQldttxValid = !!(extAccount && (extAccount.token || extAccount.extPassword) && extAccount.status !== 'ERROR');
       const safeNotifyClassSchedule = isQldttxValid ? notifyClassSchedule : false;
       const safeNotifyQldtAnnouncements = isQldttxValid ? notifyQldtAnnouncements : false;
+
+      // Kiểm tra trạng thái tài khoản PTIT S-Link
+      const slinkAccount = await prisma.externalAccount.findFirst({
+        where: {
+          username: username.toUpperCase(),
+          OR: [
+            { systemKey: 'SLINK_PTIT' },
+            { systemUrl: { contains: 'slink.ptit.edu.vn' } },
+          ],
+        },
+      });
+
+      const isSlinkValid = !!(slinkAccount && (slinkAccount.token || slinkAccount.extPassword) && slinkAccount.status !== 'ERROR');
+      const safeNotifySlinkAnnouncements = isSlinkValid ? notifySlinkAnnouncements : false;
 
       let botUsername: string | null = null;
       let botFirstName: string | null = null;
@@ -598,6 +640,8 @@ export async function POST(req: NextRequest) {
           notifyClassActivity,
           notifyQldtAnnouncements: safeNotifyQldtAnnouncements,
           qldtCheckInterval,
+          notifySlinkAnnouncements: safeNotifySlinkAnnouncements,
+          slinkCheckInterval,
           notifyClassSchedule: safeNotifyClassSchedule,
           classReminderBefore,
           botUsername,
@@ -612,6 +656,8 @@ export async function POST(req: NextRequest) {
           notifyClassActivity,
           notifyQldtAnnouncements: safeNotifyQldtAnnouncements,
           qldtCheckInterval,
+          notifySlinkAnnouncements: safeNotifySlinkAnnouncements,
+          slinkCheckInterval,
           notifyClassSchedule: safeNotifyClassSchedule,
           classReminderBefore,
           botUsername: botUsername ?? undefined,
@@ -633,6 +679,7 @@ export async function POST(req: NextRequest) {
           botUsername,
           notifyClassSchedule: safeNotifyClassSchedule,
           notifyQldtAnnouncements: safeNotifyQldtAnnouncements,
+          notifySlinkAnnouncements: safeNotifySlinkAnnouncements,
         },
       });
 
@@ -660,6 +707,35 @@ export async function POST(req: NextRequest) {
       }
 
       const result = await checkAndDispatchQldtAnnouncements({
+        username,
+        forceCheck: true,
+      });
+      return NextResponse.json(result);
+    }
+
+    // 2.55 ACTION: CHECK PTIT S-LINK ANNOUNCEMENTS NOW (Kiểm tra thông báo S-Link tức thì và đánh dấu đã đọc)
+    if (action === 'CHECK_SLINK_ANNOUNCEMENTS') {
+      const slinkAccount = await prisma.externalAccount.findFirst({
+        where: {
+          username: username.toUpperCase(),
+          OR: [
+            { systemKey: 'SLINK_PTIT' },
+            { systemUrl: { contains: 'slink.ptit.edu.vn' } },
+          ],
+        },
+      });
+      const isSlinkValid = !!(slinkAccount && (slinkAccount.token || slinkAccount.extPassword) && slinkAccount.status !== 'ERROR');
+      if (!isSlinkValid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Chưa cấu hình tài khoản Cổng Thông Tin PTIT S-Link hoặc thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại tài khoản trước khi thực hiện.',
+          },
+          { status: 400 }
+        );
+      }
+
+      const result = await checkAndDispatchSlinkAnnouncements({
         username,
         forceCheck: true,
       });

@@ -72,6 +72,10 @@ export default function TelegramConfigSection({
   const [qldtCheckInterval, setQldtCheckInterval] = useState<number>(2);
   const [isCheckingQldt, setIsCheckingQldt] = useState(false);
   const [qldtCheckMsg, setQldtCheckMsg] = useState('');
+  const [notifySlinkAnnouncements, setNotifySlinkAnnouncements] = useState(true);
+  const [slinkCheckInterval, setSlinkCheckInterval] = useState<number>(2);
+  const [isCheckingSlink, setIsCheckingSlink] = useState(false);
+  const [slinkCheckMsg, setSlinkCheckMsg] = useState('');
   const [notifyClassSchedule, setNotifyClassSchedule] = useState(true);
   const [classReminderBefore, setClassReminderBefore] = useState<number>(30);
   const [isCheckingClassSchedule, setIsCheckingClassSchedule] = useState(false);
@@ -88,6 +92,14 @@ export default function TelegramConfigSection({
 
   // QLDTTX Account Status
   const [qldttxStatus, setQldttxStatus] = useState<{
+    isConfigured: boolean;
+    status: string;
+    syncMessage?: string | null;
+    lastSyncAt?: string | null;
+  } | null>(null);
+
+  // S-Link Account Status
+  const [slinkStatus, setSlinkStatus] = useState<{
     isConfigured: boolean;
     status: string;
     syncMessage?: string | null;
@@ -117,6 +129,10 @@ export default function TelegramConfigSection({
   const isQldttxError = Boolean(qldttxStatus?.isConfigured && qldttxStatus?.status === 'ERROR');
   const isQldttxAvailable = isQldttxConnected;
 
+  const isSlinkConnected = Boolean(slinkStatus?.isConfigured && slinkStatus?.status === 'CONNECTED');
+  const isSlinkError = Boolean(slinkStatus?.isConfigured && slinkStatus?.status === 'ERROR');
+  const isSlinkAvailable = isSlinkConnected;
+
   // Fetch current user's Telegram config and System Bot info
   const fetchConfig = async () => {
     if (!usernameToQuery) return;
@@ -138,6 +154,9 @@ export default function TelegramConfigSection({
         if (data.qldttxStatus) {
           setQldttxStatus(data.qldttxStatus);
         }
+        if (data.slinkStatus) {
+          setSlinkStatus(data.slinkStatus);
+        }
 
         if (data.config) {
           setConfig(data.config);
@@ -151,6 +170,8 @@ export default function TelegramConfigSection({
           setNotifyClassActivity(data.config.notifyClassActivity ?? true);
           setNotifyQldtAnnouncements(data.config.notifyQldtAnnouncements ?? true);
           setQldtCheckInterval(data.config.qldtCheckInterval ?? 2);
+          setNotifySlinkAnnouncements(data.config.notifySlinkAnnouncements ?? true);
+          setSlinkCheckInterval(data.config.slinkCheckInterval ?? 2);
           setNotifyClassSchedule(data.config.notifyClassSchedule ?? true);
           setClassReminderBefore(data.config.classReminderBefore ?? 30);
           if (data.config.lastTestStatus) {
@@ -245,6 +266,8 @@ export default function TelegramConfigSection({
           notifyClassActivity,
           notifyQldtAnnouncements,
           qldtCheckInterval,
+          notifySlinkAnnouncements,
+          slinkCheckInterval,
           notifyClassSchedule,
           classReminderBefore,
         }),
@@ -294,6 +317,37 @@ export default function TelegramConfigSection({
       setErrorMsg('Không thể kết nối máy chủ để kiểm tra thông báo QLDTTX.');
     } finally {
       setIsCheckingQldt(false);
+    }
+  };
+
+  // Check S-Link announcements now
+  const handleCheckSlinkNow = async () => {
+    setIsCheckingSlink(true);
+    setSlinkCheckMsg('');
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/telegram-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'CHECK_SLINK_ANNOUNCEMENTS',
+          targetUsername: targetUsername || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSlinkCheckMsg(
+          data.totalAnnouncementsDispatched > 0
+            ? `Đã quét S-Link: Phát hiện và đã gửi ${data.totalAnnouncementsDispatched} thông báo mới về Telegram và tự động đánh dấu đã đọc!`
+            : 'Đã quét S-Link: Không có thông báo mới nào hoặc đã được gửi trước đó.'
+        );
+      } else {
+        setErrorMsg(data.error || 'Lỗi khi kiểm tra thông báo PTIT S-Link.');
+      }
+    } catch {
+      setErrorMsg('Không thể kết nối máy chủ để kiểm tra thông báo PTIT S-Link.');
+    } finally {
+      setIsCheckingSlink(false);
     }
   };
 
@@ -1206,7 +1260,7 @@ export default function TelegramConfigSection({
 
               {/* Option 5: QLDTTX Portal Announcements (Requires Telegram Ready & QLDTTX) */}
               <div
-                className={`p-3 rounded-xl border transition-all sm:col-span-2 lg:col-span-2 ${
+                className={`p-3 rounded-xl border transition-all ${
                   !isTelegramReady || !isQldttxAvailable
                     ? 'bg-slate-100/80 border-slate-200 opacity-60 cursor-not-allowed'
                     : 'bg-white border-sky-300 bg-sky-50/40 hover:border-sky-400 cursor-pointer'
@@ -1244,6 +1298,51 @@ export default function TelegramConfigSection({
                           ? 'Mật khẩu QLDTTX sai/hết hạn. Cần cập nhật lại.'
                           : 'Yêu cầu liên kết tài khoản Cổng QLDTTX.'
                         : '/#/xemthongbao (Thông báo mới từ Học viện)'}
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {/* Option 6: PTIT S-Link Portal Announcements (Requires Telegram Ready & S-Link) */}
+              <div
+                className={`p-3 rounded-xl border transition-all ${
+                  !isTelegramReady || !isSlinkAvailable
+                    ? 'bg-slate-100/80 border-slate-200 opacity-60 cursor-not-allowed'
+                    : 'bg-white border-indigo-300 bg-indigo-50/40 hover:border-indigo-400 cursor-pointer'
+                }`}
+              >
+                <label className={`flex items-start gap-2.5 ${!isTelegramReady || !isSlinkAvailable ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    disabled={!isTelegramReady || !isSlinkAvailable}
+                    checked={isTelegramReady && isSlinkAvailable && notifySlinkAnnouncements}
+                    onChange={(e) => isTelegramReady && isSlinkAvailable && setNotifySlinkAnnouncements(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer shrink-0 disabled:cursor-not-allowed"
+                  />
+                  <div className="text-xs flex-1">
+                    <div className="font-bold flex items-center justify-between gap-1">
+                      <span className={isTelegramReady && isSlinkAvailable ? 'text-indigo-900' : 'text-slate-500'}>
+                        Thông Báo PTIT S-Link
+                      </span>
+                      {!isTelegramReady ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-slate-200 text-slate-600 flex items-center gap-0.5">
+                          <Lock className="w-2.5 h-2.5" /> Khóa
+                        </span>
+                      ) : !isSlinkAvailable ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1">
+                          <Lock className="w-2.5 h-2.5" />
+                          {isSlinkError ? 'Lỗi xác thực' : 'Chưa liên kết'}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className={`text-[10px] mt-0.5 ${isTelegramReady && isSlinkAvailable ? 'text-indigo-700' : 'text-slate-400'}`}>
+                      {!isTelegramReady
+                        ? 'Yêu cầu cấu hình & test Telegram thành công.'
+                        : !isSlinkAvailable
+                        ? isSlinkError
+                          ? 'Mật khẩu S-Link sai/hết hạn. Cần cập nhật lại.'
+                          : 'Yêu cầu liên kết tài khoản PTIT S-Link.'
+                        : 'slink.ptit.edu.vn (Tự động đánh dấu đã đọc sau khi gửi)'}
                     </div>
                   </div>
                 </label>
@@ -1373,6 +1472,60 @@ export default function TelegramConfigSection({
               <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-xl flex items-center gap-2 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{qldtCheckMsg}</span>
+              </div>
+            )}
+
+            {/* S-Link Check Interval Selector */}
+            {isTelegramReady && isSlinkAvailable && notifySlinkAnnouncements && (
+              <div className="mt-1 p-3 sm:p-3.5 bg-indigo-50 border border-indigo-200 rounded-xl flex flex-col gap-3 text-xs">
+                <div className="flex flex-col gap-0.5">
+                  <div className="font-bold text-indigo-900 flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    <span>Tần suất kiểm tra thông báo mới từ PTIT S-Link:</span>
+                  </div>
+                  <div className="text-[11px] text-indigo-700">
+                    Hệ thống sẽ quét định kỳ ứng dụng <a href="https://slink.ptit.edu.vn/" target="_blank" rel="noopener noreferrer" className="underline font-bold text-indigo-800 hover:text-indigo-950">PTIT S-Link</a>, bắn tin nhắn Telegram khi có thông báo mới và <strong>tự động đánh dấu đã đọc</strong>.
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { value: 1, label: '1 tiếng' },
+                    { value: 2, label: '2 tiếng (Khuyên dùng)' },
+                    { value: 5, label: '5 tiếng' },
+                  ].map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setSlinkCheckInterval(item.value)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                        slinkCheckInterval === item.value
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={handleCheckSlinkNow}
+                    disabled={isCheckingSlink}
+                    className="px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-900 font-bold text-xs rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50 active:scale-95"
+                    title="Kiểm tra thông báo S-Link ngay lập tức"
+                  >
+                    {isCheckingSlink ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                    <span>Kiểm Tra Ngay</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {isTelegramReady && slinkCheckMsg && (
+              <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-medium rounded-xl flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>{slinkCheckMsg}</span>
               </div>
             )}
           </div>

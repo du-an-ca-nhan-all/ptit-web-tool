@@ -224,6 +224,9 @@ model TelegramConfig {
   notifyQldtAnnouncements Boolean   @default(true) // Nhận thông báo mới từ cổng QLDTTX (/#/xemthongbao)
   qldtCheckInterval       Int       @default(2)    // Tần suất kiểm tra (1, 2, hoặc 5 tiếng)
   lastQldtCheckedAt       DateTime? // Thời điểm kiểm tra thông báo QLDTTX gần nhất
+  notifySlinkAnnouncements Boolean  @default(true) // Nhận thông báo mới từ Cổng PTIT S-Link
+  slinkCheckInterval      Int       @default(2)    // Tần suất kiểm tra S-Link (1, 2, hoặc 5 tiếng)
+  lastSlinkCheckedAt      DateTime? // Thời điểm kiểm tra thông báo S-Link gần nhất
   notifyClassSchedule     Boolean   @default(true) // Nhận thông báo lịch học (Sáng 7h-10h & trước giờ học)
   classReminderBefore     Int       @default(30)   // Nhắc trước giờ học (30 phút, 60 phút, hoặc 0 = cả hai)
   
@@ -644,6 +647,20 @@ model GlobalSyncQueueItem {
   @@index([jobType])
   @@index([status])
   @@index([createdAt])
+}
+
+// 27. Bảng SlinkAnnouncementLog: Nhật ký lưu các thông báo từ PTIT S-Link đã gửi để tránh gửi lặp
+model SlinkAnnouncementLog {
+  id             Int      @id @default(autoincrement())
+  username       String   // Mã SV
+  announcementId String   // ID / _id thông báo S-Link
+  title          String?  // Tiêu đề thông báo
+  publishDate    String?  // Ngày gửi thông báo
+  sentAt         DateTime @default(now())
+
+  @@unique([username, announcementId])
+  @@index([username])
+  @@index([announcementId])
 }
 
 

@@ -398,6 +398,7 @@ export const getInitialHomeState = (): InitialHomeState => {
     search: getParam('search'),
     classCode: getParam('classCode'),
     subjectCode: getParam('subjectCode'),
+    date: getParam('date'),
     monitorClass:
       getParam('monitorClass') ||
       getParam('classCode') ||

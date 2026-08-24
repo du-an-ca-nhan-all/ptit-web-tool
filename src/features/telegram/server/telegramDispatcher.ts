@@ -13,6 +13,13 @@ import {
   fetchStudentAnnouncementsFromQLDTTX,
   fetchStudentTimetableFromQLDTTX,
 } from '@/src/features/external-portal/server/qldttxServerService';
+import {
+  getSlinkNotifications,
+  getValidSlinkTokenOrRefresh,
+  markSlinkNotificationAsRead,
+  cleanHtml,
+  formatSlinkDate,
+} from '@/src/features/external-portal/server/slinkServerService';
 
 /**
  * Normalizes date string into DD/MM/YYYY format
@@ -593,6 +600,195 @@ export async function checkAndDispatchQldtAnnouncements(options: {
     return {
       success: false,
       error: err.message || 'Lỗi khi kiểm tra thông báo QLDTTX',
+    };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6.5 PTIT S-LINK ANNOUNCEMENTS: KIỂM TRA THÔNG BÁO MỚI TỪ CỔNG S-LINK (https://slink.ptit.edu.vn/)
+// VÀ TỰ ĐỘNG ĐÁNH DẤU LÀ ĐÃ ĐỌC SAU KHI GỬI THÀNH CÔNG VỀ TELEGRAM
+// ─────────────────────────────────────────────────────────────────────────────
+export async function checkAndDispatchSlinkAnnouncements(options: {
+  username?: string;
+  forceCheck?: boolean;
+} = {}) {
+  try {
+    const whereCond: any = {
+      isEnabled: true,
+      notifySlinkAnnouncements: true,
+    };
+    if (options.username) {
+      whereCond.username = options.username;
+    }
+
+    const subscribers = await prisma.telegramConfig.findMany({
+      where: whereCond,
+      include: {
+        user: {
+          include: {
+            student: true,
+          },
+        },
+      },
+    });
+
+    let totalChecked = 0;
+    let totalAnnouncementsDispatched = 0;
+    let totalMarkedRead = 0;
+    const errors: string[] = [];
+
+    for (const sub of subscribers) {
+      const intervalHours = sub.slinkCheckInterval || 2;
+
+      // Check if enough time has elapsed
+      if (!options.forceCheck && sub.lastSlinkCheckedAt) {
+        const elapsedHours = (Date.now() - new Date(sub.lastSlinkCheckedAt).getTime()) / (1000 * 60 * 60);
+        if (elapsedHours < intervalHours) {
+          continue;
+        }
+      }
+
+      // Find S-Link external account
+      const extAccount = await prisma.externalAccount.findFirst({
+        where: {
+          username: sub.username,
+          OR: [
+            { systemKey: 'SLINK_PTIT' },
+            { systemUrl: { contains: 'slink.ptit.edu.vn' } },
+          ],
+        },
+      });
+
+      if (!extAccount || (!extAccount.extPassword && !extAccount.token)) {
+        continue;
+      }
+
+      totalChecked++;
+
+      try {
+        const { token, isNew } = await getValidSlinkTokenOrRefresh({
+          username: extAccount.extUsername,
+          password: extAccount.extPassword,
+          existingToken: extAccount.token,
+        });
+
+        if (isNew && token !== extAccount.token) {
+          await prisma.externalAccount.update({
+            where: { id: extAccount.id },
+            data: {
+              token,
+              status: 'CONNECTED',
+              lastSyncAt: new Date(),
+              syncMessage: `Đã tự động làm mới Token S-Link lúc ${new Date().toLocaleTimeString('vi-VN')}`,
+            },
+          }).catch(() => {});
+        }
+
+        const notifRes = await getSlinkNotifications(token, 1, 20, false);
+        const announcements = notifRes?.data?.result || [];
+
+        if (announcements.length === 0) {
+          await prisma.telegramConfig.update({
+            where: { id: sub.id },
+            data: { lastSlinkCheckedAt: new Date() },
+          }).catch(() => {});
+          continue;
+        }
+
+        let effectiveToken: string;
+        try {
+          const resolved = await resolveEffectiveBotToken(sub.botToken);
+          effectiveToken = resolved.token;
+        } catch {
+          continue;
+        }
+
+        for (const ann of announcements) {
+          const notifId = String(ann.id || ann._id || '');
+          if (!notifId) continue;
+
+          // Check if already dispatched
+          const alreadyLogged = await prisma.slinkAnnouncementLog.findUnique({
+            where: {
+              username_announcementId: {
+                username: sub.username,
+                announcementId: notifId,
+              },
+            },
+          });
+
+          if (alreadyLogged && !options.forceCheck) {
+            continue;
+          }
+
+          const studentName = sub.user?.student?.hoTen || sub.username;
+          const rawContent = ann.content || ann.description || '';
+          const cleaned = cleanHtml(rawContent);
+          const cleanSummary = cleaned ? (cleaned.length > 400 ? cleaned.slice(0, 400) + '...' : cleaned) : '';
+          const senderDisplay = ann.senderName || ann.sender || 'Cổng PTIT S-Link';
+          const dateDisplay = formatSlinkDate(ann.createdAt);
+
+          const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ PTIT S-LINK</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n📌 <b>${ann.title}</b>\n\n${cleanSummary ? `📝 <i>${cleanSummary}</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${senderDisplay}</b>\n🗓️ Thời gian: <b>${dateDisplay}</b>\n🔗 <a href="https://slink.ptit.edu.vn/">Mở cổng PTIT S-Link</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
+
+          const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
+            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          });
+
+          if (sendRes.success) {
+            totalAnnouncementsDispatched++;
+
+            // 1. Lưu log để tránh gửi lặp
+            await prisma.slinkAnnouncementLog.upsert({
+              where: {
+                username_announcementId: {
+                  username: sub.username,
+                  announcementId: notifId,
+                },
+              },
+              create: {
+                username: sub.username,
+                announcementId: notifId,
+                title: ann.title,
+                publishDate: ann.createdAt,
+              },
+              update: {
+                sentAt: new Date(),
+              },
+            });
+
+            // 2. Sau khi đã gửi thành công, tiến hành đánh dấu thông báo đó là đã đọc trên S-Link
+            try {
+              await markSlinkNotificationAsRead(token, notifId, 'ONE');
+              totalMarkedRead++;
+            } catch (markErr: any) {
+              console.warn(`[checkAndDispatchSlinkAnnouncements] Đánh dấu đã đọc thông báo S-Link (${notifId}) thất bại:`, markErr?.message);
+            }
+          }
+        }
+
+        // Update last checked time
+        await prisma.telegramConfig.update({
+          where: { id: sub.id },
+          data: { lastSlinkCheckedAt: new Date() },
+        }).catch(() => {});
+      } catch (err: any) {
+        errors.push(`${sub.username}: ${err.message}`);
+      }
+    }
+
+    return {
+      success: true,
+      totalSubscribers: subscribers.length,
+      totalChecked,
+      totalAnnouncementsDispatched,
+      totalMarkedRead,
+      errors: errors.slice(0, 5),
+    };
+  } catch (err: any) {
+    console.error('checkAndDispatchSlinkAnnouncements error:', err);
+    return {
+      success: false,
+      error: err.message || 'Lỗi khi kiểm tra thông báo PTIT S-Link',
     };
   }
 }
