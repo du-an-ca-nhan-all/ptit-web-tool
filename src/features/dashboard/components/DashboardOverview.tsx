@@ -83,6 +83,7 @@ export default function DashboardOverview({
         user={effectiveUserForBanner}
         externalAccountStatus={data.externalAccountStatus}
         lmsAccountStatus={data.lmsAccountStatus}
+        slinkAccountStatus={data.slinkAccountStatus}
         telegramStatus={data.telegramStatus}
         activeBatchName={data.activeBatch?.name}
         onRefresh={refresh}

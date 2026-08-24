@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Clock,
   BookOpen,
+  Smartphone,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import { ExternalAccountStatus, TelegramSyncStatus } from '../types/dashboard.types';
@@ -21,6 +22,7 @@ interface StudentHeroBannerProps {
   user: LoginUser;
   externalAccountStatus: ExternalAccountStatus;
   lmsAccountStatus?: ExternalAccountStatus;
+  slinkAccountStatus?: ExternalAccountStatus;
   telegramStatus: TelegramSyncStatus;
   activeBatchName?: string | null;
   onRefresh: () => void;
@@ -32,6 +34,7 @@ export default function StudentHeroBanner({
   user,
   externalAccountStatus,
   lmsAccountStatus,
+  slinkAccountStatus,
   telegramStatus,
   activeBatchName,
   onRefresh,
@@ -173,6 +176,35 @@ export default function StudentHeroBanner({
                 </span>
                 {lmsAccountStatus.isConnected ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
+                )}
+              </button>
+            )}
+
+            {/* S-Link Status */}
+            {slinkAccountStatus && (
+              <button
+                type="button"
+                onClick={() => onNavigateTab('profile', 'EXTERNAL_ACCOUNTS')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                  slinkAccountStatus.isConnected
+                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 hover:bg-purple-500/20'
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                }`}
+                title={
+                  slinkAccountStatus.isConnected
+                    ? 'Đã kết nối Cổng Thông Tin PTIT S-Link'
+                    : 'Chưa liên kết tài khoản PTIT S-Link (Bấm để liên kết)'
+                }
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>
+                  S-Link:{' '}
+                  <strong>{slinkAccountStatus.isConnected ? 'Đã kết nối' : 'Chưa liên kết'}</strong>
+                </span>
+                {slinkAccountStatus.isConnected ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
                 ) : (
                   <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
                 )}

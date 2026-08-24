@@ -17,6 +17,7 @@ import {
   DollarSign,
   Globe,
   Settings,
+  Smartphone,
 } from 'lucide-react';
 
 interface QuickActionGridProps {
@@ -115,6 +116,15 @@ export default function QuickActionGrid({ onNavigateTab, isAdmin, isMonitor }: Q
       badge: 'LMS PTTC1',
       badgeColor: 'bg-sky-100 text-sky-700',
       onClick: () => onNavigateTab('profile', 'LMS'),
+    },
+    {
+      title: 'Cổng Thông Tin PTIT S-Link',
+      desc: 'Xem thông báo, tin tức & quản lý tài khoản Keycloak SSO',
+      icon: <Smartphone className="w-5 h-5 text-purple-500" />,
+      bg: 'bg-purple-50/70 hover:bg-purple-50 border-purple-100 hover:border-purple-200',
+      badge: 'S-Link',
+      badgeColor: 'bg-purple-100 text-purple-700',
+      onClick: () => onNavigateTab('profile', 'EXTERNAL_ACCOUNTS'),
     },
     {
       title: 'So Sánh ĐKMH',
