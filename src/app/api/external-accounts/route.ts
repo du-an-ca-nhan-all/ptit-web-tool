@@ -4,6 +4,7 @@ import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { AVAILABLE_EXTERNAL_SYSTEMS } from '@/src/types';
 import { loginAndGetToken, validateToken, getValidTokenOrRefresh } from '@/src/features/external-portal/server/qldttxServerService';
 import { loginLMS, validateLmsToken, getValidLmsTokenOrRefresh } from '@/src/features/external-portal/server/lmsServerService';
+import { loginSlink, validateSlinkToken, getValidSlinkTokenOrRefresh } from '@/src/features/external-portal/server/slinkServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 async function getAuthUser(req: NextRequest) {
@@ -181,6 +182,13 @@ export async function POST(req: NextRequest) {
           let freshToken: string;
           if (acc.systemKey === 'LMS_PTTC1') {
             const res = await getValidLmsTokenOrRefresh({
+              username: acc.extUsername,
+              password: acc.extPassword,
+              existingToken: acc.token,
+            });
+            freshToken = res.token;
+          } else if (acc.systemKey === 'SLINK_PTIT') {
+            const res = await getValidSlinkTokenOrRefresh({
               username: acc.extUsername,
               password: acc.extPassword,
               existingToken: acc.token,
@@ -366,6 +374,36 @@ export async function POST(req: NextRequest) {
             { status: 400 }
           );
         }
+      } else if (systemKey === 'SLINK_PTIT') {
+        try {
+          const slinkRes = await loginSlink({
+            username: cleanUsername,
+            password: cleanPassword,
+          });
+          fetchedToken = `Bearer ${slinkRes.access_token}`;
+          syncMessage = 'Đã xác thực và cấp Token kết nối PTIT S-Link thành công!';
+        } catch (tokenErr: any) {
+          console.warn(`S-Link login failed for ${cleanUsername} during SAVE:`, tokenErr.message);
+
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'SAVE_EXTERNAL_ACCOUNT_FAILED',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Lưu cấu hình PTIT S-Link cho ${effectiveUsername} thất bại do đăng nhập không thành công: ${tokenErr.message}`,
+            metadata: { effectiveUsername, systemKey, error: tokenErr.message },
+          });
+
+          return NextResponse.json(
+            {
+              error: `Kiểm tra kết nối PTIT S-Link thất bại: ${tokenErr.message}. Vui lòng kiểm tra lại Tên đăng nhập/Email và Mật khẩu trước khi lưu.`,
+            },
+            { status: 400 }
+          );
+        }
       }
 
       const account = await prisma.externalAccount.upsert({
@@ -520,6 +558,50 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
               {
                 error: `Kiểm tra kết nối LMS thất bại: ${testErr.message}`,
+              },
+              { status: 400 }
+            );
+          }
+        } else if (systemKey === 'SLINK_PTIT') {
+          try {
+            const slinkRes = await loginSlink({
+              username: cleanInputUser,
+              password: cleanInputPass,
+            });
+
+            await logActivity({
+              req,
+              userId: authUser.id,
+              username: authUser.username,
+              userRole: authUser.role,
+              action: 'TEST_EXTERNAL_ACCOUNT_CREDENTIALS',
+              targetType: 'EXTERNAL_ACCOUNT',
+              targetId: effectiveUsername,
+              description: `Kiểm tra kết nối tài khoản PTIT S-Link (${cleanInputUser}) thành công`,
+              metadata: { effectiveUsername, targetSystemUser: cleanInputUser },
+            });
+
+            return NextResponse.json({
+              success: true,
+              message: `Kiểm tra kết nối tới PTIT S-Link thành công! Đăng nhập chính xác.`,
+              token: `Bearer ${slinkRes.access_token}`,
+            });
+          } catch (testErr: any) {
+            await logActivity({
+              req,
+              userId: authUser.id,
+              username: authUser.username,
+              userRole: authUser.role,
+              action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
+              targetType: 'EXTERNAL_ACCOUNT',
+              targetId: effectiveUsername,
+              description: `Kiểm tra kết nối PTIT S-Link (${cleanInputUser}) thất bại: ${testErr.message}`,
+              metadata: { effectiveUsername, targetSystemUser: cleanInputUser, error: testErr.message },
+            });
+
+            return NextResponse.json(
+              {
+                error: `Kiểm tra kết nối PTIT S-Link thất bại: ${testErr.message}`,
               },
               { status: 400 }
             );
@@ -699,6 +781,75 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(
             {
               error: `Không thể kết nối LMS: ${loginErr.message}`,
+            },
+            { status: 400 }
+          );
+        }
+      } else if (existing.systemKey === 'SLINK_PTIT') {
+        try {
+          const { token: validToken, isNew } = await getValidSlinkTokenOrRefresh({
+            username: existing.extUsername,
+            password: existing.extPassword,
+            existingToken: existing.token,
+          });
+
+          const updated = await prisma.externalAccount.update({
+            where: { id: existing.id },
+            data: {
+              token: validToken,
+              status: 'CONNECTED',
+              lastSyncAt: new Date(),
+              syncMessage: isNew
+                ? `Đã đăng nhập và cấp Token S-Link mới lúc ${new Date().toLocaleTimeString('vi-VN')}`
+                : `Token S-Link hiện tại còn sống và hợp lệ lúc ${new Date().toLocaleTimeString('vi-VN')}`,
+            },
+          });
+
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'TEST_EXTERNAL_ACCOUNT',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Kiểm tra/làm mới token PTIT S-Link cho ${effectiveUsername}: Thành công (${isNew ? 'Cấp token mới' : 'Token hợp lệ'})`,
+            metadata: { effectiveUsername, isNew },
+          });
+
+          return NextResponse.json({
+            success: true,
+            message: isNew
+              ? `Đã đăng nhập và lấy Token PTIT S-Link mới thành công cho ${existing.extUsername}!`
+              : `Token PTIT S-Link hiện tại còn sống và hợp lệ!`,
+            token: updated.token,
+            isNew,
+            lastSyncAt: updated.lastSyncAt?.toISOString(),
+          });
+        } catch (loginErr: any) {
+          await prisma.externalAccount.update({
+            where: { id: existing.id },
+            data: {
+              status: 'ERROR',
+              syncMessage: `Lỗi kết nối PTIT S-Link: ${loginErr.message}`,
+            },
+          });
+
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Kiểm tra kết nối PTIT S-Link cho ${effectiveUsername} thất bại: ${loginErr.message}`,
+            metadata: { effectiveUsername, error: loginErr.message },
+          });
+
+          return NextResponse.json(
+            {
+              error: `Không thể kết nối PTIT S-Link: ${loginErr.message}`,
             },
             { status: 400 }
           );

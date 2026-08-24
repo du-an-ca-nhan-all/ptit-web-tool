@@ -9,6 +9,13 @@ import {
   TimetableSubjectSummary,
   StudentTimetableCalendarResult,
 } from '../server/studentTimetableServerService';
+import {
+  SlinkAuthTokenResponse,
+  SlinkUserInfo,
+  SlinkNotificationItem,
+  SlinkNotificationResponse,
+  SlinkLoginResult,
+} from '../server/slinkServerService';
 
 export type {
   LoginUser,
@@ -18,4 +25,9 @@ export type {
   TimetableCalendarEvent,
   TimetableSubjectSummary,
   StudentTimetableCalendarResult,
+  SlinkAuthTokenResponse,
+  SlinkUserInfo,
+  SlinkNotificationItem,
+  SlinkNotificationResponse,
+  SlinkLoginResult,
 };

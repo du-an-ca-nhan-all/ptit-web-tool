@@ -82,6 +82,9 @@ export async function getDashboardData(
   const lmsAccount = user.externalAccounts?.find(
     (a) => a.systemKey === 'LMS_PTTC1' || (a.systemUrl && a.systemUrl.includes('lms.pttc1.edu.vn'))
   );
+  const slinkAccount = user.externalAccounts?.find(
+    (a) => a.systemKey === 'SLINK_PTIT' || (a.systemUrl && a.systemUrl.includes('slink.ptit.edu.vn'))
+  );
 
   // 3. Define concurrent background tasks
   const rawExamsPromise = prisma.examRecord.findMany({
@@ -387,6 +390,14 @@ export async function getDashboardData(
     systemName: lmsAccount?.systemName || 'Hệ thống học tập trực tuyến (LMS PTTC1)',
   };
 
+  // S-Link Account Status
+  const slinkAccountStatus = {
+    isConfigured: Boolean(slinkAccount),
+    isConnected: slinkAccount?.status === 'CONNECTED',
+    lastSyncAt: slinkAccount?.lastSyncAt ? slinkAccount.lastSyncAt.toISOString() : null,
+    systemName: slinkAccount?.systemName || 'Cổng Thông Tin PTIT S-Link',
+  };
+
   let lmsSummary: LmsDashboardSummary | undefined = undefined;
   if (lmsAccount && lmsData && lmsData.isConfigured !== false) {
     const courses = lmsData.courses || [];
@@ -518,6 +529,7 @@ export async function getDashboardData(
     adminSystemHealth,
     externalAccountStatus,
     lmsAccountStatus,
+    slinkAccountStatus,
     telegramStatus,
     activeAnnouncements,
     activeBatch: activeBatch

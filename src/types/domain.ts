@@ -160,6 +160,15 @@ export const AVAILABLE_EXTERNAL_SYSTEMS: ExternalSystemConfig[] = [
     badgeColor: 'bg-sky-50 text-sky-700 border-sky-200',
     iconKey: 'BookOpen',
   },
+  {
+    key: 'SLINK_PTIT',
+    name: 'Cổng thông tin PTIT S-Link',
+    url: 'https://slink.ptit.edu.vn/',
+    description: 'Cổng thông tin & ứng dụng sinh viên PTIT S-Link (Keycloak SSO). Xem thông báo, tin tức và dịch vụ sinh viên.',
+    placeholderUser: 'Nhập Email hoặc Mã sinh viên PTIT (Ví dụ: thanhlv.k25dtcn402@stu.ptit.edu.vn hoặc K25DTCN402)',
+    badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
+    iconKey: 'Smartphone',
+  },
 ];
 
 export interface TelegramConfigItem {

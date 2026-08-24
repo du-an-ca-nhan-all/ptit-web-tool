@@ -160,6 +160,7 @@ export interface DashboardData {
   adminSystemHealth?: AdminSystemHealth;
   externalAccountStatus: ExternalAccountStatus;
   lmsAccountStatus?: ExternalAccountStatus;
+  slinkAccountStatus?: ExternalAccountStatus;
   telegramStatus: TelegramSyncStatus;
   activeAnnouncements: AnnouncementItem[];
   activeBatch?: ExamBatchItem | null;

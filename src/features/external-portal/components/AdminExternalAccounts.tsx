@@ -29,6 +29,7 @@ import {
   Lock,
   BookOpen,
   Clock,
+  Smartphone,
 } from 'lucide-react';
 import { LoginUser, AVAILABLE_EXTERNAL_SYSTEMS } from '../../../types';
 
@@ -443,6 +444,9 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
   const lmsAccounts = accounts.filter((a) => a.systemKey === 'LMS_PTTC1');
   const lmsCount = lmsAccounts.length;
   const lmsTokenCount = lmsAccounts.filter((a) => !!a.token).length;
+  const slinkAccounts = accounts.filter((a) => a.systemKey === 'SLINK_PTIT');
+  const slinkCount = slinkAccounts.length;
+  const slinkTokenCount = slinkAccounts.filter((a) => !!a.token).length;
   const coveragePercent = totalStudents > 0 ? ((accounts.length / totalStudents) * 100).toFixed(1) : '0';
 
   return (
@@ -556,7 +560,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
             <Users className="w-6 h-6" />
@@ -590,12 +594,26 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">LMS Học Tập Trực Tuyến</div>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">LMS Trực Tuyến</div>
             <div className="text-2xl font-black text-sky-600 mt-0.5">
               {lmsCount}{' '}
               <span className="text-xs font-normal text-slate-400">({lmsTokenCount} Session)</span>
             </div>
             <div className="text-[11px] text-sky-700 font-bold mt-0.5">Tài khoản lms.pttc1.edu.vn</div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+            <Smartphone className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">PTIT S-Link</div>
+            <div className="text-2xl font-black text-purple-600 mt-0.5">
+              {slinkCount}{' '}
+              <span className="text-xs font-normal text-slate-400">({slinkTokenCount} Token)</span>
+            </div>
+            <div className="text-[11px] text-purple-700 font-bold mt-0.5">SSO slink.ptit.edu.vn</div>
           </div>
         </div>
 
@@ -621,6 +639,14 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 className="text-[11px] text-sky-600 hover:underline flex items-center gap-1 font-mono font-semibold"
               >
                 lms.pttc1.edu.vn <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+              <a
+                href="https://slink.ptit.edu.vn/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-purple-600 hover:underline flex items-center gap-1 font-mono font-semibold"
+              >
+                slink.ptit.edu.vn <ExternalLink className="w-2.5 h-2.5" />
               </a>
             </div>
           </div>
@@ -791,6 +817,11 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                             <BookOpen className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                             <span>LMS PTTC1</span>
                           </span>
+                        ) : acc.systemKey === 'SLINK_PTIT' ? (
+                          <span className="inline-flex items-center gap-1.5 font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">
+                            <Smartphone className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                            <span>PTIT S-Link</span>
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                             <Globe className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -869,6 +900,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                             title={
                               acc.systemKey === 'LMS_PTTC1'
                                 ? 'Lấy / Làm mới Session LMS'
+                                : acc.systemKey === 'SLINK_PTIT'
+                                ? 'Lấy / Làm mới Token PTIT S-Link'
                                 : 'Lấy / Làm mới Token QLDTTX'
                             }
                           >
@@ -1041,6 +1074,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
                   {formData.systemKey === 'LMS_PTTC1' ? (
                     <BookOpen className="w-5 h-5 text-white" />
+                  ) : formData.systemKey === 'SLINK_PTIT' ? (
+                    <Smartphone className="w-5 h-5 text-white" />
                   ) : (
                     <Globe className="w-5 h-5 text-white" />
                   )}
@@ -1048,8 +1083,20 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 <div>
                   <h3 className="text-lg font-black tracking-tight">
                     {modalMode === 'ADD'
-                      ? `Thêm Cấu Hình Tài Khoản ${formData.systemKey === 'LMS_PTTC1' ? 'LMS' : 'QLDTTX'}`
-                      : `Chỉnh Sửa Tài Khoản ${formData.systemKey === 'LMS_PTTC1' ? 'LMS' : 'QLDTTX'}`}
+                      ? `Thêm Cấu Hình Tài Khoản ${
+                          formData.systemKey === 'LMS_PTTC1'
+                            ? 'LMS'
+                            : formData.systemKey === 'SLINK_PTIT'
+                            ? 'PTIT S-Link'
+                            : 'QLDTTX'
+                        }`
+                      : `Chỉnh Sửa Tài Khoản ${
+                          formData.systemKey === 'LMS_PTTC1'
+                            ? 'LMS'
+                            : formData.systemKey === 'SLINK_PTIT'
+                            ? 'PTIT S-Link'
+                            : 'QLDTTX'
+                        }`}
                   </h3>
                   <p className="text-xs text-indigo-100 mt-0.5 font-mono">{formData.systemUrl}</p>
                 </div>
@@ -1145,7 +1192,13 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                       setModalTestStatus('IDLE');
                       setModalTestError('');
                     }}
-                    placeholder={`Nhập mật khẩu tài khoản ${formData.systemKey === 'LMS_PTTC1' ? 'LMS' : 'QLDTTX'}`}
+                    placeholder={`Nhập mật khẩu tài khoản ${
+                      formData.systemKey === 'LMS_PTTC1'
+                        ? 'LMS'
+                        : formData.systemKey === 'SLINK_PTIT'
+                        ? 'PTIT S-Link'
+                        : 'QLDTTX'
+                    }`}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 pr-10 text-sm font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                     required
                   />

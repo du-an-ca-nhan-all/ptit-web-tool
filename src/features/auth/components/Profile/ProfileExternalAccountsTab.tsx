@@ -21,6 +21,7 @@ import {
   X,
   Sparkles,
   ArrowRight,
+  Smartphone,
 } from 'lucide-react';
 import { LoginUser } from '../../types/auth.types';
 
@@ -115,6 +116,13 @@ export function ProfileExternalAccountsTab({
         </div>
       );
     }
+    if (iconKey === 'Smartphone' || iconKey === 'Bell') {
+      return (
+        <div className={`p-2.5 rounded-2xl shrink-0 ${isConnected ? 'bg-purple-50 text-purple-600 border border-purple-200' : 'bg-purple-50 text-purple-600'}`}>
+          <Smartphone className="w-5 h-5 sm:w-6 sm:h-6" />
+        </div>
+      );
+    }
     return (
       <div className={`p-2.5 rounded-2xl shrink-0 ${isConnected ? 'bg-indigo-50 text-indigo-600 border border-indigo-200' : 'bg-indigo-50 text-indigo-600'}`}>
         <Globe className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -135,7 +143,7 @@ export function ProfileExternalAccountsTab({
               Liên Kết Các Hệ Thống Đào Tạo & Học Tập Trực Tuyến
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Hỗ trợ tự động đồng bộ từ: <strong className="text-indigo-600 font-mono">qldttx.pttc1.edu.vn</strong> • <strong className="text-sky-600 font-mono">lms.pttc1.edu.vn</strong>
+              Hỗ trợ tự động đồng bộ từ: <strong className="text-indigo-600 font-mono">qldttx.pttc1.edu.vn</strong> • <strong className="text-sky-600 font-mono">lms.pttc1.edu.vn</strong> • <strong className="text-purple-600 font-mono">slink.ptit.edu.vn</strong>
             </p>
           </div>
         </div>
