@@ -12,6 +12,10 @@ import {
   saveSystemTelegramBot,
   toggleSystemTelegramBot,
   resolveEffectiveBotToken,
+  getTelegramQueueStats,
+  clearTelegramQueue,
+  setTelegramQueuePaused,
+  enqueueBatchTelegramMessages,
 } from '@/src/features/telegram/server/telegramServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { getTelegramAdminConfig, saveTelegramAdminConfig } from '@/src/lib/globalConfig';
@@ -110,6 +114,7 @@ export async function GET(req: NextRequest) {
         systemBot: systemBotPublic,
         systemBotConfig: systemBotFull,
         telegramAdmin,
+        queueStats: getTelegramQueueStats(),
       });
     }
 
@@ -392,6 +397,7 @@ export async function POST(req: NextRequest) {
 
       const sendRes = await sendTelegramMessage(effectiveToken, chatId.trim(), testMsg, {
         threadId: threadId ? Number(threadId) : undefined,
+        priority: 'HIGH',
       });
 
       if (sendRes.success) {
@@ -405,6 +411,66 @@ export async function POST(req: NextRequest) {
           error: sendRes.error || 'Gửi tin nhắn thử nghiệm thất bại',
         }, { status: 400 });
       }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // GLOBAL TELEGRAM QUEUE ACTIONS (ADMIN ONLY)
+    // ─────────────────────────────────────────────────────────────
+    if (action === 'GET_QUEUE_STATS') {
+      if (!authUser.isAdmin) {
+        return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền xem thống kê hàng đợi' }, { status: 403 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        queueStats: getTelegramQueueStats(),
+      });
+    }
+
+    if (action === 'CLEAR_QUEUE') {
+      if (!authUser.isAdmin) {
+        return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền xóa hàng đợi' }, { status: 403 });
+      }
+
+      const res = clearTelegramQueue();
+      await logActivity({
+        req,
+        action: 'CLEAR_TELEGRAM_QUEUE',
+        targetType: 'TELEGRAM_GLOBAL_CONFIG',
+        targetId: 'QUEUE',
+        description: `Admin ${authUser.username} đã xóa toàn bộ ${res.clearedCount} tin nhắn đang chờ trong hàng đợi Telegram`,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Đã xóa thành công ${res.clearedCount} tin nhắn trong hàng đợi Telegram!`,
+        clearedCount: res.clearedCount,
+        queueStats: getTelegramQueueStats(),
+      });
+    }
+
+    if (action === 'TOGGLE_QUEUE_PAUSE') {
+      if (!authUser.isAdmin) {
+        return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền tạm dừng/tiếp tục hàng đợi' }, { status: 403 });
+      }
+
+      const isPaused = Boolean(body.isPaused);
+      const res = setTelegramQueuePaused(isPaused);
+
+      await logActivity({
+        req,
+        action: isPaused ? 'PAUSE_TELEGRAM_QUEUE' : 'RESUME_TELEGRAM_QUEUE',
+        targetType: 'TELEGRAM_GLOBAL_CONFIG',
+        targetId: 'QUEUE',
+        description: `Admin ${authUser.username} đã ${isPaused ? 'tạm dừng' : 'tiếp tục'} hàng đợi Telegram`,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Đã ${isPaused ? 'tạm dừng' : 'tiếp tục kích hoạt'} hàng đợi gửi tin Telegram!`,
+        isPaused: res.isPaused,
+        queueStats: getTelegramQueueStats(),
+      });
     }
 
     if (action === 'BROADCAST') {
@@ -445,45 +511,41 @@ export async function POST(req: NextRequest) {
 
       const formattedBroadcast = `📢 <b>THÔNG BÁO TỪ QUẢN TRỊ VIÊN - PTIT EDUSYNC</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📌 <b>${title}</b>\n\n${content}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Gửi lúc: ${new Date().toLocaleTimeString('vi-VN')} - ${new Date().toLocaleDateString('vi-VN')}</i>`;
 
-      let sentCount = 0;
-      let failCount = 0;
-
-      for (const sub of subscribers) {
+      // Batch enqueue into Global Telegram Queue
+      const batchItems = subscribers.map((sub) => {
         let tokenToUse = sub.botToken?.trim();
         if (!tokenToUse) {
-          try {
-            const resolved = await resolveEffectiveBotToken(null);
-            tokenToUse = resolved.token;
-          } catch {
-            tokenToUse = sysConfig.botToken;
-          }
+          tokenToUse = sysConfig.botToken;
         }
 
-        const sendRes = await sendTelegramMessage(tokenToUse, sub.chatId, formattedBroadcast, {
-          threadId: sub.threadId ? Number(sub.threadId) : undefined,
-        });
+        return {
+          botToken: tokenToUse,
+          chatId: sub.chatId,
+          text: formattedBroadcast,
+          options: {
+            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          },
+          priority: 'BULK' as const,
+        };
+      });
 
-        if (sendRes.success) {
-          sentCount++;
-        } else {
-          failCount++;
-        }
-      }
+      const { queuedCount } = enqueueBatchTelegramMessages(batchItems);
 
       await logActivity({
         req,
         action: 'BROADCAST_TELEGRAM',
         targetType: 'TELEGRAM_GLOBAL_CONFIG',
         targetId: 'BROADCAST',
-        description: `Admin gửi broadcast Telegram "${title}" tới ${sentCount} tài khoản (Thất bại: ${failCount})`,
-        metadata: { title, sentCount, failCount },
+        description: `Admin đưa phát sóng Telegram "${title}" vào hàng đợi gửi dần tới ${queuedCount} tài khoản`,
+        metadata: { title, queuedCount },
       });
 
       return NextResponse.json({
         success: true,
-        message: `Đã gửi phát sóng thông báo tới ${sentCount} tài khoản (Thất bại: ${failCount}).`,
-        totalSent: sentCount,
-        totalFailed: failCount,
+        message: `Đã đưa thông báo tới ${queuedCount} tài khoản vào hàng đợi gửi dần an toàn (không bị Rate Limit).`,
+        totalSent: queuedCount,
+        totalFailed: 0,
+        queueStats: getTelegramQueueStats(),
       });
     }
 

@@ -42,6 +42,11 @@ import {
   AlarmClock,
   Bell,
   SendHorizontal,
+  Activity,
+  Inbox,
+  AlertTriangle,
+  Gauge,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 
@@ -81,7 +86,7 @@ interface AdminTelegramBotManagerProps {
 }
 
 export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBotManagerProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'CONFIG' | 'SUBSCRIBERS' | 'REMINDERS' | 'BROADCAST' | 'BACKUP_ALERTS'>('CONFIG');
+  const [activeSubTab, setActiveSubTab] = useState<'CONFIG' | 'SUBSCRIBERS' | 'REMINDERS' | 'BROADCAST' | 'BACKUP_ALERTS' | 'QUEUE'>('CONFIG');
   const [isLoading, setIsLoading] = useState(true);
 
   // Global bot state
@@ -92,6 +97,12 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
   const [showToken, setShowToken] = useState(false);
   const [isSavingBot, setIsSavingBot] = useState(false);
   const [isTogglingBot, setIsTogglingBot] = useState(false);
+
+  // Global Queue state
+  const [queueStats, setQueueStats] = useState<any | null>(null);
+  const [isClearingQueue, setIsClearingQueue] = useState(false);
+  const [isTogglingQueuePause, setIsTogglingQueuePause] = useState(false);
+  const [isFetchingQueue, setIsFetchingQueue] = useState(false);
 
   // Subscribers state
   const [subscribers, setSubscribers] = useState<SubscriberItem[]>([]);
@@ -160,6 +171,9 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
       if (res.ok && data.success) {
         setSubscribers(data.configs || []);
         setSystemBot(data.systemBot || null);
+        if (data.queueStats) {
+          setQueueStats(data.queueStats);
+        }
         if (data.systemBotConfig) {
           setSystemBotConfig(data.systemBotConfig);
           setBotTokenInput(data.systemBotConfig.botToken || '');
@@ -204,9 +218,84 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
     }
   };
 
+  const fetchQueueStats = async () => {
+    try {
+      setIsFetchingQueue(true);
+      const res = await fetch('/api/telegram-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'GET_QUEUE_STATS' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.queueStats) {
+        setQueueStats(data.queueStats);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsFetchingQueue(false);
+    }
+  };
+
+  const handleClearQueue = async () => {
+    if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ tin nhắn đang chờ trong hàng đợi Telegram?')) return;
+    try {
+      setIsClearingQueue(true);
+      const res = await fetch('/api/telegram-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'CLEAR_QUEUE' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg(data.message);
+        if (data.queueStats) setQueueStats(data.queueStats);
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        setErrorMsg(data.error || 'Xóa hàng đợi thất bại');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Lỗi khi xóa hàng đợi');
+    } finally {
+      setIsClearingQueue(false);
+    }
+  };
+
+  const handleToggleQueuePause = async (pause: boolean) => {
+    try {
+      setIsTogglingQueuePause(true);
+      const res = await fetch('/api/telegram-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'TOGGLE_QUEUE_PAUSE', isPaused: pause }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg(data.message);
+        if (data.queueStats) setQueueStats(data.queueStats);
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        setErrorMsg(data.error || 'Lỗi cập nhật trạng thái hàng đợi');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Lỗi cập nhật trạng thái hàng đợi');
+    } finally {
+      setIsTogglingQueuePause(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Poll queue stats when on QUEUE tab or when there are pending items
+  useEffect(() => {
+    if (activeSubTab === 'QUEUE') {
+      fetchQueueStats();
+      const interval = setInterval(fetchQueueStats, 2500);
+      return () => clearInterval(interval);
+    }
+  }, [activeSubTab]);
 
   // Save Global System Bot
   const handleSaveGlobalBot = async (e: React.FormEvent) => {
@@ -777,6 +866,24 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
         >
           <Database className="w-4 h-4" />
           <span>5. Cấu Hình Sao Lưu & Thông Báo Admin</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('QUEUE')}
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer relative ${
+            activeSubTab === 'QUEUE'
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Activity className="w-4 h-4" />
+          <span>6. Hàng Đợi Gửi Tin (Global Queue)</span>
+          {queueStats && queueStats.pending > 0 && (
+            <span className="px-2 py-0.5 text-[10px] font-black rounded-full bg-amber-500 text-white animate-pulse shadow-sm">
+              {queueStats.pending}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1940,6 +2047,364 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
                 </li>
               </ul>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: GLOBAL TELEGRAM QUEUE MONITOR */}
+      {activeSubTab === 'QUEUE' && (
+        <div className="flex flex-col gap-6">
+          {/* Header & Action Bar */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100 shadow-2xs">
+                <Activity className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-base font-bold text-slate-800">
+                    Hàng Đợi Gửi Tin Toàn Cục (Global Telegram Queue)
+                  </h3>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      queueStats?.isPaused
+                        ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                        : queueStats?.rateLimitedUntil
+                        ? 'bg-rose-100 text-rose-800 border border-rose-200 animate-pulse'
+                        : queueStats?.sending > 0
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200 animate-pulse'
+                        : queueStats?.pending > 0
+                        ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    {queueStats?.isPaused
+                      ? 'ĐANG TẠM DỪNG'
+                      : queueStats?.rateLimitedUntil
+                      ? 'ĐANG HOÃN (429 COOLDOWN)'
+                      : queueStats?.sending > 0
+                      ? 'ĐANG GỬI TIN...'
+                      : queueStats?.pending > 0
+                      ? 'CÓ TIN ĐANG CHỜ'
+                      : 'SẴN SÀNG (IDLE)'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Điều phối gửi tin tuần tự có kiểm soát tốc độ (Rate Limit) để không bị Telegram chặn HTTP 429 Too Many Requests.
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <button
+                type="button"
+                onClick={fetchQueueStats}
+                disabled={isFetchingQueue}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isFetchingQueue ? 'animate-spin' : ''}`} />
+                <span>Làm Mới</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleToggleQueuePause(!queueStats?.isPaused)}
+                disabled={isTogglingQueuePause}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                  queueStats?.isPaused
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20'
+                    : 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
+                }`}
+              >
+                {queueStats?.isPaused ? (
+                  <>
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Tiếp Tục Chạy</span>
+                  </>
+                ) : (
+                  <>
+                    <Pause className="w-3.5 h-3.5" />
+                    <span>Tạm Dừng Hàng Đợi</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClearQueue}
+                disabled={isClearingQueue || (!queueStats?.pending && !queueStats?.sending)}
+                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Xóa Chờ Gửi</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {/* Card 1: Pending */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500">Đang Chờ Gửi</span>
+                <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                  <Inbox className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-black text-indigo-600 font-mono">
+                  {queueStats?.pending ?? 0}
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-0.5">tin trong hàng đợi</div>
+              </div>
+            </div>
+
+            {/* Card 2: Active Sending */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500">Đang Gửi Đi</span>
+                <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg">
+                  <Send className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-black text-purple-600 font-mono">
+                  {queueStats?.sending ?? 0}
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-0.5">kết nối đồng thời</div>
+              </div>
+            </div>
+
+            {/* Card 3: Sent Success */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500">Đã Gửi Thành Công</span>
+                <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-black text-emerald-600 font-mono">
+                  {queueStats?.sentCount ?? 0}
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-0.5">tin nhắn / file</div>
+              </div>
+            </div>
+
+            {/* Card 4: Failed */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500">Thất Bại</span>
+                <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-black text-rose-600 font-mono">
+                  {queueStats?.failedCount ?? 0}
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-0.5">vượt quá số lần thử</div>
+              </div>
+            </div>
+
+            {/* Card 5: 429 Pauses */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500">Lần Chạm 429</span>
+                <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-black text-amber-600 font-mono">
+                  {queueStats?.rateLimitPauses ?? 0}
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-0.5">tự động hoãn thành công</div>
+              </div>
+            </div>
+
+            {/* Card 6: Total Processed */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500">Tổng Đã Xử Lý</span>
+                <div className="p-1.5 bg-sky-50 text-sky-600 rounded-lg">
+                  <Gauge className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-black text-slate-800 font-mono">
+                  {queueStats?.totalProcessed ?? 0}
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-0.5">kể từ khi khởi động</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Rate Limiting Specs & Parameters */}
+          <div className="bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 rounded-3xl p-6 text-white border border-slate-800 shadow-lg">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="p-2 bg-purple-500/20 rounded-xl text-purple-400 border border-purple-500/30">
+                <SlidersHorizontal className="w-4 h-4" />
+              </div>
+              <h4 className="text-sm font-bold text-white">Chính Sách Chống Giới Hạn Tốc Độ (Rate Limit Rules)</h4>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-300">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-purple-300 font-bold">
+                  <Clock className="w-4 h-4" />
+                  <span>Khoảng cách gửi toàn cục (Global)</span>
+                </div>
+                <div className="text-slate-200 font-semibold font-mono text-sm">
+                  {queueStats?.minGlobalIntervalMs || 50}ms / tin (Tối đa ~20 tin/s)
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Telegram cho phép tối đa 30 tin/s. Giới hạn 20 tin/s bảo đảm an toàn 100% không bị ngắt kết nối.
+                </div>
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-emerald-300 font-bold">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Khoảng cách cùng 1 Chat ID</span>
+                </div>
+                <div className="text-slate-200 font-semibold font-mono text-sm">
+                  {queueStats?.minPerChatIntervalMs || 1100}ms / tin (Tối đa 1 tin / 1.1s)
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Telegram giới hạn 1 tin/s đối với mỗi nhóm/chat. Queue tự động phân bổ xen kẽ các chat khác nhau.
+                </div>
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-amber-300 font-bold">
+                  <Sparkles className="w-4 h-4" />
+                  <span>Cơ chế Xếp hàng Ưu tiên</span>
+                </div>
+                <div className="text-slate-200 font-semibold text-[11px] leading-relaxed">
+                  <span className="text-rose-300 font-bold">CRITICAL / HIGH</span> (Ping test, khẩn cấp) &gt;{' '}
+                  <span className="text-indigo-300 font-bold">NORMAL</span> (Nhắc lịch thi, thông báo) &gt;{' '}
+                  <span className="text-slate-400 font-bold">BULK</span> (Phát thanh hàng loạt).
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Tự động đọc `retry_after` nếu gặp 429 và tạm dừng hàng đợi đúng số giây yêu cầu.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* History Log Table */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <Clock className="w-5 h-5 text-indigo-600" />
+                <h4 className="text-sm font-bold text-slate-800">
+                  Lịch Sử Gửi Tin Gần Đây ({queueStats?.recentHistory?.length || 0})
+                </h4>
+              </div>
+              <span className="text-[11px] text-slate-400">Tự động cập nhật mỗi 2.5 giây</span>
+            </div>
+
+            {(!queueStats?.recentHistory || queueStats.recentHistory.length === 0) ? (
+              <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-3">
+                <Inbox className="w-10 h-10 stroke-1 text-slate-300" />
+                <p className="text-xs">Chưa có tin nhắn nào được xử lý qua hàng đợi trong phiên làm việc này.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Thời gian</th>
+                      <th className="py-2.5 px-3">Loại</th>
+                      <th className="py-2.5 px-3">Người nhận (Chat ID)</th>
+                      <th className="py-2.5 px-3">Độ ưu tiên</th>
+                      <th className="py-2.5 px-3">Trạng thái</th>
+                      <th className="py-2.5 px-3">Lần thử</th>
+                      <th className="py-2.5 px-3">Độ trễ</th>
+                      <th className="py-2.5 px-3">Xem trước / Lỗi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {queueStats.recentHistory.map((item: any) => (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-3 font-mono text-slate-500 whitespace-nowrap text-[11px]">
+                          {item.completedAt ? new Date(item.completedAt).toLocaleTimeString('vi-VN') : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          {item.type === 'document' ? (
+                            <span className="px-2 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 rounded-md font-bold text-[10px]">
+                              TẬP TIN
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-md font-bold text-[10px]">
+                              VĂN BẢN
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-700">
+                          <code>{item.chatId}</code>
+                          {item.threadId ? (
+                            <span className="ml-1 text-[10px] text-purple-600 font-normal">
+                              (Topic: {item.threadId})
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              item.priority === 'CRITICAL'
+                                ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                : item.priority === 'HIGH'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : item.priority === 'NORMAL'
+                                ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200'
+                            }`}
+                          >
+                            {item.priority}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          {item.status === 'SUCCESS' ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-[11px]">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Thành công</span>
+                            </span>
+                          ) : item.status === 'RETRYING' ? (
+                            <span className="inline-flex items-center gap-1 text-amber-600 font-bold text-[11px]">
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Đang thử lại</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-rose-600 font-bold text-[11px]">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              <span>Thất bại</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-slate-600">
+                          {item.attempts}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-slate-500 whitespace-nowrap text-[11px]">
+                          {item.durationMs !== undefined ? `${item.durationMs}ms` : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 max-w-xs truncate text-slate-600">
+                          {item.error ? (
+                            <span className="text-rose-600 font-semibold">{item.error}</span>
+                          ) : item.filename ? (
+                            <span className="font-mono text-sky-700">{item.filename}</span>
+                          ) : (
+                            <span>{item.textPreview || '-'}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

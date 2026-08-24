@@ -4,6 +4,7 @@ import {
   checkAndDispatchSlinkAnnouncements,
   runClassScheduleReminders,
 } from './telegramDispatcher';
+import { ensureTelegramQueueWorkerLiveness } from './telegramQueueServerService';
 import { runDailyAutoBackupScheduler } from '@/src/features/database-backup/server/backupServerService';
 import {
   runGlobalNightlySyncScheduler,
@@ -24,6 +25,9 @@ export async function recoverAllStuckQueueJobs(maxStuckMinutes?: number) {
       recoverStuckGlobalSyncQueueItems({ maxStuckMinutes, autoResumeWorker: true }),
     ]);
 
+    // Ensure Telegram Queue Worker is active
+    ensureTelegramQueueWorkerLiveness();
+
     const total = (flowRes?.totalStuck || 0) + (globalRes?.totalStuck || 0);
     if (total > 0) {
       console.log(
@@ -41,6 +45,9 @@ export async function recoverAllStuckQueueJobs(maxStuckMinutes?: number) {
  * Chạy tất cả các tác vụ Scheduler & Telegram 1 lần
  */
 export async function runTelegramSchedulerTasks() {
+  // Đảm bảo Telegram Queue Worker đang chạy xử lý các tin còn tồn
+  ensureTelegramQueueWorkerLiveness();
+
   // Quét phục hồi các tác vụ bị kẹt quá 5 phút
   recoverAllStuckQueueJobs(5).catch((err) => {
     console.error('[Telegram Scheduler] Periodic stuck jobs recovery error:', err);

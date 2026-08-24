@@ -100,9 +100,9 @@ export async function verifyTelegramBot(botToken: string): Promise<{
 }
 
 /**
- * Send a message via Telegram Bot API
+ * Raw Telegram API: Send message directly to Telegram Bot API without queuing
  */
-export async function sendTelegramMessage(
+export async function sendRawTelegramMessage(
   botToken: string,
   chatId: string,
   text: string,
@@ -201,9 +201,9 @@ export async function sendTelegramMessage(
 }
 
 /**
- * Send a document/file via Telegram Bot API (sendDocument)
+ * Raw Telegram API: Send document/file directly to Telegram Bot API without queuing
  */
-export async function sendTelegramDocument(
+export async function sendRawTelegramDocument(
   botToken: string,
   chatId: string,
   fileBuffer: Buffer | Uint8Array,
@@ -271,6 +271,51 @@ export async function sendTelegramDocument(
       error: `Không thể gửi file đến Telegram: ${err.message || 'Lỗi mạng'}`,
     };
   }
+}
+
+/**
+ * Send a message via Global Telegram Queue (rate-limited, throttled, 429 backoff)
+ */
+export async function sendTelegramMessage(
+  botToken: string,
+  chatId: string,
+  text: string,
+  options?: {
+    threadId?: string | number | null;
+    parseMode?: 'HTML' | 'MarkdownV2' | 'Markdown';
+    disableWebPagePreview?: boolean;
+    priority?: import('./telegramQueueServerService').TelegramMessagePriority;
+    sendImmediately?: boolean;
+  }
+): Promise<TelegramSendResult> {
+  if (options?.sendImmediately) {
+    return await sendRawTelegramMessage(botToken, chatId, text, options);
+  }
+  const { enqueueTelegramMessage } = await import('./telegramQueueServerService');
+  return await enqueueTelegramMessage(botToken, chatId, text, options, options?.priority || 'NORMAL');
+}
+
+/**
+ * Send a document/file via Global Telegram Queue (sendDocument)
+ */
+export async function sendTelegramDocument(
+  botToken: string,
+  chatId: string,
+  fileBuffer: Buffer | Uint8Array,
+  filename: string,
+  options?: {
+    threadId?: string | number | null;
+    caption?: string;
+    parseMode?: 'HTML' | 'MarkdownV2' | 'Markdown';
+    priority?: import('./telegramQueueServerService').TelegramMessagePriority;
+    sendImmediately?: boolean;
+  }
+): Promise<TelegramSendResult> {
+  if (options?.sendImmediately) {
+    return await sendRawTelegramDocument(botToken, chatId, fileBuffer, filename, options);
+  }
+  const { enqueueTelegramDocument } = await import('./telegramQueueServerService');
+  return await enqueueTelegramDocument(botToken, chatId, fileBuffer, filename, options, options?.priority || 'NORMAL');
 }
 
 /**
@@ -789,4 +834,8 @@ export async function toggleSystemTelegramBot(isActive: boolean) {
   };
   return await setGlobalConfig(GLOBAL_CONFIG_KEYS.TELEGRAM_BOT, updatedValue);
 }
+
+// Re-export queue server service utilities
+export * from './telegramQueueServerService';
+
 
