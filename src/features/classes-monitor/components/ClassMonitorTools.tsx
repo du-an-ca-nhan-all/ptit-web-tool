@@ -16,9 +16,9 @@ export default function ClassMonitorTools({ records, selectedClass, onClassChang
     return Array.from(cls).sort();
   }, [records]);
 
-  // Set default class if available
+  // Set default class if available and selectedClass is empty
   React.useEffect(() => {
-    if (classes.length > 0 && (!selectedClass || !classes.includes(selectedClass))) {
+    if (!selectedClass && classes.length > 0) {
       onClassChange(classes[0]);
     }
   }, [classes, selectedClass, onClassChange]);

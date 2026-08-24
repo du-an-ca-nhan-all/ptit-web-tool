@@ -398,8 +398,11 @@ export const getInitialHomeState = (): InitialHomeState => {
     search: getParam('search'),
     classCode: getParam('classCode'),
     subjectCode: getParam('subjectCode'),
-    date: getParam('date'),
-    monitorClass: getParam('monitorClass') || getParam('classCode'),
+    monitorClass:
+      getParam('monitorClass') ||
+      getParam('classCode') ||
+      getParam('class') ||
+      getParam('maLop'),
     sortKey: (getParam('sortKey') as SortKey) || 'DateTime',
     sortDir: (getParam('sortDir') as SortDirection) || 'asc',
     page: initialPage,

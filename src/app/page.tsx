@@ -35,7 +35,7 @@ export default function Home() {
           state.setAuthError?.(null);
           state.setCurrentUser(user);
           localStorage.setItem('currentUser', JSON.stringify(user));
-          if (user.lop) state.setMonitorClass(user.lop);
+          if (!state.monitorClass && user.lop) state.setMonitorClass(user.lop);
         }}
       />
     );

@@ -72,6 +72,13 @@ export function useHomeState() {
     announcements,
   } = useAnnouncements();
 
+  // Set default monitorClass from currentUser only if empty
+  useEffect(() => {
+    if (!monitorClass && currentUser?.lop) {
+      setMonitorClass(currentUser.lop);
+    }
+  }, [currentUser?.lop, monitorClass, setMonitorClass]);
+
   // 2. Local Exam Schedule & Table States
   const [records, setRecords] = useState<ExamRecord[]>([]);
   const [sessions, setSessions] = useState<ExamSession[]>([]);

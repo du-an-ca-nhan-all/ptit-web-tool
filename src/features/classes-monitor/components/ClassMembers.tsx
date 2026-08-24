@@ -109,11 +109,29 @@ export default function ClassMembers({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const [allSystemClasses, setAllSystemClasses] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch('/api/exam-records?distinct=true')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.classes && Array.isArray(data.classes)) {
+          setAllSystemClasses(data.classes);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Available classes in dataset
   const classes = useMemo(() => {
-    const cls = new Set(records.map((r) => r.MaLop).filter(Boolean));
-    return Array.from(cls).sort();
-  }, [records]);
+    const set = new Set<string>();
+    allSystemClasses.forEach((c) => c && set.add(c));
+    loginUsers.forEach((u) => u.lop && set.add(u.lop));
+    records.forEach((r) => r.MaLop && set.add(r.MaLop));
+    if (currentUser?.lop) set.add(currentUser.lop);
+    if (selectedClass) set.add(selectedClass);
+    return Array.from(set).filter(Boolean).sort();
+  }, [allSystemClasses, loginUsers, records, currentUser?.lop, selectedClass]);
 
   // Load students from database API when selectedClass changes
   const fetchClassMembers = useCallback(async () => {
@@ -137,13 +155,15 @@ export default function ClassMembers({
     fetchClassMembers();
   }, [fetchClassMembers]);
 
-  // Set default class if current selected is invalid
+  // Set default class only if current selected is empty
   useEffect(() => {
-    const userClass = currentUser?.lop;
-    if (userClass && classes.includes(userClass) && (!selectedClass || !classes.includes(selectedClass))) {
-      onClassChange(userClass);
-    } else if (classes.length > 0 && (!selectedClass || !classes.includes(selectedClass))) {
-      onClassChange(classes[0]);
+    if (!selectedClass) {
+      const userClass = currentUser?.lop;
+      if (userClass) {
+        onClassChange(userClass);
+      } else if (classes.length > 0) {
+        onClassChange(classes[0]);
+      }
     }
   }, [classes, selectedClass, currentUser, onClassChange]);
 
@@ -514,6 +534,37 @@ export default function ClassMembers({
         </div>
       )}
 
+      {/* Notice when viewing another class */}
+      {userOwnClass && userOwnClass !== selectedClass && (
+        <div className="bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border border-blue-200 rounded-2xl sm:rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0 shadow-xs shadow-blue-200">
+              <Eye className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+                <span>Đang xem danh sách lớp: <strong className="text-blue-700 font-mono text-sm">{selectedClass}</strong></span>
+                <span className="bg-amber-100 text-amber-800 text-[11px] font-black px-2.5 py-0.5 rounded-full border border-amber-300">
+                  Lớp Khác
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                Lớp chính của bạn: <strong className="text-slate-800 font-mono">{userOwnClass}</strong>. Bấm nút bên cạnh để quay về lớp của bạn bất cứ lúc nào.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onClassChange(userOwnClass)}
+            className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 shrink-0"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Về Lớp Của Tôi ({userOwnClass})</span>
+          </button>
+        </div>
+      )}
+
       {/* Header Banner & Class Selector */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm shrink-0">
         <div>
@@ -521,11 +572,15 @@ export default function ClassMembers({
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight">
               Quản Lý Thành Viên Lớp <span className="text-blue-600">{selectedClass}</span>
             </h2>
-            {isMyClass && (
+            {isMyClass ? (
               <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full border border-emerald-200 flex items-center gap-1">
                 <UserCheck className="w-3.5 h-3.5" /> Lớp của bạn
               </span>
-            )}
+            ) : userOwnClass ? (
+              <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full border border-amber-300 flex items-center gap-1">
+                <Eye className="w-3.5 h-3.5 text-amber-600" /> Đang xem lớp khác
+              </span>
+            ) : null}
           </div>
           <p className="text-xs sm:text-sm text-slate-500 flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {classMonitor ? (
@@ -569,9 +624,10 @@ export default function ClassMembers({
           {userOwnClass && userOwnClass !== selectedClass && (
             <button
               onClick={() => onClassChange(userOwnClass)}
-              className="px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors shadow-2xs whitespace-nowrap cursor-pointer"
+              className="px-3 py-2 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all shadow-2xs whitespace-nowrap cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
-              Về Lớp Của Tôi ({userOwnClass})
+              <RotateCcw className="w-3 h-3 text-blue-600" />
+              <span>Về Lớp Của Tôi ({userOwnClass})</span>
             </button>
           )}
 
@@ -584,7 +640,7 @@ export default function ClassMembers({
             >
               {classes.map((c) => (
                 <option key={c} value={c}>
-                  {c} {userOwnClass === c ? '(Lớp tôi)' : ''}
+                  {c} {userOwnClass === c ? '⭐ (Lớp của tôi)' : ''}
                 </option>
               ))}
             </select>
