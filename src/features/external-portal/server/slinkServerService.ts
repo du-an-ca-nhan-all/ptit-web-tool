@@ -5,6 +5,9 @@
  */
 
 import { prisma } from '@/src/lib/prisma';
+import { cleanHtml, decodeHtmlEntities, escapeTelegramHtml } from '@/src/lib/htmlUtils';
+
+export { cleanHtml, decodeHtmlEntities, escapeTelegramHtml };
 
 export const SLINK_BASE_URL = 'https://slink.ptit.edu.vn/';
 export const SLINK_SSO_TOKEN_URL = 'https://gwdu.ptit.edu.vn/sso/realms/ptit/protocol/openid-connect/token';
@@ -286,6 +289,15 @@ export async function getSlinkNotifications(
 
   const json = (await res.json()) as SlinkNotificationResponse;
 
+  if (json.data?.result && Array.isArray(json.data.result)) {
+    json.data.result = json.data.result.map((item) => ({
+      ...item,
+      title: decodeHtmlEntities(item.title || ''),
+      senderName: item.senderName ? decodeHtmlEntities(item.senderName) : item.senderName,
+      sender: item.sender ? decodeHtmlEntities(item.sender) : item.sender,
+    }));
+  }
+
   if (unreadOnly && json.data?.result) {
     json.data.result = json.data.result.filter((item) => !item.read);
   }
@@ -328,25 +340,6 @@ export async function markSlinkNotificationAsRead(
   }
 
   return (await res.json()) as { success: boolean; data?: any };
-}
-
-/**
- * Xóa các thẻ HTML trong nội dung thông báo
- */
-export function cleanHtml(html?: string): string {
-  if (!html) return '';
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\n\s*\n/g, '\n')
-    .trim();
 }
 
 /**

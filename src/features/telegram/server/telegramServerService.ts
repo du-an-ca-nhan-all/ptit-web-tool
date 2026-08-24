@@ -1,4 +1,5 @@
 import { prisma } from '@/src/lib/prisma';
+import { cleanHtml } from '@/src/lib/htmlUtils';
 
 export interface TelegramBotInfo {
   id: number;
@@ -153,6 +154,36 @@ export async function sendTelegramMessage(
         messageId: data.result.message_id,
         rawResponse: data.result,
       };
+    }
+
+    // Fallback: Nếu Telegram báo lỗi parse entity HTML/Markdown, tự động thử gửi lại dưới dạng plain text
+    if (
+      (!data.ok || !res.ok) &&
+      payload.parse_mode &&
+      typeof data.description === 'string' &&
+      (data.description.toLowerCase().includes("can't parse entities") ||
+        data.description.toLowerCase().includes('parse mode'))
+    ) {
+      const fallbackPayload = {
+        ...payload,
+        text: cleanHtml(text),
+      };
+      delete fallbackPayload.parse_mode;
+
+      const retryRes = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fallbackPayload),
+      });
+
+      const retryData = await retryRes.json();
+      if (retryRes.ok && retryData.ok && retryData.result) {
+        return {
+          success: true,
+          messageId: retryData.result.message_id,
+          rawResponse: retryData.result,
+        };
+      }
     }
 
     return {

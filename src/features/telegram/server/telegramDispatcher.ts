@@ -19,6 +19,7 @@ import {
   markSlinkNotificationAsRead,
   cleanHtml,
   formatSlinkDate,
+  escapeTelegramHtml,
 } from '@/src/features/external-portal/server/slinkServerService';
 
 /**
@@ -548,9 +549,13 @@ export async function checkAndDispatchQldtAnnouncements(options: {
           }
 
           const studentName = sub.user?.student?.hoTen || sub.username;
-          const cleanSummary = ann.summary ? ann.summary.slice(0, 350) : '';
+          const cleanTitle = cleanHtml(ann.title || 'Thông báo mới từ QLDTTX');
+          const rawSummary = ann.summary || ann.content || '';
+          const cleanedSummary = cleanHtml(rawSummary);
+          const cleanSummary = cleanedSummary ? (cleanedSummary.length > 350 ? cleanedSummary.slice(0, 350) + '...' : cleanedSummary) : '';
+          const senderDisplay = cleanHtml(ann.sender || 'Phòng Đào Tạo');
 
-          const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ CỔNG QLDTTX (PTTC1)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n📌 <b>${ann.title}</b>\n\n${cleanSummary ? `📝 <i>${cleanSummary}...</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${ann.sender || 'Phòng Đào Tạo'}</b>\n🗓️ Ngày đăng: <b>${ann.publishDate || 'Gần đây'}</b>\n🔗 <a href="https://qldttx.pttc1.edu.vn/#/xemthongbao">Xem chi tiết trên QLDTTX (/#/xemthongbao)</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
+          const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ CỔNG QLDTTX (PTTC1)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${escapeTelegramHtml(studentName)}</b> (<code>${escapeTelegramHtml(sub.username)}</code>)\n📌 <b>${escapeTelegramHtml(cleanTitle)}</b>\n\n${cleanSummary ? `📝 <i>${escapeTelegramHtml(cleanSummary)}</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${escapeTelegramHtml(senderDisplay)}</b>\n🗓️ Ngày đăng: <b>${escapeTelegramHtml(ann.publishDate || 'Gần đây')}</b>\n🔗 <a href="https://qldttx.pttc1.edu.vn/#/xemthongbao">Xem chi tiết trên QLDTTX (/#/xemthongbao)</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
 
           const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
             threadId: sub.threadId ? Number(sub.threadId) : undefined,
@@ -722,13 +727,14 @@ export async function checkAndDispatchSlinkAnnouncements(options: {
           }
 
           const studentName = sub.user?.student?.hoTen || sub.username;
+          const cleanTitle = cleanHtml(ann.title || 'Thông báo mới từ PTIT S-Link');
           const rawContent = ann.content || ann.description || '';
           const cleaned = cleanHtml(rawContent);
           const cleanSummary = cleaned ? (cleaned.length > 400 ? cleaned.slice(0, 400) + '...' : cleaned) : '';
-          const senderDisplay = ann.senderName || ann.sender || 'Cổng PTIT S-Link';
+          const senderDisplay = cleanHtml(ann.senderName || ann.sender || 'Cổng PTIT S-Link');
           const dateDisplay = formatSlinkDate(ann.createdAt);
 
-          const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ PTIT S-LINK</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n📌 <b>${ann.title}</b>\n\n${cleanSummary ? `📝 <i>${cleanSummary}</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${senderDisplay}</b>\n🗓️ Thời gian: <b>${dateDisplay}</b>\n🔗 <a href="https://slink.ptit.edu.vn/">Mở cổng PTIT S-Link</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
+          const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ PTIT S-LINK</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${escapeTelegramHtml(studentName)}</b> (<code>${escapeTelegramHtml(sub.username)}</code>)\n📌 <b>${escapeTelegramHtml(cleanTitle)}</b>\n\n${cleanSummary ? `📝 <i>${escapeTelegramHtml(cleanSummary)}</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${escapeTelegramHtml(senderDisplay)}</b>\n🗓️ Thời gian: <b>${escapeTelegramHtml(dateDisplay)}</b>\n🔗 <a href="https://slink.ptit.edu.vn/">Mở cổng PTIT S-Link</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
 
           const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
             threadId: sub.threadId ? Number(sub.threadId) : undefined,
