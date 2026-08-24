@@ -90,13 +90,12 @@ export async function GET(req: NextRequest) {
 
     // Format output based on permissions
     const students = studentsRaw.map((s) => {
-      const basic = {
+      const basic: any = {
         maSV: s.maSV,
         hoLot: s.hoLot || '',
         ten: s.ten || '',
         hoTen: s.hoTen || `${s.hoLot || ''} ${s.ten || ''}`.trim(),
         gioiTinh: s.gioiTinh || 'Nam',
-        ngaySinh: s.ngaySinh || '',
         maLop: s.maLop || 'Chưa rõ lớp',
         trangThai: s.trangThai || 'DANG_HOC',
       };
@@ -109,6 +108,7 @@ export async function GET(req: NextRequest) {
       const hasPassword = Boolean(s.user?.passwordHash && s.user.passwordHash.trim() !== '');
       return {
         ...basic,
+        ngaySinh: s.ngaySinh || '',
         id: s.id,
         soDienThoai: s.soDienThoai || null,
         ghiChu: s.ghiChu || null,

@@ -453,21 +453,23 @@ export default function AllStudentsList({
                   <div className="grid grid-cols-2 gap-2 text-xs p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="flex flex-col gap-0.5">
                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-indigo-500" /> Ngày Sinh
-                      </span>
-                      <div className="font-mono font-bold text-slate-800 text-xs">
-                        {student.ngaySinh || '—'}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
                         <User className="w-3 h-3 text-sky-500" /> Giới Tính
                       </span>
                       <div className="font-bold text-slate-800 text-xs">
                         {student.gioiTinh || 'Nam'}
                       </div>
                     </div>
+
+                    {isAdmin && (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-indigo-500" /> Ngày Sinh
+                        </span>
+                        <div className="font-mono font-bold text-slate-800 text-xs">
+                          {student.ngaySinh || '—'}
+                        </div>
+                      </div>
+                    )}
 
                     {/* ADMIN INFO CELLS */}
                     {isAdmin && (
@@ -582,7 +584,7 @@ export default function AllStudentsList({
                     <th className="py-3.5 px-4 w-12 text-center">STT</th>
                     <th className="py-3.5 px-4">Sinh Viên / Mã SV</th>
                     <th className="py-3.5 px-4">Giới Tính</th>
-                    <th className="py-3.5 px-4">Ngày Sinh</th>
+                    {isAdmin && <th className="py-3.5 px-4">Ngày Sinh</th>}
                     <th className="py-3.5 px-4">Lớp Học</th>
                     <th className="py-3.5 px-4">Trạng Thái</th>
 
@@ -648,9 +650,11 @@ export default function AllStudentsList({
                           </span>
                         </td>
 
-                        <td className="py-3.5 px-4 text-slate-600 text-xs font-medium font-mono">
-                          {student.ngaySinh || '—'}
-                        </td>
+                        {isAdmin && (
+                          <td className="py-3.5 px-4 text-slate-600 text-xs font-medium font-mono">
+                            {student.ngaySinh || '—'}
+                          </td>
+                        )}
 
                         <td className="py-3.5 px-4">
                           {student.maLop ? (
