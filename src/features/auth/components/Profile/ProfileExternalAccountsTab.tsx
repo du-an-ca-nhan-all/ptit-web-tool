@@ -173,6 +173,16 @@ export function ProfileExternalAccountsTab({
             const isEditing = !!editingSystems[sys.systemKey];
             const isConnected = sys.isConfigured && !isEditing;
 
+            const isError =
+              sys.status === 'ERROR' ||
+              Boolean(
+                sys.syncMessage &&
+                  (sys.syncMessage.toLowerCase().includes('lỗi') ||
+                    sys.syncMessage.toLowerCase().includes('thất bại') ||
+                    sys.syncMessage.toLowerCase().includes('không chính xác') ||
+                    sys.syncMessage.toLowerCase().includes('hết hạn'))
+              );
+
             const form = extForm[sys.systemKey] || {
               username: sys.extUsername || currentUser.username || '',
               password: '',
@@ -198,7 +208,11 @@ export function ProfileExternalAccountsTab({
               return (
                 <div
                   key={sys.systemKey}
-                  className="rounded-3xl border border-emerald-200 bg-white p-5 sm:p-6 shadow-xs flex flex-col gap-4.5 transition-all hover:border-emerald-300"
+                  className={`rounded-3xl border bg-white p-5 sm:p-6 shadow-xs flex flex-col gap-4.5 transition-all ${
+                    isError
+                      ? 'border-rose-200 hover:border-rose-300'
+                      : 'border-emerald-200 hover:border-emerald-300'
+                  }`}
                 >
                   {/* System Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
@@ -209,9 +223,15 @@ export function ProfileExternalAccountsTab({
                           <h4 className="font-black text-slate-800 text-sm sm:text-base">
                             {sys.systemName}
                           </h4>
-                          <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1">
-                            <Check className="w-3.5 h-3.5 text-emerald-600" /> Đã Liên Kết
-                          </span>
+                          {isError ? (
+                            <span className="bg-rose-100 text-rose-800 text-xs font-black px-2.5 py-0.5 rounded-full border border-rose-300 inline-flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-600" /> Kết Nối Thất Bại
+                            </span>
+                          ) : (
+                            <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1">
+                              <Check className="w-3.5 h-3.5 text-emerald-600" /> Đã Liên Kết
+                            </span>
+                          )}
                         </div>
                         <a
                           href={sys.systemUrl}
@@ -258,8 +278,18 @@ export function ProfileExternalAccountsTab({
 
                   {/* Status / Sync message banner */}
                   {sys.syncMessage && (
-                    <div className="text-xs text-emerald-900 bg-emerald-50 border border-emerald-200/80 p-3 rounded-2xl flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <div
+                      className={`text-xs p-3 rounded-2xl flex items-center gap-2 ${
+                        isError
+                          ? 'text-rose-900 bg-rose-50 border border-rose-200/80'
+                          : 'text-emerald-900 bg-emerald-50 border border-emerald-200/80'
+                      }`}
+                    >
+                      {isError ? (
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      )}
                       <span>{sys.syncMessage}</span>
                     </div>
                   )}

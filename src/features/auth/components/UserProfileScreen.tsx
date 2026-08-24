@@ -98,17 +98,23 @@ export default function UserProfileScreen({
       const data = await res.json();
       if (res.ok && data.accounts) {
         setExternalAccounts(data.accounts);
-        const formState: any = {};
-        data.accounts.forEach((acc: any) => {
-          formState[acc.systemKey] = {
-            username: acc.extUsername || currentUser.username,
-            password: '',
-            showPass: false,
-            isSaving: false,
-            isTesting: false,
-          };
+        setExtForm((prev: any) => {
+          const formState: any = { ...prev };
+          data.accounts.forEach((acc: any) => {
+            formState[acc.systemKey] = {
+              username: prev[acc.systemKey]?.username || acc.extUsername || currentUser.username,
+              password: prev[acc.systemKey]?.password || '',
+              showPass: prev[acc.systemKey]?.showPass || false,
+              isSaving: false,
+              isTesting: false,
+              testStatus: prev[acc.systemKey]?.testStatus || 'IDLE',
+              testMessage: prev[acc.systemKey]?.testMessage || '',
+              lastTestedUser: prev[acc.systemKey]?.lastTestedUser || '',
+              lastTestedPass: prev[acc.systemKey]?.lastTestedPass || '',
+            };
+          });
+          return formState;
         });
-        setExtForm(formState);
       }
     } catch (err) {
       console.error('Fetch external accounts error:', err);
@@ -318,6 +324,9 @@ export default function UserProfileScreen({
         }));
         setErrorMsg(errMsg);
       }
+      if (sys.isConfigured) {
+        fetchExternalAccounts();
+      }
     } catch (err) {
       const errMsg = 'Lỗi kết nối máy chủ khi kiểm tra tài khoản.';
       setExtForm((prev) => ({
@@ -332,6 +341,9 @@ export default function UserProfileScreen({
         },
       }));
       setErrorMsg(errMsg);
+      if (sys.isConfigured) {
+        fetchExternalAccounts();
+      }
     }
   };
 

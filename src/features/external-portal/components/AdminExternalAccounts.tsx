@@ -965,8 +965,26 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
               </div>
 
               {viewingTokenAccount.syncMessage && (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
-                  <span className="font-bold text-slate-700 block mb-0.5">Nhật ký trạng thái:</span>
+                <div
+                  className={`p-3 rounded-xl text-xs ${
+                    viewingTokenAccount.status === 'ERROR' ||
+                    viewingTokenAccount.syncMessage.toLowerCase().includes('lỗi') ||
+                    viewingTokenAccount.syncMessage.toLowerCase().includes('thất bại')
+                      ? 'bg-rose-50 border border-rose-200 text-rose-800'
+                      : 'bg-slate-50 border border-slate-200 text-slate-600'
+                  }`}
+                >
+                  <span
+                    className={`font-bold block mb-0.5 ${
+                      viewingTokenAccount.status === 'ERROR' ||
+                      viewingTokenAccount.syncMessage.toLowerCase().includes('lỗi') ||
+                      viewingTokenAccount.syncMessage.toLowerCase().includes('thất bại')
+                        ? 'text-rose-900'
+                        : 'text-slate-700'
+                    }`}
+                  >
+                    Nhật ký trạng thái:
+                  </span>
                   <span>{viewingTokenAccount.syncMessage}</span>
                 </div>
               )}
