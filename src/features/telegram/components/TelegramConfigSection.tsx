@@ -650,7 +650,7 @@ export default function TelegramConfigSection({
                 <span>Thêm Bot Vào Kênh / Chat Riêng</span>
               </div>
               <p className="text-slate-600 leading-relaxed text-[11px] sm:text-xs">
-                Nếu dùng <strong>Bot Hệ Thống</strong>, chỉ cần bấm nút <em>"Mở Bot & Nhấn Start"</em> hoặc <em>"Thêm Bot vào Nhóm"</em>. Nếu dùng Bot Riêng, tạo bot qua @BotFather và dán token.
+                Nếu dùng <strong>Bot Hệ Thống</strong>, chỉ cần bấm nút <em>"Thêm Bot vào Nhóm"</em>. Nếu dùng Bot Riêng, tạo bot qua @BotFather và dán token.
               </p>
             </div>
 
@@ -850,17 +850,6 @@ export default function TelegramConfigSection({
 
             {systemBot?.botUsername ? (
               <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                <a
-                  href={systemBot.botUrl || `https://t.me/${systemBot.botUsername}?start=start`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 sm:flex-none justify-center px-3.5 py-2 bg-white hover:bg-sky-50 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-                >
-                  <Send className="w-3.5 h-3.5 text-sky-600" />
-                  <span>Mở Bot & Start</span>
-                  <ExternalLink className="w-3 h-3 opacity-60" />
-                </a>
-
                 <a
                   href={systemBot.addToGroupUrl || `https://t.me/${systemBot.botUsername}?startgroup=true`}
                   target="_blank"
