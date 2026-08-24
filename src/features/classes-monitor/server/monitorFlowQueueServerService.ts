@@ -234,59 +234,67 @@ export async function recoverStuckFlowQueueItems(options?: {
     select: { id: true, batchId: true, attempts: true, maxAttempts: true },
   });
 
-  if (stuckItems.length === 0) {
-    return { recoveredCount: 0, failedCount: 0, totalStuck: 0 };
-  }
-
   let recoveredCount = 0;
   let failedCount = 0;
 
-  const toQueueIds: string[] = [];
-  const toFailIds: string[] = [];
+  if (stuckItems.length > 0) {
+    const toQueueIds: string[] = [];
+    const toFailIds: string[] = [];
 
-  for (const item of stuckItems) {
-    if (item.attempts >= item.maxAttempts) {
-      toFailIds.push(item.id);
-      failedCount++;
-    } else {
-      toQueueIds.push(item.id);
-      recoveredCount++;
+    for (const item of stuckItems) {
+      if (item.attempts >= item.maxAttempts) {
+        toFailIds.push(item.id);
+        failedCount++;
+      } else {
+        toQueueIds.push(item.id);
+        recoveredCount++;
+      }
+    }
+
+    if (toFailIds.length > 0) {
+      await prisma.monitorFlowQueueItem.updateMany({
+        where: { id: { in: toFailIds } },
+        data: {
+          status: 'FAILED',
+          resultMessage: 'Tác vụ bị gián đoạn do ứng dụng bị tắt / khởi động lại (đã vượt quá số lần thử)',
+          finishedAt: new Date(),
+        },
+      });
+    }
+
+    if (toQueueIds.length > 0) {
+      await prisma.monitorFlowQueueItem.updateMany({
+        where: { id: { in: toQueueIds } },
+        data: {
+          status: 'QUEUED',
+          startedAt: null,
+          resultMessage: 'Được phục hồi vào hàng đợi sau khi ứng dụng khởi động lại',
+        },
+      });
+    }
+
+    const affectedBatchIds = [...new Set(stuckItems.map((i) => i.batchId))];
+    for (const bId of affectedBatchIds) {
+      await recalculateBatchCounts(bId);
     }
   }
 
-  if (toFailIds.length > 0) {
-    await prisma.monitorFlowQueueItem.updateMany({
-      where: { id: { in: toFailIds } },
-      data: {
-        status: 'FAILED',
-        resultMessage: 'Tác vụ bị gián đoạn do ứng dụng bị tắt / khởi động lại (đã vượt quá số lần thử)',
-        finishedAt: new Date(),
-      },
-    });
-  }
-
-  if (toQueueIds.length > 0) {
-    await prisma.monitorFlowQueueItem.updateMany({
-      where: { id: { in: toQueueIds } },
-      data: {
+  // Tự động kích hoạt worker chạy tiếp nếu có bất kỳ item nào đang QUEUED và worker chưa chạy
+  if (options?.autoResumeWorker !== false) {
+    const queuedCount = await prisma.monitorFlowQueueItem.count({
+      where: {
         status: 'QUEUED',
-        startedAt: null,
-        resultMessage: 'Được phục hồi vào hàng đợi sau khi ứng dụng khởi động lại',
+        ...(options?.batchId ? { batchId: options.batchId } : {}),
       },
     });
-  }
 
-  const affectedBatchIds = [...new Set(stuckItems.map((i) => i.batchId))];
-  for (const bId of affectedBatchIds) {
-    await recalculateBatchCounts(bId);
-  }
-
-  if (options?.autoResumeWorker !== false && toQueueIds.length > 0) {
-    setImmediate(() => {
-      processFlowQueue().catch((err) => {
-        console.error('[FlowQueue] Error auto-resuming worker after recovery:', err);
+    if (queuedCount > 0 && !isWorkerRunning) {
+      setImmediate(() => {
+        processFlowQueue(options?.batchId).catch((err) => {
+          console.error('[FlowQueue] Error auto-resuming worker after recovery:', err);
+        });
       });
-    });
+    }
   }
 
   return { recoveredCount, failedCount, totalStuck: stuckItems.length };
@@ -680,12 +688,12 @@ export async function getFlowQueueStatus(options: {
   if (options.classCode) whereClause.classCode = options.classCode.toUpperCase();
   if (options.monitorUsername) whereClause.monitorUsername = options.monitorUsername.toUpperCase();
 
-  // Nếu worker không chạy nhưng có item RUNNING, tự động khôi phục về QUEUED và khởi động lại worker
+  // Nếu worker không chạy nhưng có item RUNNING hoặc QUEUED, tự động khôi phục và tiếp tục chạy worker
   if (!isWorkerRunning) {
-    const runningCount = await prisma.monitorFlowQueueItem.count({
-      where: { ...whereClause, status: 'RUNNING' },
+    const activeCount = await prisma.monitorFlowQueueItem.count({
+      where: { ...whereClause, status: { in: ['RUNNING', 'QUEUED'] } },
     });
-    if (runningCount > 0) {
+    if (activeCount > 0) {
       await recoverStuckFlowQueueItems({
         classCode: options.classCode,
         monitorUsername: options.monitorUsername,
