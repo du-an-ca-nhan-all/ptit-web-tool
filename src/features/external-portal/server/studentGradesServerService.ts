@@ -264,8 +264,13 @@ export function buildGradeResultFromRawData(
     });
   }
 
-  // Sắp xếp GPA Progression theo thứ tự học kỳ tăng dần
-  const progressionSemesters = [...processedSemesters].sort((a, b) => a.semesterId.localeCompare(b.semesterId));
+  // Sắp xếp các học kỳ theo thứ tự gần nhất đến cũ nhất (descending) để đồng nhất với UI
+  processedSemesters.sort((a, b) => b.semesterId.localeCompare(a.semesterId, undefined, { numeric: true }));
+
+  // Sắp xếp GPA Progression theo thứ tự học kỳ tăng dần (cho biểu đồ timeline)
+  const progressionSemesters = [...processedSemesters].sort((a, b) =>
+    a.semesterId.localeCompare(b.semesterId, undefined, { numeric: true })
+  );
   const gpaProgression: GpaTrendItem[] = progressionSemesters.map((s) => ({
     semesterId: s.semesterId,
     semesterName: s.semesterName,

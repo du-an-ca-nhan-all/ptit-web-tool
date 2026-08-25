@@ -222,8 +222,12 @@ export function buildSlinkGradeResultFromRawData(
     }
   }
 
-  // Sắp xếp các học kỳ theo thứ tự tăng dần
-  const sortedSemesterKeys = Array.from(semesterMap.keys()).sort();
+  // Sắp xếp các học kỳ theo thứ tự gần nhất đến cũ nhất (descending)
+  const sortedSemesterKeys = Array.from(semesterMap.keys()).sort((a, b) => {
+    if (a === 'OTHER') return 1;
+    if (b === 'OTHER') return -1;
+    return b.localeCompare(a, undefined, { numeric: true });
+  });
 
   for (const semesterId of sortedSemesterKeys) {
     const semData = semesterMap.get(semesterId) || {};
@@ -257,7 +261,7 @@ export function buildSlinkGradeResultFromRawData(
       const isPassed =
         c.dat === true ? true : c.dat === false ? false : finalScore10 !== null ? (finalScore10 >= 4.0) : null;
 
-      const isCalculatedInGpa = c.tichLuy !== false && c.hocPhan?.loaiHocPhan?.isTinhDiem !== false;
+      const isCalculatedInGpa = c.tichLuy !== false && c.hocPhan?.loaiHocPhan?.isTinhDiem !== false || c.hocPhan?.loaiHocPhan?.isTinhSoTinChiTichLuy;
 
       // Xây dựng danh sách điểm thành phần
       const components: CourseComponentGrade[] = [];
@@ -346,8 +350,11 @@ export function buildSlinkGradeResultFromRawData(
     });
   }
 
-  // Phân tích tiến độ GPA qua từng học kỳ
-  const gpaProgression: GpaTrendItem[] = processedSemesters.map((s) => ({
+  // Phân tích tiến độ GPA qua từng học kỳ (sắp xếp theo thứ tự thời gian tăng dần từ cũ đến mới cho biểu đồ timeline)
+  const progressionSemesters = [...processedSemesters].sort((a, b) =>
+    a.semesterId.localeCompare(b.semesterId, undefined, { numeric: true })
+  );
+  const gpaProgression: GpaTrendItem[] = progressionSemesters.map((s) => ({
     semesterId: s.semesterId,
     semesterName: s.semesterName,
     gpa10: s.gpa10Semester,
@@ -443,11 +450,22 @@ export function buildSlinkGradeResultFromRawData(
     },
   ];
 
-  // Tính tổng hợp toàn khóa
-  const gpa10 = parseScore(accumulated.trungBinh) ?? (processedSemesters.length > 0 ? processedSemesters[processedSemesters.length - 1].gpa10Cumulative : null);
-  const gpa4 = parseScore(accumulated.trungBinhThang4) ?? (processedSemesters.length > 0 ? processedSemesters[processedSemesters.length - 1].gpa4Cumulative : null);
+  // Lấy học kỳ mới nhất có điểm tích lũy để fallback nếu thông tin tổng hợp chưa có
+  const latestSemesterWithGpa =
+    processedSemesters.find((s) => s.gpa4Cumulative !== null || s.gpa10Cumulative !== null) ||
+    (processedSemesters.length > 0 ? processedSemesters[0] : null);
 
-  const totalPassedCredits = Number(accumulated.tongSoTinChi || (processedSemesters.length > 0 ? processedSemesters[processedSemesters.length - 1].creditsCumulative : 0));
+  // Tính tổng hợp toàn khóa
+  const gpa10 =
+    parseScore(accumulated.trungBinh) ??
+    (latestSemesterWithGpa ? latestSemesterWithGpa.gpa10Cumulative : null);
+  const gpa4 =
+    parseScore(accumulated.trungBinhThang4) ??
+    (latestSemesterWithGpa ? latestSemesterWithGpa.gpa4Cumulative : null);
+
+  const totalPassedCredits = Number(
+    accumulated.tongSoTinChi || (latestSemesterWithGpa ? latestSemesterWithGpa.creditsCumulative : 0)
+  );
   const totalCreditsAccumulated = totalPassedCredits;
   const totalCreditsRegistered = Number(accumulated.tongSoTinChiDangKy || totalPassedCredits);
   const totalInProgressCredits = gradeCounts.IN_PROGRESS.credits;
