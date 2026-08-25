@@ -26,6 +26,48 @@ export interface NextExamCountdown {
   totalUpcomingExams: number;
 }
 
+export interface GradeDistributionSummary {
+  aCount: number; // A+, A
+  bCount: number; // B+, B
+  cCount: number; // C+, C
+  dCount: number; // D+, D
+  fCount: number; // F / KĐ
+}
+
+export interface LatestSemesterSummary {
+  name: string;
+  gpa4?: number | null;
+  gpa10?: number | null;
+  credits?: number;
+}
+
+export interface AcademicSourceSummary {
+  source: 'SLINK' | 'QLHT';
+  sourceName: string;
+  portalUrl: string;
+  hasData: boolean;
+  isConfigured?: boolean;
+  isConnected?: boolean;
+  gpa10?: number | null;
+  gpa4?: number | null;
+  creditsAccumulated?: number;
+  creditsPassed?: number;
+  creditsRegistered?: number;
+  classification?: string | null;
+  totalSubjects?: number;
+  totalPassed?: number;
+  totalFailed?: number;
+  totalInProgress?: number;
+  passRate?: number;
+  creditPassRate?: number;
+  lastSyncAt?: string | null;
+  tenKhoaNganh?: string | null;
+  maKhoaNganh?: string | null;
+  totalSemesters?: number;
+  latestSemester?: LatestSemesterSummary | null;
+  gradeDistribution?: GradeDistributionSummary | null;
+}
+
 export interface AcademicSummary {
   hasData: boolean;
   gpa10?: number | null;
@@ -37,7 +79,11 @@ export interface AcademicSummary {
   totalSubjects?: number;
   totalPassed?: number;
   totalFailed?: number;
+  totalInProgress?: number;
+  passRate?: number;
   lastSyncAt?: string | null;
+  slink?: AcademicSourceSummary;
+  qlht?: AcademicSourceSummary;
 }
 
 export interface ClassMonitorSummary {

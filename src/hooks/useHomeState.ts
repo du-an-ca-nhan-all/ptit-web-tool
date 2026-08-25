@@ -209,6 +209,11 @@ export function useHomeState() {
         if (subTab) {
           setProfileSubTab(subTab);
         }
+        if (options?.source && typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          url.searchParams.set('source', options.source);
+          window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+        }
       }
       setIsMobileMenuOpen(false);
     },

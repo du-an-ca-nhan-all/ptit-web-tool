@@ -45,6 +45,7 @@ import {
 
 interface StudentGradesViewProps {
   currentUser: LoginUser;
+  initialSource?: 'QLDTTX' | 'SLINK';
   onNavigateToExternalAccounts?: () => void;
 }
 
@@ -89,15 +90,23 @@ const getRelativeSyncTime = (dateStr?: string | null) => {
 
 export default function StudentGradesView({
   currentUser,
+  initialSource,
   onNavigateToExternalAccounts,
 }: StudentGradesViewProps) {
   const [dataSource, setDataSource] = useState<'QLDTTX' | 'SLINK'>(() => {
+    if (initialSource) return initialSource;
     if (typeof window === 'undefined') return 'SLINK';
     const params = new URLSearchParams(window.location.search);
     const s = params.get('source')?.toUpperCase();
     if (s === 'QLDTTX' || s === 'QLHT') return 'QLDTTX';
     return 'SLINK';
   });
+
+  useEffect(() => {
+    if (initialSource && initialSource !== dataSource) {
+      setDataSource(initialSource);
+    }
+  }, [initialSource]);
 
   const [data, setData] = useState<StudentGradesResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);

@@ -132,7 +132,15 @@ export default function DashboardOverview({
 
         <AcademicSnapshotCards
           academic={data.academicSummary}
-          onNavigateToGrades={() => onNavigateTab('profile', 'GRADES')}
+          onNavigateToGrades={(source) => {
+            const srcParam = source === 'SLINK' ? 'slink' : 'qldttx';
+            if (typeof window !== 'undefined') {
+              const url = new URL(window.location.href);
+              url.searchParams.set('source', srcParam);
+              window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+            }
+            onNavigateTab('profile', 'GRADES', { source: srcParam });
+          }}
           onNavigateToExternalAccounts={() => onNavigateTab('profile', 'EXTERNAL_ACCOUNTS')}
         />
 
