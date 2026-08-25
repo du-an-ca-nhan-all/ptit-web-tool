@@ -193,7 +193,6 @@ export function buildGradeResultFromRawData(
         (hasLetterGrade && !['F', 'KĐ', 'KHONG DAT', 'KHÔNG ĐẠT'].includes(letterGrade))
       ) {
         isPassed = true;
-        semCreditsPassed += credits;
       } else if (
         hasFinalScore &&
         (
@@ -209,8 +208,21 @@ export function buildGradeResultFromRawData(
         isPassed = null;
       }
 
-      const isCalculatedInGpa = c.khong_tinh_diem_tbtl === 0 || c.khong_tinh_diem_tbtl === '0';
-      const reasonNotCalculated = c.ly_do_khong_tinh_diem_tbtl || undefined;
+      const isCalculatedInGpa = !(
+        c.khong_tinh_diem_tbtl === 1 ||
+        c.khong_tinh_diem_tbtl === '1' ||
+        c.khong_tinh_diem_tbtl === true ||
+        c.tich_luy === 0 ||
+        c.tich_luy === '0' ||
+        c.tich_luy === false
+      );
+      const reasonNotCalculated =
+        c.ly_do_khong_tinh_diem_tbtl ||
+        (!isCalculatedInGpa ? 'Học phần không tính vào GPA & tín chỉ tích lũy' : undefined);
+
+      if (isPassed === true) {
+        semCreditsPassed += credits;
+      }
 
       const courseObj: StudentCourseGrade = {
         id: `${semesterId}_${c.ma_mon || Math.random().toString(36).slice(2, 7)}`,
@@ -249,14 +261,26 @@ export function buildGradeResultFromRawData(
       }
     }
 
+    // Tính GPA học kỳ từ các môn có isCalculatedInGpa
+    const semGpaCourses = semesterCourses.filter(
+      (c) => c.isCalculatedInGpa && c.finalScore4 !== null && c.credits > 0
+    );
+    const semGpaCredits = semGpaCourses.reduce((sum, c) => sum + c.credits, 0);
+    const calcSemGpa4 = semGpaCredits > 0
+      ? semGpaCourses.reduce((sum, c) => sum + (c.finalScore4 || 0) * c.credits, 0) / semGpaCredits
+      : null;
+    const calcSemGpa10 = semGpaCredits > 0
+      ? semGpaCourses.reduce((sum, c) => sum + (c.finalScore10 || 0) * c.credits, 0) / semGpaCredits
+      : null;
+
     processedSemesters.push({
       semesterId,
       semesterName,
-      gpa10Semester: parseScore(sem.dtb_hk_he10),
-      gpa4Semester: parseScore(sem.dtb_hk_he4),
+      gpa10Semester: parseScore(sem.dtb_hk_he10) ?? (calcSemGpa10 !== null ? Math.round(calcSemGpa10 * 100) / 100 : null),
+      gpa4Semester: parseScore(sem.dtb_hk_he4) ?? (calcSemGpa4 !== null ? Math.round(calcSemGpa4 * 100) / 100 : null),
       gpa10Cumulative: parseScore(sem.dtb_tich_luy_he_10),
       gpa4Cumulative: parseScore(sem.dtb_tich_luy_he_4),
-      creditsPassedSemester: parseScore(sem.so_tin_chi_dat_hk) ?? semCreditsPassed,
+      creditsPassedSemester: semCreditsPassed,
       creditsCumulative: parseScore(sem.so_tin_chi_dat_tich_luy) ?? 0,
       creditsRegisteredSemester: semCreditsRegistered,
       classificationSemester: sem.xep_loai_tkb_hk || 'Chưa xếp loại',
@@ -271,6 +295,17 @@ export function buildGradeResultFromRawData(
   const progressionSemesters = [...processedSemesters].sort((a, b) =>
     a.semesterId.localeCompare(b.semesterId, undefined, { numeric: true })
   );
+
+  // Tín chỉ tích lũy qua từng kỳ: chỉ tính môn Đạt và isCalculatedInGpa
+  let runningCumulativeCredits = 0;
+  for (const s of progressionSemesters) {
+    const semAccCredits = s.courses
+      .filter((c) => c.isPassed === true && c.isCalculatedInGpa)
+      .reduce((sum, c) => sum + c.credits, 0);
+    runningCumulativeCredits += semAccCredits;
+    s.creditsCumulative = runningCumulativeCredits;
+  }
+
   const gpaProgression: GpaTrendItem[] = progressionSemesters.map((s) => ({
     semesterId: s.semesterId,
     semesterName: s.semesterName,
@@ -301,7 +336,14 @@ export function buildGradeResultFromRawData(
   // Phân nhóm môn học
   const topCourses = allCourses.filter((c) => c.letterGrade === 'A+' || c.letterGrade === 'A' || (c.finalScore10 !== null && c.finalScore10 >= 8.5));
   const improvementCourses = allCourses.filter(
-    (c) => c.isPassed === false || (c.isPassed === true && (c.letterGrade === 'D' || c.letterGrade === 'D+' || c.letterGrade === 'C' || (c.finalScore10 !== null && c.finalScore10 < 6.5)))
+    (c) =>
+      c.isCalculatedInGpa &&
+      (c.isPassed === false ||
+        (c.isPassed === true &&
+          (c.letterGrade === 'D' ||
+            c.letterGrade === 'D+' ||
+            c.letterGrade === 'C' ||
+            (c.finalScore10 !== null && c.finalScore10 < 6.5))))
   );
   const inProgressCourses = allCourses.filter((c) => c.isPassed === null);
 
@@ -310,12 +352,33 @@ export function buildGradeResultFromRawData(
   const totalInProgressSubjects = inProgressCourses.length;
   const totalSubjects = allCourses.length;
 
-  const totalPassedCredits = fetchedResult?.summary?.totalPassedCredits || allCourses.filter((c) => c.isPassed === true).reduce((sum, c) => sum + c.credits, 0);
-  const totalCreditsRegistered = fetchedResult?.summary?.totalCreditsRegistered || allCourses.reduce((sum, c) => sum + c.credits, 0);
+  // Tính số tín chỉ đạt toàn khóa (chỉ cần pass là tính)
+  const totalPassedCredits = allCourses
+    .filter((c) => c.isPassed === true)
+    .reduce((sum, c) => sum + c.credits, 0);
+
+  // Tính số tín chỉ tích lũy chỉ cho các môn Đạt VÀ isCalculatedInGpa
+  const passedAccumulatedCourses = allCourses.filter((c) => c.isPassed === true && c.isCalculatedInGpa);
+  const totalCreditsAccumulated = passedAccumulatedCourses.reduce((sum, c) => sum + c.credits, 0);
+  const totalCreditsRegistered = allCourses.reduce((sum, c) => sum + c.credits, 0);
   const totalInProgressCredits = inProgressCourses.reduce((sum, c) => sum + c.credits, 0);
-  const totalCreditsAccumulated = fetchedResult?.summary?.totalCreditsAccumulated || totalPassedCredits;
-  const gpa4 = fetchedResult?.summary?.gpa4 ?? null;
-  const gpa10 = fetchedResult?.summary?.gpa10 ?? null;
+
+  // Tính GPA tích lũy toàn khóa từ các môn có isCalculatedInGpa
+  const allGradedGpaCourses = allCourses.filter(
+    (c) => c.isCalculatedInGpa && c.finalScore4 !== null && c.credits > 0
+  );
+  const totalGpaCredits = allGradedGpaCourses.reduce((sum, c) => sum + c.credits, 0);
+  const fallbackCumGpa4 =
+    totalGpaCredits > 0
+      ? Math.round((allGradedGpaCourses.reduce((sum, c) => sum + (c.finalScore4 || 0) * c.credits, 0) / totalGpaCredits) * 100) / 100
+      : null;
+  const fallbackCumGpa10 =
+    totalGpaCredits > 0
+      ? Math.round((allGradedGpaCourses.reduce((sum, c) => sum + (c.finalScore10 || 0) * c.credits, 0) / totalGpaCredits) * 100) / 100
+      : null;
+
+  const gpa4 = fetchedResult?.summary?.gpa4 ?? fallbackCumGpa4;
+  const gpa10 = fetchedResult?.summary?.gpa10 ?? fallbackCumGpa10;
   const classification = fetchedResult?.summary?.classification || 'Chưa xếp loại';
 
   const gradedSubjectsCount = totalPassedSubjects + totalFailedSubjects;

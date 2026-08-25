@@ -261,7 +261,15 @@ export function buildSlinkGradeResultFromRawData(
       const isPassed =
         c.dat === true ? true : c.dat === false ? false : finalScore10 !== null ? (finalScore10 >= 4.0) : null;
 
-      const isCalculatedInGpa = c.tichLuy !== false && c.hocPhan?.loaiHocPhan?.isTinhDiem !== false || c.hocPhan?.loaiHocPhan?.isTinhSoTinChiTichLuy;
+      // Quyết định tính tổng tín chỉ và GPA dựa vào isTinhSoTinChiTichLuy của loại học phần
+      const isCalculatedInGpa = Boolean(
+        c.hocPhan?.loaiHocPhan?.isTinhSoTinChiTichLuy ??
+        c.loaiHocPhan?.isTinhSoTinChiTichLuy ??
+        c.isTinhSoTinChiTichLuy
+      );
+      const reasonNotCalculated = !isCalculatedInGpa
+        ? 'Học phần không tính vào tín chỉ & GPA tích lũy'
+        : undefined;
 
       // Xây dựng danh sách điểm thành phần
       const components: CourseComponentGrade[] = [];
@@ -306,7 +314,7 @@ export function buildSlinkGradeResultFromRawData(
         letterGrade: letterGrade || (isPassed ? 'Đạt' : 'Chưa có'),
         isPassed,
         isCalculatedInGpa,
-        reasonNotCalculated: !isCalculatedInGpa ? 'Học phần không tính vào GPA tích lũy' : undefined,
+        reasonNotCalculated,
         components,
         semesterId,
         semesterName,
@@ -325,12 +333,29 @@ export function buildSlinkGradeResultFromRawData(
       }
     }
 
-    const gpa10Sem = parseScore(semData.trungBinhHocKy);
-    const gpa4Sem = parseScore(semData.trungBinhHocKyThang4);
+    // Tính GPA học kỳ từ các môn có isCalculatedInGpa
+    const semGpaCourses = processedCourses.filter(
+      (c) => c.isCalculatedInGpa && c.finalScore4 !== null && c.credits > 0
+    );
+    const semGpaCredits = semGpaCourses.reduce((sum, c) => sum + c.credits, 0);
+    const calcSemGpa4 = semGpaCredits > 0
+      ? semGpaCourses.reduce((sum, c) => sum + (c.finalScore4 || 0) * c.credits, 0) / semGpaCredits
+      : null;
+    const calcSemGpa10 = semGpaCredits > 0
+      ? semGpaCourses.reduce((sum, c) => sum + (c.finalScore10 || 0) * c.credits, 0) / semGpaCredits
+      : null;
+
+    // TC Đạt trong kỳ: chỉ cần pass là được tính
+    const semPassedCredits = processedCourses
+      .filter((c) => c.isPassed === true)
+      .reduce((sum, c) => sum + c.credits, 0);
+
+    const gpa10Sem = parseScore(semData.trungBinhHocKy) ?? (calcSemGpa10 !== null ? Math.round(calcSemGpa10 * 100) / 100 : null);
+    const gpa4Sem = parseScore(semData.trungBinhHocKyThang4) ?? (calcSemGpa4 !== null ? Math.round(calcSemGpa4 * 100) / 100 : null);
     const gpa10Cum = parseScore(semData.trungBinhTichLuyToanKhoa);
     const gpa4Cum = parseScore(semData.trungBinhTichLuyToanKhoaThang4);
 
-    const creditsPassedSem = Number(semData.tongSoTinChiTichLuyHocKy || 0);
+    const creditsPassedSem = semPassedCredits;
     const creditsCum = Number(semData.tongSoTinChiTichLuyToanKhoa || 0);
     const creditsRegSem = Number(semData.tongSoTinChiDangKyHocKy || semData.tongSoTinChiHocKy || 0);
     const classSem = String(semData.hocLucHocKy || semData.hocLuc || 'N/A');
@@ -354,6 +379,17 @@ export function buildSlinkGradeResultFromRawData(
   const progressionSemesters = [...processedSemesters].sort((a, b) =>
     a.semesterId.localeCompare(b.semesterId, undefined, { numeric: true })
   );
+
+  // Tín chỉ tích lũy qua từng kỳ: chỉ tính môn Đạt và isCalculatedInGpa
+  let runningCumulativeCredits = 0;
+  for (const s of progressionSemesters) {
+    const semAccCredits = s.courses
+      .filter((c) => c.isPassed === true && c.isCalculatedInGpa)
+      .reduce((sum, c) => sum + c.credits, 0);
+    runningCumulativeCredits += semAccCredits;
+    s.creditsCumulative = runningCumulativeCredits;
+  }
+
   const gpaProgression: GpaTrendItem[] = progressionSemesters.map((s) => ({
     semesterId: s.semesterId,
     semesterName: s.semesterName,
@@ -455,18 +491,40 @@ export function buildSlinkGradeResultFromRawData(
     processedSemesters.find((s) => s.gpa4Cumulative !== null || s.gpa10Cumulative !== null) ||
     (processedSemesters.length > 0 ? processedSemesters[0] : null);
 
+  // Tính số tín chỉ đạt toàn khóa (chỉ cần pass là tính)
+  const totalPassedCredits = allCourses
+    .filter((c) => c.isPassed === true)
+    .reduce((sum, c) => sum + c.credits, 0);
+
+  // Tính số tín chỉ tích lũy chỉ cho các môn Đạt VÀ isCalculatedInGpa
+  const passedAccumulatedCourses = allCourses.filter((c) => c.isPassed === true && c.isCalculatedInGpa);
+  const totalCreditsAccumulated = passedAccumulatedCourses.reduce((sum, c) => sum + c.credits, 0);
+  const calculatedCreditsAccumulated = totalCreditsAccumulated;
+
+  // Tính GPA tích lũy toàn khóa từ các môn có isCalculatedInGpa
+  const allGradedGpaCourses = allCourses.filter(
+    (c) => c.isCalculatedInGpa && c.finalScore4 !== null && c.credits > 0
+  );
+  const totalGpaCredits = allGradedGpaCourses.reduce((sum, c) => sum + c.credits, 0);
+  const fallbackCumGpa4 =
+    totalGpaCredits > 0
+      ? Math.round((allGradedGpaCourses.reduce((sum, c) => sum + (c.finalScore4 || 0) * c.credits, 0) / totalGpaCredits) * 100) / 100
+      : null;
+  const fallbackCumGpa10 =
+    totalGpaCredits > 0
+      ? Math.round((allGradedGpaCourses.reduce((sum, c) => sum + (c.finalScore10 || 0) * c.credits, 0) / totalGpaCredits) * 100) / 100
+      : null;
+
   // Tính tổng hợp toàn khóa
   const gpa10 =
     parseScore(accumulated.trungBinh) ??
-    (latestSemesterWithGpa ? latestSemesterWithGpa.gpa10Cumulative : null);
+    (latestSemesterWithGpa ? latestSemesterWithGpa.gpa10Cumulative : null) ??
+    fallbackCumGpa10;
   const gpa4 =
     parseScore(accumulated.trungBinhThang4) ??
-    (latestSemesterWithGpa ? latestSemesterWithGpa.gpa4Cumulative : null);
+    (latestSemesterWithGpa ? latestSemesterWithGpa.gpa4Cumulative : null) ??
+    fallbackCumGpa4;
 
-  const totalPassedCredits = Number(
-    accumulated.tongSoTinChi || (latestSemesterWithGpa ? latestSemesterWithGpa.creditsCumulative : 0)
-  );
-  const totalCreditsAccumulated = totalPassedCredits;
   const totalCreditsRegistered = Number(accumulated.tongSoTinChiDangKy || totalPassedCredits);
   const totalInProgressCredits = gradeCounts.IN_PROGRESS.credits;
 
@@ -501,9 +559,13 @@ export function buildSlinkGradeResultFromRawData(
     .sort((a, b) => (b.finalScore10 || 0) - (a.finalScore10 || 0))
     .slice(0, 8);
 
-  // Môn học cần cải thiện (C, D, F)
+  // Môn học cần cải thiện (C, D, F) - Chỉ xét các môn có isCalculatedInGpa
   const improvementCourses = allCourses
-    .filter((c) => c.finalScore10 !== null && c.finalScore10 < 6.5)
+    .filter(
+      (c) =>
+        c.isCalculatedInGpa &&
+        (c.isPassed === false || (c.finalScore10 !== null && c.finalScore10 < 6.5))
+    )
     .sort((a, b) => (a.finalScore10 || 0) - (b.finalScore10 || 0));
 
   // Môn đang học

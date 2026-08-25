@@ -791,7 +791,7 @@ export async function fetchStudentGradesFromQLDTTX(account: {
   const finalGpa10 = !isNaN(gpa10Val) ? gpa10Val : fallbackGpa10;
   const finalCreditsAccumulated = !isNaN(creditsAccVal) ? creditsAccVal : fallbackCredits || 0;
 
-  // Tính tổng số tín chỉ đã đăng ký và tổng số môn đạt
+  // Tính tổng số tín chỉ đã đăng ký và tổng số môn đạt (chỉ tính vào tích lũy nếu môn tính vào GPA)
   let totalRegisteredCredits = 0;
   let totalPassedCredits = 0;
 
@@ -800,7 +800,16 @@ export async function fetchStudentGradesFromQLDTTX(account: {
     list.forEach((m: any) => {
       const tc = parseFloat(m.so_tin_chi) || 0;
       totalRegisteredCredits += tc;
-      if (m.ket_qua === 1 || (m.diem_tk_so !== '' && parseFloat(m.diem_tk_so) >= 1.0)) {
+      const isCalculatedInGpa = !(
+        m.khong_tinh_diem_tbtl === 1 ||
+        m.khong_tinh_diem_tbtl === '1' ||
+        m.khong_tinh_diem_tbtl === true ||
+        m.tich_luy === 0 ||
+        m.tich_luy === '0' ||
+        m.tich_luy === false
+      );
+      const isPassed = m.ket_qua === 1 || m.ket_qua === '1' || (m.diem_tk_so !== '' && parseFloat(m.diem_tk_so) >= 1.0);
+      if (isPassed && isCalculatedInGpa) {
         totalPassedCredits += tc;
       }
     });

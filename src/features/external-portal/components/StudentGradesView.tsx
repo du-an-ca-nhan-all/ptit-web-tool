@@ -306,7 +306,7 @@ export default function StudentGradesView({
     data.semesters.forEach((sem) => {
       sem.courses.forEach((c) => {
         const status = c.isPassed === true ? 'Đạt' : c.isPassed === false ? 'Chưa đạt' : 'Đang học';
-        const note = c.reasonNotCalculated || (c.isCalculatedInGpa ? 'Tính điểm TB' : 'Không tính điểm TB');
+        const note = c.reasonNotCalculated || (c.isCalculatedInGpa ? 'Tính điểm TB & tích lũy' : 'Không tính điểm TB & tích lũy');
         csv += `"${sem.semesterName}","${c.subjectCode}","${c.subjectName}",${c.credits},"${c.group}","${c.examScore ?? ''}","${c.finalScore10 ?? ''}","${c.finalScore4 ?? ''}","${c.letterGrade}","${status}","${note}"\n`;
       });
     });
@@ -685,8 +685,8 @@ export default function StudentGradesView({
                   />
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1.5">
-                  <span>Tiến độ tốt nghiệp</span>
-                  <span className="font-bold text-emerald-600">{summary?.graduationProgressRate || 0}%</span>
+                  <span>Tiến độ tốt nghiệp: <b className="font-bold text-emerald-600">{summary?.graduationProgressRate || 0}%</b></span>
+                  <span>Tổng TC Đạt: <b className="font-bold text-slate-700 font-mono">{summary?.totalPassedCredits || 0} TC</b></span>
                 </div>
               </div>
             </div>
@@ -1419,6 +1419,15 @@ export default function StudentGradesView({
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {!selectedCourseModal.isCalculatedInGpa && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3.5 py-2.5 rounded-2xl flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="font-medium">
+                  {selectedCourseModal.reasonNotCalculated || 'Học phần không tính vào GPA & tín chỉ tích lũy'}
+                </span>
+              </div>
+            )}
 
             <div className="flex flex-col gap-3">
               <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">Danh Sách Điểm Thành Phần</h4>
