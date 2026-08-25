@@ -16,6 +16,12 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertTriangle,
+  Clock,
+  Inbox,
+  Image as ImageIcon,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
 } from 'lucide-react';
 
 interface SlinkConnectionGuideProps {
@@ -48,6 +54,54 @@ export function SlinkConnectionGuide({
 }: SlinkConnectionGuideProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+
+  const images = [
+    {
+      id: 'step1',
+      stepNum: 1,
+      title: 'Bước 1: Ấn "Forgot password?" trên S-Link',
+      shortTitle: '1. Ấn "Forgot password?"',
+      subTitle: 'Màn hình đăng nhập cổng https://slink.ptit.edu.vn/',
+      badge: 'Cổng S-Link',
+      badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+      src: '/assets/an_quen_mat_khau.png',
+      caption: 'Nhấn vào dòng chữ đỏ "Forgot password?" ở góc dưới ô Password',
+    },
+    {
+      id: 'step2',
+      stepNum: 2,
+      title: 'Bước 2: Điền Email sinh viên PTIT & Submit',
+      shortTitle: '2. Điền Email & Submit',
+      subTitle: 'Form yêu cầu gửi link đặt lại mật khẩu',
+      badge: 'Cổng S-Link',
+      badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      src: '/assets/anh_dien_email_quen_mat_khau.png',
+      caption: 'Nhập địa chỉ Email sinh viên (...@stu.ptit.edu.vn) rồi ấn nút đỏ "Submit"',
+    },
+    {
+      id: 'step3',
+      stepNum: 3,
+      title: 'Bước 3: Nhận Email từ PTIT Slink SSO',
+      shortTitle: '3. Nhận Email & Bấm Link',
+      subTitle: 'Hòm thư Microsoft Outlook (Office 365) của trường',
+      badge: 'Microsoft Outlook',
+      badgeColor: 'bg-sky-100 text-sky-800 border-sky-200',
+      src: '/assets/email_quen_mat_khau.png',
+      caption: 'Mở thư từ "PTIT Slink SSO <slink@ptit.edu.vn>" và nhấp vào "Link to reset credentials" (hiệu lực 5 phút)',
+    },
+    {
+      id: 'step4',
+      stepNum: 4,
+      title: 'Bước 4: Tạo Mật khẩu mới & Xác nhận',
+      shortTitle: '4. Tạo Mật khẩu mới',
+      subTitle: 'Màn hình thiết lập mật khẩu mới S-Link',
+      badge: 'Cổng S-Link',
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      src: '/assets/anh_dien_mat_khau_moi.png',
+      caption: 'Nhập mật khẩu mới vào "New password" và "Confirm password", sau đó ấn "Submit"',
+    },
+  ];
 
   const guideSteps = [
     {
@@ -73,23 +127,37 @@ export function SlinkConnectionGuide({
       desc: (
         <>
           Trên màn hình đăng nhập S-Link, nhấn vào dòng chữ đỏ{' '}
-          <strong className="text-rose-600 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
-            Forgot password?
-          </strong>{' '}
-          ở ngay phía dưới ô nhập Password <em>(xem ảnh minh họa)</em>.
+          <button
+            type="button"
+            onClick={() => handleOpenLightbox(0)}
+            className="text-rose-600 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 hover:bg-rose-100 inline-flex items-center gap-0.5 cursor-pointer"
+          >
+            <span>Forgot password?</span>
+            <ImageIcon className="w-3 h-3" />
+          </button>{' '}
+          ở ngay phía dưới ô nhập Password.
         </>
       ),
     },
     {
       step: 3,
-      title: 'Nhập Email sinh viên PTIT',
+      title: 'Nhập Email sinh viên PTIT và bấm Submit',
       desc: (
         <>
           Điền địa chỉ Email sinh viên do nhà trường cấp (ví dụ:{' '}
           <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-[11px]">
             ...ptit.edu.vn
           </code>
-          ) hoặc Mã sinh viên rồi bấm gửi yêu cầu lấy lại mật khẩu.
+          ) vào ô <em>Username or email</em> rồi bấm nút đỏ{' '}
+          <button
+            type="button"
+            onClick={() => handleOpenLightbox(1)}
+            className="text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 hover:bg-indigo-100 inline-flex items-center gap-0.5 cursor-pointer"
+          >
+            <span>Submit</span>
+            <ImageIcon className="w-3 h-3" />
+          </button>
+          .
         </>
       ),
     },
@@ -106,17 +174,44 @@ export function SlinkConnectionGuide({
             className="text-sky-600 hover:text-sky-800 font-bold underline inline-flex items-center gap-0.5"
           >
             PTIT Microsoft Outlook <ExternalLink className="w-3 h-3" />
-          </a>{' '}
-          của bạn để mở thư gửi từ hệ thống S-Link.
+          </a>
+          . Kiểm tra thư từ người gửi{' '}
+          <strong className="text-slate-800">PTIT Slink SSO</strong> (
+          <span className="font-mono text-purple-700 text-[11px]">slink@ptit.edu.vn</span>) với tiêu đề{' '}
+          <em>"Reset password"</em>.{' '}
+          <button
+            type="button"
+            onClick={() => handleOpenLightbox(2)}
+            className="text-sky-600 hover:text-sky-800 font-bold underline inline-flex items-center gap-0.5 text-[11px] cursor-pointer"
+          >
+            [Xem ảnh email]
+          </button>
         </>
       ),
     },
     {
       step: 5,
-      title: 'Click vào link trong Email để tạo mật khẩu mới',
+      title: 'Click vào link trong Email và tạo mật khẩu mới',
       desc: (
         <>
-          Bấm vào liên kết xác nhận trong email để tạo <strong>Mật khẩu mới</strong> cho tài khoản S-Link trực tiếp.
+          Nhấp vào liên kết{' '}
+          <strong className="text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+            Link to reset credentials
+          </strong>{' '}
+          trong email để mở form tạo mật khẩu mới.{' '}
+          <span className="text-amber-700 font-semibold inline-flex items-center gap-1">
+            <Clock className="w-3 h-3" /> (Link có hiệu lực trong 5 phút)
+          </span>
+          . Nhập mật khẩu mới tại ô <em>New password</em> & <em>Confirm password</em> rồi bấm{' '}
+          <button
+            type="button"
+            onClick={() => handleOpenLightbox(3)}
+            className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 inline-flex items-center gap-0.5 cursor-pointer"
+          >
+            <span>Submit</span>
+            <ImageIcon className="w-3 h-3" />
+          </button>
+          .
         </>
       ),
     },
@@ -133,8 +228,15 @@ export function SlinkConnectionGuide({
     },
   ];
 
-  // Modal Lightbox Component
+  const handleOpenLightbox = (index = 0) => {
+    setActiveImageIndex(index);
+    setIsLightboxOpen(true);
+  };
+
+  // Lightbox Modal Component
   const renderLightboxModal = () => {
+    const currentImg = images[activeImageIndex] || images[0];
+
     return (
       <div
         className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
@@ -142,7 +244,7 @@ export function SlinkConnectionGuide({
           if (e.target === e.currentTarget) setIsLightboxOpen(false);
         }}
       >
-        <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-200 flex flex-col max-h-[94vh] animate-in zoom-in-95 duration-200">
           {/* Lightbox Header */}
           <div className="p-4 sm:p-5 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -151,10 +253,10 @@ export function SlinkConnectionGuide({
               </div>
               <div>
                 <h3 className="text-sm sm:text-base font-black tracking-tight">
-                  Hướng Dẫn Lấy Mật Khẩu Cổng PTIT S-Link
+                  Hướng Dẫn Lấy Mật Khẩu Cổng PTIT S-Link (4 Bước)
                 </h3>
                 <p className="text-xs text-purple-200">
-                  Tạo mật khẩu tài khoản trực tiếp qua chức năng "Forgot password?"
+                  Tạo mật khẩu tài khoản trực tiếp qua chức năng "Forgot password?" & Email Microsoft
                 </p>
               </div>
             </div>
@@ -169,6 +271,7 @@ export function SlinkConnectionGuide({
 
           {/* Lightbox Body */}
           <div className="p-4 sm:p-6 overflow-y-auto flex flex-col gap-4">
+            {/* Warning Box */}
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-950 flex items-start gap-2.5">
               <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div className="leading-relaxed text-[11.5px]">
@@ -176,57 +279,94 @@ export function SlinkConnectionGuide({
               </div>
             </div>
 
-            {/* High-res Image with Caption */}
-            <div className="relative rounded-2xl overflow-hidden border-2 border-purple-300 shadow-md bg-slate-100 flex items-center justify-center p-2">
-              <img
-                src="/assets/an_quen_mat_khau.png"
-                alt="Minh họa ấn quên mật khẩu trên Cổng S-Link"
-                className="max-h-[380px] w-auto object-contain rounded-xl"
-              />
+            {/* 4 Tabs selector */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 border-b border-slate-200 pb-3">
+              {images.map((img, idx) => (
+                <button
+                  key={img.id}
+                  type="button"
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`px-2.5 py-2 rounded-2xl text-[11.5px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                    activeImageIndex === idx
+                      ? 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-200'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span className="w-4 h-4 rounded-full bg-white/25 text-[10px] font-black flex items-center justify-center shrink-0">
+                    {img.stepNum}
+                  </span>
+                  <span className="truncate">{img.shortTitle}</span>
+                </button>
+              ))}
             </div>
 
-            {/* Quick Steps */}
+            {/* Active Image Box */}
+            <div className="relative rounded-2xl overflow-hidden border-2 border-purple-300 shadow-md bg-slate-100 flex flex-col items-center justify-center p-3">
+              <div className="w-full flex items-center justify-between mb-2 px-1 gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border ${currentImg.badgeColor}`}>
+                    {currentImg.badge}
+                  </span>
+                  <span className="text-xs font-bold text-slate-800">{currentImg.title}</span>
+                </div>
+                <span className="text-[11px] text-slate-500 font-medium">{currentImg.subTitle}</span>
+              </div>
+
+              <div className="relative w-full flex items-center justify-center bg-slate-900/5 rounded-xl p-2 min-h-[260px]">
+                <img
+                  src={currentImg.src}
+                  alt={currentImg.title}
+                  className="max-h-[380px] w-auto max-w-full object-contain rounded-xl shadow-xs"
+                />
+
+                {/* Left/Right controls */}
+                <button
+                  type="button"
+                  onClick={() => setActiveImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-slate-900/70 hover:bg-slate-900 text-white rounded-full transition shadow cursor-pointer backdrop-blur-xs"
+                  title="Ảnh trước"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-slate-900/70 hover:bg-slate-900 text-white rounded-full transition shadow cursor-pointer backdrop-blur-xs"
+                  title="Ảnh tiếp theo"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mt-2.5 p-2 bg-purple-50/90 border border-purple-200 rounded-xl text-xs text-purple-950 font-bold text-center w-full">
+                🔍 {currentImg.caption}
+              </div>
+            </div>
+
+            {/* Quick Steps List */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2">
               <div className="font-bold text-slate-800 flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-indigo-600" />
-                <span>Quy trình 5 bước đơn giản:</span>
+                <span>Tóm tắt quy trình 4 bước:</span>
               </div>
-              <ol className="list-decimal list-inside space-y-1.5 text-slate-600 text-[11.5px] leading-relaxed">
-                <li>
-                  Mở trang đăng nhập{' '}
-                  <a
-                    href="https://slink.ptit.edu.vn/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-indigo-600 underline"
-                  >
-                    slink.ptit.edu.vn
-                  </a>
-                  .
-                </li>
-                <li>
-                  Nhấn vào nút <strong className="text-rose-600 font-bold">"Forgot password?"</strong> ngay dưới ô nhập mật khẩu.
-                </li>
-                <li>
-                  Nhập địa chỉ Email sinh viên PTIT (ví dụ:{' '}
-                  <code className="bg-slate-200 px-1 py-0.5 rounded font-mono text-slate-800">...ptit.edu.vn</code>) rồi nhấn Gửi.
-                </li>
-                <li>
-                  Đăng nhập vào{' '}
-                  <a
-                    href="https://outlook.office.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-sky-600 underline"
-                  >
-                    hòm thư Microsoft Outlook của trường
-                  </a>{' '}
-                  để nhận email khôi phục từ PTIT S-Link.
-                </li>
-                <li>
-                  Bấm vào link trong email để đặt mật khẩu mới, sau đó dùng mật khẩu này kết nối vào PTIT Web Tool.
-                </li>
-              </ol>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600">
+                <div className="p-2 bg-white rounded-xl border border-slate-200">
+                  <strong className="text-purple-700 block mb-0.5">1. Màn hình S-Link</strong>
+                  Bấm vào dòng chữ đỏ <em>"Forgot password?"</em>.
+                </div>
+                <div className="p-2 bg-white rounded-xl border border-slate-200">
+                  <strong className="text-indigo-700 block mb-0.5">2. Điền Email PTIT</strong>
+                  Nhập email <code>...stu.ptit.edu.vn</code> và bấm <em>"Submit"</em>.
+                </div>
+                <div className="p-2 bg-white rounded-xl border border-slate-200">
+                  <strong className="text-sky-700 block mb-0.5">3. Mở Email Outlook</strong>
+                  Nhận email từ <em>PTIT Slink SSO</em> và nhấp <em>"Link to reset credentials"</em>.
+                </div>
+                <div className="p-2 bg-white rounded-xl border border-slate-200">
+                  <strong className="text-emerald-700 block mb-0.5">4. Tạo Mật khẩu mới</strong>
+                  Nhập mật khẩu mới & xác nhận, sau đó liên kết vào Web Tool.
+                </div>
+              </div>
             </div>
           </div>
 
@@ -295,11 +435,11 @@ export function SlinkConnectionGuide({
 
           <button
             type="button"
-            onClick={() => setIsLightboxOpen(true)}
+            onClick={() => handleOpenLightbox(0)}
             className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
           >
             <HelpCircle className="w-3.5 h-3.5" />
-            <span>Xem Hướng Dẫn Chi Tiết</span>
+            <span>Xem Hướng Dẫn Kèm 4 Ảnh</span>
           </button>
         </div>
 
@@ -321,10 +461,10 @@ export function SlinkConnectionGuide({
             </div>
             <button
               type="button"
-              onClick={() => setIsLightboxOpen(true)}
+              onClick={() => handleOpenLightbox(0)}
               className="text-indigo-600 hover:text-indigo-800 font-bold underline flex items-center gap-1 text-[11px] cursor-pointer"
             >
-              <span>Xem hướng dẫn lấy mật khẩu</span>
+              <span>Xem hướng dẫn lấy mật khẩu (4 ảnh)</span>
               <ExternalLink className="w-3 h-3" />
             </button>
           </div>
@@ -432,35 +572,45 @@ export function SlinkConnectionGuide({
               </div>
             </div>
 
-            {/* Visual preview card */}
-            <div className="w-full lg:w-64 shrink-0 flex flex-col gap-2">
+            {/* Visual preview 4-cards gallery grid */}
+            <div className="w-full lg:w-80 shrink-0 flex flex-col gap-2.5">
               <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                 <Key className="w-3.5 h-3.5 text-purple-600" />
-                <span>Ảnh minh họa nút Quên Mật Khẩu:</span>
+                <span>Ảnh minh họa toàn bộ 4 bước:</span>
               </div>
 
-              <div
-                onClick={() => setIsLightboxOpen(true)}
-                className="group relative rounded-2xl overflow-hidden border-2 border-purple-200 hover:border-purple-400 bg-slate-900 cursor-pointer shadow-sm transition-all transform active:scale-98"
-                title="Bấm vào để xem ảnh phóng to chi tiết"
-              >
-                <img
-                  src="/assets/an_quen_mat_khau.png"
-                  alt="Hướng dẫn ấn Forgot password trên PTIT S-Link"
-                  className="w-full h-auto object-cover object-center group-hover:opacity-90 transition-opacity"
-                />
-                <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white p-2 text-center">
-                  <ZoomIn className="w-6 h-6 text-white drop-shadow-md" />
-                  <span className="text-[11px] font-bold bg-purple-600/90 px-2 py-0.5 rounded-full backdrop-blur-xs">
-                    Phóng to ảnh
-                  </span>
-                </div>
-                <div className="absolute bottom-2 left-2 right-2 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-1 rounded-lg text-center truncate">
-                  🔍 Nhấn vào "Forgot password?"
-                </div>
+              <div className="grid grid-cols-2 gap-2">
+                {images.map((img, idx) => (
+                  <div
+                    key={img.id}
+                    onClick={() => handleOpenLightbox(idx)}
+                    className="group relative rounded-2xl overflow-hidden border-2 border-purple-200 hover:border-purple-400 bg-slate-900 cursor-pointer shadow-sm transition-all transform active:scale-98"
+                    title={`Bấm vào để xem ảnh ${img.title} phóng to`}
+                  >
+                    <div className="aspect-[4/3] bg-slate-950 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={img.src}
+                        alt={img.title}
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300 opacity-90 group-hover:opacity-100"
+                      />
+                    </div>
+
+                    <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white p-1 text-center">
+                      <ZoomIn className="w-4 h-4 text-white drop-shadow-md" />
+                      <span className="text-[9px] font-bold bg-purple-600/90 px-1.5 py-0.5 rounded-full backdrop-blur-xs">
+                        Phóng to
+                      </span>
+                    </div>
+
+                    <div className="absolute bottom-1 left-1 right-1 bg-slate-900/85 backdrop-blur-xs text-white text-[9.5px] font-bold px-1.5 py-0.5 rounded-lg text-center truncate">
+                      {img.shortTitle}
+                    </div>
+                  </div>
+                ))}
               </div>
+
               <p className="text-[10px] text-slate-500 italic text-center">
-                (Bấm vào ảnh trên để xem phóng to rõ nét)
+                (Nhấp vào bất kỳ ảnh nào để xem toàn bộ 4 ảnh phóng to)
               </p>
             </div>
           </div>
