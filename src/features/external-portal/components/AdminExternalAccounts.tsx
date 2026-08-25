@@ -32,6 +32,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { LoginUser, AVAILABLE_EXTERNAL_SYSTEMS } from '../../../types';
+import { SlinkConnectionGuide } from './SlinkConnectionGuide';
 
 interface ExternalAccountAdminItem {
   id: number;
@@ -747,6 +748,13 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
           </div>
         </div>
 
+        {/* SLINK Guide Banner when filtered by SLINK_PTIT */}
+        {selectedSystem === 'SLINK_PTIT' && (
+          <div className="p-4 pb-0">
+            <SlinkConnectionGuide variant="banner" />
+          </div>
+        )}
+
         {/* Accounts Table */}
         <div className="overflow-x-auto">
           {isLoading ? (
@@ -1141,6 +1149,10 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                   ))}
                 </select>
               </div>
+
+              {formData.systemKey === 'SLINK_PTIT' && (
+                <SlinkConnectionGuide variant="compact" />
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">

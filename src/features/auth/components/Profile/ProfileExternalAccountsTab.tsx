@@ -24,6 +24,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { LoginUser } from '../../types/auth.types';
+import { SlinkConnectionGuide } from '@/src/features/external-portal/components/SlinkConnectionGuide';
 
 interface ProfileExternalAccountsTabProps {
   currentUser: LoginUser;
@@ -302,6 +303,11 @@ export function ProfileExternalAccountsTab({
                     </div>
                   )}
 
+                  {/* S-Link Helper Guide in connected view */}
+                  {sys.systemKey === 'SLINK_PTIT' && (
+                    <SlinkConnectionGuide variant="compact" />
+                  )}
+
                   {/* Action Buttons for Connected State */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t border-slate-100 gap-2.5">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -401,6 +407,15 @@ export function ProfileExternalAccountsTab({
                   <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-2xl border border-slate-100">
                     {sys.description}
                   </p>
+                )}
+
+                {/* Hướng Dẫn Kết Nối Dành Riêng Cho PTIT S-Link */}
+                {sys.systemKey === 'SLINK_PTIT' && (
+                  <SlinkConnectionGuide
+                    variant="card"
+                    defaultExpanded={true}
+                    title={isEditing ? 'Hướng Dẫn Đổi / Lấy Lại Mật Khẩu PTIT S-Link' : 'Hướng Dẫn Lấy Mật Khẩu Cổng PTIT S-Link'}
+                  />
                 )}
 
                 {/* 3-Step Flow Visual Indicator */}
