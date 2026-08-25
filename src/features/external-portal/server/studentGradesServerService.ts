@@ -35,11 +35,13 @@ export interface SemesterGradeSummary {
   gpa4Semester: number | null;
   gpa10Cumulative: number | null;
   gpa4Cumulative: number | null;
-  creditsPassedSemester: number;
-  creditsCumulative: number;
-  creditsAccumulatedSemester?: number;
-  creditsAccumulatedCumulativeOfficial?: number;
-  creditsAccumulatedCumulativeExpected?: number;
+  creditsPassedSemester: number; // Tổng số tín chỉ môn đạt trong kỳ
+  creditsCumulative: number; // Tín chỉ tích lũy lũy kế
+  creditsAccumulatedSemester?: number; // Tín chỉ đã chốt chính thức trong kỳ
+  creditsAccumulatedExpectedSemester?: number; // Tín chỉ dự kiến đạt trong kỳ (tất cả môn đạt tính GPA)
+  creditsPendingSemester?: number; // Tín chỉ chưa chốt / chờ chốt trong kỳ
+  creditsAccumulatedCumulativeOfficial?: number; // Lũy kế đã chốt chính thức
+  creditsAccumulatedCumulativeExpected?: number; // Lũy kế dự kiến toàn bộ môn đạt
   creditsRegisteredSemester: number;
   creditsDebtSemester?: number;
   classificationSemester: string;
@@ -54,7 +56,10 @@ export interface GpaTrendItem {
   gpaCumulative10: number | null;
   gpaCumulative4: number | null;
   creditsSemester: number;
+  creditsAccumulatedSemester?: number;
+  creditsPendingSemester?: number;
   creditsCumulative: number;
+  creditsCumulativeExpected?: number;
 }
 
 export interface GradeDistributionBucket {
@@ -283,6 +288,15 @@ export function buildGradeResultFromRawData(
       ? semGpaCourses.reduce((sum, c) => sum + (c.finalScore10 || 0) * c.credits, 0) / semGpaCredits
       : null;
 
+    const semOfficialAccCredits = semesterCourses
+      .filter((c) => c.isPassed === true && c.isAccumulatedOfficial)
+      .reduce((sum, c) => sum + c.credits, 0);
+    const semExpectedAccCredits = semesterCourses
+      .filter((c) => c.isPassed === true && c.isCalculatedInGpa)
+      .reduce((sum, c) => sum + c.credits, 0);
+    const semAccCredits = semOfficialAccCredits > 0 ? semOfficialAccCredits : semExpectedAccCredits;
+    const semPendingCredits = Math.max(0, semExpectedAccCredits - semAccCredits);
+
     processedSemesters.push({
       semesterId,
       semesterName,
@@ -292,6 +306,9 @@ export function buildGradeResultFromRawData(
       gpa4Cumulative: parseScore(sem.dtb_tich_luy_he_4),
       creditsPassedSemester: semCreditsPassed,
       creditsCumulative: parseScore(sem.so_tin_chi_dat_tich_luy) ?? 0,
+      creditsAccumulatedSemester: semAccCredits,
+      creditsAccumulatedExpectedSemester: semExpectedAccCredits,
+      creditsPendingSemester: semPendingCredits,
       creditsRegisteredSemester: semCreditsRegistered,
       classificationSemester: sem.xep_loai_tkb_hk || 'Chưa xếp loại',
       courses: semesterCourses,
@@ -314,6 +331,7 @@ export function buildGradeResultFromRawData(
       .reduce((sum, c) => sum + c.credits, 0);
     runningCumulativeCredits += semAccCredits;
     s.creditsCumulative = runningCumulativeCredits;
+    s.creditsAccumulatedCumulativeExpected = runningCumulativeCredits;
   }
 
   const gpaProgression: GpaTrendItem[] = progressionSemesters.map((s) => ({
@@ -324,7 +342,10 @@ export function buildGradeResultFromRawData(
     gpaCumulative10: s.gpa10Cumulative,
     gpaCumulative4: s.gpa4Cumulative,
     creditsSemester: s.creditsPassedSemester,
+    creditsAccumulatedSemester: s.creditsAccumulatedSemester,
+    creditsPendingSemester: s.creditsPendingSemester,
     creditsCumulative: s.creditsCumulative,
+    creditsCumulativeExpected: s.creditsAccumulatedCumulativeExpected,
   }));
 
   // Xây dựng Phân bố Điểm chữ

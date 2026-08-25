@@ -888,9 +888,37 @@ export default function StudentGradesView({
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-200/60">
-                          <span>TC Đạt Kỳ: <b>{prog.creditsSemester} TC</b></span>
-                          <span>TC Tích Lũy: <b className="text-emerald-700">{prog.creditsCumulative} TC</b></span>
+                        <div className="flex flex-col gap-1 text-xs text-slate-600 pt-2.5 border-t border-slate-200/60">
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1 text-emerald-800 font-bold">
+                              <Lock className="w-3 h-3 text-emerald-600" />
+                              <span>Đã chốt:</span>
+                            </span>
+                            <span className="font-mono font-black text-emerald-700">
+                              {prog.creditsAccumulatedSemester ?? prog.creditsSemester} TC
+                              <span className="font-normal text-slate-400 text-[10px] ml-1">(Lũy kế: {prog.creditsCumulative} TC)</span>
+                            </span>
+                          </div>
+
+                          {(prog.creditsPendingSemester ?? 0) > 0 && (
+                            <div className="flex items-center justify-between text-amber-900 font-bold bg-amber-50/80 px-2 py-0.5 rounded-md border border-amber-200/80 mt-0.5">
+                              <span className="flex items-center gap-1 text-[11px]">
+                                <Clock className="w-2.5 h-2.5 text-amber-600" />
+                                <span>Chưa chốt (dự kiến):</span>
+                              </span>
+                              <span className="font-mono font-black text-amber-700 text-[11px]">
+                                +{prog.creditsPendingSemester} TC
+                                {prog.creditsCumulativeExpected ? (
+                                  <span className="font-normal text-slate-500 text-[10px] ml-1">(LK dự kiến: {prog.creditsCumulativeExpected} TC)</span>
+                                ) : null}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 mt-0.5">
+                            <span>Tổng TC đạt kỳ:</span>
+                            <span className="font-mono font-bold text-slate-600">{prog.creditsSemester} TC</span>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1197,7 +1225,7 @@ export default function StudentGradesView({
                     </div>
 
                     {/* Quick Semester Metrics */}
-                    <div className="flex items-center gap-3 flex-wrap text-xs">
+                    <div className="flex items-center gap-2.5 flex-wrap text-xs">
                       {sem.gpa4Semester !== null && (
                         <div className="bg-white/10 px-3 py-1 rounded-xl flex items-center gap-1.5">
                           <span className="text-slate-300">GPA Kỳ:</span>
@@ -1212,10 +1240,80 @@ export default function StudentGradesView({
                         </div>
                       )}
 
+                      <div className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-xl flex items-center gap-1.5 font-bold">
+                        <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Đã chốt:</span>
+                        <span className="font-mono text-white">{sem.creditsAccumulatedSemester ?? sem.creditsPassedSemester} TC</span>
+                      </div>
+
+                      {(sem.creditsPendingSemester ?? 0) > 0 && (
+                        <div className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-3 py-1 rounded-xl flex items-center gap-1.5 font-bold animate-pulse">
+                          <Clock className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Chưa chốt:</span>
+                          <span className="font-mono text-white">+{sem.creditsPendingSemester} TC</span>
+                        </div>
+                      )}
+
                       <div className="bg-white/10 px-3 py-1 rounded-xl flex items-center gap-1.5">
                         <span className="text-slate-300">TC Đạt:</span>
                         <span className="font-mono font-bold text-white">{sem.creditsPassedSemester} TC</span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Semester Credits Detailed Info Strip (Phân chia Tín chỉ Đã chốt vs Chưa chốt từng học kỳ) */}
+                  <div className="bg-slate-50/90 border-b border-slate-200 px-4 sm:px-6 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
+                    <div className="flex items-center gap-2.5 sm:gap-4 flex-wrap">
+                      {/* Tín chỉ đã chốt kỳ này */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 text-emerald-800 font-bold bg-emerald-100/90 px-2.5 py-1 rounded-xl border border-emerald-300 shadow-2xs">
+                          <Lock className="w-3 h-3 text-emerald-700" />
+                          <span>Đã chốt kỳ:</span>
+                          <b className="font-mono font-black">{sem.creditsAccumulatedSemester ?? sem.creditsPassedSemester} TC</b>
+                        </span>
+                        {sem.creditsAccumulatedCumulativeOfficial ? (
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            (Lũy kế chốt: <b className="font-mono text-emerald-700 font-bold">{sem.creditsAccumulatedCumulativeOfficial} TC</b>)
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {/* Tín chỉ chưa chốt / chờ chốt kỳ này */}
+                      {(sem.creditsPendingSemester ?? 0) > 0 ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 text-amber-900 font-bold bg-amber-100/90 px-2.5 py-1 rounded-xl border border-amber-300 shadow-2xs">
+                            <Clock className="w-3 h-3 text-amber-700" />
+                            <span>Chưa chốt (chờ xét):</span>
+                            <b className="font-mono font-black text-amber-800">+{sem.creditsPendingSemester} TC</b>
+                          </span>
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            (Dự kiến kỳ: <b className="font-mono text-indigo-700 font-bold">{sem.creditsAccumulatedExpectedSemester ?? sem.creditsPassedSemester} TC</b>
+                            {sem.creditsAccumulatedCumulativeExpected ? (
+                              <> • Lũy kế dự kiến: <b className="font-mono text-indigo-700 font-bold">{sem.creditsAccumulatedCumulativeExpected} TC</b></>
+                            ) : null})
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1 bg-white px-2.5 py-1 rounded-xl border border-emerald-200">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                          <span>100% môn đạt kỳ này đã khóa sổ vào học bạ</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Stats: Đăng ký & Nợ */}
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium self-end md:self-auto">
+                      <span>Đăng ký: <b className="text-slate-800 font-mono">{sem.creditsRegisteredSemester || sem.courses.reduce((sum, c) => sum + c.credits, 0)} TC</b></span>
+                      <span>•</span>
+                      <span>Tổng Đạt: <b className="text-slate-800 font-mono">{sem.creditsPassedSemester} TC</b></span>
+                      {sem.creditsDebtSemester ? (
+                        <>
+                          <span>•</span>
+                          <span className="text-rose-600 font-bold flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> Nợ kỳ: <b className="font-mono">{sem.creditsDebtSemester} TC</b>
+                          </span>
+                        </>
+                      ) : null}
                     </div>
                   </div>
 

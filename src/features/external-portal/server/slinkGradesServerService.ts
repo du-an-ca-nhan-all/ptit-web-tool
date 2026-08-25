@@ -395,6 +395,20 @@ export function buildSlinkGradeResultFromRawData(
       .filter((c) => c.isPassed === true)
       .reduce((sum, c) => sum + c.credits, 0);
 
+    // TC Đã chốt chính thức trong kỳ (các môn có cờ tichLuy / isAccumulatedOfficial)
+    const semOfficialAccCredits = processedCourses
+      .filter((c) => c.isPassed === true && c.isAccumulatedOfficial)
+      .reduce((sum, c) => sum + c.credits, 0);
+
+    // TC Dự kiến đạt trong kỳ (toàn bộ môn Đạt VÀ tính vào GPA)
+    const semExpectedAccCredits = processedCourses
+      .filter((c) => c.isPassed === true && c.isCalculatedInGpa)
+      .reduce((sum, c) => sum + c.credits, 0);
+
+    const rawAccSem = Number(semData.tongSoTinChiTichLuyHocKy || 0);
+    const creditsAccSem = semOfficialAccCredits > 0 ? semOfficialAccCredits : (rawAccSem > 0 ? rawAccSem : semExpectedAccCredits);
+    const creditsPendingSem = Math.max(0, semExpectedAccCredits - creditsAccSem);
+
     const gpa10Sem = parseScore(semData.trungBinhHocKy) ?? (calcSemGpa10 !== null ? Math.round(calcSemGpa10 * 100) / 100 : null);
     const gpa4Sem = parseScore(semData.trungBinhHocKyThang4) ?? (calcSemGpa4 !== null ? Math.round(calcSemGpa4 * 100) / 100 : null);
     const gpa10Cum = parseScore(semData.trungBinhTichLuyToanKhoa);
@@ -402,7 +416,6 @@ export function buildSlinkGradeResultFromRawData(
 
     const creditsPassedSem = semPassedCredits;
     const creditsCumOfficial = Number(semData.tongSoTinChiTichLuyToanKhoa || 0);
-    const creditsAccSem = Number(semData.tongSoTinChiTichLuyHocKy || semData.tongSoTinChiHocKy || 0);
     const creditsRegSem = Number(semData.tongSoTinChiDangKyHocKy || semData.tongSoTinChiHocKy || 0);
     const creditsDebtSem = Number(semData.tongSoTinChiNoHocKy || 0);
     const classSem = String(semData.hocLucHocKy || semData.hocLuc || 'N/A');
@@ -417,6 +430,8 @@ export function buildSlinkGradeResultFromRawData(
       creditsPassedSemester: creditsPassedSem,
       creditsCumulative: creditsCumOfficial,
       creditsAccumulatedSemester: creditsAccSem,
+      creditsAccumulatedExpectedSemester: semExpectedAccCredits,
+      creditsPendingSemester: creditsPendingSem,
       creditsAccumulatedCumulativeOfficial: creditsCumOfficial,
       creditsAccumulatedCumulativeExpected: 0, // Điền ở vòng lặp sau
       creditsRegisteredSemester: creditsRegSem,
@@ -454,7 +469,10 @@ export function buildSlinkGradeResultFromRawData(
     gpaCumulative10: s.gpa10Cumulative,
     gpaCumulative4: s.gpa4Cumulative,
     creditsSemester: s.creditsPassedSemester,
-    creditsCumulative: s.creditsCumulative,
+    creditsAccumulatedSemester: s.creditsAccumulatedSemester,
+    creditsPendingSemester: s.creditsPendingSemester,
+    creditsCumulative: s.creditsAccumulatedCumulativeOfficial || s.creditsCumulative,
+    creditsCumulativeExpected: s.creditsAccumulatedCumulativeExpected,
   }));
 
   // Phân bố điểm
