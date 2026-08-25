@@ -2,27 +2,53 @@
  * Utility functions for date manipulation and formatting (Vietnamese locale)
  */
 
-export function parseDateString(dateStr: string): Date | null {
-  if (!dateStr) return null;
-  const trimmed = dateStr.trim();
+export function parseDateString(dateInput: string | number | Date | null | undefined): Date | null {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) {
+    return isNaN(dateInput.getTime()) ? null : dateInput;
+  }
+  if (typeof dateInput === 'number') {
+    const d = new Date(dateInput);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const trimmed = String(dateInput).trim();
+  if (!trimmed) return null;
 
-  // Match DD/MM/YYYY
-  const ddmmyyyy = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (ddmmyyyy) {
-    const [, day, month, year] = ddmmyyyy;
-    const d = new Date(Number(year), Number(month) - 1, Number(day));
+  // Match DD/MM/YYYY with optional time (e.g. 25/08/2026, 25/08/2026 14:30, 25/08/2026 14:30:00, 25/08/2026 - 14:30)
+  const ddmmyyyyWithTime = trimmed.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[\s,\-T]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/
+  );
+  if (ddmmyyyyWithTime) {
+    const [, day, month, year, hours, minutes, seconds] = ddmmyyyyWithTime;
+    const d = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      hours !== undefined ? Number(hours) : 0,
+      minutes !== undefined ? Number(minutes) : 0,
+      seconds !== undefined ? Number(seconds) : 0
+    );
     return isNaN(d.getTime()) ? null : d;
   }
 
-  // Match YYYY-MM-DD
-  const yyyymmdd = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (yyyymmdd) {
-    const [, year, month, day] = yyyymmdd;
-    const d = new Date(Number(year), Number(month) - 1, Number(day));
+  // Match YYYY-MM-DD with optional time
+  const yyyymmddWithTime = trimmed.match(
+    /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[\s,\-T]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/
+  );
+  if (yyyymmddWithTime) {
+    const [, year, month, day, hours, minutes, seconds] = yyyymmddWithTime;
+    const d = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      hours !== undefined ? Number(hours) : 0,
+      minutes !== undefined ? Number(minutes) : 0,
+      seconds !== undefined ? Number(seconds) : 0
+    );
     return isNaN(d.getTime()) ? null : d;
   }
 
-  // Fallback to ISO
+  // Fallback to ISO / native parser
   const d = new Date(trimmed);
   return isNaN(d.getTime()) ? null : d;
 }

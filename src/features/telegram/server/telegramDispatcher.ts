@@ -21,6 +21,7 @@ import {
   formatSlinkDate,
   escapeTelegramHtml,
 } from '@/src/features/external-portal/server/slinkServerService';
+import { parseDateString } from '@/src/lib/date-utils';
 
 /**
  * Normalizes date string into DD/MM/YYYY format
@@ -721,6 +722,20 @@ export async function checkAndDispatchSlinkAnnouncements(options: {
           const notifId = String(ann.id || ann._id || '');
           if (!notifId) continue;
 
+          // Bỏ qua thông báo nếu đã có từ hơn 3 ngày trước (> 3 ngày)
+          const rawDate = ann.createdAt || ann.created_at || ann.publishDate || ann.publishedAt || ann.date;
+          if (rawDate) {
+            const notifDate = parseDateString(rawDate);
+            if (notifDate && !isNaN(notifDate.getTime())) {
+              const diffMs = Date.now() - notifDate.getTime();
+              const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+              if (diffMs > THREE_DAYS_MS) {
+                // Bỏ qua thông báo cũ hơn 3 ngày trước
+                continue;
+              }
+            }
+          }
+
           // Check if already dispatched
           const alreadyLogged = await prisma.slinkAnnouncementLog.findUnique({
             where: {
@@ -741,7 +756,7 @@ export async function checkAndDispatchSlinkAnnouncements(options: {
           const cleaned = cleanHtml(rawContent);
           const cleanSummary = cleaned ? (cleaned.length > 400 ? cleaned.slice(0, 400) + '...' : cleaned) : '';
           const senderDisplay = cleanHtml(ann.senderName || ann.sender || 'Cổng PTIT S-Link');
-          const dateDisplay = formatSlinkDate(ann.createdAt);
+          const dateDisplay = formatSlinkDate(ann.createdAt || rawDate);
 
           const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ PTIT S-LINK</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${escapeTelegramHtml(studentName)}</b> (<code>${escapeTelegramHtml(sub.username)}</code>)\n📌 <b>${escapeTelegramHtml(cleanTitle)}</b>\n\n${cleanSummary ? `📝 <i>${escapeTelegramHtml(cleanSummary)}</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${escapeTelegramHtml(senderDisplay)}</b>\n🗓️ Thời gian: <b>${escapeTelegramHtml(dateDisplay)}</b>\n🔗 <a href="https://slink.ptit.edu.vn/">Mở cổng PTIT S-Link</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
 
@@ -764,7 +779,7 @@ export async function checkAndDispatchSlinkAnnouncements(options: {
                 username: sub.username,
                 announcementId: notifId,
                 title: ann.title,
-                publishDate: ann.createdAt,
+                publishDate: ann.createdAt || (rawDate ? String(rawDate) : undefined),
               },
               update: {
                 sentAt: new Date(),

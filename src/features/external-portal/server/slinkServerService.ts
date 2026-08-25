@@ -6,6 +6,7 @@
 
 import { prisma } from '@/src/lib/prisma';
 import { cleanHtml, decodeHtmlEntities, escapeTelegramHtml } from '@/src/lib/htmlUtils';
+import { parseDateString } from '@/src/lib/date-utils';
 
 export { cleanHtml, decodeHtmlEntities, escapeTelegramHtml };
 
@@ -345,10 +346,11 @@ export async function markSlinkNotificationAsRead(
 /**
  * Format ngày tháng ISO sang định dạng ngày giờ Việt Nam
  */
-export function formatSlinkDate(isoStr?: string): string {
+export function formatSlinkDate(isoStr?: string | Date | number): string {
   if (!isoStr) return 'N/A';
   try {
-    const d = new Date(isoStr);
+    const d = parseDateString(isoStr);
+    if (!d || isNaN(d.getTime())) return String(isoStr);
     return d.toLocaleString('vi-VN', {
       timeZone: 'Asia/Ho_Chi_Minh',
       year: 'numeric',
@@ -359,7 +361,7 @@ export function formatSlinkDate(isoStr?: string): string {
       second: '2-digit',
     });
   } catch {
-    return isoStr;
+    return String(isoStr);
   }
 }
 
