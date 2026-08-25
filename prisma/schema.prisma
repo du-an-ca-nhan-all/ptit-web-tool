@@ -41,9 +41,6 @@ model User {
   // Quan hệ 1-1 với StudentSlinkGradeRecord
   slinkGradeRecord StudentSlinkGradeRecord?
   
-  // Quan hệ 1-N với ActivityLog
-  activityLogs     ActivityLog[]
-  
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -202,8 +199,6 @@ model ActivityLog {
   ipAddress   String?  // Địa chỉ IP
   userAgent   String?  // Trình duyệt / thiết bị
   createdAt   DateTime @default(now())
-
-  user        User?    @relation(fields: [username], references: [username], onDelete: SetNull)
 
   @@index([username])
   @@index([action])
