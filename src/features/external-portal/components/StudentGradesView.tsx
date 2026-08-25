@@ -91,6 +91,13 @@ export default function StudentGradesView({
   currentUser,
   onNavigateToExternalAccounts,
 }: StudentGradesViewProps) {
+  const [dataSource, setDataSource] = useState<'QLDTTX' | 'SLINK'>(() => {
+    if (typeof window === 'undefined') return 'QLDTTX';
+    const params = new URLSearchParams(window.location.search);
+    const s = params.get('source')?.toUpperCase();
+    return s === 'SLINK' ? 'SLINK' : 'QLDTTX';
+  });
+
   const [data, setData] = useState<StudentGradesResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -133,6 +140,16 @@ export default function StudentGradesView({
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
     let changed = false;
+
+    if (dataSource !== 'QLDTTX') {
+      if (url.searchParams.get('source') !== 'slink') {
+        url.searchParams.set('source', 'slink');
+        changed = true;
+      }
+    } else if (url.searchParams.has('source')) {
+      url.searchParams.delete('source');
+      changed = true;
+    }
 
     if (selectedSemester !== 'ALL') {
       if (url.searchParams.get('semester') !== selectedSemester) {
@@ -177,10 +194,11 @@ export default function StudentGradesView({
     if (changed) {
       window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
     }
-  }, [selectedSemester, selectedGradeFilter, searchQuery, activeAnalyticsTab]);
+  }, [dataSource, selectedSemester, selectedGradeFilter, searchQuery, activeAnalyticsTab]);
 
   // Fetch grades from API
-  const fetchGrades = useCallback(async (refresh = false) => {
+  const fetchGrades = useCallback(async (refresh = false, targetSource?: 'QLDTTX' | 'SLINK') => {
+    const activeSrc = targetSource || dataSource;
     if (refresh) {
       setIsRefreshing(true);
       setSyncFeedback(null);
@@ -190,8 +208,15 @@ export default function StudentGradesView({
     setError(null);
     setErrorType(null);
 
+    const isSlink = activeSrc === 'SLINK';
+    const sourceLabel = isSlink ? 'PTIT S-Link' : 'QLDTTX';
+
     try {
-      const res = await fetch(`/api/student/grades${refresh ? '?refresh=true' : ''}`);
+      const endpoint = isSlink
+        ? `/api/slink/grades${refresh ? '?refresh=true' : ''}`
+        : `/api/student/grades${refresh ? '?refresh=true' : ''}`;
+
+      const res = await fetch(endpoint);
       const json = await res.json();
       if (res.ok && json.success) {
         setData(json);
@@ -200,38 +225,38 @@ export default function StudentGradesView({
           const syncTimeFormatted = formatSyncDateTime(json.lastSyncAt || new Date().toISOString());
           setSyncFeedback({
             type: 'success',
-            message: `Đồng bộ thành công dữ liệu bảng điểm mới nhất từ QLDTTX (lúc ${syncTimeFormatted})!`,
+            message: `Đồng bộ thành công dữ liệu bảng điểm mới nhất từ ${sourceLabel} (lúc ${syncTimeFormatted})!`,
           });
           setTimeout(() => setSyncFeedback(null), 6000);
         }
       } else {
         const type = json.errorType || (res.status === 401 ? 'INVALID_CREDENTIALS' : 'SERVER_ERROR');
         setErrorType(type);
-        setError(json.error || 'Không thể tải kết quả học tập');
+        setError(json.error || `Không thể tải kết quả học tập từ ${sourceLabel}`);
         if (json.username) {
           setData(json);
         }
         if (refresh) {
           setSyncFeedback({
             type: 'error',
-            message: json.error || 'Đồng bộ từ cổng QLDTTX thất bại. Vui lòng kiểm tra lại tài khoản.',
+            message: json.error || `Đồng bộ từ cổng ${sourceLabel} thất bại. Vui lòng kiểm tra lại tài khoản.`,
           });
         }
       }
     } catch (err: any) {
       setErrorType('SERVER_ERROR');
-      setError('Lỗi kết nối máy chủ khi lấy dữ liệu bảng điểm');
+      setError(`Lỗi kết nối máy chủ khi lấy dữ liệu bảng điểm từ ${sourceLabel}`);
       if (refresh) {
         setSyncFeedback({
           type: 'error',
-          message: 'Lỗi kết nối máy chủ khi đồng bộ điểm từ QLDTTX.',
+          message: `Lỗi kết nối máy chủ khi đồng bộ điểm từ ${sourceLabel}.`,
         });
       }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [dataSource]);
 
   useEffect(() => {
     fetchGrades();
@@ -317,15 +342,65 @@ export default function StudentGradesView({
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+      {/* Source Selector Tab */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl sm:rounded-2xl">
+          <button
+            onClick={() => {
+              if (dataSource !== 'QLDTTX') {
+                setDataSource('QLDTTX');
+                fetchGrades(false, 'QLDTTX');
+              }
+            }}
+            className={`px-3.5 py-2 rounded-lg sm:rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              dataSource === 'QLDTTX'
+                ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/50'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4 text-indigo-600" />
+            <span>Cổng QLDTTX (qlht)</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (dataSource !== 'SLINK') {
+                setDataSource('SLINK');
+                fetchGrades(false, 'SLINK');
+              }
+            }}
+            className={`px-3.5 py-2 rounded-lg sm:rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              dataSource === 'SLINK'
+                ? 'bg-white text-violet-700 shadow-xs border border-slate-200/50'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Award className="w-4 h-4 text-violet-600" />
+            <span>Cổng PTIT S-Link</span>
+            <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 text-[10px] font-black rounded-md">MỚI</span>
+          </button>
+        </div>
+
+        <div className="text-[11px] text-slate-500 px-3 flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${dataSource === 'SLINK' ? 'bg-violet-500' : 'bg-indigo-500'} inline-block animate-pulse`} />
+          <span>Nguồn hiển thị:</span>
+          <strong className="text-slate-800 font-semibold font-mono">
+            {dataSource === 'SLINK' ? 'slink.ptit.edu.vn' : 'qldttx.pttc1.edu.vn'}
+          </strong>
+        </div>
+      </div>
+
       {/* Top Banner / Quick Header */}
       <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4">
         <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
-          <div className="p-2.5 sm:p-3 bg-gradient-to-br from-indigo-600 via-blue-600 to-purple-600 text-white rounded-xl sm:rounded-2xl shadow-xs shadow-indigo-500/20 shrink-0 mt-0.5 sm:mt-0">
-            <Award className="w-5 h-5 sm:w-6 sm:h-6" />
+          <div className={`p-2.5 sm:p-3 ${dataSource === 'SLINK' ? 'bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600' : 'bg-gradient-to-br from-indigo-600 via-blue-600 to-purple-600'} text-white rounded-xl sm:rounded-2xl shadow-xs shadow-indigo-500/20 shrink-0 mt-0.5 sm:mt-0`}>
+            {dataSource === 'SLINK' ? <Award className="w-5 h-5 sm:w-6 sm:h-6" /> : <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6" />}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <h2 className="text-sm sm:text-lg font-black text-slate-800">Bảng Điểm & Kết Quả Học Tập</h2>
+              <h2 className="text-sm sm:text-lg font-black text-slate-800">
+                Bảng Điểm & Kết Quả Học Tập {dataSource === 'SLINK' ? '(PTIT S-Link)' : '(QLDTTX)'}
+              </h2>
               {data?.isCachedDb ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                   <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600 shrink-0" />
@@ -347,7 +422,7 @@ export default function StudentGradesView({
               {data?.lastSyncAt && (
                 <span
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200"
-                  title="Thời điểm kéo dữ liệu từ Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)"
+                  title={`Thời điểm kéo dữ liệu từ Cổng ${dataSource === 'SLINK' ? 'PTIT S-Link' : 'Quản Lý Đào Tạo Từ Xa (QLDTTX)'}`}
                 >
                   <Clock className="w-3 h-3 text-indigo-600 shrink-0" />
                   <span>Cập nhật:</span>
@@ -356,25 +431,25 @@ export default function StudentGradesView({
               )}
             </div>
             <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-relaxed">
-              Cổng: <strong className="text-indigo-600 font-mono">qldttx.pttc1.edu.vn</strong> • Tổng số <b>{semesters.length} học kỳ</b> ({summary?.totalSubjects || 0} học phần)
+              Cổng: <strong className="text-indigo-600 font-mono">{dataSource === 'SLINK' ? 'slink.ptit.edu.vn' : 'qldttx.pttc1.edu.vn'}</strong> • Tổng số <b>{semesters.length} học kỳ</b> ({summary?.totalSubjects || 0} học phần)
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          {/* Active Pull button from QLDTTX */}
+          {/* Active Pull button */}
           <button
             onClick={() => fetchGrades(true)}
             disabled={isRefreshing || isLoading}
-            className="flex-1 sm:flex-initial px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-xs shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
-            title="Chủ động kết nối và kéo bảng điểm, điểm thành phần mới nhất từ Cổng Quản Lý Đào Tạo Từ Xa"
+            className={`flex-1 sm:flex-initial px-3.5 py-2 ${dataSource === 'SLINK' ? 'bg-violet-600 hover:bg-violet-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-xs shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95`}
+            title={`Chủ động kết nối và kéo bảng điểm, điểm thành phần mới nhất từ Cổng ${dataSource === 'SLINK' ? 'PTIT S-Link' : 'Quản Lý Đào Tạo Từ Xa'}`}
           >
             {isRefreshing ? (
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
             ) : (
               <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
             )}
-            <span>{isRefreshing ? 'Đang kéo...' : 'Đồng Bộ QLDTTX'}</span>
+            <span>{isRefreshing ? 'Đang kéo...' : dataSource === 'SLINK' ? 'Đồng Bộ S-Link' : 'Đồng Bộ QLDTTX'}</span>
           </button>
 
           <button
@@ -438,10 +513,12 @@ export default function StudentGradesView({
             </div>
             <div>
               <h4 className="text-xs font-bold text-amber-900">
-                Chưa liên kết tài khoản Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)
+                Chưa liên kết tài khoản {dataSource === 'SLINK' ? 'Cổng PTIT S-Link (slink.ptit.edu.vn)' : 'Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX)'}
               </h4>
               <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                Liên kết tài khoản QLDTTX để hệ thống tự động trích xuất bảng điểm thi, điểm thành phần và phân tích tiến độ học tập chi tiết.
+                {dataSource === 'SLINK'
+                  ? 'Liên kết tài khoản PTIT S-Link để hệ thống tự động trích xuất bảng điểm môn học, điểm quá trình, kết quả học kỳ và phân tích tiến độ học tập.'
+                  : 'Liên kết tài khoản QLDTTX để hệ thống tự động trích xuất bảng điểm thi, điểm thành phần và phân tích tiến độ học tập chi tiết.'}
               </p>
             </div>
           </div>
@@ -450,7 +527,7 @@ export default function StudentGradesView({
               onClick={onNavigateToExternalAccounts}
               className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-2xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
             >
-              <span>Liên Kết QLĐT Ngay</span>
+              <span>{dataSource === 'SLINK' ? 'Liên Kết S-Link Ngay' : 'Liên Kết QLĐT Ngay'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}

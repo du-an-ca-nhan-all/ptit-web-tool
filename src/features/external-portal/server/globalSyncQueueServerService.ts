@@ -3,6 +3,7 @@ import { getStudentTimetableCalendar } from './studentTimetableServerService';
 import { getStudentGrades } from './studentGradesServerService';
 import { getOrFetchStudentLmsOverview } from './lmsServerService';
 import { getStudentQldtExamSchedule } from './studentExamScheduleServerService';
+import { getStudentSlinkGrades } from './slinkGradesServerService';
 import {
   getGlobalConfig,
   setGlobalConfig,
@@ -27,7 +28,7 @@ export async function enqueueGlobalSyncJob(options: EnqueueGlobalSyncOptions) {
   const triggeredBy = options.triggeredBy || 'ADMIN_MANUAL';
   const scheduledTime = options.scheduledTime || '22:00';
 
-  // Nếu chọn SYNC_ALL -> Tách thành 4 batches riêng biệt
+  // Nếu chọn SYNC_ALL -> Tách thành 5 batches riêng biệt (Lịch học, Bảng điểm QLDTTX, LMS, Lịch thi, Điểm S-Link)
   if (options.jobType === 'SYNC_ALL') {
     const resTimetable = await enqueueSingleGlobalJobType({
       ...options,
@@ -37,7 +38,7 @@ export async function enqueueGlobalSyncJob(options: EnqueueGlobalSyncOptions) {
     const resGrades = await enqueueSingleGlobalJobType({
       ...options,
       jobType: 'SYNC_GRADES',
-      title: options.title ? `${options.title} - Bảng điểm` : undefined,
+      title: options.title ? `${options.title} - Bảng điểm QLDTTX` : undefined,
     });
     const resLms = await enqueueSingleGlobalJobType({
       ...options,
@@ -49,16 +50,22 @@ export async function enqueueGlobalSyncJob(options: EnqueueGlobalSyncOptions) {
       jobType: 'SYNC_EXAMS',
       title: options.title ? `${options.title} - Lịch thi` : undefined,
     });
+    const resSlink = await enqueueSingleGlobalJobType({
+      ...options,
+      jobType: 'SYNC_SLINK_GRADES',
+      title: options.title ? `${options.title} - Điểm S-Link` : undefined,
+    });
 
     return {
       success: true,
-      message: `Đã đưa 4 đợt đồng bộ (Lịch học, Điểm số, LMS, Lịch thi) vào hàng đợi ngầm.`,
-      batches: [resTimetable, resGrades, resLms, resExams],
+      message: `Đã đưa 5 đợt đồng bộ (Lịch học, Điểm số QLDTTX, LMS, Lịch thi, Điểm S-Link) vào hàng đợi ngầm.`,
+      batches: [resTimetable, resGrades, resLms, resExams, resSlink],
       totalItems:
         (resTimetable.totalItems || 0) +
         (resGrades.totalItems || 0) +
         (resLms.totalItems || 0) +
-        (resExams.totalItems || 0),
+        (resExams.totalItems || 0) +
+        (resSlink.totalItems || 0),
     };
   }
 
@@ -73,16 +80,25 @@ async function enqueueSingleGlobalJobType(options: EnqueueGlobalSyncOptions) {
   const triggeredBy = options.triggeredBy || 'ADMIN_MANUAL';
   const scheduledTime = options.scheduledTime || '22:00';
   const isLmsJob = options.jobType === 'SYNC_LMS';
+  const isSlinkJob = options.jobType === 'SYNC_SLINK_GRADES';
 
   // 1. Xác định danh sách sinh viên mục tiêu theo từng loại hệ thống liên kết:
-  // - SYNC_TIMETABLE & SYNC_GRADES: Chỉ lấy những ai ĐÃ LIÊN KẾT Cổng Quản Lý Đào Tạo (QLDTTX / QLHT)
-  // - SYNC_LMS: Chỉ lấy những ai ĐÃ LIÊN KẾT Cổng LMS PTTC1
+  // - SYNC_TIMETABLE, SYNC_GRADES & SYNC_EXAMS: Cổng Quản Lý Đào Tạo (QLDTTX / QLHT)
+  // - SYNC_LMS: Cổng LMS PTTC1
+  // - SYNC_SLINK_GRADES: Cổng PTIT S-Link
   let extAccounts = await prisma.externalAccount.findMany({
     where: isLmsJob
       ? {
           OR: [
             { systemKey: 'LMS_PTTC1' },
             { systemUrl: { contains: 'lms.pttc1.edu.vn' } },
+          ],
+        }
+      : isSlinkJob
+      ? {
+          OR: [
+            { systemKey: 'SLINK_PTIT' },
+            { systemUrl: { contains: 'slink.ptit.edu.vn' } },
           ],
         }
       : {
@@ -105,11 +121,16 @@ async function enqueueSingleGlobalJobType(options: EnqueueGlobalSyncOptions) {
   }
 
   if (extAccounts.length === 0) {
+    let emptyMsg = 'Không có sinh viên nào đã liên kết tài khoản Cổng Quản Lý Đào Tạo (QLDTTX/QLHT) để thực hiện đồng bộ.';
+    if (isLmsJob) {
+      emptyMsg = 'Không có sinh viên nào đã liên kết tài khoản LMS PTTC1 để thực hiện đồng bộ.';
+    } else if (isSlinkJob) {
+      emptyMsg = 'Không có sinh viên nào đã liên kết tài khoản PTIT S-Link để thực hiện đồng bộ.';
+    }
+
     return {
       success: false,
-      message: isLmsJob
-        ? 'Không có sinh viên nào đã liên kết tài khoản LMS PTTC1 để thực hiện đồng bộ.'
-        : 'Không có sinh viên nào đã liên kết tài khoản Cổng Quản Lý Đào Tạo (QLDTTX/QLHT) để thực hiện đồng bộ.',
+      message: emptyMsg,
       totalItems: 0,
       batchId: null,
     };
@@ -362,10 +383,12 @@ async function processSingleGlobalSyncItem(item: any) {
   const normUsername = item.username.toUpperCase();
   const jobType = item.jobType as GlobalJobType;
   const isLmsJob = jobType === 'SYNC_LMS';
+  const isSlinkJob = jobType === 'SYNC_SLINK_GRADES';
 
   // Kiểm tra tài khoản ExternalAccount tương ứng với loại Job:
-  // - SYNC_TIMETABLE & SYNC_GRADES: Cần tài khoản QLDTTX (qlht)
+  // - SYNC_TIMETABLE, SYNC_GRADES & SYNC_EXAMS: Cần tài khoản QLDTTX (qlht)
   // - SYNC_LMS: Cần tài khoản LMS PTTC1
+  // - SYNC_SLINK_GRADES: Cần tài khoản PTIT S-Link
   const extAcc = await prisma.externalAccount.findFirst({
     where: isLmsJob
       ? {
@@ -375,6 +398,14 @@ async function processSingleGlobalSyncItem(item: any) {
             { systemUrl: { contains: 'lms.pttc1.edu.vn' } },
           ],
         }
+      : isSlinkJob
+      ? {
+          username: normUsername,
+          OR: [
+            { systemKey: 'SLINK_PTIT' },
+            { systemUrl: { contains: 'slink.ptit.edu.vn' } },
+          ],
+        }
       : {
           username: normUsername,
           systemKey: 'QLDTTX_PTTC1',
@@ -382,9 +413,13 @@ async function processSingleGlobalSyncItem(item: any) {
   });
 
   if (!extAcc || (!extAcc.extPassword && !extAcc.token)) {
-    const msg = isLmsJob
-      ? 'Bỏ qua: Sinh viên chưa liên kết tài khoản Hệ thống học tập trực tuyến (LMS PTTC1)'
-      : 'Bỏ qua: Sinh viên chưa liên kết tài khoản Cổng Quản Lý Đào Tạo (QLDTTX / QLHT)';
+    let msg = 'Bỏ qua: Sinh viên chưa liên kết tài khoản Cổng Quản Lý Đào Tạo (QLDTTX / QLHT)';
+    if (isLmsJob) {
+      msg = 'Bỏ qua: Sinh viên chưa liên kết tài khoản Hệ thống học tập trực tuyến (LMS PTTC1)';
+    } else if (isSlinkJob) {
+      msg = 'Bỏ qua: Sinh viên chưa liên kết tài khoản PTIT S-Link';
+    }
+
     await prisma.globalSyncQueueItem.update({
       where: { id: item.id },
       data: {
@@ -519,6 +554,41 @@ async function processSingleGlobalSyncItem(item: any) {
         });
       }
     }
+
+    // 5. TÁC VỤ 5: ĐỒNG BỘ KẾT QUẢ HỌC TẬP PTIT S-LINK
+    else if (jobType === 'SYNC_SLINK_GRADES') {
+      const res = await getStudentSlinkGrades(normUsername, { forceRefresh: true });
+      if (res.success) {
+        const gpa10Str = res.summary.gpa10 !== null ? res.summary.gpa10.toFixed(2) : 'N/A';
+        const gpa4Str = res.summary.gpa4 !== null ? res.summary.gpa4.toFixed(2) : 'N/A';
+        const msg = `Đã đồng bộ S-Link GPA 10: ${gpa10Str} | GPA 4: ${gpa4Str} (${res.summary.totalPassedCredits} TC đạt / ${res.summary.totalCreditsRegistered} TC)`;
+
+        await prisma.globalSyncQueueItem.update({
+          where: { id: item.id },
+          data: {
+            status: 'SUCCESS',
+            resultMessage: msg,
+            resultData: JSON.stringify({
+              gpa10: res.summary.gpa10,
+              gpa4: res.summary.gpa4,
+              totalPassedCredits: res.summary.totalPassedCredits,
+              totalSubjects: res.summary.totalSubjects,
+              classification: res.summary.classification,
+            }),
+            finishedAt: new Date(),
+          },
+        });
+      } else {
+        await prisma.globalSyncQueueItem.update({
+          where: { id: item.id },
+          data: {
+            status: res.errorType === 'NOT_CONFIGURED' ? 'SKIPPED' : 'FAILED',
+            resultMessage: res.error || 'Lỗi khi kéo kết quả học tập từ PTIT S-Link',
+            finishedAt: new Date(),
+          },
+        });
+      }
+    }
   } catch (err: any) {
     const errorMsg = err.message || 'Lỗi không xác định khi thực hiện đồng bộ';
     await prisma.globalSyncQueueItem.update({
@@ -631,6 +701,13 @@ export function getNormalizedGlobalSyncConfig(rawConfig?: GlobalNightlySyncConfi
       lastSyncDate: rawConfig?.examsJob?.lastSyncDate || null,
       lastSyncAt: rawConfig?.examsJob?.lastSyncAt || null,
       lastStatus: rawConfig?.examsJob?.lastStatus || null,
+    },
+    slinkGradesJob: {
+      isEnabled: rawConfig?.slinkGradesJob?.isEnabled ?? true,
+      scheduleTime: rawConfig?.slinkGradesJob?.scheduleTime || '23:00', // 23h đêm hàng ngày
+      lastSyncDate: rawConfig?.slinkGradesJob?.lastSyncDate || null,
+      lastSyncAt: rawConfig?.slinkGradesJob?.lastSyncAt || null,
+      lastStatus: rawConfig?.slinkGradesJob?.lastStatus || null,
     },
     customJobs: rawConfig?.customJobs || {},
   };
@@ -831,7 +908,23 @@ export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boole
       configModified = true;
     }
 
-    // 5. Kiểm tra và quét các ca thi diễn ra HÔM NAY (random 20..30 phút/lần cho từng sinh viên)
+    // 5. Job 5: Đồng bộ Kết quả học tập PTIT S-Link (Cấu hình giờ chạy riêng: config.slinkGradesJob - Mặc định 23:00 đêm VN)
+    if (config.slinkGradesJob && isJobDueToRun(config.slinkGradesJob, currentHour, currentMinute, currentDateStr)) {
+      console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 5 (Điểm S-Link) lúc ${config.slinkGradesJob.scheduleTime} VN...`);
+      const resSlinkGrades = await enqueueSingleGlobalJobType({
+        jobType: 'SYNC_SLINK_GRADES',
+        title: `Tự động đồng bộ Điểm S-Link (${config.slinkGradesJob.scheduleTime} ${currentDateStr})`,
+        triggeredBy: 'SYSTEM_CRON',
+        scheduledTime: config.slinkGradesJob.scheduleTime,
+      });
+      batchesCreated.push(resSlinkGrades);
+      config.slinkGradesJob.lastSyncDate = currentDateStr;
+      config.slinkGradesJob.lastSyncAt = new Date().toISOString();
+      config.slinkGradesJob.lastStatus = resSlinkGrades.success ? 'SUCCESS' : 'FAILED';
+      configModified = true;
+    }
+
+    // 6. Kiểm tra và quét các ca thi diễn ra HÔM NAY (random 20..30 phút/lần cho từng sinh viên)
     try {
       const todayScanRes = await checkAndQueueTodayExamsSync(currentDateStr, nowVN);
       if (todayScanRes.queuedCount > 0) {

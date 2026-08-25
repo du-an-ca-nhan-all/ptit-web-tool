@@ -66,6 +66,8 @@ export function useGlobalSyncQueue() {
     timetableJob: { isEnabled: true, scheduleTime: '22:00' },
     gradesJob: { isEnabled: true, scheduleTime: '22:00' },
     lmsJob: { isEnabled: true, scheduleTime: '22:00' },
+    examsJob: { isEnabled: true, scheduleTime: '07:00' },
+    slinkGradesJob: { isEnabled: true, scheduleTime: '23:00' },
   });
   const [isWorkerRunning, setIsWorkerRunning] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);

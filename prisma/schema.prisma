@@ -38,6 +38,9 @@ model User {
   // Quan hệ 1-1 với StudentLmsRecord
   lmsRecord        StudentLmsRecord?
   
+  // Quan hệ 1-1 với StudentSlinkGradeRecord
+  slinkGradeRecord StudentSlinkGradeRecord?
+  
   // Quan hệ 1-N với ActivityLog
   activityLogs     ActivityLog[]
   
@@ -661,6 +664,40 @@ model SlinkAnnouncementLog {
   @@unique([username, announcementId])
   @@index([username])
   @@index([announcementId])
+}
+
+// 28. Bảng StudentSlinkGradeRecord: Lưu trữ bảng điểm, điểm thành phần & kết quả học tập từ Cổng PTIT S-Link
+model StudentSlinkGradeRecord {
+  id              Int       @id @default(autoincrement())
+  username        String    @unique // Mã sinh viên (User.username)
+  user            User?     @relation(fields: [username], references: [username], onDelete: Cascade)
+  
+  // Dữ liệu JSON thô đầy đủ từ S-Link (sinhVien, khoaNganh, semesters, courses, statistics)
+  rawData         String    // JSON string chứa toàn bộ danh sách điểm và thành phần từ S-Link
+  
+  // Các chỉ số tổng hợp nhanh để query / hiển thị / thống kê
+  gpa10           Float?    // Điểm TB tích lũy hệ 10
+  gpa4            Float?    // Điểm TB tích lũy hệ 4
+  creditsAcc      Int?      @default(0) // Số tín chỉ tích lũy
+  creditsPassed   Int?      @default(0) // Số tín chỉ đạt
+  creditsReg      Int?      @default(0) // Tổng số tín chỉ đã đăng ký
+  classification  String?   // Xếp loại học lực (Xuất sắc, Giỏi, Khá, Trung bình...)
+  totalSubjects   Int?      @default(0) // Tổng số môn học
+  totalPassed     Int?      @default(0) // Số môn đạt
+  totalFailed     Int?      @default(0) // Số môn chưa đạt
+  totalInProgress Int?      @default(0) // Số môn đang học
+  
+  maKhoaNganh     String?   // Mã khóa ngành (ví dụ "7_3_2025TX_7480201")
+  tenKhoaNganh    String?   // Tên khóa ngành (ví dụ "D25TX - Công nghệ thông tin")
+  
+  lastPulledAt    DateTime? @default(now()) // Thời điểm kéo dữ liệu từ S-Link
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([username])
+  @@index([gpa4])
+  @@index([classification])
+  @@index([lastPulledAt])
 }
 
 

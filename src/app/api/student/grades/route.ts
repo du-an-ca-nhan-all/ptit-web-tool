@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
 import { getStudentGrades } from '@/src/features/external-portal/server/studentGradesServerService';
+import { getStudentSlinkGrades } from '@/src/features/external-portal/server/slinkGradesServerService';
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const refresh = searchParams.get('refresh') === 'true';
     const targetUsername = searchParams.get('targetUsername')?.trim().toUpperCase();
+    const source = (searchParams.get('source') || searchParams.get('system') || 'qldttx').toLowerCase();
 
     let usernameToQuery = authUser.username.toUpperCase();
     if (targetUsername && targetUsername !== authUser.username.toUpperCase()) {
@@ -31,9 +33,9 @@ export async function GET(req: NextRequest) {
       usernameToQuery = targetUsername;
     }
 
-    const gradesData = await getStudentGrades(usernameToQuery, {
-      forceRefresh: refresh,
-    });
+    const gradesData = source === 'slink'
+      ? await getStudentSlinkGrades(usernameToQuery, { forceRefresh: refresh })
+      : await getStudentGrades(usernameToQuery, { forceRefresh: refresh });
 
     return NextResponse.json(gradesData);
   } catch (err: any) {
@@ -44,3 +46,4 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
