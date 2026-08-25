@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const classCode = searchParams.get('classCode');
     const username = searchParams.get('username')?.toUpperCase();
+    const requestedSemester = searchParams.get('semester') || searchParams.get('hocKy') || '';
 
     if (!classCode) {
       return NextResponse.json({ error: 'Mã lớp (classCode) là bắt buộc' }, { status: 400 });
@@ -42,13 +43,29 @@ export async function GET(req: NextRequest) {
       orderBy: { username: 'asc' },
     });
 
-    let mainData = null;
+    let mainData: any = null;
+    const allAvailableSemestersMap = new Map<string, any>();
+
     if (mainReg) {
       try {
         const parsed = JSON.parse(mainReg.data);
+        if (Array.isArray(parsed.semesters)) {
+          parsed.semesters.forEach((s: any) => {
+            if (!allAvailableSemestersMap.has(String(s.hoc_ky))) {
+              allAvailableSemestersMap.set(String(s.hoc_ky), {
+                hoc_ky: s.hoc_ky,
+                ten_hoc_ky: s.ten_hoc_ky,
+                totalCourses: s.totalCourses,
+                totalCredits: s.totalCredits,
+              });
+            }
+          });
+        }
         mainData = {
           username: mainReg.username,
           data: parsed.data ? parsed : { data: parsed },
+          semesters: parsed.semesters || [],
+          allCourses: parsed.allCourses || [],
           totalCourses: mainReg.totalCourses,
           totalCredits: mainReg.totalCredits,
           tuitionFee: mainReg.tuitionFee,
@@ -62,10 +79,26 @@ export async function GET(req: NextRequest) {
       try {
         const parsed = JSON.parse(reg.data);
         const isMonitor = monitorUser?.username?.toUpperCase() === reg.username?.toUpperCase();
+
+        if (Array.isArray(parsed.semesters)) {
+          parsed.semesters.forEach((s: any) => {
+            if (!allAvailableSemestersMap.has(String(s.hoc_ky))) {
+              allAvailableSemestersMap.set(String(s.hoc_ky), {
+                hoc_ky: s.hoc_ky,
+                ten_hoc_ky: s.ten_hoc_ky,
+                totalCourses: s.totalCourses,
+                totalCredits: s.totalCredits,
+              });
+            }
+          });
+        }
+
         allSubAccounts.push({
           username: reg.username,
           isMonitor,
           data: parsed.data ? parsed : { data: parsed },
+          semesters: parsed.semesters || [],
+          allCourses: parsed.allCourses || [],
           totalCourses: reg.totalCourses,
           totalCredits: reg.totalCredits,
           tuitionFee: reg.tuitionFee,
@@ -82,10 +115,15 @@ export async function GET(req: NextRequest) {
         ) || (mainData?.username?.toUpperCase() === username ? mainData : null);
     }
 
+    const availableSemesters = Array.from(allAvailableSemestersMap.values());
+
     return NextResponse.json({
+      success: true,
       main: mainData,
       subAccount: userSubAccount,
       allSubAccounts,
+      semesters: availableSemesters,
+      selectedSemester: requestedSemester || 'CURRENT',
       hasData: !!(mainData || allSubAccounts.length > 0),
     });
   } catch (error: any) {
@@ -93,3 +131,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+

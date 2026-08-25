@@ -16,14 +16,26 @@ import {
   Search,
   Check,
   ShieldAlert,
+  Calendar,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
+
+export interface SemesterInfo {
+  hoc_ky: number;
+  ten_hoc_ky: string;
+  totalCourses: number;
+  totalCredits: number;
+  ngay_bat_dau_hk?: string;
+  ngay_ket_thuc_hk?: string;
+}
 
 interface CourseCompareProps {
   data: {
     main: any;
     subAccount: any;
     allSubAccounts?: any[];
+    semesters?: SemesterInfo[];
+    selectedSemester?: string;
   } | null;
   currentUser?: LoginUser | null;
   onNavigateTab?: (tab: string, subTab?: string) => void;
@@ -32,19 +44,52 @@ interface CourseCompareProps {
   onSubTabChange?: (tab: 'COURSES' | 'COMPARE') => void;
 }
 
-// Helper safely extracting courses from any nesting structure
-const extractCoursesFromAccount = (acc: any): any[] => {
+// Helper safely extracting courses from any nesting structure based on selectedSemester
+const extractCoursesFromAccount = (acc: any, selectedSemester?: string): any[] => {
   if (!acc) return [];
+  const rawData = acc.data?.data || acc.data || acc;
+  const semesters: SemesterInfo[] = acc.semesters || rawData.semesters || [];
+
+  if (selectedSemester && selectedSemester !== 'CURRENT') {
+    if (selectedSemester === 'ALL') {
+      if (acc.allCourses && acc.allCourses.length > 0) {
+        return acc.allCourses.map((c: any) => c.to_hoc || c);
+      }
+      const allCombined: any[] = [];
+      semesters.forEach((s: any) => {
+        (s.courses || []).forEach((c: any) => {
+          allCombined.push({ ...(c.to_hoc || c), semesterHocKy: s.hoc_ky, semesterName: s.ten_hoc_ky });
+        });
+      });
+      if (allCombined.length > 0) return allCombined;
+    } else {
+      const foundSem = semesters.find((s: any) => String(s.hoc_ky) === String(selectedSemester));
+      if (foundSem && Array.isArray((foundSem as any).courses)) {
+        return (foundSem as any).courses.map((c: any) => c.to_hoc || c);
+      }
+    }
+  }
+
+  // Default: current registration courses
   const rawList =
-    acc.data?.data?.ds_kqdkmh ||
+    rawData.ds_kqdkmh ||
     acc.data?.ds_kqdkmh ||
     acc.ds_kqdkmh ||
-    (Array.isArray(acc.data) ? acc.data : []) ||
+    (Array.isArray(rawData) ? rawData : []) ||
     [];
 
-  return rawList
-    .map((item: any) => item.to_hoc || item)
-    .filter((c: any) => c && (c.ma_mon || c.MaMH));
+  if (rawList.length > 0) {
+    return rawList
+      .map((item: any) => item.to_hoc || item)
+      .filter((c: any) => c && (c.ma_mon || c.MaMH));
+  }
+
+  // Fallback to first available semester if ds_kqdkmh is empty
+  if (semesters.length > 0 && (semesters[0] as any)?.courses?.length > 0) {
+    return ((semesters[0] as any).courses || []).map((item: any) => item.to_hoc || item);
+  }
+
+  return [];
 };
 
 export default function CourseCompare({
@@ -57,21 +102,27 @@ export default function CourseCompare({
 }: CourseCompareProps) {
   const [data, setData] = useState(initialData);
   const [isLoading, setIsLoading] = useState(!initialData);
+  const [selectedSemester, setSelectedSemester] = useState<string>('CURRENT');
 
   useEffect(() => {
     if (initialData) {
       setData(initialData);
       setIsLoading(false);
+      if (initialData.selectedSemester) {
+        setSelectedSemester(initialData.selectedSemester);
+      }
     }
   }, [initialData]);
 
-  const loadCompareData = async () => {
+  const loadCompareData = async (semParam?: string) => {
     setIsLoading(true);
     const classCode = currentUser?.lop || 'D25TXCN11-K';
     const username = currentUser?.username || '';
+    const activeSem = semParam !== undefined ? semParam : selectedSemester;
+    const semQuery = activeSem ? `&semester=${encodeURIComponent(activeSem)}` : '';
     try {
       const res = await fetch(
-        `/api/course-compare?classCode=${encodeURIComponent(classCode)}${username ? `&username=${encodeURIComponent(username)}` : ''}`
+        `/api/course-compare?classCode=${encodeURIComponent(classCode)}${username ? `&username=${encodeURIComponent(username)}` : ''}${semQuery}`
       );
       const json = await res.json();
       if (json && json.hasData) {
@@ -111,7 +162,7 @@ export default function CourseCompare({
   const [isPulling, setIsPulling] = useState(false);
   const [pullMsg, setPullMsg] = useState('');
 
-  // Handle direct pull from QLDTTX for current student
+  // Handle direct pull from QLDTTX for current student (including past semesters)
   const handlePullMyCourses = async () => {
     if (!currentUser) return;
     setIsPulling(true);
@@ -128,10 +179,10 @@ export default function CourseCompare({
       });
       const resData = await res.json();
       if (res.ok && resData.success) {
-        setPullMsg('Đã đồng bộ môn học mới nhất thành công!');
-        await loadCompareData();
+        setPullMsg('Đã đồng bộ toàn bộ môn học và các kỳ cũ thành công!');
+        await loadCompareData(selectedSemester);
         if (onReload) onReload();
-        setTimeout(() => setPullMsg(''), 4000);
+        setTimeout(() => setPullMsg(''), 5000);
       } else {
         alert(resData.error || 'Đồng bộ thất bại. Vui lòng kiểm tra lại tài khoản liên kết QLDTTX.');
       }
@@ -154,13 +205,40 @@ export default function CourseCompare({
     );
   }, [data, selectedStudentUsername]);
 
+  // Extract available semesters list
+  const availableSemesters = useMemo(() => {
+    if (Array.isArray(data?.semesters) && data.semesters.length > 0) {
+      return data.semesters;
+    }
+    const map = new Map<string, SemesterInfo>();
+    const scanSemesters = (acc: any) => {
+      const sems = acc?.semesters || acc?.data?.semesters || [];
+      if (Array.isArray(sems)) {
+        sems.forEach((s: any) => {
+          if (!map.has(String(s.hoc_ky))) {
+            map.set(String(s.hoc_ky), {
+              hoc_ky: s.hoc_ky,
+              ten_hoc_ky: s.ten_hoc_ky,
+              totalCourses: s.totalCourses || (s.courses || []).length,
+              totalCredits: s.totalCredits || 0,
+            });
+          }
+        });
+      }
+    };
+    scanSemesters(data?.main);
+    scanSemesters(activeSubAccount);
+    (data?.allSubAccounts || []).forEach(scanSemesters);
+    return Array.from(map.values());
+  }, [data, activeSubAccount]);
+
   const monitorCourses = useMemo(() => {
-    return extractCoursesFromAccount(data?.main);
-  }, [data]);
+    return extractCoursesFromAccount(data?.main, selectedSemester);
+  }, [data, selectedSemester]);
 
   const myCourses = useMemo(() => {
-    return extractCoursesFromAccount(activeSubAccount);
-  }, [activeSubAccount]);
+    return extractCoursesFromAccount(activeSubAccount, selectedSemester);
+  }, [activeSubAccount, selectedSemester]);
 
   const hasMonitorData = monitorCourses.length > 0 && !!data?.main;
   const isCurrentUserMonitor = !!currentUser?.isMonitor || !!currentUser?.isAdmin;
@@ -177,7 +255,7 @@ export default function CourseCompare({
       // Bỏ qua lớp trưởng
       if (data.main && acc.username?.toLowerCase() === data.main.username?.toLowerCase()) return;
 
-      const courses = extractCoursesFromAccount(acc);
+      const courses = extractCoursesFromAccount(acc, selectedSemester);
       const course = courses.find((c: any) => (c.ma_mon || c.MaMH) === courseCode);
 
       totalAnalyzed++;
@@ -195,7 +273,7 @@ export default function CourseCompare({
       missingUsers,
       groupMap,
     };
-  }, [selectedCourse, data]);
+  }, [selectedCourse, data, selectedSemester]);
 
   const comparison = useMemo(() => {
     const monitorMap = new Map<string, any>(
@@ -394,33 +472,73 @@ export default function CourseCompare({
         </div>
       )}
 
-      {/* Student Selector Dropdown (When class has multiple students) */}
-      {data?.allSubAccounts && data.allSubAccounts.length > 0 && (
-        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* Filter Control Bar: Semester Selector & Student Selector */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Semester Filter */}
+        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <Users className="w-5 h-5 text-indigo-600" />
+            <Calendar className="w-5 h-5 text-blue-600 shrink-0" />
             <div>
               <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
-                Sinh viên cần đối chiếu với Lớp trưởng:
+                Học Kỳ Đối Chiếu:
               </span>
               <span className="text-[11px] text-slate-400">
-                Mặc định so sánh với mốc đăng ký của Lớp trưởng ({data?.main?.username || 'Lớp trưởng'})
+                So sánh theo từng học kỳ
               </span>
             </div>
           </div>
           <select
-            value={selectedStudentUsername}
-            onChange={(e) => setSelectedStudentUsername(e.target.value)}
-            className="bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer min-w-[260px]"
+            value={selectedSemester}
+            onChange={(e) => {
+              const sem = e.target.value;
+              setSelectedSemester(sem);
+              loadCompareData(sem);
+            }}
+            className="w-full sm:w-auto bg-slate-50 border border-slate-300 rounded-2xl px-3.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer min-w-[200px]"
           >
-            {data.allSubAccounts.map((acc: any) => (
-              <option key={acc.username} value={acc.username?.toUpperCase()}>
-                {acc.username?.toUpperCase()} {acc.username?.toUpperCase() === currentUser?.username?.toUpperCase() ? '(Bạn)' : ''} {acc.isMonitor || acc.username?.toUpperCase() === data?.main?.username?.toUpperCase() ? '★ Lớp trưởng' : ''}
+            <option value="CURRENT">⚡ Đợt ĐKMH Hiện Tại</option>
+            {availableSemesters.map((s) => (
+              <option key={s.hoc_ky} value={String(s.hoc_ky)}>
+                📅 {s.ten_hoc_ky}
               </option>
             ))}
+            {availableSemesters.length > 0 && <option value="ALL">🌐 Tất Cả Các Học Kỳ</option>}
           </select>
         </div>
-      )}
+
+        {/* Student Selector Dropdown */}
+        {data?.allSubAccounts && data.allSubAccounts.length > 0 ? (
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <Users className="w-5 h-5 text-indigo-600 shrink-0" />
+              <div>
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                  Sinh Viên Đối Chiếu:
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Đối chiếu với Lớp trưởng ({data?.main?.username || 'Lớp trưởng'})
+                </span>
+              </div>
+            </div>
+            <select
+              value={selectedStudentUsername}
+              onChange={(e) => setSelectedStudentUsername(e.target.value)}
+              className="w-full sm:w-auto bg-slate-50 border border-slate-300 rounded-2xl px-3.5 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer min-w-[200px]"
+            >
+              {data.allSubAccounts.map((acc: any) => (
+                <option key={acc.username} value={acc.username?.toUpperCase()}>
+                  {acc.username?.toUpperCase()} {acc.username?.toUpperCase() === currentUser?.username?.toUpperCase() ? '(Bạn)' : ''} {acc.isMonitor || acc.username?.toUpperCase() === data?.main?.username?.toUpperCase() ? '★ Lớp trưởng' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm flex items-center gap-2.5 text-xs text-slate-500 font-bold">
+            <Users className="w-5 h-5 text-slate-400" />
+            <span>Đang so sánh tài khoản của bạn với Lớp trưởng</span>
+          </div>
+        )}
+      </div>
 
       {/* Comparison Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

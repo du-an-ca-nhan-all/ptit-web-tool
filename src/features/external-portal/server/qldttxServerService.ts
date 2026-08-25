@@ -843,5 +843,338 @@ export async function fetchStudentGradesFromQLDTTX(account: {
   };
 }
 
+export const QLDTTX_SEMESTER_COURSES_API_URL = 'https://qldttx.pttc1.edu.vn/api/sch/w-locdstkbhockytheodoituong';
 
+/**
+ * Lấy danh sách môn học & thời khóa biểu của một học kỳ cụ thể từ cổng QLDTTX (/#/tkb-hocky)
+ */
+export async function fetchSemesterCoursesFromQLDTTX(
+  account: {
+    username: string;
+    password?: string;
+    token?: string | null;
+  },
+  hocKy: number | string,
+  tenHocKy?: string
+): Promise<{
+  hoc_ky: number;
+  ten_hoc_ky: string;
+  totalCourses: number;
+  totalCredits: number;
+  courses: Array<any>;
+  rawNhomTo: Array<any>;
+  newToken?: string;
+}> {
+  let validToken = account.token;
+  let isNew = false;
+  let accumulatedToken: string | undefined;
 
+  if (!validToken && account.password) {
+    const res = await getValidTokenOrRefresh({
+      username: account.username,
+      password: account.password,
+      existingToken: account.token,
+    });
+    validToken = res.token;
+    isNew = res.isNew;
+    if (isNew) accumulatedToken = validToken;
+  }
+
+  if (!validToken) {
+    throw new Error('Chưa có token hoặc mật khẩu để kết nối cổng QLDTTX');
+  }
+
+  const rawToken = validToken.replace(/^Bearer\s+/i, '').trim();
+  const hocKyNum = Number(hocKy);
+
+  const bodyPayload = {
+    hoc_ky: hocKyNum,
+    loai_doi_tuong: 1,
+    id_du_lieu: null,
+  };
+
+  let response = await fetch(QLDTTX_SEMESTER_COURSES_API_URL, {
+    method: 'POST',
+    headers: {
+      ...STATIC_HEADERS,
+      Authorization: `Bearer ${rawToken}`,
+      Cookie: `access_token=${rawToken}`,
+    },
+    body: JSON.stringify(bodyPayload),
+  });
+
+  if ((response.status === 401 || response.status === 403) && account.password) {
+    const fresh = await loginAndGetToken({
+      username: account.username,
+      password: account.password,
+    });
+    accumulatedToken = fresh;
+    const freshRaw = fresh.replace(/^Bearer\s+/i, '').trim();
+    response = await fetch(QLDTTX_SEMESTER_COURSES_API_URL, {
+      method: 'POST',
+      headers: {
+        ...STATIC_HEADERS,
+        Authorization: `Bearer ${freshRaw}`,
+        Cookie: `access_token=${freshRaw}`,
+      },
+      body: JSON.stringify(bodyPayload),
+    });
+  }
+
+  const text = await response.text();
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = text;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Cổng QLDTTX phản hồi lỗi lấy môn học kỳ ${hocKy} (${response.status}): ${typeof parsed === 'string' ? parsed : JSON.stringify(parsed)}`
+    );
+  }
+
+  const dataObj = parsed?.data || {};
+  const rawNhomTo: any[] = Array.isArray(dataObj?.ds_nhom_to) ? dataObj.ds_nhom_to : [];
+
+  // Group raw schedule entries by ma_mon + nhom_to (or id_to_hoc) to get unique course items
+  const courseMap = new Map<string, any>();
+
+  for (const item of rawNhomTo) {
+    const courseKey = `${item.ma_mon || ''}_${item.nhom_to || ''}_${item.id_to_hoc || ''}`;
+    const tcNum = parseFloat(item.so_tc) || parseFloat(item.so_tc_so) || 0;
+
+    const scheduleEntry = {
+      thu: item.thu,
+      tbd: item.tbd,
+      so_tiet: item.so_tiet,
+      tu_gio: item.tu_gio,
+      den_gio: item.den_gio,
+      phong: item.phong,
+      tkb: item.tkb,
+      gv: item.gv,
+      dt_gv: item.dt_gv,
+      link_hoc_online: item.link_hoc_online,
+      lop: item.lop || item.ten_lop,
+    };
+
+    if (!courseMap.has(courseKey)) {
+      courseMap.set(courseKey, {
+        id_kqdk: item.id_to_hoc || courseKey,
+        id_to_hoc: item.id_to_hoc,
+        ma_mon: item.ma_mon,
+        ten_mon: item.ten_mon,
+        so_tc: tcNum,
+        so_tc_hp: tcNum,
+        nhom_to: item.nhom_to,
+        lop: item.lop || item.ten_lop || '',
+        ten_lop: item.ten_lop || item.lop || '',
+        ds_lop: item.ds_lop || [],
+        khoi: item.khoi || '',
+        tkb: item.tkb || '',
+        phong: item.phong || '',
+        gv: item.gv || '',
+        dt_gv: item.dt_gv || '',
+        link_hoc_online: item.link_hoc_online || '',
+        thu: item.thu,
+        tbd: item.tbd,
+        so_tiet: item.so_tiet,
+        tu_gio: item.tu_gio,
+        den_gio: item.den_gio,
+        sl_dk: item.sl_dk,
+        gc_kqdk: item.gc_kqdk || '',
+        hoc_ky: hocKyNum,
+        ten_hoc_ky: tenHocKy || `Học kỳ ${hocKyNum}`,
+        schedules: [scheduleEntry],
+        to_hoc: {
+          id_to_hoc: item.id_to_hoc,
+          ma_mon: item.ma_mon,
+          ten_mon: item.ten_mon,
+          so_tc: tcNum,
+          so_tc_hp: tcNum,
+          nhom_to: item.nhom_to,
+          lop: item.lop || item.ten_lop || '',
+          tkb: item.tkb || '',
+          phong: item.phong || '',
+          gv: item.gv || '',
+          dt_gv: item.dt_gv || '',
+          link_hoc_online: item.link_hoc_online || '',
+          thu: item.thu,
+          tbd: item.tbd,
+          so_tiet: item.so_tiet,
+          tu_gio: item.tu_gio,
+          den_gio: item.den_gio,
+          phai_dong: 0,
+        },
+      });
+    } else {
+      const existing = courseMap.get(courseKey);
+      existing.schedules.push(scheduleEntry);
+      // Append TKB string if different
+      if (item.tkb && !existing.tkb.includes(item.tkb)) {
+        existing.tkb = existing.tkb ? `${existing.tkb}; ${item.tkb}` : item.tkb;
+        existing.to_hoc.tkb = existing.tkb;
+      }
+      if (!existing.link_hoc_online && item.link_hoc_online) {
+        existing.link_hoc_online = item.link_hoc_online;
+        existing.to_hoc.link_hoc_online = item.link_hoc_online;
+      }
+    }
+  }
+
+  const courses = Array.from(courseMap.values());
+  let totalCredits = 0;
+  courses.forEach((c) => {
+    totalCredits += c.so_tc || 0;
+  });
+
+  return {
+    hoc_ky: hocKyNum,
+    ten_hoc_ky: tenHocKy || `Học kỳ ${hocKyNum}`,
+    totalCourses: courses.length,
+    totalCredits,
+    courses,
+    rawNhomTo,
+    newToken: accumulatedToken,
+  };
+}
+
+/**
+ * Lấy toàn bộ môn học của tất cả các học kỳ cũ + kỳ hiện tại từ cổng QLDTTX (/#/tkb-hocky & /#/home)
+ */
+export async function fetchAllSemestersCoursesFromQLDTTX(account: {
+  username: string;
+  password?: string;
+  token?: string | null;
+}): Promise<{
+  currentRegistration: {
+    data: any;
+    totalCourses: number;
+    totalCredits: number;
+    tuitionFee: number;
+    courses: any[];
+  };
+  semesters: Array<{
+    hoc_ky: number;
+    ten_hoc_ky: string;
+    ngay_bat_dau_hk?: string;
+    ngay_ket_thuc_hk?: string;
+    totalCourses: number;
+    totalCredits: number;
+    courses: any[];
+  }>;
+  allCourses: any[];
+  totalCourses: number;
+  totalCredits: number;
+  tuitionFee: number;
+  newToken?: string;
+}> {
+  let validToken = account.token;
+  let accumulatedToken: string | undefined;
+
+  // 1. Get semesters list from QLDTTX
+  const semesterData = await fetchStudentSemestersFromQLDTTX(account);
+  if (semesterData.newToken) {
+    validToken = semesterData.newToken;
+    accumulatedToken = semesterData.newToken;
+  }
+
+  const semesterList = semesterData.semesters || [];
+
+  // 2. Fetch current live course registration (ĐKMH)
+  let currentRegResult: any = {
+    data: null,
+    totalCourses: 0,
+    totalCredits: 0,
+    tuitionFee: 0,
+    courses: [],
+  };
+
+  try {
+    const regRes = await fetchStudentCoursesFromQLDTTX({
+      username: account.username,
+      password: account.password,
+      token: validToken,
+    });
+    currentRegResult = {
+      data: regRes.data,
+      totalCourses: regRes.totalCourses,
+      totalCredits: regRes.totalCredits,
+      tuitionFee: regRes.tuitionFee,
+      courses: regRes.data?.data?.ds_kqdkmh || [],
+    };
+  } catch (e) {
+    console.warn('[fetchAllSemestersCoursesFromQLDTTX] Fetch current registration warning:', e);
+  }
+
+  // 3. Fetch courses for each semester via /api/sch/w-locdstkbhockytheodoituong
+  const semesters: Array<{
+    hoc_ky: number;
+    ten_hoc_ky: string;
+    ngay_bat_dau_hk?: string;
+    ngay_ket_thuc_hk?: string;
+    totalCourses: number;
+    totalCredits: number;
+    courses: any[];
+  }> = [];
+
+  for (const s of semesterList) {
+    try {
+      const semCourses = await fetchSemesterCoursesFromQLDTTX(
+        {
+          username: account.username,
+          password: account.password,
+          token: validToken,
+        },
+        s.hoc_ky,
+        s.ten_hoc_ky
+      );
+
+      if (semCourses.newToken) {
+        validToken = semCourses.newToken;
+        accumulatedToken = semCourses.newToken;
+      }
+
+      semesters.push({
+        hoc_ky: s.hoc_ky,
+        ten_hoc_ky: s.ten_hoc_ky,
+        ngay_bat_dau_hk: s.ngay_bat_dau_hk,
+        ngay_ket_thuc_hk: s.ngay_ket_thuc_hk,
+        totalCourses: semCourses.totalCourses,
+        totalCredits: semCourses.totalCredits,
+        courses: semCourses.courses,
+      });
+    } catch (err) {
+      console.warn(`[fetchAllSemestersCoursesFromQLDTTX] Error fetching semester ${s.hoc_ky}:`, err);
+    }
+  }
+
+  // 4. Combine all courses
+  const allCoursesMap = new Map<string, any>();
+  semesters.forEach((sem) => {
+    sem.courses.forEach((c) => {
+      const key = `${sem.hoc_ky}_${c.ma_mon}_${c.nhom_to}`;
+      if (!allCoursesMap.has(key)) {
+        allCoursesMap.set(key, { ...c, semesterHocKy: sem.hoc_ky, semesterName: sem.ten_hoc_ky });
+      }
+    });
+  });
+  const allCourses = Array.from(allCoursesMap.values());
+
+  // Use current registration metrics if available, otherwise latest semester metrics
+  const latestSem = semesters[0];
+  const finalTotalCourses = currentRegResult.totalCourses > 0 ? currentRegResult.totalCourses : (latestSem?.totalCourses || 0);
+  const finalTotalCredits = currentRegResult.totalCredits > 0 ? currentRegResult.totalCredits : (latestSem?.totalCredits || 0);
+  const finalTuitionFee = currentRegResult.tuitionFee || 0;
+
+  return {
+    currentRegistration: currentRegResult,
+    semesters,
+    allCourses,
+    totalCourses: finalTotalCourses,
+    totalCredits: finalTotalCredits,
+    tuitionFee: finalTuitionFee,
+    newToken: accumulatedToken,
+  };
+}
