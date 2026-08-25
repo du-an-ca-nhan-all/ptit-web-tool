@@ -92,10 +92,11 @@ export default function StudentGradesView({
   onNavigateToExternalAccounts,
 }: StudentGradesViewProps) {
   const [dataSource, setDataSource] = useState<'QLDTTX' | 'SLINK'>(() => {
-    if (typeof window === 'undefined') return 'QLDTTX';
+    if (typeof window === 'undefined') return 'SLINK';
     const params = new URLSearchParams(window.location.search);
     const s = params.get('source')?.toUpperCase();
-    return s === 'SLINK' ? 'SLINK' : 'QLDTTX';
+    if (s === 'QLDTTX' || s === 'QLHT') return 'QLDTTX';
+    return 'SLINK';
   });
 
   const [data, setData] = useState<StudentGradesResult | null>(null);
@@ -142,12 +143,12 @@ export default function StudentGradesView({
     const url = new URL(window.location.href);
     let changed = false;
 
-    if (dataSource !== 'QLDTTX') {
-      if (url.searchParams.get('source') !== 'slink') {
-        url.searchParams.set('source', 'slink');
+    if (dataSource !== 'SLINK') {
+      if (url.searchParams.get('source') !== 'qldttx' && url.searchParams.get('source') !== 'qlht') {
+        url.searchParams.set('source', 'qldttx');
         changed = true;
       }
-    } else if (url.searchParams.has('source')) {
+    } else if (url.searchParams.has('source') && (url.searchParams.get('source') === 'qldttx' || url.searchParams.get('source') === 'qlht' || url.searchParams.get('source') === 'slink')) {
       url.searchParams.delete('source');
       changed = true;
     }
@@ -348,23 +349,6 @@ export default function StudentGradesView({
         <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl sm:rounded-2xl">
           <button
             onClick={() => {
-              if (dataSource !== 'QLDTTX') {
-                setDataSource('QLDTTX');
-                fetchGrades(false, 'QLDTTX');
-              }
-            }}
-            className={`px-3.5 py-2 rounded-lg sm:rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              dataSource === 'QLDTTX'
-                ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/50'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <GraduationCap className="w-4 h-4 text-indigo-600" />
-            <span>Cổng QLDTTX (qlht)</span>
-          </button>
-
-          <button
-            onClick={() => {
               if (dataSource !== 'SLINK') {
                 setDataSource('SLINK');
                 fetchGrades(false, 'SLINK');
@@ -379,6 +363,23 @@ export default function StudentGradesView({
             <Award className="w-4 h-4 text-violet-600" />
             <span>Cổng PTIT S-Link</span>
             <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 text-[10px] font-black rounded-md">MỚI</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (dataSource !== 'QLDTTX') {
+                setDataSource('QLDTTX');
+                fetchGrades(false, 'QLDTTX');
+              }
+            }}
+            className={`px-3.5 py-2 rounded-lg sm:rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              dataSource === 'QLDTTX'
+                ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/50'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4 text-indigo-600" />
+            <span>Cổng QLDTTX (qlht)</span>
           </button>
         </div>
 
@@ -549,13 +550,27 @@ export default function StudentGradesView({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-              <span>Yêu Cầu Cấu Hình Cổng QLDTTX (PTTC1)</span>
+              <span>
+                {dataSource === 'SLINK'
+                  ? 'Yêu Cầu Cấu Hình Cổng PTIT S-Link'
+                  : 'Yêu Cầu Cấu Hình Cổng QLDTTX (PTTC1)'}
+              </span>
             </div>
             <h3 className="text-xl font-black text-slate-800 tracking-tight">
-              Chưa Cấu Hình Tài Khoản Đào Tạo Từ Xa
+              {dataSource === 'SLINK'
+                ? 'Chưa Cấu Hình Tài Khoản PTIT S-Link'
+                : 'Chưa Cấu Hình Tài Khoản Đào Tạo Từ Xa'}
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
-              Để xem được <b>Bảng Điểm & Kết Quả Học Tập</b> từ nhà trường, bạn cần cấu hình thông tin đăng nhập tại Cổng Quản Lý Đào Tạo Từ Xa (<span className="font-mono text-indigo-600">https://qldttx.pttc1.edu.vn/</span>).
+              {dataSource === 'SLINK' ? (
+                <>
+                  Để xem được <b>Bảng Điểm & Kết Quả Học Tập</b> từ S-Link, bạn cần cấu hình thông tin đăng nhập tại Cổng PTIT S-Link (<span className="font-mono text-violet-600">https://slink.ptit.edu.vn/</span>).
+                </>
+              ) : (
+                <>
+                  Để xem được <b>Bảng Điểm & Kết Quả Học Tập</b> từ nhà trường, bạn cần cấu hình thông tin đăng nhập tại Cổng Quản Lý Đào Tạo Từ Xa (<span className="font-mono text-indigo-600">https://qldttx.pttc1.edu.vn/</span>).
+                </>
+              )}
             </p>
           </div>
 
@@ -578,7 +593,7 @@ export default function StudentGradesView({
               className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-2xl text-xs font-bold transition shadow-lg shadow-indigo-600/30 flex items-center gap-2 cursor-pointer active:scale-98"
             >
               <Award className="w-4 h-4" />
-              <span>Đến Cấu Hình Tài Khoản QLDTTX Ngay</span>
+              <span>{dataSource === 'SLINK' ? 'Đến Cấu Hình Tài Khoản S-Link Ngay' : 'Đến Cấu Hình Tài Khoản QLDTTX Ngay'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           )}
@@ -591,13 +606,15 @@ export default function StudentGradesView({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
               <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-              <span>Lỗi Xác Thực Tài Khoản QLDTTX</span>
+              <span>{dataSource === 'SLINK' ? 'Lỗi Xác Thực Tài Khoản PTIT S-Link' : 'Lỗi Xác Thực Tài Khoản QLDTTX'}</span>
             </div>
             <h3 className="text-xl font-black text-slate-800 tracking-tight">
               Tài Khoản Hoặc Mật Khẩu Không Chính Xác
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
-              Không thể đăng nhập vào cổng QLDTTX để lấy dữ liệu bảng điểm. Vui lòng kiểm tra lại mã sinh viên và mật khẩu.
+              {dataSource === 'SLINK'
+                ? 'Không thể đăng nhập vào cổng PTIT S-Link để lấy dữ liệu bảng điểm. Vui lòng kiểm tra lại tài khoản và mật khẩu S-Link.'
+                : 'Không thể đăng nhập vào cổng QLDTTX để lấy dữ liệu bảng điểm. Vui lòng kiểm tra lại mã sinh viên và mật khẩu.'}
             </p>
           </div>
 
@@ -607,7 +624,7 @@ export default function StudentGradesView({
                 onClick={onNavigateToExternalAccounts}
                 className="px-6 py-3 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white rounded-2xl text-xs font-bold transition shadow-lg shadow-rose-600/30 flex items-center gap-2 cursor-pointer active:scale-98"
               >
-                <span>Cập Nhật Lại Mật Khẩu QLDTTX</span>
+                <span>{dataSource === 'SLINK' ? 'Cập Nhật Lại Mật Khẩu S-Link' : 'Cập Nhật Lại Mật Khẩu QLDTTX'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}
@@ -774,7 +791,7 @@ export default function StudentGradesView({
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                <span className="flex items-center gap-1 text-[11px] text-slate-500" title="Thời gian hệ thống kéo điểm từ cổng QLDTTX">
+                <span className="flex items-center gap-1 text-[11px] text-slate-500" title={`Thời gian hệ thống kéo điểm từ Cổng ${dataSource === 'SLINK' ? 'PTIT S-Link' : 'QLDTTX'}`}>
                   <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                   <span>Đồng bộ: <b className="text-slate-800">{data?.lastSyncAt ? getRelativeSyncTime(data.lastSyncAt) || 'Vừa xong' : '—'}</b></span>
                 </span>
