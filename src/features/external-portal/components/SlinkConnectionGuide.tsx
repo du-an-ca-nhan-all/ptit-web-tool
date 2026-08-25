@@ -17,11 +17,10 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  Inbox,
-  Image as ImageIcon,
   ChevronLeft,
   ChevronRight,
-  Lock,
+  Layers,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 interface SlinkConnectionGuideProps {
@@ -62,29 +61,26 @@ export function SlinkConnectionGuide({
       stepNum: 1,
       title: 'Bước 1: Ấn "Forgot password?" trên S-Link',
       shortTitle: '1. Ấn "Forgot password?"',
-      subTitle: 'Màn hình đăng nhập cổng https://slink.ptit.edu.vn/',
       badge: 'Cổng S-Link',
-      badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+      badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
       src: '/assets/an_quen_mat_khau.png',
-      caption: 'Nhấn vào dòng chữ đỏ "Forgot password?" ở góc dưới ô Password',
+      caption: 'Nhấn vào dòng chữ đỏ "Forgot password?" ở góc dưới ô Password trên màn hình đăng nhập',
     },
     {
       id: 'step2',
       stepNum: 2,
       title: 'Bước 2: Điền Email sinh viên PTIT & Submit',
       shortTitle: '2. Điền Email & Submit',
-      subTitle: 'Form yêu cầu gửi link đặt lại mật khẩu',
       badge: 'Cổng S-Link',
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
       src: '/assets/anh_dien_email_quen_mat_khau.png',
-      caption: 'Nhập địa chỉ Email sinh viên (...@stu.ptit.edu.vn) rồi ấn nút đỏ "Submit"',
+      caption: 'Nhập địa chỉ Email sinh viên (...@stu.ptit.edu.vn) rồi bấm nút đỏ "Submit"',
     },
     {
       id: 'step3',
       stepNum: 3,
       title: 'Bước 3: Nhận Email từ PTIT Slink SSO',
       shortTitle: '3. Nhận Email & Bấm Link',
-      subTitle: 'Hòm thư Microsoft Outlook (Office 365) của trường',
       badge: 'Microsoft Outlook',
       badgeColor: 'bg-sky-100 text-sky-800 border-sky-200',
       src: '/assets/email_quen_mat_khau.png',
@@ -95,7 +91,6 @@ export function SlinkConnectionGuide({
       stepNum: 4,
       title: 'Bước 4: Tạo Mật khẩu mới & Xác nhận',
       shortTitle: '4. Tạo Mật khẩu mới',
-      subTitle: 'Màn hình thiết lập mật khẩu mới S-Link',
       badge: 'Cổng S-Link',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       src: '/assets/anh_dien_mat_khau_moi.png',
@@ -145,7 +140,7 @@ export function SlinkConnectionGuide({
       desc: (
         <>
           Điền địa chỉ Email sinh viên do nhà trường cấp (ví dụ:{' '}
-          <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-[11px]">
+          <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-[11px] border border-slate-200">
             ...ptit.edu.vn
           </code>
           ) vào ô <em>Username or email</em> rồi bấm nút đỏ{' '}
@@ -233,20 +228,20 @@ export function SlinkConnectionGuide({
     setIsLightboxOpen(true);
   };
 
+  const currentImg = images[activeImageIndex] || images[0];
+
   // Lightbox Modal Component
   const renderLightboxModal = () => {
-    const currentImg = images[activeImageIndex] || images[0];
-
     return (
       <div
-        className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget) setIsLightboxOpen(false);
         }}
       >
-        <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-200 flex flex-col max-h-[94vh] animate-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden border border-slate-200 flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
           {/* Lightbox Header */}
-          <div className="p-4 sm:p-5 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between">
+          <div className="p-4 sm:p-5 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-white/20 rounded-xl backdrop-blur-xs">
                 <Smartphone className="w-5 h-5 text-white" />
@@ -280,7 +275,7 @@ export function SlinkConnectionGuide({
             </div>
 
             {/* 4 Tabs selector */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 border-b border-slate-200 pb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 border-b border-slate-200 pb-3">
               {images.map((img, idx) => (
                 <button
                   key={img.id}
@@ -289,10 +284,14 @@ export function SlinkConnectionGuide({
                   className={`px-2.5 py-2 rounded-2xl text-[11.5px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
                     activeImageIndex === idx
                       ? 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-200'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
                   }`}
                 >
-                  <span className="w-4 h-4 rounded-full bg-white/25 text-[10px] font-black flex items-center justify-center shrink-0">
+                  <span
+                    className={`w-4 h-4 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${
+                      activeImageIndex === idx ? 'bg-white text-purple-700' : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
                     {img.stepNum}
                   </span>
                   <span className="truncate">{img.shortTitle}</span>
@@ -300,84 +299,75 @@ export function SlinkConnectionGuide({
               ))}
             </div>
 
-            {/* Active Image Box */}
-            <div className="relative rounded-2xl overflow-hidden border-2 border-purple-300 shadow-md bg-slate-100 flex flex-col items-center justify-center p-3">
-              <div className="w-full flex items-center justify-between mb-2 px-1 gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border ${currentImg.badgeColor}`}>
-                    {currentImg.badge}
-                  </span>
-                  <span className="text-xs font-bold text-slate-800">{currentImg.title}</span>
-                </div>
-                <span className="text-[11px] text-slate-500 font-medium">{currentImg.subTitle}</span>
+            {/* Active Image Container - Clean without overlays */}
+            <div className="rounded-2xl border-2 border-purple-200 shadow-xs bg-slate-50 flex flex-col items-center justify-center p-3 gap-2">
+              <div className="w-full flex items-center justify-between px-1 gap-2 flex-wrap">
+                <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border ${currentImg.badgeColor}`}>
+                  {currentImg.badge}
+                </span>
+                <span className="text-xs font-bold text-slate-800">{currentImg.title}</span>
               </div>
 
-              <div className="relative w-full flex items-center justify-center bg-slate-900/5 rounded-xl p-2 min-h-[260px]">
+              <div className="w-full flex items-center justify-center bg-white rounded-xl p-2 border border-slate-200 min-h-[260px] max-h-[420px] overflow-hidden">
                 <img
                   src={currentImg.src}
                   alt={currentImg.title}
-                  className="max-h-[380px] w-auto max-w-full object-contain rounded-xl shadow-xs"
+                  className="max-h-[400px] w-auto max-w-full object-contain rounded-lg shadow-xs"
                 />
-
-                {/* Left/Right controls */}
-                <button
-                  type="button"
-                  onClick={() => setActiveImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-slate-900/70 hover:bg-slate-900 text-white rounded-full transition shadow cursor-pointer backdrop-blur-xs"
-                  title="Ảnh trước"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-slate-900/70 hover:bg-slate-900 text-white rounded-full transition shadow cursor-pointer backdrop-blur-xs"
-                  title="Ảnh tiếp theo"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
               </div>
 
-              <div className="mt-2.5 p-2 bg-purple-50/90 border border-purple-200 rounded-xl text-xs text-purple-950 font-bold text-center w-full">
+              {/* Caption clearly beneath the image */}
+              <div className="p-2.5 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-950 font-bold text-center w-full">
                 🔍 {currentImg.caption}
               </div>
             </div>
 
-            {/* Quick Steps List */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2">
-              <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-indigo-600" />
-                <span>Tóm tắt quy trình 4 bước:</span>
+            {/* Step navigation buttons */}
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <button
+                type="button"
+                disabled={activeImageIndex === 0}
+                onClick={() => setActiveImageIndex((prev) => Math.max(0, prev - 1))}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Ảnh trước</span>
+              </button>
+
+              <div className="flex items-center gap-1.5">
+                {images.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveImageIndex(idx)}
+                    className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
+                      activeImageIndex === idx ? 'bg-purple-600 w-6' : 'bg-slate-300 hover:bg-slate-400'
+                    }`}
+                    title={`Ảnh ${idx + 1}`}
+                  />
+                ))}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600">
-                <div className="p-2 bg-white rounded-xl border border-slate-200">
-                  <strong className="text-purple-700 block mb-0.5">1. Màn hình S-Link</strong>
-                  Bấm vào dòng chữ đỏ <em>"Forgot password?"</em>.
-                </div>
-                <div className="p-2 bg-white rounded-xl border border-slate-200">
-                  <strong className="text-indigo-700 block mb-0.5">2. Điền Email PTIT</strong>
-                  Nhập email <code>...stu.ptit.edu.vn</code> và bấm <em>"Submit"</em>.
-                </div>
-                <div className="p-2 bg-white rounded-xl border border-slate-200">
-                  <strong className="text-sky-700 block mb-0.5">3. Mở Email Outlook</strong>
-                  Nhận email từ <em>PTIT Slink SSO</em> và nhấp <em>"Link to reset credentials"</em>.
-                </div>
-                <div className="p-2 bg-white rounded-xl border border-slate-200">
-                  <strong className="text-emerald-700 block mb-0.5">4. Tạo Mật khẩu mới</strong>
-                  Nhập mật khẩu mới & xác nhận, sau đó liên kết vào Web Tool.
-                </div>
-              </div>
+
+              <button
+                type="button"
+                disabled={activeImageIndex === images.length - 1}
+                onClick={() => setActiveImageIndex((prev) => Math.min(images.length - 1, prev + 1))}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <span>Ảnh tiếp theo</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
           {/* Lightbox Footer */}
-          <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+          <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 shrink-0">
             <div className="flex items-center gap-2">
               <a
                 href="https://slink.ptit.edu.vn/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <Smartphone className="w-3.5 h-3.5" />
                 <span>Mở Cổng PTIT S-Link</span>
@@ -388,10 +378,10 @@ export function SlinkConnectionGuide({
                 href="https://outlook.office.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <Mail className="w-3.5 h-3.5" />
-                <span>Mở Email PTIT Microsoft</span>
+                <span>Mở Email Microsoft (Outlook)</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
             </div>
@@ -476,11 +466,11 @@ export function SlinkConnectionGuide({
     );
   }
 
-  // Default 'card' variant
+  // Default 'card' variant: Left-Right side-by-side with cleanly formatted thumbnails
   return (
     <>
       <div
-        className={`bg-gradient-to-br from-purple-50/90 via-indigo-50/50 to-slate-50 border border-purple-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-xs text-slate-700 shadow-xs flex flex-col gap-3.5 transition-all ${className}`}
+        className={`bg-gradient-to-br from-purple-50/90 via-indigo-50/40 to-slate-50 border border-purple-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-xs text-slate-700 shadow-xs flex flex-col gap-3.5 transition-all ${className}`}
       >
         {/* Header with Toggle */}
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-purple-100">
@@ -521,8 +511,8 @@ export function SlinkConnectionGuide({
         </div>
 
         {isExpanded && (
-          <div className="flex flex-col lg:flex-row gap-4 pt-1 animate-in fade-in duration-200">
-            {/* Step list */}
+          <div className="flex flex-col lg:flex-row gap-5 pt-1 animate-in fade-in duration-200">
+            {/* Left Column: Full 6-Step List */}
             <div className="flex-1 space-y-2.5">
               <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5 mb-1">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
@@ -572,45 +562,58 @@ export function SlinkConnectionGuide({
               </div>
             </div>
 
-            {/* Visual preview 4-cards gallery grid */}
-            <div className="w-full lg:w-80 shrink-0 flex flex-col gap-2.5">
-              <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5 text-purple-600" />
-                <span>Ảnh minh họa toàn bộ 4 bước:</span>
+            {/* Right Column: 4-Cards Visual Gallery (NO text overlaying the image) */}
+            <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-2.5">
+              <div className="font-bold text-slate-800 text-xs flex items-center justify-between gap-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Ảnh minh họa (4 bước):</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenLightbox(0)}
+                  className="text-indigo-600 hover:text-indigo-800 text-[11px] font-bold underline flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>Phóng to</span>
+                  <ZoomIn className="w-3 h-3" />
+                </button>
               </div>
 
+              {/* 2x2 Grid of Thumbnails with labels BELOW each image */}
               <div className="grid grid-cols-2 gap-2">
                 {images.map((img, idx) => (
                   <div
                     key={img.id}
                     onClick={() => handleOpenLightbox(idx)}
-                    className="group relative rounded-2xl overflow-hidden border-2 border-purple-200 hover:border-purple-400 bg-slate-900 cursor-pointer shadow-sm transition-all transform active:scale-98"
+                    className="group flex flex-col rounded-xl overflow-hidden border border-slate-200/90 hover:border-purple-400 bg-white shadow-2xs cursor-pointer transition-all hover:shadow-xs transform active:scale-98"
                     title={`Bấm vào để xem ảnh ${img.title} phóng to`}
                   >
-                    <div className="aspect-[4/3] bg-slate-950 flex items-center justify-center overflow-hidden">
+                    {/* Clean Image Area with Object Contain */}
+                    <div className="h-24 sm:h-28 bg-slate-100/90 flex items-center justify-center p-1.5 relative overflow-hidden">
                       <img
                         src={img.src}
                         alt={img.title}
-                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300 opacity-90 group-hover:opacity-100"
+                        className="max-h-full max-w-full object-contain rounded transition-transform duration-200 group-hover:scale-103"
                       />
+                      <div className="absolute inset-0 bg-slate-900/15 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="p-1 bg-purple-600 text-white rounded-full shadow">
+                          <ZoomIn className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white p-1 text-center">
-                      <ZoomIn className="w-4 h-4 text-white drop-shadow-md" />
-                      <span className="text-[9px] font-bold bg-purple-600/90 px-1.5 py-0.5 rounded-full backdrop-blur-xs">
-                        Phóng to
+                    {/* Step Title Box - Completely BELOW the image */}
+                    <div className="p-1.5 bg-slate-50 border-t border-slate-100 text-center">
+                      <span className="text-[10px] font-bold text-slate-700 block truncate">
+                        {img.shortTitle}
                       </span>
-                    </div>
-
-                    <div className="absolute bottom-1 left-1 right-1 bg-slate-900/85 backdrop-blur-xs text-white text-[9.5px] font-bold px-1.5 py-0.5 rounded-lg text-center truncate">
-                      {img.shortTitle}
                     </div>
                   </div>
                 ))}
               </div>
 
               <p className="text-[10px] text-slate-500 italic text-center">
-                (Nhấp vào bất kỳ ảnh nào để xem toàn bộ 4 ảnh phóng to)
+                (Bấm vào bất kỳ ảnh nào để xem toàn màn hình)
               </p>
             </div>
           </div>
