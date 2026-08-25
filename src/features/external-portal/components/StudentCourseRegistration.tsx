@@ -23,15 +23,28 @@ import {
   Users,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
+import CourseCompare from './CourseCompare';
+
+export type RegisteredCoursesSubTab = 'COURSES' | 'COMPARE';
 
 interface StudentCourseRegistrationProps {
   currentUser: LoginUser;
-  onNavigateTab?: (tab: string) => void;
+  onNavigateTab?: (tab: string, subTab?: string) => void;
+  initialSubTab?: RegisteredCoursesSubTab;
+  courseCompareData?: {
+    main: any;
+    subAccount: any;
+    allSubAccounts?: any[];
+  } | null;
+  onReloadCourseCompare?: () => void;
 }
 
 export default function StudentCourseRegistration({
   currentUser,
   onNavigateTab,
+  initialSubTab = 'COURSES',
+  courseCompareData,
+  onReloadCourseCompare,
 }: StudentCourseRegistrationProps) {
   const [courses, setCourses] = useState<any[]>([]);
   const [summary, setSummary] = useState<{
@@ -67,6 +80,13 @@ export default function StudentCourseRegistration({
   const [isBatchPulling, setIsBatchPulling] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCourseDetail, setSelectedCourseDetail] = useState<any | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<RegisteredCoursesSubTab>(initialSubTab);
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
 
   // Feedback notifications
   const [successMsg, setSuccessMsg] = useState('');
@@ -257,10 +277,13 @@ export default function StudentCourseRegistration({
         <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto">
           {/* Reload local button */}
           <button
-            onClick={fetchRegisteredCourses}
+            onClick={() => {
+              fetchRegisteredCourses();
+              if (onReloadCourseCompare) onReloadCourseCompare();
+            }}
             disabled={isLoading}
             className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Tải lại từ cơ sở dữ liệu"
+            title="Tải lại dữ liệu"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             <span>Tải Lại</span>
@@ -310,19 +333,73 @@ export default function StudentCourseRegistration({
             </button>
           )}
 
-          {/* Quick Navigate to Course Compare */}
-          {onNavigateTab && (
+          {/* Switch Subtab Button */}
+          {activeSubTab === 'COURSES' ? (
             <button
-              onClick={() => onNavigateTab('course_compare')}
+              onClick={() => setActiveSubTab('COMPARE')}
               className="px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-2xl transition-colors border border-blue-200 flex items-center gap-1.5 cursor-pointer"
-              title="So sánh kết quả ĐKMH với Lớp trưởng"
+              title="Chuyển sang So sánh ĐKMH với Lớp trưởng"
             >
-              <ArrowLeftRight className="w-3.5 h-3.5" />
+              <ArrowLeftRight className="w-3.5 h-3.5 text-cyan-600" />
               <span>So Sánh ĐKMH</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveSubTab('COURSES')}
+              className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-2xl transition-colors border border-emerald-200 flex items-center gap-1.5 cursor-pointer"
+              title="Xem danh sách môn học đã đăng ký"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Môn Đã Đăng Ký</span>
             </button>
           )}
         </div>
       </div>
+
+      {/* Subtabs Navigation Bar */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-1.5 border border-slate-200 shadow-xs flex items-center gap-2 overflow-x-auto scrollbar-none">
+        <button
+          onClick={() => setActiveSubTab('COURSES')}
+          className={`shrink-0 py-2.5 px-4 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap ${
+            activeSubTab === 'COURSES'
+              ? 'bg-blue-600 text-white shadow-xs shadow-blue-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Môn Học Đã Đăng Ký</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+              activeSubTab === 'COURSES' ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
+            }`}
+          >
+            {summary.totalCourses}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('COMPARE')}
+          className={`shrink-0 py-2.5 px-4 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap ${
+            activeSubTab === 'COMPARE'
+              ? 'bg-blue-600 text-white shadow-xs shadow-blue-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <ArrowLeftRight className="w-4 h-4" />
+          <span>So Sánh ĐKMH</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              activeSubTab === 'COMPARE' ? 'bg-blue-500 text-white' : 'bg-cyan-100 text-cyan-800'
+            }`}
+          >
+            Đối Chiếu Lớp Trưởng
+          </span>
+        </button>
+      </div>
+
+      {/* Subtab 1: Môn Học Đã Đăng Ký Content */}
+      {activeSubTab === 'COURSES' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
 
       {/* External Account Not Linked Warning */}
       {!summary.externalAccount?.isConfigured && (
@@ -630,6 +707,20 @@ export default function StudentCourseRegistration({
             </div>
           </div>
         </div>
+      )}
+        </div>
+      )}
+
+      {/* Subtab 2: So Sánh ĐKMH Content */}
+      {activeSubTab === 'COMPARE' && (
+        <CourseCompare
+          embedded={true}
+          data={courseCompareData || null}
+          currentUser={currentUser}
+          onNavigateTab={onNavigateTab}
+          onReload={onReloadCourseCompare}
+          onSubTabChange={(tab) => setActiveSubTab(tab)}
+        />
       )}
     </div>
   );

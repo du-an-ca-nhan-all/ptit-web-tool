@@ -26,8 +26,10 @@ interface CourseCompareProps {
     allSubAccounts?: any[];
   } | null;
   currentUser?: LoginUser | null;
-  onNavigateTab?: (tab: string) => void;
+  onNavigateTab?: (tab: string, subTab?: string) => void;
   onReload?: () => void;
+  embedded?: boolean;
+  onSubTabChange?: (tab: 'COURSES' | 'COMPARE') => void;
 }
 
 // Helper safely extracting courses from any nesting structure
@@ -50,6 +52,8 @@ export default function CourseCompare({
   currentUser,
   onNavigateTab,
   onReload,
+  embedded = false,
+  onSubTabChange,
 }: CourseCompareProps) {
   const [data, setData] = useState(initialData);
   const [isLoading, setIsLoading] = useState(!initialData);
@@ -232,7 +236,7 @@ export default function CourseCompare({
 
   if (isLoading && !data) {
     return (
-      <div className="p-4 md:p-8 max-w-7xl mx-auto w-full">
+      <div className={embedded ? "w-full" : "p-4 md:p-8 max-w-7xl mx-auto w-full"}>
         <div className="flex flex-col items-center justify-center py-28 gap-3.5 bg-white rounded-3xl border border-slate-200 shadow-sm animate-in fade-in duration-200">
           <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-bold text-slate-700">Đang đối chiếu dữ liệu đăng ký môn học...</p>
@@ -242,8 +246,16 @@ export default function CourseCompare({
     );
   }
 
+  const handleGoToMyCourses = () => {
+    if (onSubTabChange) {
+      onSubTabChange('COURSES');
+    } else if (onNavigateTab) {
+      onNavigateTab('registered_courses');
+    }
+  };
+
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+    <div className={embedded ? "space-y-6 animate-in fade-in duration-200" : "p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300"}>
       {/* Toast */}
       {pullMsg && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top">
@@ -311,9 +323,9 @@ export default function CourseCompare({
             </button>
           )}
 
-          {onNavigateTab && (
+          {(onNavigateTab || onSubTabChange) && (
             <button
-              onClick={() => onNavigateTab('registered_courses')}
+              onClick={handleGoToMyCourses}
               className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-2xl transition-colors border border-emerald-200 flex items-center gap-1.5 cursor-pointer"
             >
               <BookOpen className="w-3.5 h-3.5" />
@@ -369,9 +381,9 @@ export default function CourseCompare({
                 )}
                 <span>Đồng Bộ Môn Học Lớp Trưởng Ngay</span>
               </button>
-            ) : onNavigateTab ? (
+            ) : (onNavigateTab || onSubTabChange) ? (
               <button
-                onClick={() => onNavigateTab('registered_courses')}
+                onClick={handleGoToMyCourses}
                 className="w-full sm:w-auto px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-2xl transition-colors shrink-0 cursor-pointer shadow-sm flex items-center justify-center gap-2"
               >
                 <BookOpen className="w-4 h-4" />
@@ -469,9 +481,9 @@ export default function CourseCompare({
           <p className="text-xs text-slate-500 max-w-md">
             Khi Lớp trưởng thực hiện đồng bộ kết quả đăng ký môn học từ cổng trường QLDTTX, toàn bộ kết quả đối chiếu 4 trạng thái (Trùng khớp, Khác nhóm, Thiếu môn, ĐK thêm) sẽ tự động hiển thị tại đây.
           </p>
-          {onNavigateTab && (
+          {(onNavigateTab || onSubTabChange) && (
             <button
-              onClick={() => onNavigateTab('registered_courses')}
+              onClick={handleGoToMyCourses}
               className="mt-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-2xl transition-colors cursor-pointer flex items-center gap-2"
             >
               <BookOpen className="w-4 h-4" />

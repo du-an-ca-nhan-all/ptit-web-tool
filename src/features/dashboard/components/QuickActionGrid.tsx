@@ -128,7 +128,7 @@ export default function QuickActionGrid({ onNavigateTab, isAdmin, isMonitor }: Q
     },
     {
       title: 'So Sánh ĐKMH',
-      desc: 'Đối chiếu môn học giữa tài khoản chính & phụ',
+      desc: 'Đối chiếu kết quả đăng ký môn học với Lớp trưởng',
       icon: <ArrowLeftRight className="w-5 h-5 text-cyan-500" />,
       bg: 'bg-cyan-50/70 hover:bg-cyan-50 border-cyan-100 hover:border-cyan-200',
       badge: 'Tiện ích',

@@ -24,7 +24,6 @@ import {
   SettlementManager,
 } from '../../features/envelope-settlement';
 import {
-  CourseCompare,
   StudentCourseRegistration,
   CourseRegistrationPortal,
   AdminExternalAccounts,
@@ -214,7 +213,22 @@ export default function HomeMainContent({
       ) : activeTab === 'registered_courses' && effectiveUser ? (
         <StudentCourseRegistration
           currentUser={effectiveUser}
-          onNavigateTab={(tab) => handleTabChange(tab as NavigationTab)}
+          initialSubTab="COURSES"
+          onNavigateTab={(tab, subTab) =>
+            handleTabChange(tab as NavigationTab, subTab as ProfileSubTab)
+          }
+          courseCompareData={courseCompareData}
+          onReloadCourseCompare={fetchCourseCompareData}
+        />
+      ) : activeTab === 'course_compare' && effectiveUser ? (
+        <StudentCourseRegistration
+          currentUser={effectiveUser}
+          initialSubTab="COMPARE"
+          onNavigateTab={(tab, subTab) =>
+            handleTabChange(tab as NavigationTab, subTab as ProfileSubTab)
+          }
+          courseCompareData={courseCompareData}
+          onReloadCourseCompare={fetchCourseCompareData}
         />
       ) : activeTab === 'external_accounts_admin' && isAdmin ? (
         <AdminExternalAccounts currentUser={effectiveUser!} />
@@ -262,13 +276,6 @@ export default function HomeMainContent({
             handleTabChange('members', undefined, { monitorClass: classCode });
             setIsClassGroupOpen(true);
           }}
-        />
-      ) : activeTab === 'course_compare' ? (
-        <CourseCompare
-          data={courseCompareData}
-          currentUser={effectiveUser}
-          onNavigateTab={(tab) => handleTabChange(tab as NavigationTab)}
-          onReload={fetchCourseCompareData}
         />
       ) : activeTab === 'members' ? (
         <ClassMembers

@@ -4,7 +4,6 @@ import React from 'react';
 import {
   CalendarDays,
   Crown,
-  ArrowLeftRight,
   Users,
   Mail,
   User,
@@ -174,26 +173,12 @@ export default function Sidebar({
               <button
                 onClick={() => onTabChange('registered_courses')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
-                  activeTab === 'registered_courses'
+                  activeTab === 'registered_courses' || activeTab === 'course_compare'
                     ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 font-bold'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
                 }`}
               >
                 <BookOpen className="w-4 h-4 text-emerald-400" /> Môn Học Đã Đăng Ký
-              </button>
-            )}
-
-            {/* So sánh ĐKMH */}
-            {currentUser && (
-              <button
-                onClick={() => onTabChange('course_compare')}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
-                  activeTab === 'course_compare'
-                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
-                }`}
-              >
-                <ArrowLeftRight className="w-4 h-4 text-cyan-400" /> So Sánh ĐKMH
               </button>
             )}
 
