@@ -21,6 +21,7 @@ export interface StudentCourseGrade {
   letterGrade: string; // A+, A, B+, B, C+, C, D+, D, F
   isPassed: boolean | null; // true: Đạt (ket_qua = 1), false: Rớt (ket_qua = 0), null: Chưa có điểm (-1)
   isCalculatedInGpa: boolean; // false nếu là môn điều kiện, môn cải thiện hoặc chưa nhập điểm
+  isAccumulatedOfficial?: boolean; // true nếu đã được chốt tích lũy chính thức (cờ tichLuy S-Link)
   reasonNotCalculated?: string;
   components: CourseComponentGrade[];
   semesterId: string;
@@ -36,7 +37,11 @@ export interface SemesterGradeSummary {
   gpa4Cumulative: number | null;
   creditsPassedSemester: number;
   creditsCumulative: number;
+  creditsAccumulatedSemester?: number;
+  creditsAccumulatedCumulativeOfficial?: number;
+  creditsAccumulatedCumulativeExpected?: number;
   creditsRegisteredSemester: number;
+  creditsDebtSemester?: number;
   classificationSemester: string;
   courses: StudentCourseGrade[];
 }
@@ -81,18 +86,23 @@ export interface StudentGradesResult {
   summary: {
     gpa10: number | null;
     gpa4: number | null;
-    totalCreditsAccumulated: number;
-    totalPassedCredits: number;
-    totalCreditsRegistered: number;
-    totalInProgressCredits: number;
+    totalCreditsAccumulated: number; // Tín chỉ tích lũy chính thức (Đã chốt)
+    totalCreditsAccumulatedExpected?: number; // Tín chỉ tích lũy dự kiến (Toàn bộ môn đạt tính vào GPA)
+    totalPassedCredits: number; // Tổng tín chỉ các môn đã đạt
+    totalCreditsRegistered: number; // Tổng số tín chỉ đã đăng ký
+    totalInProgressCredits: number; // Tổng số tín chỉ đang học
+    totalCreditsDebt?: number; // Số tín chỉ nợ / chưa tích lũy
     classification: string;
     totalPassedSubjects: number;
     totalFailedSubjects: number;
     totalInProgressSubjects: number;
     totalSubjects: number;
     passRate: number; // 0..100
-    curriculumTargetCredits: number; // default ~130
-    graduationProgressRate: number; // 0..100
+    curriculumTargetCredits: number; // Tổng số tín chỉ CTĐT (VD: 150)
+    graduationProgressRate: number; // % tiến độ theo tín chỉ chính thức đã chốt
+    graduationProgressRateExpected?: number; // % tiến độ theo tín chỉ dự kiến (môn đạt)
+    academicYearLevel?: string; // Ví dụ: "Năm nhất"
+    curriculumName?: string; // Tên chương trình đào tạo
   };
   gradeDistribution: {
     buckets: GradeDistributionBucket[];

@@ -133,6 +133,7 @@ export default function StudentGradesView({
   });
 
   const [selectedCourseModal, setSelectedCourseModal] = useState<StudentCourseGrade | null>(null);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
 
   // Sync filters to URL query params
@@ -659,34 +660,75 @@ export default function StudentGradesView({
               </div>
             </div>
 
-            {/* Card 2: Credits Earned */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+            {/* Card 2: Credits Earned (Both Official & Expected with Detailed Explanation) */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tín Chỉ Tích Lũy</span>
-                  <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-xl">
-                    <CheckCircle2 className="w-4 h-4" />
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tín Chỉ Tích Lũy</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreditsModal(true)}
+                      className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-indigo-600 transition cursor-pointer"
+                      title="Xem giải thích chi tiết số tín chỉ Đã chốt vs Dự kiến"
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreditsModal(true)}
+                    className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
+                  >
+                    Chi tiết
+                  </button>
                 </div>
-                <div className="flex items-baseline gap-2 mt-3">
-                  <span className="text-3xl sm:text-4xl font-black text-slate-800 font-mono">
-                    {summary?.totalCreditsAccumulated || 0}
-                  </span>
-                  <span className="text-xs text-slate-400 font-bold">/ {summary?.curriculumTargetCredits || 130} TC</span>
+
+                <div className="mt-2.5">
+                  {/* Primary: Đã chốt chính thức */}
+                  <div className="flex items-baseline justify-between">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                        {summary?.totalCreditsAccumulated || 0}
+                      </span>
+                      <span className="text-xs text-slate-400 font-bold">/ {summary?.curriculumTargetCredits || 150} TC</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Đã chốt
+                    </span>
+                  </div>
+
+                  {/* Secondary: Dự kiến (toàn bộ môn đạt) */}
+                  <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-dashed border-slate-100 text-xs">
+                    <span className="text-slate-500 font-medium flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-amber-500 shrink-0" />
+                      <span>Dự kiến đạt:</span>
+                    </span>
+                    <span className="font-mono font-bold text-indigo-600">
+                      {summary?.totalCreditsAccumulatedExpected ?? summary?.totalCreditsAccumulated ?? 0} / {summary?.curriculumTargetCredits || 150} TC
+                      <span className="text-slate-400 font-normal ml-1">({summary?.graduationProgressRateExpected ?? summary?.graduationProgressRate ?? 0}%)</span>
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Progress Bar */}
+              {/* Dual-stage Progress Bar */}
               <div className="mt-3">
-                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-slate-100 rounded-full h-2 relative overflow-hidden">
+                  {/* Expected progress (Background bar) */}
                   <div
-                    className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${summary?.graduationProgressRate || 0}%` }}
+                    className="bg-teal-300 h-2 rounded-full absolute left-0 top-0 transition-all duration-500"
+                    style={{ width: `${Math.min(100, summary?.graduationProgressRateExpected || 0)}%` }}
+                  />
+                  {/* Official progress (Foreground bar) */}
+                  <div
+                    className="bg-emerald-500 h-2 rounded-full absolute left-0 top-0 transition-all duration-500"
+                    style={{ width: `${Math.min(100, summary?.graduationProgressRate || 0)}%` }}
                   />
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1.5">
-                  <span>Tiến độ tốt nghiệp: <b className="font-bold text-emerald-600">{summary?.graduationProgressRate || 0}%</b></span>
-                  <span>Tổng TC Đạt: <b className="font-bold text-slate-700 font-mono">{summary?.totalPassedCredits || 0} TC</b></span>
+                  <span>Tiến độ: <b className="font-bold text-emerald-600 font-mono">{summary?.graduationProgressRate || 0}%</b> (chính thức)</span>
+                  <span>Tổng đạt: <b className="font-bold text-slate-700 font-mono">{summary?.totalPassedCredits || 0} TC</b></span>
                 </div>
               </div>
             </div>
@@ -1188,13 +1230,22 @@ export default function StudentGradesView({
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 mb-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                               <span className="text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
                                 {course.subjectCode}
                               </span>
                               <span className="text-[11px] font-bold text-slate-500">
                                 {course.credits} TC • Nhóm {course.group}
                               </span>
+                              {course.isAccumulatedOfficial ? (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                  <Lock className="w-2.5 h-2.5" /> Đã chốt TL
+                                </span>
+                              ) : course.isPassed === true && course.isCalculatedInGpa ? (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                  <Clock className="w-2.5 h-2.5" /> Chờ chốt TL
+                                </span>
+                              ) : null}
                             </div>
                             <h5 className="text-xs font-bold text-slate-800 leading-snug">
                               {course.subjectName}
@@ -1285,17 +1336,18 @@ export default function StudentGradesView({
                     <table className="w-full text-xs text-left">
                       <thead className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
                         <tr>
-                          <th className="px-4 py-3 text-center">STT</th>
-                          <th className="px-4 py-3">Mã MH</th>
+                          <th className="px-3.5 py-3 text-center">STT</th>
+                          <th className="px-3.5 py-3">Mã MH</th>
                           <th className="px-4 py-3">Tên Môn Học</th>
-                          <th className="px-4 py-3 text-center">TC</th>
-                          <th className="px-4 py-3 text-center">Tổ/Nhóm</th>
-                          <th className="px-4 py-3 text-center">Điểm Thi</th>
-                          <th className="px-4 py-3 text-center">Điểm TK (10)</th>
-                          <th className="px-4 py-3 text-center">Điểm TK (4)</th>
-                          <th className="px-4 py-3 text-center">Điểm Chữ</th>
-                          <th className="px-4 py-3 text-center">Kết Quả</th>
-                          <th className="px-4 py-3 text-center">Chi Tiết TP</th>
+                          <th className="px-3 py-3 text-center">TC</th>
+                          <th className="px-3.5 py-3 text-center">Tích Lũy</th>
+                          <th className="px-3 py-3 text-center">Tổ/Nhóm</th>
+                          <th className="px-3 py-3 text-center">Điểm Thi</th>
+                          <th className="px-3 py-3 text-center">Điểm TK (10)</th>
+                          <th className="px-3 py-3 text-center">Điểm TK (4)</th>
+                          <th className="px-3 py-3 text-center">Điểm Chữ</th>
+                          <th className="px-3.5 py-3 text-center">Kết Quả</th>
+                          <th className="px-3.5 py-3 text-center">Chi Tiết TP</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1310,8 +1362,8 @@ export default function StudentGradesView({
                                 : 'bg-slate-50/20'
                             }`}
                           >
-                            <td className="px-4 py-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
-                            <td className="px-4 py-3.5 font-mono font-bold text-indigo-700">{course.subjectCode}</td>
+                            <td className="px-3.5 py-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
+                            <td className="px-3.5 py-3.5 font-mono font-bold text-indigo-700">{course.subjectCode}</td>
                             <td className="px-4 py-3.5 font-bold text-slate-800">
                               <div className="flex flex-col">
                                 <span>{course.subjectName}</span>
@@ -1322,18 +1374,44 @@ export default function StudentGradesView({
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-3.5 text-center font-mono font-bold text-slate-700">{course.credits}</td>
-                            <td className="px-4 py-3.5 text-center font-mono text-slate-500">{course.group}</td>
-                            <td className="px-4 py-3.5 text-center font-mono font-bold text-slate-700">
+                            <td className="px-3 py-3.5 text-center font-mono font-bold text-slate-700">{course.credits}</td>
+                            <td className="px-3.5 py-3.5 text-center">
+                              {course.isAccumulatedOfficial ? (
+                                <span
+                                  title="Đã chốt tích lũy chính thức trên S-Link (tính vào 18 TC)"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs"
+                                >
+                                  <Lock className="w-2.5 h-2.5" /> Đã chốt
+                                </span>
+                              ) : course.isPassed === true && course.isCalculatedInGpa ? (
+                                <span
+                                  title="Đã có điểm đạt, dự kiến tính vào 29 TC (chờ đợt chốt S-Link)"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300"
+                                >
+                                  <Clock className="w-2.5 h-2.5" /> Chờ chốt
+                                </span>
+                              ) : !course.isCalculatedInGpa ? (
+                                <span
+                                  title="Học phần điều kiện / KNM không tính vào GPA tích lũy"
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-500"
+                                >
+                                  Không tính
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3.5 text-center font-mono text-slate-500">{course.group}</td>
+                            <td className="px-3 py-3.5 text-center font-mono font-bold text-slate-700">
                               {course.examScore !== null ? course.examScore.toFixed(1) : '—'}
                             </td>
-                            <td className="px-4 py-3.5 text-center font-mono font-black text-slate-800">
+                            <td className="px-3 py-3.5 text-center font-mono font-black text-slate-800">
                               {course.finalScore10 !== null ? course.finalScore10.toFixed(1) : '—'}
                             </td>
-                            <td className="px-4 py-3.5 text-center font-mono font-black text-indigo-600">
+                            <td className="px-3 py-3.5 text-center font-mono font-black text-indigo-600">
                               {course.finalScore4 !== null ? course.finalScore4.toFixed(1) : '—'}
                             </td>
-                            <td className="px-4 py-3.5 text-center">
+                            <td className="px-3 py-3.5 text-center">
                               {course.letterGrade ? (
                                 <span
                                   className={`px-2.5 py-0.5 rounded-lg text-xs font-black font-mono border ${
@@ -1354,7 +1432,7 @@ export default function StudentGradesView({
                                 <span className="text-slate-400">—</span>
                               )}
                             </td>
-                            <td className="px-4 py-3.5 text-center">
+                            <td className="px-3.5 py-3.5 text-center">
                               {course.isPassed === true ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                   <Check className="w-3 h-3 stroke-[3]" /> Đạt
@@ -1369,7 +1447,7 @@ export default function StudentGradesView({
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-3.5 text-center">
+                            <td className="px-3.5 py-3.5 text-center">
                               {course.components.length > 0 ? (
                                 <button
                                   onClick={() => setSelectedCourseModal(course)}
@@ -1485,6 +1563,92 @@ export default function StudentGradesView({
               className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold transition cursor-pointer"
             >
               Đóng
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* CREDITS EXPLANATION MODAL (GIẢI THÍCH CHI TIẾT SỰ KHÁC BIỆT GIỮA CÁC SỐ LIỆU TÍN CHỈ) */}
+      {showCreditsModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-50 text-indigo-700 rounded-2xl">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800">Giải Thích Số Tín Chỉ Tích Lũy</h3>
+                  <p className="text-xs text-slate-500">Phân biệt giữa số liệu Đã chốt chính thức và Dự kiến toàn khóa</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCreditsModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3.5">
+              {/* Item 1: Đã chốt chính thức */}
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Tín Chỉ Đã Chốt Chính Thức:</span>
+                  </span>
+                  <span className="text-sm font-black font-mono text-emerald-800 bg-white px-2 py-0.5 rounded-lg border border-emerald-300">
+                    {summary?.totalCreditsAccumulated || 0} / {summary?.curriculumTargetCredits || 150} TC ({summary?.graduationProgressRate || 0}%)
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  Đây là số tín chỉ đã được <b>Phòng Đào tạo Học viện xét duyệt và khóa sổ chính thức</b> vào học bạ trên hệ thống S-Link (tương ứng với các môn có cờ tích lũy <code className="bg-emerald-100/80 px-1 rounded font-mono text-[11px]">Đã chốt</code>). Điểm trung bình tích lũy hiện tại ({summary?.gpa4 !== null ? summary?.gpa4.toFixed(2) : '—'} / 4.0) được tính dựa trên số liệu này.
+                </p>
+              </div>
+
+              {/* Item 2: Dự kiến toàn bộ môn đạt */}
+              <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-amber-900 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Tín Chỉ Dự Kiến (Toàn Bộ Môn Đạt):</span>
+                  </span>
+                  <span className="text-sm font-black font-mono text-amber-800 bg-white px-2 py-0.5 rounded-lg border border-amber-300">
+                    {summary?.totalCreditsAccumulatedExpected ?? summary?.totalCreditsAccumulated ?? 0} / {summary?.curriculumTargetCredits || 150} TC ({summary?.graduationProgressRateExpected ?? summary?.graduationProgressRate ?? 0}%)
+                  </span>
+                </div>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Tính tổng toàn bộ các môn học bạn <b>đã thi và có kết quả Đạt</b> (hệ 10 &ge; 4.0 / hệ 4 &ge; 1.0) và tính vào GPA. Con số này bao gồm <b>{summary?.totalCreditsAccumulated || 0} TC đã chốt</b> cộng thêm các môn học kỳ gần nhất đã có điểm thi nhưng đang chờ đợt xét duyệt toàn khóa tiếp theo của nhà trường.
+                </p>
+              </div>
+
+              {/* Item 3: Tổng số tín chỉ CTĐT */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Chương Trình Đào Tạo Chuẩn:</span>
+                  </span>
+                  <span className="text-sm font-black font-mono text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-slate-200">
+                    {summary?.curriculumTargetCredits || 150} TC
+                  </span>
+                </div>
+                <div className="text-xs text-slate-600 space-y-1">
+                  <div>• Chuyên ngành: <b className="text-slate-800">{summary?.curriculumName || 'Công nghệ thông tin'}</b> ({summary?.academicYearLevel || 'Năm nhất'})</div>
+                  <div>• Tín chỉ còn lại cần tích lũy: <b className="text-slate-800 font-mono">{Math.max(0, (summary?.curriculumTargetCredits || 150) - (summary?.totalCreditsAccumulated || 0))} TC</b> (chính thức) hoặc <b className="text-indigo-600 font-mono">{Math.max(0, (summary?.curriculumTargetCredits || 150) - (summary?.totalCreditsAccumulatedExpected || 0))} TC</b> (dự kiến)</div>
+                  {summary?.totalCreditsDebt ? (
+                    <div>• Tín chỉ nợ / chưa tích lũy: <b className="text-rose-600 font-mono">{summary.totalCreditsDebt} TC</b></div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowCreditsModal(false)}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition cursor-pointer shadow-sm"
+            >
+              Đã hiểu
             </button>
           </div>
         </div>

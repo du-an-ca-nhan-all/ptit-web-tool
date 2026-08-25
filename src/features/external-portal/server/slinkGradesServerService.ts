@@ -45,6 +45,7 @@ export async function fetchStudentGradesFromSlink(credentials: {
 }): Promise<{
   sinhVien: any;
   khoaNganh: any;
+  chuongTrinhDaoTao: any;
   semesters: any[];
   courses: any[];
   statistics: any;
@@ -98,6 +99,43 @@ export async function fetchStudentGradesFromSlink(credentials: {
     sinhVien?.maKhoaNganh ||
     sinhVien?.kqhtTichLuyNganh1?.maKhoaNganh ||
     '';
+
+  // 2.1 Lấy thông tin Chương Trình Đào Tạo chuẩn (CTĐT hiện tại để lấy tổng số tín chỉ CTĐT chuẩn: ví dụ 150 TC)
+  let chuongTrinhDaoTao = null;
+  if (maKhoaNganh) {
+    try {
+      const resCtdt = await fetch(
+        `${SLINK_QLDT_API_BASE}/chuong-trinh-dao-tao/me/khoa-nganh/${encodeURIComponent(
+          maKhoaNganh
+        )}/hien-tai`,
+        { headers }
+      );
+      if (resCtdt.ok) {
+        const dataCtdt = await resCtdt.json();
+        chuongTrinhDaoTao = dataCtdt?.data || null;
+      }
+    } catch (err) {
+      console.warn('[fetchStudentGradesFromSlink] Lỗi lấy CTĐT hiện tại:', err);
+    }
+
+    // Fallback qua tiến trình chuẩn đầu ra nếu chưa có
+    if (!chuongTrinhDaoTao) {
+      try {
+        const resChuanDauRa = await fetch(
+          `${SLINK_QLDT_API_BASE}/chung-chi-sv/chung-chi-chuan-dau-ra/tien-trinh/me/khoa-nganh/${encodeURIComponent(
+            maKhoaNganh
+          )}`,
+          { headers }
+        );
+        if (resChuanDauRa.ok) {
+          const dataCdr = await resChuanDauRa.json();
+          chuongTrinhDaoTao = dataCdr?.data?.ctdtKeHoach || null;
+        }
+      } catch (err) {
+        console.warn('[fetchStudentGradesFromSlink] Lỗi lấy CTĐT từ chuẩn đầu ra:', err);
+      }
+    }
+  }
 
   // 3. Lấy danh sách kết quả học tập theo từng học kỳ
   let semesters: any[] = [];
@@ -153,6 +191,7 @@ export async function fetchStudentGradesFromSlink(credentials: {
   return {
     sinhVien,
     khoaNganh,
+    chuongTrinhDaoTao,
     semesters,
     courses,
     statistics,
@@ -179,6 +218,8 @@ export function buildSlinkGradeResultFromRawData(
   const accumulated = sinhVien?.kqhtTichLuyNganh1 || {};
   const rawSemesters: any[] = fetchedResult?.semesters || [];
   const rawCourses: any[] = fetchedResult?.courses || [];
+  const ctdt = fetchedResult?.chuongTrinhDaoTao || fetchedResult?.ctdtKeHoach || {};
+  const khoaNganh = fetchedResult?.khoaNganh || {};
 
   const processedSemesters: SemesterGradeSummary[] = [];
   const allCourses: StudentCourseGrade[] = [];
@@ -271,6 +312,9 @@ export function buildSlinkGradeResultFromRawData(
         ? 'Học phần không tính vào tín chỉ & GPA tích lũy'
         : undefined;
 
+      // Cờ tích lũy chính thức từ S-Link (đã chốt vào đợt xét)
+      const isAccumulatedOfficial = Boolean(c.tichLuy);
+
       // Xây dựng danh sách điểm thành phần
       const components: CourseComponentGrade[] = [];
 
@@ -314,6 +358,7 @@ export function buildSlinkGradeResultFromRawData(
         letterGrade: letterGrade || (isPassed ? 'Đạt' : 'Chưa có'),
         isPassed,
         isCalculatedInGpa,
+        isAccumulatedOfficial,
         reasonNotCalculated,
         components,
         semesterId,
@@ -356,8 +401,10 @@ export function buildSlinkGradeResultFromRawData(
     const gpa4Cum = parseScore(semData.trungBinhTichLuyToanKhoaThang4);
 
     const creditsPassedSem = semPassedCredits;
-    const creditsCum = Number(semData.tongSoTinChiTichLuyToanKhoa || 0);
+    const creditsCumOfficial = Number(semData.tongSoTinChiTichLuyToanKhoa || 0);
+    const creditsAccSem = Number(semData.tongSoTinChiTichLuyHocKy || semData.tongSoTinChiHocKy || 0);
     const creditsRegSem = Number(semData.tongSoTinChiDangKyHocKy || semData.tongSoTinChiHocKy || 0);
+    const creditsDebtSem = Number(semData.tongSoTinChiNoHocKy || 0);
     const classSem = String(semData.hocLucHocKy || semData.hocLuc || 'N/A');
 
     processedSemesters.push({
@@ -368,8 +415,12 @@ export function buildSlinkGradeResultFromRawData(
       gpa10Cumulative: gpa10Cum,
       gpa4Cumulative: gpa4Cum,
       creditsPassedSemester: creditsPassedSem,
-      creditsCumulative: creditsCum,
+      creditsCumulative: creditsCumOfficial,
+      creditsAccumulatedSemester: creditsAccSem,
+      creditsAccumulatedCumulativeOfficial: creditsCumOfficial,
+      creditsAccumulatedCumulativeExpected: 0, // Điền ở vòng lặp sau
       creditsRegisteredSemester: creditsRegSem,
+      creditsDebtSemester: creditsDebtSem,
       classificationSemester: classSem,
       courses: processedCourses,
     });
@@ -380,14 +431,19 @@ export function buildSlinkGradeResultFromRawData(
     a.semesterId.localeCompare(b.semesterId, undefined, { numeric: true })
   );
 
-  // Tín chỉ tích lũy qua từng kỳ: chỉ tính môn Đạt và isCalculatedInGpa
-  let runningCumulativeCredits = 0;
+  // Tín chỉ tích lũy dự kiến lũy kế qua từng kỳ (tính tất cả các môn Đạt & isCalculatedInGpa)
+  let runningCumulativeExpectedCredits = 0;
   for (const s of progressionSemesters) {
-    const semAccCredits = s.courses
+    const semAccExpectedCredits = s.courses
       .filter((c) => c.isPassed === true && c.isCalculatedInGpa)
       .reduce((sum, c) => sum + c.credits, 0);
-    runningCumulativeCredits += semAccCredits;
-    s.creditsCumulative = runningCumulativeCredits;
+    runningCumulativeExpectedCredits += semAccExpectedCredits;
+    s.creditsAccumulatedCumulativeExpected = runningCumulativeExpectedCredits;
+
+    // Nếu chưa có creditsCumulative chính thức, lấy theo runningCumulative
+    if (!s.creditsCumulative || s.creditsCumulative === 0) {
+      s.creditsCumulative = s.creditsAccumulatedCumulativeOfficial || runningCumulativeExpectedCredits;
+    }
   }
 
   const gpaProgression: GpaTrendItem[] = progressionSemesters.map((s) => ({
@@ -491,15 +547,22 @@ export function buildSlinkGradeResultFromRawData(
     processedSemesters.find((s) => s.gpa4Cumulative !== null || s.gpa10Cumulative !== null) ||
     (processedSemesters.length > 0 ? processedSemesters[0] : null);
 
-  // Tính số tín chỉ đạt toàn khóa (chỉ cần pass là tính)
+  // 1. Tổng số tín chỉ đạt (bao gồm cả môn KNM/điều kiện nếu pass)
   const totalPassedCredits = allCourses
     .filter((c) => c.isPassed === true)
     .reduce((sum, c) => sum + c.credits, 0);
 
-  // Tính số tín chỉ tích lũy chỉ cho các môn Đạt VÀ isCalculatedInGpa
+  // 2. Số tín chỉ tích lũy dự kiến (toàn bộ môn đã đạt VÀ tính vào GPA, ví dụ: 29 TC)
   const passedAccumulatedCourses = allCourses.filter((c) => c.isPassed === true && c.isCalculatedInGpa);
-  const totalCreditsAccumulated = passedAccumulatedCourses.reduce((sum, c) => sum + c.credits, 0);
-  const calculatedCreditsAccumulated = totalCreditsAccumulated;
+  const totalCreditsAccumulatedExpected = passedAccumulatedCourses.reduce((sum, c) => sum + c.credits, 0);
+
+  // 3. Số tín chỉ tích lũy chính thức (đã chốt theo đợt xét S-Link, ví dụ: 18 TC)
+  const officialAccCredits =
+    Number(accumulated.tongSoTinChi ?? 0) ||
+    Number(latestSemesterWithGpa?.creditsAccumulatedCumulativeOfficial ?? 0) ||
+    allCourses.filter((c) => c.isPassed === true && c.isAccumulatedOfficial).reduce((sum, c) => sum + c.credits, 0);
+
+  const totalCreditsAccumulated = officialAccCredits > 0 ? officialAccCredits : totalCreditsAccumulatedExpected;
 
   // Tính GPA tích lũy toàn khóa từ các môn có isCalculatedInGpa
   const allGradedGpaCourses = allCourses.filter(
@@ -526,6 +589,7 @@ export function buildSlinkGradeResultFromRawData(
     fallbackCumGpa4;
 
   const totalCreditsRegistered = Number(accumulated.tongSoTinChiDangKy || totalPassedCredits);
+  const totalCreditsDebt = Number(accumulated.tongSoTinChiNo || 0);
   const totalInProgressCredits = gradeCounts.IN_PROGRESS.credits;
 
   let classification = String(accumulated.hocLuc || '').trim();
@@ -550,8 +614,24 @@ export function buildSlinkGradeResultFromRawData(
   const finishedSubjects = totalPassedSubjects + totalFailedSubjects;
   const passRate = finishedSubjects > 0 ? Math.round((totalPassedSubjects / finishedSubjects) * 100) : 100;
 
-  const targetCredits = 130; // Mặc định chương trình đại học ~130 tín chỉ
-  const graduationProgressRate = Math.min(100, Math.round((totalPassedCredits / targetCredits) * 100));
+  // Tổng số tín chỉ CTĐT chuẩn (lấy động từ CTĐT S-Link: 150 TC cho CNTT, hoặc fallback 130)
+  const targetCredits = Number(
+    ctdt?.tongSoTinChi ||
+    ctdt?.ctdtKeHoach?.tongSoTinChi ||
+    (khoaNganh?.khoaNganhChinh?.ma?.includes('748') ? 150 : 130)
+  );
+
+  const curriculumName = String(
+    ctdt?.ten ||
+    khoaNganh?.khoaNganhChinh?.ten ||
+    sinhVien?.nganh?.ten ||
+    'Công nghệ thông tin'
+  ).trim();
+
+  const academicYearLevel = String(accumulated.trinhDo || sinhVien?.trinhDo || 'Năm nhất').trim();
+
+  const graduationProgressRate = targetCredits > 0 ? Math.min(100, Math.round((totalCreditsAccumulated / targetCredits) * 100)) : 0;
+  const graduationProgressRateExpected = targetCredits > 0 ? Math.min(100, Math.round((totalCreditsAccumulatedExpected / targetCredits) * 100)) : 0;
 
   // Top môn học điểm cao
   const topCourses = allCourses
@@ -572,7 +652,7 @@ export function buildSlinkGradeResultFromRawData(
   const inProgressCourses = allCourses.filter((c) => c.isPassed === null);
 
   // Mục tiêu học tập (Academic Target Goals)
-  const remainingCredits = Math.max(0, targetCredits - totalPassedCredits);
+  const remainingCredits = Math.max(0, targetCredits - totalCreditsAccumulated);
   const targetGoals: AcademicTargetGoal[] = [
     { label: 'Bằng Khá', targetGpa4: 2.5, isAchievable: true, requiredGpaOnRemaining: null, status: 'POSSIBLE', note: '' },
     { label: 'Bằng Giỏi', targetGpa4: 3.2, isAchievable: true, requiredGpaOnRemaining: null, status: 'POSSIBLE', note: '' },
@@ -589,14 +669,14 @@ export function buildSlinkGradeResultFromRawData(
       goal.isAchievable = false;
       goal.note = `Đã hoàn thành toàn bộ chương trình đào tạo`;
     } else if (gpa4 !== null) {
-      const requiredPoints = goal.targetGpa4 * targetCredits - gpa4 * totalPassedCredits;
-      const reqGpa = requiredPoints / remainingCredits;
+      const requiredPoints = goal.targetGpa4 * targetCredits - gpa4 * totalCreditsAccumulated;
+      const reqGpa = remainingCredits > 0 ? requiredPoints / remainingCredits : 0;
       goal.requiredGpaOnRemaining = Math.round(reqGpa * 100) / 100;
 
       if (reqGpa <= 4.0) {
         goal.isAchievable = true;
         goal.status = reqGpa > 3.6 ? 'CHALLENGING' : 'POSSIBLE';
-        goal.note = `Cần đạt GPA TB tối thiểu ${goal.requiredGpaOnRemaining.toFixed(2)} cho ${remainingCredits} tín chỉ còn lại`;
+        goal.note = `Cần đạt GPA TB tối thiểu ${goal.requiredGpaOnRemaining.toFixed(2)} cho ${remainingCredits} TC còn lại (Đã chốt ${totalCreditsAccumulated} TC, dự kiến đạt ${totalCreditsAccumulatedExpected}/${targetCredits} TC)`;
       } else {
         goal.isAchievable = false;
         goal.status = 'UNACHIEVABLE';
@@ -617,9 +697,11 @@ export function buildSlinkGradeResultFromRawData(
       gpa10,
       gpa4,
       totalCreditsAccumulated,
+      totalCreditsAccumulatedExpected,
       totalPassedCredits,
       totalCreditsRegistered,
       totalInProgressCredits,
+      totalCreditsDebt,
       classification,
       totalPassedSubjects,
       totalFailedSubjects,
@@ -628,6 +710,9 @@ export function buildSlinkGradeResultFromRawData(
       passRate,
       curriculumTargetCredits: targetCredits,
       graduationProgressRate,
+      graduationProgressRateExpected,
+      academicYearLevel,
+      curriculumName,
     },
     gradeDistribution: {
       buckets,
