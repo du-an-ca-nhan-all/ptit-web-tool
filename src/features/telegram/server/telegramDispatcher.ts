@@ -689,8 +689,12 @@ export async function checkAndDispatchSlinkAnnouncements(options: {
           }).catch(() => {});
         }
 
-        const notifRes = await getSlinkNotifications(token, 1, 20, false);
-        const announcements = notifRes?.data?.result || [];
+        // Chỉ lấy các thông báo đang CHƯA ĐỌC trên Cổng S-Link (unreadOnly = true)
+        const notifRes = await getSlinkNotifications(token, 1, 30, true);
+        const rawAnnouncements = notifRes?.data?.result || [];
+
+        // Lọc kỹ lại đảm bảo chỉ gửi thông báo đang được đánh dấu là chưa đọc trên S-Link (!item.read)
+        const announcements = rawAnnouncements.filter((ann: any) => ann && !ann.read && !ann.isRead);
 
         if (announcements.length === 0) {
           await prisma.telegramConfig.update({
@@ -709,6 +713,11 @@ export async function checkAndDispatchSlinkAnnouncements(options: {
         }
 
         for (const ann of announcements) {
+          // Bỏ qua nếu thông báo đã được đánh dấu đọc trên S-Link
+          if (ann.read === true || ann.isRead === true) {
+            continue;
+          }
+
           const notifId = String(ann.id || ann._id || '');
           if (!notifId) continue;
 
