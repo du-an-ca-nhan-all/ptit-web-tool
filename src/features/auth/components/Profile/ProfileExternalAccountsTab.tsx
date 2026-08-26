@@ -22,9 +22,11 @@ import {
   Sparkles,
   ArrowRight,
   Smartphone,
+  KeyRound,
 } from 'lucide-react';
 import { LoginUser } from '../../types/auth.types';
 import { SlinkConnectionGuide } from '@/src/features/external-portal/components/SlinkConnectionGuide';
+import SlinkForgotPasswordModal from '@/src/features/external-portal/components/SlinkForgotPasswordModal';
 
 interface ProfileExternalAccountsTabProps {
   currentUser: LoginUser;
@@ -63,6 +65,7 @@ export function ProfileExternalAccountsTab({
 }: ProfileExternalAccountsTabProps) {
   // Quản lý trạng thái mở form chỉnh sửa cho từng hệ thống (systemKey)
   const [editingSystems, setEditingSystems] = useState<Record<string, boolean>>({});
+  const [isSlinkForgotModalOpen, setIsSlinkForgotModalOpen] = useState(false);
 
   const handleStartEdit = (sys: any) => {
     setEditingSystems((prev) => ({ ...prev, [sys.systemKey]: true }));
@@ -305,7 +308,10 @@ export function ProfileExternalAccountsTab({
 
                   {/* S-Link Helper Guide in connected view */}
                   {sys.systemKey === 'SLINK_PTIT' && (
-                    <SlinkConnectionGuide variant="compact" />
+                    <SlinkConnectionGuide
+                      variant="compact"
+                      defaultUsername={sys.extUsername || currentUser.username}
+                    />
                   )}
 
                   {/* Action Buttons for Connected State */}
@@ -332,6 +338,19 @@ export function ProfileExternalAccountsTab({
                         <Pencil className="w-3.5 h-3.5" />
                         <span>Chỉnh Sửa Thông Tin</span>
                       </button>
+
+                      {/* S-Link specific: Quick Reset Password Button */}
+                      {sys.systemKey === 'SLINK_PTIT' && (
+                        <button
+                          type="button"
+                          onClick={() => setIsSlinkForgotModalOpen(true)}
+                          className="px-4 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
+                          title="Tự động gửi yêu cầu đặt lại mật khẩu S-Link qua Email"
+                        >
+                          <KeyRound className="w-3.5 h-3.5 text-purple-600" />
+                          <span>Quên / Đổi Mật Khẩu</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* Button Delete / Disconnect */}
@@ -414,6 +433,7 @@ export function ProfileExternalAccountsTab({
                   <SlinkConnectionGuide
                     variant="card"
                     defaultExpanded={true}
+                    defaultUsername={form.username || currentUser.username}
                     title={isEditing ? 'Hướng Dẫn Đổi / Lấy Lại Mật Khẩu PTIT S-Link' : 'Hướng Dẫn Lấy Mật Khẩu Cổng PTIT S-Link'}
                   />
                 )}
@@ -542,6 +562,21 @@ export function ProfileExternalAccountsTab({
                         {form.showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
+
+                    {/* S-Link Helper: Quick Reset Link under password field */}
+                    {sys.systemKey === 'SLINK_PTIT' && (
+                      <div className="mt-1.5 flex items-center justify-between text-[11px] bg-purple-50/80 border border-purple-200/80 rounded-xl px-3 py-1.5">
+                        <span className="text-purple-900 font-medium">Chưa có hoặc quên mật khẩu S-Link?</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsSlinkForgotModalOpen(true)}
+                          className="text-purple-700 hover:text-purple-900 font-bold underline inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Sparkles className="w-3 h-3 text-purple-600" />
+                          <span>Gửi yêu cầu reset tự động</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -645,6 +680,13 @@ export function ProfileExternalAccountsTab({
           })}
         </div>
       )}
+
+      {/* S-Link Forgot Password Modal */}
+      <SlinkForgotPasswordModal
+        isOpen={isSlinkForgotModalOpen}
+        onClose={() => setIsSlinkForgotModalOpen(false)}
+        defaultUsername={extForm['SLINK_PTIT']?.username || currentUser.username}
+      />
     </div>
   );
 }

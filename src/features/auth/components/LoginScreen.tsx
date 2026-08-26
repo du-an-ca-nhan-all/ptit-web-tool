@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { LoginUser, ExamRecord } from '../types/auth.types';
 import { usePWAContext } from '../../../components/pwa/PWAProvider';
+import SlinkForgotPasswordModal from '@/src/features/external-portal/components/SlinkForgotPasswordModal';
 
 interface LoginScreenProps {
   users?: LoginUser[];
@@ -42,6 +43,7 @@ export default function LoginScreen({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(initialError || '');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSlinkModalOpen, setIsSlinkModalOpen] = useState(false);
 
   useEffect(() => {
     if (initialError) {
@@ -361,7 +363,7 @@ export default function LoginScreen({
                 )}
               </button>
 
-              <div className="pt-3.5 border-t border-slate-100 text-center">
+              <div className="pt-3.5 border-t border-slate-100 text-center space-y-1.5">
                 <p className="text-xs text-slate-500">
                   Chưa kích hoạt mật khẩu?{' '}
                   <button
@@ -373,6 +375,16 @@ export default function LoginScreen({
                     className="text-blue-600 font-bold hover:underline cursor-pointer inline-flex items-center gap-0.5"
                   >
                     Đăng ký kích hoạt ngay
+                  </button>
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Quên mật khẩu Cổng S-Link?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setIsSlinkModalOpen(true)}
+                    className="text-purple-600 font-semibold hover:underline cursor-pointer"
+                  >
+                    Gửi yêu cầu reset S-Link
                   </button>
                 </p>
               </div>
@@ -650,6 +662,13 @@ export default function LoginScreen({
           </div>
         </div>
       </div>
+
+      {/* S-Link Forgot Password Modal */}
+      <SlinkForgotPasswordModal
+        isOpen={isSlinkModalOpen}
+        onClose={() => setIsSlinkModalOpen(false)}
+        defaultUsername={username || regUsername}
+      />
     </div>
   );
 }

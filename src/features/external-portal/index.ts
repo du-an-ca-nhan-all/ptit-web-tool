@@ -8,6 +8,8 @@ export { default as CourseRegistrationPortal } from './components/CourseRegistra
 export { default as AdminExternalAccounts } from './components/AdminExternalAccounts';
 export { default as GlobalSyncQueueManager } from './components/GlobalSyncQueueManager';
 export { default as LmsCoursesView } from './components/LmsCoursesView';
+export { default as SlinkForgotPasswordModal } from './components/SlinkForgotPasswordModal';
+export { SlinkConnectionGuide } from './components/SlinkConnectionGuide';
 export * from './hooks/useGlobalSyncQueue';
 export * from './hooks/useCourseRegistration';
 

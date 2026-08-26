@@ -13,6 +13,8 @@ export { cleanHtml, decodeHtmlEntities, escapeTelegramHtml };
 export const SLINK_BASE_URL = 'https://slink.ptit.edu.vn/';
 export const SLINK_SSO_TOKEN_URL = 'https://gwdu.ptit.edu.vn/sso/realms/ptit/protocol/openid-connect/token';
 export const SLINK_SSO_USERINFO_URL = 'https://gwdu.ptit.edu.vn/sso/realms/ptit/protocol/openid-connect/userinfo';
+export const SLINK_RESET_CREDENTIALS_URL =
+  'https://gwdu.ptit.edu.vn/sso/realms/ptit/login-actions/reset-credentials?client_id=ptit-connect';
 export const SLINK_NOTIFICATION_API_URL = 'https://gwdu.ptit.edu.vn/notification/notification/me/page';
 export const SLINK_NOTIFICATION_READ_API_URL = 'https://gwdu.ptit.edu.vn/notification/notification/read';
 
@@ -432,5 +434,112 @@ export async function getOrFetchStudentSlinkOverview(
     userInfo: userInfoRes,
     notifications: notifRes?.data || null,
     lastSyncAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Tự động gửi yêu cầu quên / đặt lại mật khẩu PTIT S-Link (Keycloak SSO Reset Credentials)
+ * @param identifier Tên đăng nhập / Mã sinh viên (MSV) hoặc Email sinh viên (...@stu.ptit.edu.vn)
+ */
+export async function requestSlinkPasswordReset(identifier: string): Promise<{
+  success: boolean;
+  message: string;
+  sentTo: string;
+  pageId?: string;
+}> {
+  const cleanIdentifier = identifier.trim();
+  if (!cleanIdentifier) {
+    throw new Error('Vui lòng cung cấp Mã sinh viên (MSV) hoặc Email sinh viên để gửi yêu cầu đặt lại mật khẩu S-Link.');
+  }
+
+  // Bước 1: Gọi GET đến trang reset-credentials của Keycloak SSO để khởi tạo phiên & lấy session_code, execution ID
+  const getRes = await fetch(SLINK_RESET_CREDENTIALS_URL, {
+    method: 'GET',
+    headers: {
+      'User-Agent': SLINK_USER_AGENT,
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+    },
+  });
+
+  if (!getRes.ok) {
+    throw new Error(`Không thể kết nối đến cổng PTIT SSO Reset Password (HTTP ${getRes.status})`);
+  }
+
+  const cookieHeader = getRes.headers.get('set-cookie') || '';
+  const cookies = cookieHeader
+    .split(/,(?=[^;]+;)/)
+    .map((c) => c.split(';')[0].trim())
+    .filter(Boolean)
+    .join('; ');
+
+  const htmlText = await getRes.text();
+  const match = htmlText.match(/const kcContext = (\{[\s\S]*?\n\s*\};)/);
+  if (!match) {
+    throw new Error('Không thể phân tích ngữ cảnh khởi tạo từ cổng SSO Keycloak PTIT');
+  }
+
+  let postUrl: string | undefined;
+  try {
+    const fn = new Function('return ' + match[1]);
+    const kcContext = fn();
+    postUrl = kcContext.url?.loginAction;
+  } catch (e: any) {
+    throw new Error(`Lỗi phân tích phiên SSO S-Link: ${e.message}`);
+  }
+
+  if (!postUrl) {
+    throw new Error('Không tìm thấy đường dẫn hành động (loginAction) từ SSO S-Link');
+  }
+
+  // Bước 2: Gửi POST kèm username/email đến loginAction URL
+  const formBody = new URLSearchParams({
+    username: cleanIdentifier,
+  });
+
+  const postRes = await fetch(postUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': SLINK_USER_AGENT,
+      'Cookie': cookies,
+      'Origin': 'https://gwdu.ptit.edu.vn',
+      'Referer': SLINK_RESET_CREDENTIALS_URL,
+    },
+    body: formBody.toString(),
+  });
+
+  if (!postRes.ok) {
+    const errText = await postRes.text();
+    throw new Error(`Gửi yêu cầu reset mật khẩu thất bại (HTTP ${postRes.status}): ${errText.slice(0, 200)}`);
+  }
+
+  const postHtmlText = await postRes.text();
+  const postMatch = postHtmlText.match(/const kcContext = (\{[\s\S]*?\n\s*\};)/);
+  let pageId = 'unknown';
+  let messageSummary = '';
+
+  if (postMatch) {
+    try {
+      const fn2 = new Function('return ' + postMatch[1]);
+      const kcContext2 = fn2();
+      pageId = kcContext2.pageId || '';
+      messageSummary = kcContext2.message?.summary || '';
+      if (kcContext2.message?.type === 'error' || kcContext2.message?.error) {
+        throw new Error(messageSummary || 'Yêu cầu không thành công từ máy chủ SSO PTIT');
+      }
+    } catch (e: any) {
+      if (e.message && !e.message.includes('Function')) {
+        throw e;
+      }
+    }
+  }
+
+  return {
+    success: true,
+    message:
+      'Hệ thống đã tự động gửi yêu cầu đặt lại mật khẩu S-Link thành công! Vui lòng kiểm tra Hòm thư sinh viên (Microsoft Outlook / PTIT Email) để nhấn vào liên kết tạo mật khẩu mới.',
+    sentTo: cleanIdentifier,
+    pageId,
   };
 }

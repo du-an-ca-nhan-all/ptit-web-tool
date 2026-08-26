@@ -21,7 +21,9 @@ import {
   ChevronRight,
   Layers,
   Image as ImageIcon,
+  KeyRound,
 } from 'lucide-react';
+import SlinkForgotPasswordModal from './SlinkForgotPasswordModal';
 
 interface SlinkConnectionGuideProps {
   /**
@@ -43,6 +45,11 @@ interface SlinkConnectionGuideProps {
    * Lớp CSS bổ sung
    */
   className?: string;
+  /**
+   * Username / Email mặc định
+   */
+  defaultUsername?: string;
+  defaultEmail?: string;
 }
 
 export function SlinkConnectionGuide({
@@ -50,10 +57,13 @@ export function SlinkConnectionGuide({
   defaultExpanded = true,
   title = 'Hướng Dẫn Kết Nối Cổng PTIT S-Link (slink.ptit.edu.vn)',
   className = '',
+  defaultUsername = '',
+  defaultEmail = '',
 }: SlinkConnectionGuideProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   const images = [
     {
@@ -423,18 +433,37 @@ export function SlinkConnectionGuide({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => handleOpenLightbox(0)}
-            className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>Xem Hướng Dẫn Kèm 4 Ảnh</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsForgotModalOpen(true)}
+              className="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Quên Mật Khẩu (1-Click)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleOpenLightbox(0)}
+              className="px-3.5 py-2 bg-white hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-purple-600" />
+              <span>Xem Hướng Dẫn</span>
+            </button>
+          </div>
         </div>
 
         {/* Modal Lightbox */}
         {isLightboxOpen && renderLightboxModal()}
+
+        {/* Modal Forgot Password */}
+        <SlinkForgotPasswordModal
+          isOpen={isForgotModalOpen}
+          onClose={() => setIsForgotModalOpen(false)}
+          defaultUsername={defaultUsername}
+          defaultEmail={defaultEmail}
+        />
       </>
     );
   }
@@ -449,19 +478,37 @@ export function SlinkConnectionGuide({
               <ShieldAlert className="w-4 h-4 text-purple-600 shrink-0" />
               <span>Chỉ hỗ trợ đăng nhập bằng Username & Mật khẩu trực tiếp</span>
             </div>
-            <button
-              type="button"
-              onClick={() => handleOpenLightbox(0)}
-              className="text-indigo-600 hover:text-indigo-800 font-bold underline flex items-center gap-1 text-[11px] cursor-pointer"
-            >
-              <span>Xem hướng dẫn lấy mật khẩu (4 ảnh)</span>
-              <ExternalLink className="w-3 h-3" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsForgotModalOpen(true)}
+                className="text-purple-700 hover:text-purple-900 font-black underline flex items-center gap-1 text-[11px] cursor-pointer"
+              >
+                <KeyRound className="w-3 h-3 text-purple-600" />
+                <span>Quên mật khẩu? (1-Click Reset)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenLightbox(0)}
+                className="text-indigo-600 hover:text-indigo-800 font-bold underline flex items-center gap-1 text-[11px] cursor-pointer"
+              >
+                <span>Xem hướng dẫn (4 ảnh)</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Modal Lightbox */}
         {isLightboxOpen && renderLightboxModal()}
+
+        {/* Modal Forgot Password */}
+        <SlinkForgotPasswordModal
+          isOpen={isForgotModalOpen}
+          onClose={() => setIsForgotModalOpen(false)}
+          defaultUsername={defaultUsername}
+          defaultEmail={defaultEmail}
+        />
       </>
     );
   }
@@ -499,6 +546,29 @@ export function SlinkConnectionGuide({
           >
             <span>{isExpanded ? 'Thu gọn' : 'Xem chi tiết'}</span>
             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {/* Quick 1-Click Auto Reset Box */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-3.5 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-white/20 rounded-xl shrink-0">
+              <Sparkles className="w-4 h-4 text-amber-300" />
+            </div>
+            <div>
+              <div className="font-bold text-xs">Chưa có hoặc Quên Mật Khẩu S-Link?</div>
+              <div className="text-[11px] text-purple-100">
+                Gửi yêu cầu reset tự động đến Keycloak SSO PTIT để nhận link đổi mật khẩu qua Outlook
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsForgotModalOpen(true)}
+            className="px-3.5 py-2 bg-white hover:bg-purple-50 text-purple-800 text-xs font-black rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-purple-600" />
+            <span>Tự Động Reset Mật Khẩu (1-Click)</span>
           </button>
         </div>
 
@@ -622,6 +692,14 @@ export function SlinkConnectionGuide({
 
       {/* Modal Lightbox */}
       {isLightboxOpen && renderLightboxModal()}
+
+      {/* Modal Forgot Password */}
+      <SlinkForgotPasswordModal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        defaultUsername={defaultUsername}
+        defaultEmail={defaultEmail}
+      />
     </>
   );
 }

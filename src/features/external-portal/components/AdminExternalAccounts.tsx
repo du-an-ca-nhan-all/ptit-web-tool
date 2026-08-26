@@ -1151,7 +1151,10 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
               </div>
 
               {formData.systemKey === 'SLINK_PTIT' && (
-                <SlinkConnectionGuide variant="compact" />
+                <SlinkConnectionGuide
+                  variant="compact"
+                  defaultUsername={formData.extUsername || formData.username}
+                />
               )}
 
               <div>
