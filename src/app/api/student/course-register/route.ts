@@ -39,6 +39,37 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Bạn không có quyền truy cập thông tin của sinh viên khác' }, { status: 403 });
     }
 
+    // Lấy thông tin cấu hình Flow theo Lớp trưởng nếu có
+    const followerFlowConfig = await prisma.monitorFlowConfig.findFirst({
+      where: { followerUsername: targetUsername },
+      orderBy: [{ isEnabled: 'desc' }, { updatedAt: 'desc' }],
+    });
+
+    let monitorFlowConfig = null;
+    if (followerFlowConfig) {
+      const monitorStudent = await prisma.student.findUnique({
+        where: { maSV: followerFlowConfig.monitorUsername },
+        select: { maSV: true, hoTen: true, ten: true, maLop: true, soDienThoai: true },
+      });
+
+      monitorFlowConfig = {
+        isConfigured: true,
+        isEnabled: followerFlowConfig.isEnabled,
+        classCode: followerFlowConfig.classCode,
+        monitorUsername: followerFlowConfig.monitorUsername,
+        monitorFullName: monitorStudent?.hoTen || monitorStudent?.ten || followerFlowConfig.monitorUsername,
+        monitorPhone: monitorStudent?.soDienThoai || null,
+        allowRegisterCourse: followerFlowConfig.allowRegisterCourse,
+        allowCancelCourse: followerFlowConfig.allowCancelCourse,
+        autoSyncOnAction: followerFlowConfig.autoSyncOnAction,
+        note: followerFlowConfig.note,
+        lastActionAt: followerFlowConfig.lastActionAt?.toISOString() || null,
+        lastActionType: followerFlowConfig.lastActionType,
+        lastActionResult: followerFlowConfig.lastActionResult,
+        lastActionMessage: followerFlowConfig.lastActionMessage,
+      };
+    }
+
     // Lấy thông tin tài khoản liên kết QLDTTX
     const extAccount = await prisma.externalAccount.findFirst({
       where: {
@@ -52,6 +83,7 @@ export async function GET(req: NextRequest) {
         success: true,
         isConfigured: false,
         username: targetUsername,
+        monitorFlowConfig,
         message: `Sinh viên ${targetUsername} chưa liên kết tài khoản Cổng Quản Lý Đào Tạo Từ Xa (QLDTTX).`,
         openCourses: {
           ds_nhom_to: [],
@@ -173,6 +205,7 @@ export async function GET(req: NextRequest) {
       success: true,
       isConfigured: true,
       username: targetUsername,
+      monitorFlowConfig,
       openCourses: {
         ...openCoursesData,
         ds_nhom_to: enrichedGroups,
@@ -216,6 +249,36 @@ export async function POST(req: NextRequest) {
     // Check permission
     if (effectiveUsername !== authUser.username.toUpperCase() && !authUser.isAdmin && !authUser.isMonitor) {
       return NextResponse.json({ error: 'Bạn không có quyền thao tác trên tài khoản khác' }, { status: 403 });
+    }
+
+    // 0. KIỂM TRA KHÓA ĐKMH NẾU SINH VIÊN ĐANG BẬT FLOW THEO LỚP TRƯỞNG
+    if (action === 'REGISTER' || action === 'CANCEL') {
+      const followerFlowConfig = await prisma.monitorFlowConfig.findFirst({
+        where: { followerUsername: effectiveUsername },
+        orderBy: [{ isEnabled: 'desc' }, { updatedAt: 'desc' }],
+      });
+
+      if (followerFlowConfig && followerFlowConfig.isEnabled) {
+        // Cho phép nếu người thực hiện là Admin hoặc chính Lớp trưởng đang phát lệnh cho sinh viên
+        const isMonitorOrAdmin =
+          authUser.isAdmin ||
+          (authUser.isMonitor &&
+            followerFlowConfig.monitorUsername.toUpperCase() === authUser.username.toUpperCase());
+
+        if (!isMonitorOrAdmin) {
+          return NextResponse.json(
+            {
+              error: `Tài khoản của bạn đang được cấu hình Flow tự động theo Lớp trưởng (${followerFlowConfig.monitorUsername} - Lớp ${followerFlowConfig.classCode}). Tính năng tự đăng ký/hủy môn thủ công bị tạm khóa để đảm bảo học chung lịch với lớp. Vui lòng liên hệ Lớp trưởng nếu bạn muốn tự thao tác.`,
+              isFlowLocked: true,
+              monitorFlowConfig: {
+                monitorUsername: followerFlowConfig.monitorUsername,
+                classCode: followerFlowConfig.classCode,
+              },
+            },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     // Lấy thông tin tài khoản QLDTTX

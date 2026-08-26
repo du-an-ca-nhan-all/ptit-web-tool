@@ -183,6 +183,7 @@ export default function DashboardOverview({
         onNavigateTab={onNavigateTab}
         isAdmin={currentUser.isAdmin}
         isMonitor={currentUser.isMonitor}
+        isFlowConfigured={Boolean(data.studentMonitorFlowSummary?.isConfigured && data.studentMonitorFlowSummary?.isEnabled)}
       />
     </div>
   );

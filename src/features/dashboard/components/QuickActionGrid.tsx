@@ -24,9 +24,10 @@ interface QuickActionGridProps {
   onNavigateTab: (tab: string, subTab?: string) => void;
   isAdmin?: boolean;
   isMonitor?: boolean;
+  isFlowConfigured?: boolean;
 }
 
-export default function QuickActionGrid({ onNavigateTab, isAdmin, isMonitor }: QuickActionGridProps) {
+export default function QuickActionGrid({ onNavigateTab, isAdmin, isMonitor, isFlowConfigured }: QuickActionGridProps) {
   const actions = [
     ...(isMonitor
       ? [
@@ -74,10 +75,12 @@ export default function QuickActionGrid({ onNavigateTab, isAdmin, isMonitor }: Q
       : []),
     {
       title: 'Đăng Ký Môn Học (QLHT)',
-      desc: 'Cổng ĐKMH trực tiếp & Auto Canh Slot (Sniper)',
+      desc: isFlowConfigured
+        ? 'Tự động hóa theo Lớp Trưởng (Đang bật Flow)'
+        : 'Cổng ĐKMH trực tiếp & Auto Canh Slot (Sniper)',
       icon: <Zap className="w-5 h-5 text-amber-500 fill-current" />,
       bg: 'bg-amber-50/70 hover:bg-amber-50 border-amber-200 hover:border-amber-300',
-      badge: 'Auto ĐKMH',
+      badge: isFlowConfigured ? 'Flow Lớp Trưởng' : 'Auto ĐKMH',
       badgeColor: 'bg-amber-100 text-amber-800 font-black',
       onClick: () => onNavigateTab('course_registration'),
     },

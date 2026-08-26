@@ -25,6 +25,23 @@ export interface SniperLogEntry {
   message: string;
 }
 
+export interface MonitorFlowConfigInfo {
+  isConfigured: boolean;
+  isEnabled: boolean;
+  classCode: string;
+  monitorUsername: string;
+  monitorFullName?: string;
+  monitorPhone?: string | null;
+  allowRegisterCourse?: boolean;
+  allowCancelCourse?: boolean;
+  autoSyncOnAction?: boolean;
+  note?: string | null;
+  lastActionAt?: string | null;
+  lastActionType?: string | null;
+  lastActionResult?: string | null;
+  lastActionMessage?: string | null;
+}
+
 export function useCourseRegistration(currentUser: LoginUser) {
   const [openCourses, setOpenCourses] = useState<{
     ds_nhom_to: OpenCourseGroupItem[];
@@ -61,6 +78,8 @@ export function useCourseRegistration(currentUser: LoginUser) {
     isConfigured: false,
     status: 'DISCONNECTED',
   });
+
+  const [monitorFlowConfig, setMonitorFlowConfig] = useState<MonitorFlowConfigInfo | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -158,6 +177,7 @@ export function useCourseRegistration(currentUser: LoginUser) {
 
       if (res.ok && data.success) {
         setExternalAccount(data.externalAccount || { isConfigured: false, status: 'DISCONNECTED' });
+        setMonitorFlowConfig(data.monitorFlowConfig || null);
         if (data.openCourses) {
           setOpenCourses(data.openCourses);
           if (data.openCourses.id_rs) {
@@ -171,6 +191,9 @@ export function useCourseRegistration(currentUser: LoginUser) {
           }
         }
       } else {
+        if (data.monitorFlowConfig) {
+          setMonitorFlowConfig(data.monitorFlowConfig);
+        }
         if (data.isConfigured === false) {
           setExternalAccount({ isConfigured: false, status: 'DISCONNECTED' });
         } else {
@@ -192,6 +215,13 @@ export function useCourseRegistration(currentUser: LoginUser) {
   // Đăng ký môn học
   const handleRegister = useCallback(
     async (idToHoc: string, svNganh: number = 1): Promise<boolean> => {
+      if (monitorFlowConfig?.isEnabled) {
+        setErrorMsg(
+          `Tài khoản của bạn đang được bật chế độ Flow theo Lớp trưởng (${monitorFlowConfig.monitorUsername} - Lớp ${monitorFlowConfig.classCode}). Tính năng tự đăng ký môn học trực tiếp bị khóa để tránh trùng lịch của lớp.`
+        );
+        return false;
+      }
+
       setRegisteringIds((prev) => ({ ...prev, [idToHoc]: true }));
       setErrorMsg('');
       setSuccessMsg('');
@@ -233,12 +263,19 @@ export function useCourseRegistration(currentUser: LoginUser) {
         setRegisteringIds((prev) => ({ ...prev, [idToHoc]: false }));
       }
     },
-    [currentUser.username, fetchPortalData, playAlertSound]
+    [currentUser.username, fetchPortalData, monitorFlowConfig, playAlertSound]
   );
 
   // Hủy môn học
   const handleCancel = useCallback(
     async (idToHoc: string, svNganh: number = 1): Promise<boolean> => {
+      if (monitorFlowConfig?.isEnabled) {
+        setErrorMsg(
+          `Tài khoản của bạn đang được bật chế độ Flow theo Lớp trưởng (${monitorFlowConfig.monitorUsername} - Lớp ${monitorFlowConfig.classCode}). Tính năng tự hủy môn học trực tiếp bị khóa để tránh trùng lịch của lớp.`
+        );
+        return false;
+      }
+
       setCancellingIds((prev) => ({ ...prev, [idToHoc]: true }));
       setErrorMsg('');
       setSuccessMsg('');
@@ -490,12 +527,18 @@ export function useCourseRegistration(currentUser: LoginUser) {
   }, [isSniperActive, sniperInterval, runSniperStep, addSniperLog]);
 
   const startSniper = useCallback(() => {
+    if (monitorFlowConfig?.isEnabled) {
+      setErrorMsg(
+        `Tài khoản đang bật Flow theo Lớp trưởng (${monitorFlowConfig.monitorUsername} - Lớp ${monitorFlowConfig.classCode}). Tính năng Canh Slot (Sniper Bot) trực tiếp bị khóa để tránh trùng lịch học.`
+      );
+      return;
+    }
     if (sniperTargets.length === 0) {
       setErrorMsg('Vui lòng thêm ít nhất 1 môn học vào danh sách cần canh slot trước khi bắt đầu.');
       return;
     }
     setIsSniperActive(true);
-  }, [sniperTargets.length]);
+  }, [monitorFlowConfig, sniperTargets.length]);
 
   const stopSniper = useCallback(() => {
     setIsSniperActive(false);
@@ -537,6 +580,7 @@ export function useCourseRegistration(currentUser: LoginUser) {
     openCourses,
     registeredCourses,
     externalAccount,
+    monitorFlowConfig,
     currentIdRs,
     isLoading,
     isRefreshing,
