@@ -85,7 +85,6 @@ export default function DashboardOverview({
         externalAccountStatus={data.externalAccountStatus}
         lmsAccountStatus={data.lmsAccountStatus}
         slinkAccountStatus={data.slinkAccountStatus}
-        studentMonitorFlowSummary={data.studentMonitorFlowSummary}
         telegramStatus={data.telegramStatus}
         activeBatchName={data.activeBatch?.name}
         onRefresh={refresh}

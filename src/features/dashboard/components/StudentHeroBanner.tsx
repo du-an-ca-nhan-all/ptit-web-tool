@@ -14,17 +14,15 @@ import {
   Clock,
   BookOpen,
   Smartphone,
-  GitMerge,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
-import { ExternalAccountStatus, TelegramSyncStatus, StudentMonitorFlowSummary } from '../types/dashboard.types';
+import { ExternalAccountStatus, TelegramSyncStatus } from '../types/dashboard.types';
 
 interface StudentHeroBannerProps {
   user: LoginUser;
   externalAccountStatus: ExternalAccountStatus;
   lmsAccountStatus?: ExternalAccountStatus;
   slinkAccountStatus?: ExternalAccountStatus;
-  studentMonitorFlowSummary?: StudentMonitorFlowSummary;
   telegramStatus: TelegramSyncStatus;
   activeBatchName?: string | null;
   onRefresh: () => void;
@@ -37,7 +35,6 @@ export default function StudentHeroBanner({
   externalAccountStatus,
   lmsAccountStatus,
   slinkAccountStatus,
-  studentMonitorFlowSummary,
   telegramStatus,
   activeBatchName,
   onRefresh,
@@ -234,30 +231,6 @@ export default function StudentHeroBanner({
                 Telegram: <strong>{telegramStatus.isEnabled ? 'Đang bật' : 'Chưa bật'}</strong>
               </span>
             </button>
-
-            {/* Monitor Flow Follower Status (if configured) */}
-            {studentMonitorFlowSummary?.isConfigured && (
-              <button
-                type="button"
-                onClick={() => onNavigateTab('course_registration')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
-                  studentMonitorFlowSummary.isEnabled
-                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25 shadow-xs'
-                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
-                }`}
-                title={`Flow ĐKMH theo Lớp trưởng ${studentMonitorFlowSummary.monitorFullName || studentMonitorFlowSummary.monitorUsername} (Lớp ${studentMonitorFlowSummary.classCode})`}
-              >
-                <GitMerge className="w-3.5 h-3.5 text-amber-400" />
-                <span>
-                  Flow LT: <strong>{studentMonitorFlowSummary.isEnabled ? 'Đang bật' : 'Tạm dừng'}</strong>
-                </span>
-                {studentMonitorFlowSummary.isEnabled ? (
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                ) : (
-                  <span className="w-2 h-2 rounded-full bg-slate-500" />
-                )}
-              </button>
-            )}
           </div>
 
           <div className="flex items-center gap-2">
