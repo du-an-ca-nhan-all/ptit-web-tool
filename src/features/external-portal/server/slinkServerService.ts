@@ -79,19 +79,30 @@ export interface SlinkLoginResult {
 }
 
 /**
+ * Chuẩn hóa tên đăng nhập S-Link thành địa chỉ Email sinh viên PTIT (...@stu.ptit.edu.vn)
+ * @param identifier Mã SV hoặc Email sinh viên
+ */
+export function formatSlinkEmail(identifier: string): string {
+  const clean = identifier.trim();
+  if (!clean) return '';
+  if (clean.includes('@')) return clean.toLowerCase();
+  return `${clean.toLowerCase()}@stu.ptit.edu.vn`;
+}
+
+/**
  * Đăng nhập vào PTIT SSO (Keycloak Direct Access Grant)
- * @param account - Tên tài khoản / Email / MSV và mật khẩu
+ * @param account - Email sinh viên PTIT hoặc MSV và mật khẩu
  * @returns Promise<SlinkAuthTokenResponse>
  */
 export async function loginSlink(account: {
   username: string;
   password: string;
 }): Promise<SlinkAuthTokenResponse> {
-  const cleanUser = account.username.trim();
+  const cleanUser = formatSlinkEmail(account.username);
   const cleanPass = account.password.trim();
 
   if (!cleanUser || !cleanPass) {
-    throw new Error('Vui lòng cung cấp đầy đủ tên đăng nhập (MSV/Email) và mật khẩu PTIT S-Link.');
+    throw new Error('Vui lòng cung cấp đầy đủ Email sinh viên PTIT (...@stu.ptit.edu.vn) và mật khẩu S-Link.');
   }
 
   const params = new URLSearchParams({
@@ -447,9 +458,9 @@ export async function requestSlinkPasswordReset(identifier: string): Promise<{
   sentTo: string;
   pageId?: string;
 }> {
-  const cleanIdentifier = identifier.trim();
-  if (!cleanIdentifier) {
-    throw new Error('Vui lòng cung cấp Mã sinh viên (MSV) hoặc Email sinh viên để gửi yêu cầu đặt lại mật khẩu S-Link.');
+  const emailToSend = formatSlinkEmail(identifier);
+  if (!emailToSend) {
+    throw new Error('Vui lòng cung cấp Email sinh viên PTIT (...@stu.ptit.edu.vn) để gửi yêu cầu đặt lại mật khẩu S-Link.');
   }
 
   // Bước 1: Gọi GET đến trang reset-credentials của Keycloak SSO để khởi tạo phiên & lấy session_code, execution ID
@@ -492,9 +503,9 @@ export async function requestSlinkPasswordReset(identifier: string): Promise<{
     throw new Error('Không tìm thấy đường dẫn hành động (loginAction) từ SSO S-Link');
   }
 
-  // Bước 2: Gửi POST kèm username/email đến loginAction URL
+  // Bước 2: Gửi POST kèm email đến loginAction URL
   const formBody = new URLSearchParams({
-    username: cleanIdentifier,
+    username: emailToSend,
   });
 
   const postRes = await fetch(postUrl, {
@@ -539,7 +550,7 @@ export async function requestSlinkPasswordReset(identifier: string): Promise<{
     success: true,
     message:
       'Hệ thống đã tự động gửi yêu cầu đặt lại mật khẩu S-Link thành công! Vui lòng kiểm tra Hòm thư sinh viên (Microsoft Outlook / PTIT Email) để nhấn vào liên kết tạo mật khẩu mới.',
-    sentTo: cleanIdentifier,
+    sentTo: emailToSend,
     pageId,
   };
 }

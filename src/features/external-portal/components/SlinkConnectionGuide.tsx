@@ -222,11 +222,14 @@ export function SlinkConnectionGuide({
     },
     {
       step: 6,
-      title: 'Điền thông tin và Lưu & Kết Nối trên PTIT Web Tool',
+      title: 'Điền Email & Mật khẩu mới để Lưu & Kết Nối',
       desc: (
         <>
-          Quay lại form bên dưới, nhập <strong>Tên đăng nhập (Email / MSV)</strong> và{' '}
-          <strong>Mật khẩu mới</strong> vừa tạo, sau đó ấn <strong>"Kiểm Tra Kết Nối"</strong> rồi{' '}
+          Quay lại form bên dưới, nhập <strong>Email sinh viên PTIT</strong> (ví dụ:{' '}
+          <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-[11px] border border-slate-200">
+            ...@stu.ptit.edu.vn
+          </code>
+          ) và <strong>Mật khẩu mới</strong> vừa tạo, sau đó ấn <strong>"Kiểm Tra Kết Nối"</strong> rồi{' '}
           <strong>"Lưu & Kết Nối"</strong>.
         </>
       ),

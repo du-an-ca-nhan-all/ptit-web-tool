@@ -165,8 +165,8 @@ export const AVAILABLE_EXTERNAL_SYSTEMS: ExternalSystemConfig[] = [
     name: 'Cổng thông tin PTIT S-Link',
     url: 'https://slink.ptit.edu.vn/',
     description:
-      'Cổng thông tin & ứng dụng sinh viên PTIT S-Link. Hệ thống chỉ hỗ trợ kết nối bằng Username & Mật khẩu trực tiếp (không hỗ trợ qua PTIT Microsoft SSO). Vui lòng ấn "Forgot password?" trên S-Link để tạo mật khẩu mới.',
-    placeholderUser: 'Nhập Email sinh viên PTIT hoặc Mã SV (Ví dụ: thanhlv...stu.ptit.edu.vn hoặc K25DTCN402)',
+      'Cổng thông tin & ứng dụng sinh viên PTIT S-Link. Tên đăng nhập là địa chỉ Email sinh viên PTIT (...@stu.ptit.edu.vn hoặc ...@ptit.edu.vn) kèm mật khẩu trực tiếp.',
+    placeholderUser: 'Nhập Email sinh viên PTIT (Ví dụ: b21dcpt001@stu.ptit.edu.vn)',
     badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
     iconKey: 'Smartphone',
   },

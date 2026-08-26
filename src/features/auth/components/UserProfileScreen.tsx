@@ -101,8 +101,12 @@ export default function UserProfileScreen({
         setExtForm((prev: any) => {
           const formState: any = { ...prev };
           data.accounts.forEach((acc: any) => {
+            const defaultUser =
+              acc.systemKey === 'SLINK_PTIT'
+                ? acc.extUsername || (currentUser.username.includes('@') ? currentUser.username : `${currentUser.username.toLowerCase()}@stu.ptit.edu.vn`)
+                : acc.extUsername || currentUser.username;
             formState[acc.systemKey] = {
-              username: prev[acc.systemKey]?.username || acc.extUsername || currentUser.username,
+              username: prev[acc.systemKey]?.username || defaultUser,
               password: prev[acc.systemKey]?.password || '',
               showPass: prev[acc.systemKey]?.showPass || false,
               isSaving: false,

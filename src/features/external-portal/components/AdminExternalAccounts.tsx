@@ -1178,7 +1178,9 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Tên đăng nhập trên {formData.systemName} (Mã SV / Username)
+                  {formData.systemKey === 'SLINK_PTIT'
+                    ? 'Email sinh viên PTIT (Tên đăng nhập S-Link)'
+                    : `Tên đăng nhập trên ${formData.systemName} (Mã SV / Username)`}
                 </label>
                 <input
                   type="text"
@@ -1188,7 +1190,11 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                     setModalTestStatus('IDLE');
                     setModalTestError('');
                   }}
-                  placeholder="Ví dụ: K25DTCN402"
+                  placeholder={
+                    formData.systemKey === 'SLINK_PTIT'
+                      ? 'Ví dụ: b21dcpt001@stu.ptit.edu.vn'
+                      : 'Ví dụ: K25DTCN402'
+                  }
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                   required
                 />

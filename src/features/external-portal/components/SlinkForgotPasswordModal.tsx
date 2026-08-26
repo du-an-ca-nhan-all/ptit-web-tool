@@ -32,9 +32,16 @@ export default function SlinkForgotPasswordModal({
   defaultEmail = '',
   onSuccess,
 }: SlinkForgotPasswordModalProps) {
-  const [identifier, setIdentifier] = useState(
-    defaultUsername || defaultEmail || ''
-  );
+  const getInitialIdentifier = () => {
+    if (defaultEmail && defaultEmail.includes('@')) return defaultEmail.toLowerCase();
+    if (defaultUsername) {
+      const clean = defaultUsername.trim();
+      return clean.includes('@') ? clean.toLowerCase() : `${clean.toLowerCase()}@stu.ptit.edu.vn`;
+    }
+    return '';
+  };
+
+  const [identifier, setIdentifier] = useState(getInitialIdentifier());
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [result, setResult] = useState<{
@@ -52,7 +59,7 @@ export default function SlinkForgotPasswordModal({
     if (e) e.preventDefault();
     const cleanId = identifier.trim();
     if (!cleanId) {
-      setErrorMsg('Vui lòng nhập Mã sinh viên (MSV) hoặc Email sinh viên.');
+      setErrorMsg('Vui lòng nhập địa chỉ Email sinh viên PTIT (...@stu.ptit.edu.vn).');
       return;
     }
 
@@ -137,16 +144,14 @@ export default function SlinkForgotPasswordModal({
                   <span>Cách thức hoạt động tự động:</span>
                 </div>
                 <p className="text-slate-600 text-[11.5px] leading-relaxed">
-                  Hệ thống sẽ tự động gửi lệnh đến máy chủ xác thực Keycloak của PTIT. Một thư chứa{' '}
-                  <strong className="text-purple-900">liên kết đặt lại mật khẩu</strong> sẽ được gửi về{' '}
-                  <strong className="text-purple-900">Email sinh viên PTIT (Microsoft Outlook)</strong> của bạn.
+                  Tên đăng nhập Cổng PTIT S-Link là <strong className="text-purple-900">Email sinh viên PTIT</strong> (...@stu.ptit.edu.vn). Hệ thống sẽ gửi yêu cầu trực tiếp đến Keycloak SSO PTIT, và email chứa liên kết tạo mật khẩu mới sẽ được gửi về Microsoft Outlook của bạn.
                 </p>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1">
-                    <Mail className="w-3.5 h-3.5 text-indigo-600" /> Mã Sinh Viên hoặc Email PTIT:
+                    <Mail className="w-3.5 h-3.5 text-indigo-600" /> Email Sinh Viên PTIT (Tên đăng nhập S-Link):
                   </span>
                   {identifier && (
                     <button
@@ -163,13 +168,13 @@ export default function SlinkForgotPasswordModal({
                   type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="Ví dụ: B21DCPT001 hoặc b21dcpt001@stu.ptit.edu.vn"
+                  placeholder="Ví dụ: b21dcpt001@stu.ptit.edu.vn"
                   className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-3 text-xs font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none transition-all"
                   disabled={isLoading}
                   autoFocus
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Nhập Mã sinh viên (viết liền) hoặc địa chỉ email sinh viên (...@stu.ptit.edu.vn).
+                  Nhập địa chỉ Email sinh viên PTIT (hoặc nhập Mã SV để tự động điền đuôi @stu.ptit.edu.vn).
                 </p>
               </div>
 

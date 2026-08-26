@@ -54,9 +54,14 @@ export async function POST(req: NextRequest) {
 
     if (!targetIdentifier) {
       return NextResponse.json(
-        { error: 'Vui lòng cung cấp Mã sinh viên (MSV) hoặc Email sinh viên (...@stu.ptit.edu.vn).' },
+        { error: 'Vui lòng cung cấp Email sinh viên (...@stu.ptit.edu.vn).' },
         { status: 400 }
       );
+    }
+
+    // Tự động chuẩn hóa thành định dạng email nếu người dùng chỉ nhập Mã SV
+    if (!targetIdentifier.includes('@')) {
+      targetIdentifier = `${targetIdentifier.toLowerCase()}@stu.ptit.edu.vn`;
     }
 
     // Phân quyền: nếu người dùng đang đăng nhập và truyền một username khác mà không phải Admin / Monitor

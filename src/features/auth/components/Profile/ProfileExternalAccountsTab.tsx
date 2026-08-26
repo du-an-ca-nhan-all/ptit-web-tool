@@ -69,10 +69,14 @@ export function ProfileExternalAccountsTab({
 
   const handleStartEdit = (sys: any) => {
     setEditingSystems((prev) => ({ ...prev, [sys.systemKey]: true }));
+    const defaultUser =
+      sys.systemKey === 'SLINK_PTIT'
+        ? sys.extUsername || (currentUser.username.includes('@') ? currentUser.username : `${currentUser.username.toLowerCase()}@stu.ptit.edu.vn`)
+        : sys.extUsername || currentUser.username || '';
     setExtForm((prev: any) => ({
       ...prev,
       [sys.systemKey]: {
-        username: sys.extUsername || currentUser.username || '',
+        username: defaultUser,
         password: '',
         showPass: false,
         isSaving: false,
@@ -501,7 +505,10 @@ export function ProfileExternalAccountsTab({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
-                      <UserIcon className="w-3.5 h-3.5 text-slate-400" /> Tên đăng nhập ({sys.systemName})
+                      <UserIcon className="w-3.5 h-3.5 text-slate-400" />{' '}
+                      {sys.systemKey === 'SLINK_PTIT'
+                        ? 'Email sinh viên PTIT (Tên đăng nhập S-Link)'
+                        : `Tên đăng nhập (${sys.systemName})`}
                     </label>
                     <input
                       type="text"
