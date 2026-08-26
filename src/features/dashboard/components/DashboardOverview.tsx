@@ -11,6 +11,7 @@ import AcademicSnapshotCards from './AcademicSnapshotCards';
 import LmsProgressDashboardCard from './LmsProgressDashboardCard';
 import UpcomingScheduleList from './UpcomingScheduleList';
 import ClassMonitorDashboardCard from './ClassMonitorDashboardCard';
+import StudentMonitorFlowCard from './StudentMonitorFlowCard';
 import AdminSystemHealthCard from './AdminSystemHealthCard';
 import RecentAnnouncementsWidget from './RecentAnnouncementsWidget';
 import QuickActionGrid from './QuickActionGrid';
@@ -84,6 +85,7 @@ export default function DashboardOverview({
         externalAccountStatus={data.externalAccountStatus}
         lmsAccountStatus={data.lmsAccountStatus}
         slinkAccountStatus={data.slinkAccountStatus}
+        studentMonitorFlowSummary={data.studentMonitorFlowSummary}
         telegramStatus={data.telegramStatus}
         activeBatchName={data.activeBatch?.name}
         onRefresh={refresh}
@@ -107,7 +109,15 @@ export default function DashboardOverview({
         />
       )}
 
-      {/* 4. Main Stats Grid (Exam Countdown, Timetable & Today's Classes, Academic Snapshot, LMS Learning Progress) */}
+      {/* 4. Student Class Monitor Flow Configuration (For followers) */}
+      {data.studentMonitorFlowSummary && data.studentMonitorFlowSummary.isConfigured && (
+        <StudentMonitorFlowCard
+          flowSummary={data.studentMonitorFlowSummary}
+          onNavigateTab={onNavigateTab}
+        />
+      )}
+
+      {/* 5. Main Stats Grid (Exam Countdown, Timetable & Today's Classes, Academic Snapshot, LMS Learning Progress) */}
       <div
         className={`grid grid-cols-1 gap-6 ${
           data.nextExam.hasExam && data.lmsSummary?.isConfigured

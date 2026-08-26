@@ -5,7 +5,7 @@ import { getGlobalConfig, GLOBAL_CONFIG_KEYS, TelegramBotConfigValue } from '@/s
 import { getStudentTimetableCalendar } from '@/src/features/external-portal/server/studentTimetableServerService';
 import { getOrFetchStudentLmsOverview } from '@/src/features/external-portal/server/lmsServerService';
 import { AnnouncementItem } from '@/src/features/announcements';
-import { DashboardData, LmsDashboardSummary } from '../types/dashboard.types';
+import { DashboardData, LmsDashboardSummary, StudentMonitorFlowSummary } from '../types/dashboard.types';
 
 /**
  * Calculates time difference and exam status relative to now
@@ -368,16 +368,31 @@ export async function getDashboardData(
     take: 5,
   });
 
+  const followerFlowConfigPromise = prisma.monitorFlowConfig.findFirst({
+    where: {
+      followerUsername: user.username,
+    },
+    orderBy: [{ isEnabled: 'desc' }, { updatedAt: 'desc' }],
+  });
+
   // 4. Await all concurrent tasks
-  const [rawExams, timetableRes, lmsData, classMonitorSummary, adminSystemHealth, announcementsList] =
-    await Promise.all([
-      rawExamsPromise,
-      timetablePromise,
-      lmsPromise,
-      classMonitorPromise,
-      adminHealthPromise,
-      announcementsPromise,
-    ]);
+  const [
+    rawExams,
+    timetableRes,
+    lmsData,
+    classMonitorSummary,
+    adminSystemHealth,
+    announcementsList,
+    followerFlowConfig,
+  ] = await Promise.all([
+    rawExamsPromise,
+    timetablePromise,
+    lmsPromise,
+    classMonitorPromise,
+    adminHealthPromise,
+    announcementsPromise,
+    followerFlowConfigPromise,
+  ]);
 
   // Parse & sort upcoming exams
   const parsedExamsList = rawExams.map((ex) => {
@@ -720,6 +735,67 @@ export async function getDashboardData(
     botUsername: telConfig?.botUsername || null,
   };
 
+  // Student Monitor Flow Summary (Nếu SV được cấu hình Flow theo Lớp trưởng)
+  let studentMonitorFlowSummary: StudentMonitorFlowSummary | undefined = undefined;
+  if (followerFlowConfig) {
+    const [monitorStudent, recentQueueItem] = await Promise.all([
+      prisma.student.findUnique({
+        where: { maSV: followerFlowConfig.monitorUsername },
+        select: { maSV: true, hoTen: true, ten: true, maLop: true, soDienThoai: true },
+      }),
+      prisma.monitorFlowQueueItem.findFirst({
+        where: {
+          followerUsername: user.username,
+          monitorUsername: followerFlowConfig.monitorUsername,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          flowAction: true,
+          ma_mon: true,
+          ten_mon: true,
+          nhom_to: true,
+          status: true,
+          resultMessage: true,
+          createdAt: true,
+          finishedAt: true,
+        },
+      }),
+    ]);
+
+    studentMonitorFlowSummary = {
+      isConfigured: true,
+      isEnabled: followerFlowConfig.isEnabled,
+      classCode: followerFlowConfig.classCode,
+      monitorUsername: followerFlowConfig.monitorUsername,
+      monitorFullName:
+        monitorStudent?.hoTen || monitorStudent?.ten || followerFlowConfig.monitorUsername,
+      monitorPhone: monitorStudent?.soDienThoai || undefined,
+      allowRegisterCourse: followerFlowConfig.allowRegisterCourse,
+      allowCancelCourse: followerFlowConfig.allowCancelCourse,
+      autoSyncOnAction: followerFlowConfig.autoSyncOnAction,
+      note: followerFlowConfig.note,
+      lastActionAt: followerFlowConfig.lastActionAt
+        ? followerFlowConfig.lastActionAt.toISOString()
+        : null,
+      lastActionType: followerFlowConfig.lastActionType,
+      lastActionResult: followerFlowConfig.lastActionResult,
+      lastActionMessage: followerFlowConfig.lastActionMessage,
+      isExternalAccountReady: qldttxAccount?.status === 'CONNECTED',
+      recentQueueItem: recentQueueItem
+        ? {
+            flowAction: recentQueueItem.flowAction,
+            ma_mon: recentQueueItem.ma_mon,
+            ten_mon: recentQueueItem.ten_mon,
+            nhom_to: recentQueueItem.nhom_to,
+            status: recentQueueItem.status,
+            resultMessage: recentQueueItem.resultMessage,
+            createdAt: recentQueueItem.createdAt.toISOString(),
+            finishedAt: recentQueueItem.finishedAt ? recentQueueItem.finishedAt.toISOString() : null,
+          }
+        : null,
+    };
+  }
+
   // Map Active Announcements
   const activeAnnouncements: AnnouncementItem[] = announcementsList.map((a) => ({
     id: a.id,
@@ -759,6 +835,7 @@ export async function getDashboardData(
     timetableSummary,
     lmsSummary,
     classMonitorSummary,
+    studentMonitorFlowSummary,
     adminSystemHealth,
     externalAccountStatus,
     lmsAccountStatus,

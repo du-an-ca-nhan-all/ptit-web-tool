@@ -96,6 +96,34 @@ export interface ClassMonitorSummary {
   totalClassRoomsCount: number;
 }
 
+export interface StudentMonitorFlowSummary {
+  isConfigured: boolean;
+  isEnabled: boolean;
+  classCode: string;
+  monitorUsername: string;
+  monitorFullName?: string;
+  monitorPhone?: string;
+  allowRegisterCourse: boolean;
+  allowCancelCourse: boolean;
+  autoSyncOnAction: boolean;
+  note?: string | null;
+  lastActionAt?: string | null;
+  lastActionType?: string | null;
+  lastActionResult?: string | null;
+  lastActionMessage?: string | null;
+  isExternalAccountReady: boolean;
+  recentQueueItem?: {
+    flowAction: string;
+    ma_mon?: string | null;
+    ten_mon?: string | null;
+    nhom_to?: string | null;
+    status: string;
+    resultMessage?: string | null;
+    createdAt: string;
+    finishedAt?: string | null;
+  } | null;
+}
+
 export interface AdminSystemHealth {
   isAdmin: boolean;
   totalStudents: number;
@@ -203,6 +231,7 @@ export interface DashboardData {
   timetableSummary: TimetableSummary;
   lmsSummary?: LmsDashboardSummary;
   classMonitorSummary?: ClassMonitorSummary;
+  studentMonitorFlowSummary?: StudentMonitorFlowSummary;
   adminSystemHealth?: AdminSystemHealth;
   externalAccountStatus: ExternalAccountStatus;
   lmsAccountStatus?: ExternalAccountStatus;

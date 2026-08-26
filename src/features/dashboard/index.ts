@@ -6,6 +6,7 @@ export { default as PersonalTimetableCard } from './components/PersonalTimetable
 export { default as AcademicSnapshotCards } from './components/AcademicSnapshotCards';
 export { default as LmsProgressDashboardCard } from './components/LmsProgressDashboardCard';
 export { default as ClassMonitorDashboardCard } from './components/ClassMonitorDashboardCard';
+export { default as StudentMonitorFlowCard } from './components/StudentMonitorFlowCard';
 export { default as AdminSystemHealthCard } from './components/AdminSystemHealthCard';
 export { default as UpcomingScheduleList } from './components/UpcomingScheduleList';
 export { default as RecentAnnouncementsWidget } from './components/RecentAnnouncementsWidget';
