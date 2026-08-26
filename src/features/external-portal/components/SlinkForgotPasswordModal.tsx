@@ -32,16 +32,9 @@ export default function SlinkForgotPasswordModal({
   defaultEmail = '',
   onSuccess,
 }: SlinkForgotPasswordModalProps) {
-  const getInitialIdentifier = () => {
-    if (defaultEmail && defaultEmail.includes('@')) return defaultEmail.toLowerCase();
-    if (defaultUsername) {
-      const clean = defaultUsername.trim();
-      return clean.includes('@') ? clean.toLowerCase() : `${clean.toLowerCase()}@stu.ptit.edu.vn`;
-    }
-    return '';
-  };
-
-  const [identifier, setIdentifier] = useState(getInitialIdentifier());
+  const [identifier, setIdentifier] = useState(
+    defaultEmail || (defaultUsername && defaultUsername.includes('@') ? defaultUsername : '')
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [result, setResult] = useState<{

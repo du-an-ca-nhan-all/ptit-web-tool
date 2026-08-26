@@ -69,109 +69,74 @@ export function SlinkConnectionGuide({
     {
       id: 'step1',
       stepNum: 1,
-      title: 'Bước 1: Ấn "Forgot password?" trên S-Link',
-      shortTitle: '1. Ấn "Forgot password?"',
-      badge: 'Cổng S-Link',
-      badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
-      src: '/assets/an_quen_mat_khau.png',
-      caption: 'Nhấn vào dòng chữ đỏ "Forgot password?" ở góc dưới ô Password trên màn hình đăng nhập',
+      title: 'Bước 1: Nhận Email từ PTIT Slink SSO',
+      shortTitle: '1. Nhận Email & Bấm Link',
+      badge: 'Microsoft Outlook',
+      badgeColor: 'bg-sky-100 text-sky-800 border-sky-200',
+      src: '/assets/email_quen_mat_khau.png',
+      caption: 'Mở thư từ "PTIT Slink SSO <slink@ptit.edu.vn>" trong Microsoft Outlook và nhấp vào "Link to reset credentials" (hiệu lực 5 phút)',
     },
     {
       id: 'step2',
       stepNum: 2,
-      title: 'Bước 2: Điền Email sinh viên PTIT & Submit',
-      shortTitle: '2. Điền Email & Submit',
+      title: 'Bước 2: Tạo Mật khẩu mới & Xác nhận',
+      shortTitle: '2. Tạo Mật khẩu mới',
       badge: 'Cổng S-Link',
-      badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      src: '/assets/anh_dien_email_quen_mat_khau.png',
-      caption: 'Nhập địa chỉ Email sinh viên (...@stu.ptit.edu.vn) rồi bấm nút đỏ "Submit"',
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      src: '/assets/anh_dien_mat_khau_moi.png',
+      caption: 'Nhập mật khẩu mới vào ô "New password" và "Confirm password", sau đó ấn "Submit"',
     },
     {
       id: 'step3',
       stepNum: 3,
-      title: 'Bước 3: Nhận Email từ PTIT Slink SSO',
-      shortTitle: '3. Nhận Email & Bấm Link',
-      badge: 'Microsoft Outlook',
-      badgeColor: 'bg-sky-100 text-sky-800 border-sky-200',
-      src: '/assets/email_quen_mat_khau.png',
-      caption: 'Mở thư từ "PTIT Slink SSO <slink@ptit.edu.vn>" và nhấp vào "Link to reset credentials" (hiệu lực 5 phút)',
+      title: 'Tham khảo: Giao diện Quên mật khẩu S-Link',
+      shortTitle: '3. Nút Quên MK S-Link',
+      badge: 'Cổng S-Link',
+      badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
+      src: '/assets/an_quen_mat_khau.png',
+      caption: 'Nút "Forgot password?" trên màn hình đăng nhập S-Link (Tool đã tự động gửi lệnh thay bạn)',
     },
     {
       id: 'step4',
       stepNum: 4,
-      title: 'Bước 4: Tạo Mật khẩu mới & Xác nhận',
-      shortTitle: '4. Tạo Mật khẩu mới',
+      title: 'Tham khảo: Điền Email trên S-Link',
+      shortTitle: '4. Điền Email S-Link',
       badge: 'Cổng S-Link',
-      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      src: '/assets/anh_dien_mat_khau_moi.png',
-      caption: 'Nhập mật khẩu mới vào "New password" và "Confirm password", sau đó ấn "Submit"',
+      badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      src: '/assets/anh_dien_email_quen_mat_khau.png',
+      caption: 'Màn hình nhập Email sinh viên trên slink.ptit.edu.vn (Tool đã tự động gửi thay bạn)',
     },
   ];
 
   const guideSteps = [
     {
       step: 1,
-      title: 'Mở trang đăng nhập Cổng S-Link',
+      title: 'Nhấn nút "Tự Động Reset Mật Khẩu" ngay trên Tool',
       desc: (
         <>
-          Truy cập Cổng thông tin sinh viên{' '}
-          <a
-            href="https://slink.ptit.edu.vn/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-600 hover:text-indigo-800 font-bold underline inline-flex items-center gap-0.5"
+          Bấm nút{' '}
+          <button
+            type="button"
+            onClick={() => setIsForgotModalOpen(true)}
+            className="text-purple-700 font-bold bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-300 hover:bg-purple-200 inline-flex items-center gap-1 cursor-pointer active:scale-95"
           >
-            slink.ptit.edu.vn <ExternalLink className="w-3 h-3" />
-          </a>
+            <KeyRound className="w-3 h-3 text-purple-700" />
+            <span>Tự Động Reset Mật Khẩu (1-Click)</span>
+          </button>{' '}
+          trên Tool, nhập địa chỉ <strong>Email sinh viên PTIT</strong> (ví dụ:{' '}
+          <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-[11px] border border-slate-200">
+            ...@stu.ptit.edu.vn
+          </code>
+          ) và bấm gửi. Tool sẽ tự động kết nối máy chủ S-Link SSO để gửi yêu cầu đặt lại mật khẩu về email của bạn (không cần tự vào web slink.ptit.edu.vn).
         </>
       ),
     },
     {
       step: 2,
-      title: 'Nhấn vào nút "Forgot password?" (Quên mật khẩu)',
+      title: 'Mở hòm thư sinh viên trên Microsoft Outlook',
       desc: (
         <>
-          Trên màn hình đăng nhập S-Link, nhấn vào dòng chữ đỏ{' '}
-          <button
-            type="button"
-            onClick={() => handleOpenLightbox(0)}
-            className="text-rose-600 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 hover:bg-rose-100 inline-flex items-center gap-0.5 cursor-pointer"
-          >
-            <span>Forgot password?</span>
-            <ImageIcon className="w-3 h-3" />
-          </button>{' '}
-          ở ngay phía dưới ô nhập Password.
-        </>
-      ),
-    },
-    {
-      step: 3,
-      title: 'Nhập Email sinh viên PTIT và bấm Submit',
-      desc: (
-        <>
-          Điền địa chỉ Email sinh viên do nhà trường cấp (ví dụ:{' '}
-          <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-[11px] border border-slate-200">
-            ...ptit.edu.vn
-          </code>
-          ) vào ô <em>Username or email</em> rồi bấm nút đỏ{' '}
-          <button
-            type="button"
-            onClick={() => handleOpenLightbox(1)}
-            className="text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 hover:bg-indigo-100 inline-flex items-center gap-0.5 cursor-pointer"
-          >
-            <span>Submit</span>
-            <ImageIcon className="w-3 h-3" />
-          </button>
-          .
-        </>
-      ),
-    },
-    {
-      step: 4,
-      title: 'Vào Email trên Microsoft để nhận link',
-      desc: (
-        <>
-          Đăng nhập hòm thư{' '}
+          Đăng nhập hòm thư sinh viên tại{' '}
           <a
             href="https://outlook.office.com/"
             target="_blank"
@@ -186,31 +151,31 @@ export function SlinkConnectionGuide({
           <em>"Reset password"</em>.{' '}
           <button
             type="button"
-            onClick={() => handleOpenLightbox(2)}
+            onClick={() => handleOpenLightbox(0)}
             className="text-sky-600 hover:text-sky-800 font-bold underline inline-flex items-center gap-0.5 text-[11px] cursor-pointer"
           >
-            [Xem ảnh email]
+            [Xem ảnh minh họa]
           </button>
         </>
       ),
     },
     {
-      step: 5,
-      title: 'Click vào link trong Email và tạo mật khẩu mới',
+      step: 3,
+      title: 'Bấm vào link trong Email và tạo mật khẩu mới',
       desc: (
         <>
           Nhấp vào liên kết{' '}
           <strong className="text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
             Link to reset credentials
           </strong>{' '}
-          trong email để mở form tạo mật khẩu mới.{' '}
+          trong email để mở trang tạo mật khẩu mới.{' '}
           <span className="text-amber-700 font-semibold inline-flex items-center gap-1">
-            <Clock className="w-3 h-3" /> (Link có hiệu lực trong 5 phút)
+            <Clock className="w-3 h-3" /> (Link có hiệu lực 5 phút)
           </span>
           . Nhập mật khẩu mới tại ô <em>New password</em> & <em>Confirm password</em> rồi bấm{' '}
           <button
             type="button"
-            onClick={() => handleOpenLightbox(3)}
+            onClick={() => handleOpenLightbox(1)}
             className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 inline-flex items-center gap-0.5 cursor-pointer"
           >
             <span>Submit</span>
@@ -221,8 +186,8 @@ export function SlinkConnectionGuide({
       ),
     },
     {
-      step: 6,
-      title: 'Điền Email & Mật khẩu mới để Lưu & Kết Nối',
+      step: 4,
+      title: 'Điền Email & Mật khẩu mới trên Tool để Lưu & Kết Nối',
       desc: (
         <>
           Quay lại form bên dưới, nhập <strong>Email sinh viên PTIT</strong> (ví dụ:{' '}
@@ -611,16 +576,14 @@ export function SlinkConnectionGuide({
 
               {/* Action shortcuts */}
               <div className="flex flex-wrap items-center gap-2 pt-2">
-                <a
-                  href="https://slink.ptit.edu.vn/"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setIsForgotModalOpen(true)}
                   className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95"
                 >
-                  <Smartphone className="w-3 h-3" />
-                  <span>1. Mở Cổng PTIT S-Link</span>
-                  <ExternalLink className="w-3 h-3 ml-0.5" />
-                </a>
+                  <KeyRound className="w-3 h-3" />
+                  <span>1. Bấm Reset Mật Khẩu Trên Tool</span>
+                </button>
 
                 <a
                   href="https://outlook.office.com/"
@@ -630,6 +593,17 @@ export function SlinkConnectionGuide({
                 >
                   <Mail className="w-3 h-3" />
                   <span>2. Mở Email Microsoft (Outlook)</span>
+                  <ExternalLink className="w-3 h-3 ml-0.5" />
+                </a>
+
+                <a
+                  href="https://slink.ptit.edu.vn/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-[11px] font-medium transition flex items-center gap-1 cursor-pointer active:scale-95"
+                >
+                  <Smartphone className="w-3 h-3 text-slate-500" />
+                  <span>Cổng S-Link</span>
                   <ExternalLink className="w-3 h-3 ml-0.5" />
                 </a>
               </div>

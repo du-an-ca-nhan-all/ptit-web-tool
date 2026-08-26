@@ -103,7 +103,7 @@ export default function UserProfileScreen({
           data.accounts.forEach((acc: any) => {
             const defaultUser =
               acc.systemKey === 'SLINK_PTIT'
-                ? acc.extUsername || (currentUser.username.includes('@') ? currentUser.username : `${currentUser.username.toLowerCase()}@stu.ptit.edu.vn`)
+                ? acc.extUsername || ''
                 : acc.extUsername || currentUser.username;
             formState[acc.systemKey] = {
               username: prev[acc.systemKey]?.username || defaultUser,

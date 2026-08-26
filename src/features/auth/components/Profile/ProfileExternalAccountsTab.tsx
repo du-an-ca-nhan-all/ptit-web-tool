@@ -71,7 +71,7 @@ export function ProfileExternalAccountsTab({
     setEditingSystems((prev) => ({ ...prev, [sys.systemKey]: true }));
     const defaultUser =
       sys.systemKey === 'SLINK_PTIT'
-        ? sys.extUsername || (currentUser.username.includes('@') ? currentUser.username : `${currentUser.username.toLowerCase()}@stu.ptit.edu.vn`)
+        ? sys.extUsername || ''
         : sys.extUsername || currentUser.username || '';
     setExtForm((prev: any) => ({
       ...prev,
@@ -314,7 +314,7 @@ export function ProfileExternalAccountsTab({
                   {sys.systemKey === 'SLINK_PTIT' && (
                     <SlinkConnectionGuide
                       variant="compact"
-                      defaultUsername={sys.extUsername || currentUser.username}
+                      defaultUsername={sys.extUsername || ''}
                     />
                   )}
 
@@ -437,7 +437,7 @@ export function ProfileExternalAccountsTab({
                   <SlinkConnectionGuide
                     variant="card"
                     defaultExpanded={true}
-                    defaultUsername={form.username || currentUser.username}
+                    defaultUsername={form.username || ''}
                     title={isEditing ? 'Hướng Dẫn Đổi / Lấy Lại Mật Khẩu PTIT S-Link' : 'Hướng Dẫn Lấy Mật Khẩu Cổng PTIT S-Link'}
                   />
                 )}
@@ -692,7 +692,7 @@ export function ProfileExternalAccountsTab({
       <SlinkForgotPasswordModal
         isOpen={isSlinkForgotModalOpen}
         onClose={() => setIsSlinkForgotModalOpen(false)}
-        defaultUsername={extForm['SLINK_PTIT']?.username || currentUser.username}
+        defaultUsername={extForm['SLINK_PTIT']?.username || ''}
       />
     </div>
   );

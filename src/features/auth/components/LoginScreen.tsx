@@ -667,7 +667,7 @@ export default function LoginScreen({
       <SlinkForgotPasswordModal
         isOpen={isSlinkModalOpen}
         onClose={() => setIsSlinkModalOpen(false)}
-        defaultUsername={username || regUsername}
+        defaultUsername=""
       />
     </div>
   );
