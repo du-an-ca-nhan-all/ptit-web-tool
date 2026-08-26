@@ -27,11 +27,11 @@ async function main() {
       console.log(`  * ${t.label.padEnd(30, ' ')} [${t.name}]: ${t.count.toLocaleString('vi-VN')} records`);
     });
 
-    console.log('\n[2/3] Generating PostgreSQL backups (SQL Dump & JSON export)...');
+    console.log('\n[2/3] Generating PostgreSQL SQL Dump backup (.sql)...');
     const backupsDir = getBackupsDirectory();
     console.log(`- Destination folder: ${backupsDir}`);
 
-    const createdFiles = await createLocalBackup('all');
+    const createdFiles = await createLocalBackup('sql');
 
     console.log('\n[3/3] Local backup completed!');
     createdFiles.forEach((file) => {

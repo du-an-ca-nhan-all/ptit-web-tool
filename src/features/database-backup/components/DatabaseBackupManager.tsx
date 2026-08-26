@@ -65,7 +65,6 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
   const [deletingFilename, setDeletingFilename] = useState<string | null>(null);
   const [confirmDeleteFile, setConfirmDeleteFile] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [selectedFormat, setSelectedFormat] = useState<'all' | 'sql' | 'json'>('all');
 
   // Restoration State
   const [restoreTargetFile, setRestoreTargetFile] = useState<string | null>(null);
@@ -129,10 +128,10 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
     fetchBackupData();
   }, [fetchBackupData]);
 
-  // Handle direct download from live DB
-  const handleDirectDownload = (format: 'sql' | 'json') => {
-    showToast(`Đang chuẩn bị tải về file ${format.toUpperCase()}...`, 'info');
-    const url = `/api/backup?download=true&format=${format}`;
+  // Handle direct download SQL dump from live DB
+  const handleDirectDownload = () => {
+    showToast('Đang chuẩn bị tải về file SQL Dump...', 'info');
+    const url = '/api/backup?download=true&format=sql';
     const link = document.createElement('a');
     link.href = url;
     link.download = '';
@@ -140,7 +139,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
     link.click();
     document.body.removeChild(link);
     setTimeout(() => {
-      showToast(`Đã bắt đầu tải file sao lưu ${format.toUpperCase()}`, 'success');
+      showToast('Đã bắt đầu tải file sao lưu SQL Dump', 'success');
       fetchBackupData();
     }, 1000);
   };
@@ -157,18 +156,18 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
     document.body.removeChild(link);
   };
 
-  // Handle creating snapshot on server (Chủ động tạo bản sao lưu)
+  // Handle creating snapshot on server (Chủ động tạo bản sao lưu SQL)
   const handleCreateServerBackup = async () => {
     setIsCreatingBackup(true);
     try {
       const res = await fetch('/api/backup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'CREATE_SNAPSHOT', format: selectedFormat }),
+        body: JSON.stringify({ action: 'CREATE_SNAPSHOT' }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast(data.message || 'Đã tạo bản sao lưu máy chủ thành công!', 'success');
+        showToast(data.message || 'Đã tạo bản sao lưu SQL máy chủ thành công!', 'success');
         if (data.stats) setStats(data.stats);
         if (data.localBackups) setLocalBackups(data.localBackups);
       } else {
@@ -646,7 +645,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
       </div>
 
       {/* Main Actions Panel: Export & Snapshot */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Card 1: Direct Instant Download (PostgreSQL SQL Dump Live) */}
         <div className="bg-gradient-to-b from-sky-950/40 to-slate-900 border border-sky-500/20 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
           <div>
@@ -664,7 +663,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
             </p>
           </div>
           <button
-            onClick={() => handleDirectDownload('sql')}
+            onClick={handleDirectDownload}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-sky-900/30 transition cursor-pointer active:scale-98"
           >
             <ArrowDownToLine className="w-4 h-4" />
@@ -672,32 +671,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
           </button>
         </div>
 
-        {/* Card 2: Direct Instant Download (JSON Dump) */}
-        <div className="bg-gradient-to-b from-emerald-950/40 to-slate-900 border border-emerald-500/20 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl">
-                <FileCode className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-white text-base">Dữ Liệu JSON Toàn Bộ (.json)</h3>
-                <span className="text-xs text-emerald-400 font-medium">Dễ đọc, di động & phục hồi đa nền tảng</span>
-              </div>
-            </div>
-            <p className="text-slate-400 text-xs leading-relaxed mb-4">
-              Xuất toàn bộ {stats?.tableBreakdown?.length ? `${stats.tableBreakdown.length} bảng` : 'các bảng'} dữ liệu cùng metadata thành định dạng JSON chuẩn. Thích hợp cho việc lưu trữ đám mây, phân tích hoặc di chuyển hệ thống.
-            </p>
-          </div>
-          <button
-            onClick={() => handleDirectDownload('json')}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-900/30 transition cursor-pointer active:scale-98"
-          >
-            <Download className="w-4 h-4" />
-            Tải Bản JSON Đầy Đủ (.json)
-          </button>
-        </div>
-
-        {/* Card 3: Server Snapshot Creation */}
+        {/* Card 2: Server Snapshot Creation */}
         <div className="bg-gradient-to-b from-indigo-950/40 to-slate-900 border border-indigo-500/20 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-3">
@@ -705,29 +679,13 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
                 <Server className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-white text-base">Lưu Trữ Trên Máy Chủ</h3>
-                <span className="text-xs text-indigo-400 font-medium">Tạo snapshot trong thư mục backups/</span>
+                <h3 className="font-bold text-white text-base">Lưu Trữ Snapshot Trên Máy Chủ (.sql)</h3>
+                <span className="text-xs text-indigo-400 font-medium">Tạo bản sao lưu trong thư mục backups/</span>
               </div>
             </div>
-            <p className="text-slate-400 text-xs leading-relaxed mb-3">
-              Tạo bản lưu trữ đóng dấu thời gian trực tiếp trên máy chủ. Bạn có thể tải lại hoặc phục hồi bất kỳ lúc nào.
+            <p className="text-slate-400 text-xs leading-relaxed mb-4">
+              Tạo bản lưu trữ SQL (.sql) đóng dấu thời gian trực tiếp trên máy chủ. Bạn có thể tải lại hoặc phục hồi bất kỳ lúc nào ngay trên giao diện Web hoặc qua dòng lệnh.
             </p>
-            {/* Format choice */}
-            <div className="flex items-center gap-2 mb-4">
-              {(['all', 'sql', 'json'] as const).map((fmt) => (
-                <button
-                  key={fmt}
-                  onClick={() => setSelectedFormat(fmt)}
-                  className={`flex-1 py-1.5 text-[11px] font-semibold rounded-lg border transition cursor-pointer ${
-                    selectedFormat === fmt
-                      ? 'bg-indigo-600 text-white border-indigo-400 shadow-sm'
-                      : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
-                  }`}
-                >
-                  {fmt === 'all' ? 'Cả 2 File' : fmt.toUpperCase()}
-                </button>
-              ))}
-            </div>
           </div>
           <button
             onClick={handleCreateServerBackup}
@@ -742,7 +700,7 @@ export default function DatabaseBackupManager({ currentUser }: DatabaseBackupMan
             ) : (
               <>
                 <Archive className="w-4 h-4" />
-                Tạo Snapshot Máy Chủ
+                Tạo Snapshot Máy Chủ (.sql)
               </>
             )}
           </button>

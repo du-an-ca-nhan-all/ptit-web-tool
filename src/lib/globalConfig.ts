@@ -34,7 +34,7 @@ export interface BackupTelegramConfigValue {
   botToken?: string | null; // Nếu rỗng sẽ dùng System Bot
   sendSql?: boolean; // Gửi file SQL Dump PostgreSQL (.sql)
   sendSqlite?: boolean; // Legacy fallback
-  sendJson: boolean; // Gửi file JSON đầy đủ (.json)
+  sendJson?: boolean; // Legacy fallback
   autoBackupEnabled?: boolean;
   scheduleTime?: string; // Mặc định: '10:00' (10h sáng hàng ngày)
   notifyOnDbBackup?: boolean; // Thông báo khi Sao Lưu & Xuất Dữ Liệu DB (Mặc định: true)

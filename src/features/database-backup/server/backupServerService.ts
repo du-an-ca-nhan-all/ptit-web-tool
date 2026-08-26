@@ -453,42 +453,24 @@ export function generateTimestampString(date = new Date()): string {
   return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
 }
 
-export async function createLocalBackup(format: 'sql' | 'json' | 'all' = 'all'): Promise<LocalBackupFile[]> {
+export async function createLocalBackup(format: 'sql' = 'sql'): Promise<LocalBackupFile[]> {
   const backupsDir = getBackupsDirectory();
   const timestamp = generateTimestampString();
   const createdFiles: LocalBackupFile[] = [];
 
-  // 1. Backup PostgreSQL SQL Dump (.sql)
-  if (format === 'sql' || format === 'all') {
-    const sqlDump = await exportDatabaseAsSqlDump();
-    const filename = `ptit-db-backup-${timestamp}.sql`;
-    const targetPath = path.join(backupsDir, filename);
-    fs.writeFileSync(targetPath, sqlDump, 'utf8');
-    const stat = fs.statSync(targetPath);
-    createdFiles.push({
-      name: filename,
-      format: 'sql',
-      size: stat.size,
-      sizeFormatted: formatBytes(stat.size),
-      createdAt: stat.birthtime.toISOString(),
-    });
-  }
-
-  // 2. Backup JSON (.json)
-  if (format === 'json' || format === 'all') {
-    const jsonDump = await exportDatabaseAsJson();
-    const filename = `ptit-db-backup-${timestamp}.json`;
-    const targetPath = path.join(backupsDir, filename);
-    fs.writeFileSync(targetPath, JSON.stringify(jsonDump, null, 2), 'utf8');
-    const stat = fs.statSync(targetPath);
-    createdFiles.push({
-      name: filename,
-      format: 'json',
-      size: stat.size,
-      sizeFormatted: formatBytes(stat.size),
-      createdAt: stat.birthtime.toISOString(),
-    });
-  }
+  // Backup PostgreSQL SQL Dump (.sql)
+  const sqlDump = await exportDatabaseAsSqlDump();
+  const filename = `ptit-db-backup-${timestamp}.sql`;
+  const targetPath = path.join(backupsDir, filename);
+  fs.writeFileSync(targetPath, sqlDump, 'utf8');
+  const stat = fs.statSync(targetPath);
+  createdFiles.push({
+    name: filename,
+    format: 'sql',
+    size: stat.size,
+    sizeFormatted: formatBytes(stat.size),
+    createdAt: stat.birthtime.toISOString(),
+  });
 
   return createdFiles;
 }
@@ -611,7 +593,6 @@ export async function saveBackupTelegramConfig(params: {
     isEnabled = true,
     sendSql = true,
     sendSqlite,
-    sendJson = true,
     autoBackupEnabled = false,
     scheduleTime = '10:00',
     notifyOnDbBackup = true,
@@ -639,7 +620,7 @@ export async function saveBackupTelegramConfig(params: {
     botToken: botToken ? botToken.trim() : (existing?.botToken || null),
     sendSql: Boolean(sendSql ?? existing?.sendSql ?? true),
     sendSqlite: Boolean(sendSqlite ?? existing?.sendSqlite ?? true),
-    sendJson: Boolean(sendJson),
+    sendJson: false,
     autoBackupEnabled: Boolean(autoBackupEnabled),
     scheduleTime: scheduleTime || '10:00',
     notifyOnDbBackup: Boolean(notifyOnDbBackup ?? existing?.notifyOnDbBackup ?? true),
@@ -699,7 +680,7 @@ export async function testBackupTelegramTarget(params?: {
 
   const now = new Date();
   const timeStr = now.toLocaleTimeString('vi-VN') + ' ' + now.toLocaleDateString('vi-VN');
-  const message = `🔔 <b>KIỂM TRA KẾT NỐI SAO LƯU TELEGRAM (POSTGRESQL)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n✅ <b>Trạng thái:</b> Kết nối thành công!\n📌 <b>Kênh/Nhóm/Chat:</b> <code>${chatId}</code>${threadId ? ` (Topic: <code>${threadId}</code>)` : ''}\n⏰ <b>Thời gian test:</b> <i>${timeStr}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🐘 <i>Sẵn sàng nhận các file sao lưu PostgreSQL (.sql / .json) từ PTIT Exam Portal.</i>`;
+  const message = `🔔 <b>KIỂM TRA KẾT NỐI SAO LƯU TELEGRAM (POSTGRESQL)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n✅ <b>Trạng thái:</b> Kết nối thành công!\n📌 <b>Kênh/Nhóm/Chat:</b> <code>${chatId}</code>${threadId ? ` (Topic: <code>${threadId}</code>)` : ''}\n⏰ <b>Thời gian test:</b> <i>${timeStr}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🐘 <i>Sẵn sàng nhận file sao lưu PostgreSQL (.sql) từ PTIT Exam Portal.</i>`;
 
   const sendRes = await sendTelegramMessage(botToken, chatId, message, {
     threadId: threadId ? Number(threadId) : undefined,
@@ -726,7 +707,7 @@ export async function testBackupTelegramTarget(params?: {
  * Thực hiện backup và gửi file trực tiếp lên Telegram
  */
 export async function sendBackupToTelegram(params?: {
-  format?: 'sql' | 'json' | 'all';
+  format?: 'sql';
   customChatId?: string;
   customThreadId?: string | null;
   customBotToken?: string | null;
@@ -755,17 +736,6 @@ export async function sendBackupToTelegram(params?: {
     botToken = sysBot.botToken;
   }
 
-  const shouldSendSql = storedConfig?.sendSql !== false && storedConfig?.sendSqlite !== false;
-  const shouldSendJson = storedConfig?.sendJson !== false;
-
-  const format =
-    params?.format ||
-    (shouldSendSql && shouldSendJson
-      ? 'all'
-      : shouldSendSql
-      ? 'sql'
-      : 'json');
-
   const stats = await getDatabaseStats();
   const timestamp = generateTimestampString();
   const timeDisplay = new Date().toLocaleTimeString('vi-VN') + ' - ' + new Date().toLocaleDateString('vi-VN');
@@ -774,57 +744,28 @@ export async function sendBackupToTelegram(params?: {
   const results: any[] = [];
   const errors: string[] = [];
 
-  // 1. Send PostgreSQL SQL Dump (.sql)
-  if (format === 'sql' || format === 'all') {
-    try {
-      const sqlDump = await exportDatabaseAsSqlDump();
-      const sqlBuffer = Buffer.from(sqlDump, 'utf-8');
-      const filename = `ptit-db-${timestamp}.sql`;
-      const sizeFormatted = formatBytes(sqlBuffer.length);
+  // Send PostgreSQL SQL Dump (.sql)
+  try {
+    const sqlDump = await exportDatabaseAsSqlDump();
+    const sqlBuffer = Buffer.from(sqlDump, 'utf-8');
+    const filename = `ptit-db-${timestamp}.sql`;
+    const sizeFormatted = formatBytes(sqlBuffer.length);
 
-      const caption = `🐘 <b>BẢN SAO LƯU DATABASE POSTGRESQL (.sql)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n📋 <b>Bao gồm:</b> ${stats.tableBreakdown.length} bảng dữ liệu PostgreSQL\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <i>File SQL Dump chuẩn PostgreSQL - Tự động nhận diện toàn bộ cấu trúc bảng & khôi phục tức thì.</i>`;
+    const caption = `🐘 <b>BẢN SAO LƯU DATABASE POSTGRESQL (.sql)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n📋 <b>Bao gồm:</b> ${stats.tableBreakdown.length} bảng dữ liệu PostgreSQL\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <i>File SQL Dump chuẩn PostgreSQL - Tự động nhận diện toàn bộ cấu trúc bảng & khôi phục tức thì.</i>`;
 
-      const sendRes = await sendTelegramDocument(botToken, chatId, sqlBuffer, filename, {
-        threadId: threadId ? Number(threadId) : undefined,
-        caption,
-      });
+    const sendRes = await sendTelegramDocument(botToken, chatId, sqlBuffer, filename, {
+      threadId: threadId ? Number(threadId) : undefined,
+      caption,
+    });
 
-      results.push({ file: filename, format: 'sql', result: sendRes });
-      if (sendRes.success) {
-        filesSent.push(filename);
-      } else {
-        errors.push(`Lỗi gửi file SQL: ${sendRes.error}`);
-      }
-    } catch (sqlErr: any) {
-      errors.push(`Lỗi tạo file SQL Dump: ${sqlErr.message}`);
+    results.push({ file: filename, format: 'sql', result: sendRes });
+    if (sendRes.success) {
+      filesSent.push(filename);
+    } else {
+      errors.push(`Lỗi gửi file SQL: ${sendRes.error}`);
     }
-  }
-
-  // 2. Send JSON Dump (.json)
-  if (format === 'json' || format === 'all') {
-    try {
-      const jsonDump = await exportDatabaseAsJson();
-      const jsonStr = JSON.stringify(jsonDump, null, 2);
-      const jsonBuffer = Buffer.from(jsonStr, 'utf-8');
-      const filename = `ptit-db-${timestamp}.json`;
-      const sizeFormatted = formatBytes(jsonBuffer.length);
-
-      const caption = `📄 <b>BẢN XUẤT DỮ LIỆU JSON ĐẦY ĐỦ (.json)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n📋 <b>Bao gồm:</b> ${stats.tableBreakdown.length} bảng dữ liệu hệ thống PostgreSQL\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🌐 <i>Dữ liệu JSON có cấu trúc đầy đủ, tự động khớp mọi bảng & cột khi khôi phục.</i>`;
-
-      const sendRes = await sendTelegramDocument(botToken, chatId, jsonBuffer, filename, {
-        threadId: threadId ? Number(threadId) : undefined,
-        caption,
-      });
-
-      results.push({ file: filename, format: 'json', result: sendRes });
-      if (sendRes.success) {
-        filesSent.push(filename);
-      } else {
-        errors.push(`Lỗi gửi file JSON: ${sendRes.error}`);
-      }
-    } catch (jsonErr: any) {
-      errors.push(`Lỗi tạo file JSON: ${jsonErr.message}`);
-    }
+  } catch (sqlErr: any) {
+    errors.push(`Lỗi tạo file SQL Dump: ${sqlErr.message}`);
   }
 
   const isSuccess = filesSent.length > 0;
@@ -843,7 +784,7 @@ export async function sendBackupToTelegram(params?: {
   return {
     success: isSuccess,
     message: isSuccess
-      ? `Đã gửi thành công ${filesSent.length} file sao lưu lên Telegram!`
+      ? `Đã gửi thành công file sao lưu SQL (${filesSent.join(', ')}) lên Telegram!`
       : `Gửi file sao lưu lên Telegram thất bại: ${errorMsg}`,
     filesSent,
     results,
@@ -886,11 +827,11 @@ export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean
       };
     }
 
-    console.log(`⏰ [Auto Backup] Bắt đầu tự động tạo bản sao lưu dữ liệu PostgreSQL lúc ${scheduleTime} sáng...`);
+    console.log(`⏰ [Auto Backup] Bắt đầu tự động tạo bản sao lưu dữ liệu PostgreSQL (.sql) lúc ${scheduleTime} sáng...`);
 
-    // 1. Tạo snapshot lưu cục bộ trên máy chủ
-    const createdFiles = await createLocalBackup('all');
-    console.log(`⏰ [Auto Backup] Đã tạo ${createdFiles.length} file snapshot trên máy chủ.`);
+    // 1. Tạo snapshot SQL lưu cục bộ trên máy chủ
+    const createdFiles = await createLocalBackup('sql');
+    console.log(`⏰ [Auto Backup] Đã tạo file snapshot SQL trên máy chủ: ${createdFiles.map((f) => f.name).join(', ')}`);
 
     // 2. Gửi Telegram nếu có cấu hình
     let telegramResult: any = null;
@@ -909,8 +850,10 @@ export async function runDailyAutoBackupScheduler(): Promise<{ executed: boolean
         isEnabled: true,
         chatId: '',
         sendSql: true,
-        sendJson: true,
+        sendJson: false,
       }),
+      sendSql: true,
+      sendJson: false,
       autoBackupEnabled: isAutoEnabled,
       scheduleTime,
       lastAutoBackupDate: currentDateStr,
@@ -949,8 +892,8 @@ export async function restoreFromSqlDump(
   stats: DatabaseStats;
 }> {
   // 1. Tạo bản sao lưu an toàn trước khi phục hồi
-  const preRestoreFiles = await createLocalBackup('json');
-  const preRestoreName = preRestoreFiles[0]?.name || 'pre-restore-backup.json';
+  const preRestoreFiles = await createLocalBackup('sql');
+  const preRestoreName = preRestoreFiles[0]?.name || 'pre-restore-backup.sql';
 
   try {
     await prisma.$executeRawUnsafe(sqlContent);
@@ -1010,8 +953,8 @@ export async function restoreFromJsonDump(
   }
 
   // 1. Tạo bản sao lưu an toàn trước khi phục hồi
-  const preRestoreFiles = await createLocalBackup('json');
-  const preRestoreName = preRestoreFiles[0]?.name || 'pre-restore-backup.json';
+  const preRestoreFiles = await createLocalBackup('sql');
+  const preRestoreName = preRestoreFiles[0]?.name || 'pre-restore-backup.sql';
 
   // 2. Lấy danh sách bảng trong Database đích và sắp xếp theo quan hệ khoá ngoại
   const dbTables = await getPublicTables(prisma);

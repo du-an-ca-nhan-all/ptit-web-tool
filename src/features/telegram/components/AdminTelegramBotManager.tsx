@@ -139,7 +139,6 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
   const [telThreadId, setTelThreadId] = useState('');
   const [telIsEnabled, setTelIsEnabled] = useState(true);
   const [telSendSql, setTelSendSql] = useState(true);
-  const [telSendJson, setTelSendJson] = useState(true);
   const [telAutoBackupEnabled, setTelAutoBackupEnabled] = useState(true);
   const [telScheduleTime, setTelScheduleTime] = useState('10:00');
   const [telNotifyOnDbBackup, setTelNotifyOnDbBackup] = useState(true);
@@ -206,7 +205,6 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
             setTelThreadId(backupData.telegramConfig.threadId || '');
           }
           setTelSendSql(backupData.telegramConfig.sendSql !== false);
-          setTelSendJson(backupData.telegramConfig.sendJson !== false);
           setTelAutoBackupEnabled(backupData.telegramConfig.autoBackupEnabled !== false);
           setTelScheduleTime(backupData.telegramConfig.scheduleTime || '10:00');
         }
@@ -576,7 +574,6 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
             isEnabled: telIsEnabled,
             sendSql: telSendSql,
             sendSqlite: telSendSql,
-            sendJson: telSendJson,
             autoBackupEnabled: telAutoBackupEnabled,
             scheduleTime: telScheduleTime || '10:00',
             notifyOnDbBackup: telNotifyOnDbBackup,
@@ -639,12 +636,12 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
   const handleSendInstantBackupToTelegram = async () => {
     setIsSendingInstantBackup(true);
     setErrorMsg('');
-    setSuccessMsg('Đang thực hiện sao lưu toàn bộ dữ liệu và gửi lên Telegram...');
+    setSuccessMsg('Đang thực hiện sao lưu toàn bộ dữ liệu PostgreSQL sang file .sql và gửi lên Telegram...');
     try {
       const res = await fetch('/api/backup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SEND_TELEGRAM', format: 'all' }),
+        body: JSON.stringify({ action: 'SEND_TELEGRAM', format: 'sql' }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -1927,16 +1924,7 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
                       onChange={(e) => setTelSendSql(e.target.checked)}
                       className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer"
                     />
-                    <span>Tự động đính kèm file SQL (.sql)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={telSendJson}
-                      onChange={(e) => setTelSendJson(e.target.checked)}
-                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer"
-                    />
-                    <span>Tự động đính kèm file JSON (.json)</span>
+                    <span>Tự động đính kèm file SQL Dump chuẩn PostgreSQL (.sql)</span>
                   </label>
                 </div>
               </div>
@@ -2003,7 +1991,7 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
               </div>
 
               <p className="text-xs text-slate-300 leading-relaxed">
-                Nhấn nút bên dưới để hệ thống lập tức xuất toàn bộ cơ sở dữ liệu PostgreSQL (cả file .sql và .json) và gửi thẳng vào kênh Telegram cấu hình.
+                Nhấn nút bên dưới để hệ thống lập tức xuất toàn bộ cơ sở dữ liệu PostgreSQL (file .sql) và gửi thẳng vào kênh Telegram cấu hình.
               </p>
 
               <button

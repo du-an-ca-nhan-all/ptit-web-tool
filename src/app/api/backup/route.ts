@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
       }
 
       // 2. Download Live PostgreSQL SQL Dump (.sql)
-      if (format === 'sql') {
+      if (format === 'sql' || format === 'all' || !format) {
         const sqlDump = await exportDatabaseAsSqlDump();
         const buffer = Buffer.from(sqlDump, 'utf-8');
         const filename = `ptit-db-dump-${timestamp}.sql`;
@@ -139,47 +139,7 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      // 3. Download Live JSON Dump (.json)
-      if (format === 'json') {
-        const jsonDump = await exportDatabaseAsJson();
-        const jsonString = JSON.stringify(jsonDump, null, 2);
-        const filename = `ptit-db-export-${timestamp}.json`;
-        const buffer = Buffer.from(jsonString, 'utf-8');
-
-        await logActivity({
-          req,
-          userId: authUser.id,
-          username: authUser.username,
-          userRole: authUser.role,
-          action: 'EXPORT_JSON_DATABASE',
-          targetType: 'DATABASE',
-          targetId: filename,
-          description: `Xuất toàn bộ cơ sở dữ liệu sang file JSON: ${filename}`,
-          metadata: { stats: jsonDump.metadata.stats.tables },
-        });
-
-        // Dispatch Telegram Notification to Admin
-        dispatchDatabaseExportOrBackup({
-          action: 'EXPORT_JSON',
-          filename,
-          fileSize: buffer.length,
-          adminUsername: authUser.username,
-          description: `Quản trị viên ${authUser.username} xuất toàn bộ cơ sở dữ liệu sang file JSON đầy đủ (.json)`,
-          tableStats: jsonDump.metadata.stats.tables,
-        }).catch(() => {});
-
-        return new Response(buffer, {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Content-Disposition': `attachment; filename="${filename}"`,
-            'Content-Length': buffer.length.toString(),
-            'Cache-Control': 'no-store',
-          },
-        });
-      }
-
-      return NextResponse.json({ error: 'Định dạng tải về không hợp lệ (hỗ trợ sql hoặc json)' }, { status: 400 });
+      return NextResponse.json({ error: 'Định dạng tải về không hợp lệ (hỗ trợ sql)' }, { status: 400 });
     }
 
     // Default: Return stats, backups list, and telegram backup config
@@ -343,7 +303,6 @@ export async function POST(req: NextRequest) {
         isEnabled,
         sendSql,
         sendSqlite,
-        sendJson,
         autoBackupEnabled,
         scheduleTime,
         notifyOnDbBackup,
@@ -356,9 +315,8 @@ export async function POST(req: NextRequest) {
         threadId,
         botToken,
         isEnabled,
-        sendSql: sendSql ?? sendSqlite,
-        sendSqlite: sendSqlite ?? sendSql,
-        sendJson,
+        sendSql: sendSql ?? sendSqlite ?? true,
+        sendSqlite: sendSqlite ?? sendSql ?? true,
         autoBackupEnabled,
         scheduleTime,
         notifyOnDbBackup,
@@ -391,7 +349,6 @@ export async function POST(req: NextRequest) {
           threadId,
           isEnabled,
           sendSql: saved.sendSql,
-          sendJson: saved.sendJson,
           autoBackupEnabled,
           scheduleTime,
           notifyOnDbBackup: saved.notifyOnDbBackup,
@@ -435,10 +392,10 @@ export async function POST(req: NextRequest) {
 
     // 2.4. SEND BACKUP DIRECTLY TO TELEGRAM
     if (action === 'SEND_TELEGRAM') {
-      const { format, customChatId, customThreadId, customBotToken } = body;
+      const { customChatId, customThreadId, customBotToken } = body;
 
       const sendRes = await sendBackupToTelegram({
-        format,
+        format: 'sql',
         customChatId,
         customThreadId,
         customBotToken,
@@ -473,9 +430,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2.5. CREATE SERVER SNAPSHOT (Default)
-    const format = (body.format || 'all') as 'sql' | 'json' | 'all';
-    const createdFiles = await createLocalBackup(format);
+    // 2.5. CREATE SERVER SNAPSHOT (Default SQL)
+    const createdFiles = await createLocalBackup('sql');
 
     await logActivity({
       req,
@@ -485,8 +441,8 @@ export async function POST(req: NextRequest) {
       action: 'CREATE_SERVER_BACKUP',
       targetType: 'DATABASE',
       targetId: createdFiles.map((f) => f.name).join(', '),
-      description: `Tạo bản sao lưu trên máy chủ (${format}): ${createdFiles.map((f) => f.name).join(', ')}`,
-      metadata: { format, createdFiles },
+      description: `Tạo bản sao lưu PostgreSQL (.sql) trên máy chủ: ${createdFiles.map((f) => f.name).join(', ')}`,
+      metadata: { format: 'sql', createdFiles },
     });
 
     const stats = await getDatabaseStats();
@@ -498,13 +454,13 @@ export async function POST(req: NextRequest) {
       filename: createdFiles.map((f) => f.name).join(', '),
       fileSize: createdFiles.reduce((acc, f) => acc + (f.size || 0), 0),
       adminUsername: authUser.username,
-      description: `Quản trị viên ${authUser.username} tạo ${createdFiles.length} bản snapshot sao lưu máy chủ (${format.toUpperCase()})`,
+      description: `Quản trị viên ${authUser.username} tạo ${createdFiles.length} bản snapshot sao lưu máy chủ (.SQL)`,
       tableStats: stats.tables,
     }).catch(() => {});
 
     return NextResponse.json({
       success: true,
-      message: `Đã tạo thành công ${createdFiles.length} bản sao lưu trên máy chủ`,
+      message: `Đã tạo thành công ${createdFiles.length} bản sao lưu SQL trên máy chủ`,
       createdFiles,
       stats,
       localBackups,
