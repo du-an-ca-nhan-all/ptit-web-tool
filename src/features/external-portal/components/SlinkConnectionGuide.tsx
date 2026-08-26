@@ -67,44 +67,24 @@ export function SlinkConnectionGuide({
 
   const images = [
     {
-      id: 'step1',
-      stepNum: 1,
-      title: 'Bước 1: Nhận Email từ PTIT Slink SSO',
-      shortTitle: '1. Nhận Email & Bấm Link',
+      id: 'step2',
+      stepNum: 2,
+      title: 'Bước 2: Mở Email từ PTIT Slink SSO',
+      shortTitle: '2. Email Nhận Link Đổi MK',
       badge: 'Microsoft Outlook',
       badgeColor: 'bg-sky-100 text-sky-800 border-sky-200',
       src: '/assets/email_quen_mat_khau.png',
       caption: 'Mở thư từ "PTIT Slink SSO <slink@ptit.edu.vn>" trong Microsoft Outlook và nhấp vào "Link to reset credentials" (hiệu lực 5 phút)',
     },
     {
-      id: 'step2',
-      stepNum: 2,
-      title: 'Bước 2: Tạo Mật khẩu mới & Xác nhận',
-      shortTitle: '2. Tạo Mật khẩu mới',
+      id: 'step3',
+      stepNum: 3,
+      title: 'Bước 3: Tạo Mật khẩu mới & Xác nhận',
+      shortTitle: '3. Tạo Mật Khẩu Mới',
       badge: 'Cổng S-Link',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       src: '/assets/anh_dien_mat_khau_moi.png',
       caption: 'Nhập mật khẩu mới vào ô "New password" và "Confirm password", sau đó ấn "Submit"',
-    },
-    {
-      id: 'step3',
-      stepNum: 3,
-      title: 'Tham khảo: Giao diện Quên mật khẩu S-Link',
-      shortTitle: '3. Nút Quên MK S-Link',
-      badge: 'Cổng S-Link',
-      badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
-      src: '/assets/an_quen_mat_khau.png',
-      caption: 'Nút "Forgot password?" trên màn hình đăng nhập S-Link (Tool đã tự động gửi lệnh thay bạn)',
-    },
-    {
-      id: 'step4',
-      stepNum: 4,
-      title: 'Tham khảo: Điền Email trên S-Link',
-      shortTitle: '4. Điền Email S-Link',
-      badge: 'Cổng S-Link',
-      badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      src: '/assets/anh_dien_email_quen_mat_khau.png',
-      caption: 'Màn hình nhập Email sinh viên trên slink.ptit.edu.vn (Tool đã tự động gửi thay bạn)',
     },
   ];
 
@@ -226,10 +206,10 @@ export function SlinkConnectionGuide({
               </div>
               <div>
                 <h3 className="text-sm sm:text-base font-black tracking-tight">
-                  Hướng Dẫn Lấy Mật Khẩu Cổng PTIT S-Link (4 Bước)
+                  Ảnh Minh Họa Đổi Mật Khẩu S-Link (Bước 2 & Bước 3)
                 </h3>
                 <p className="text-xs text-purple-200">
-                  Tạo mật khẩu tài khoản trực tiếp qua chức năng "Forgot password?" & Email Microsoft
+                  Xem chi tiết Email xác thực Outlook và giao diện tạo mật khẩu mới
                 </p>
               </div>
             </div>
@@ -252,8 +232,8 @@ export function SlinkConnectionGuide({
               </div>
             </div>
 
-            {/* 4 Tabs selector */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 border-b border-slate-200 pb-3">
+            {/* 2 Tabs selector */}
+            <div className="grid grid-cols-2 gap-2 border-b border-slate-200 pb-3">
               {images.map((img, idx) => (
                 <button
                   key={img.id}
@@ -396,7 +376,7 @@ export function SlinkConnectionGuide({
                 </span>
               </p>
               <p className="text-slate-600 leading-relaxed text-[11px]">
-                Hệ thống chỉ hỗ trợ kết nối bằng <strong>Username/Email & Mật khẩu trực tiếp</strong> (không hỗ trợ đăng nhập qua PTIT Microsoft SSO). Vui lòng dùng tính năng "Forgot password?" trên S-Link để tạo mật khẩu.
+                Hệ thống chỉ hỗ trợ kết nối bằng <strong>Email sinh viên & Mật khẩu trực tiếp</strong> (không hỗ trợ đăng nhập qua PTIT Microsoft SSO). Vui lòng dùng tính năng "Tự Động Reset Mật Khẩu" trên Tool để tạo mật khẩu.
               </p>
             </div>
           </div>
@@ -444,7 +424,7 @@ export function SlinkConnectionGuide({
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 text-purple-900 font-bold">
               <ShieldAlert className="w-4 h-4 text-purple-600 shrink-0" />
-              <span>Chỉ hỗ trợ đăng nhập bằng Username & Mật khẩu trực tiếp</span>
+              <span>Chỉ hỗ trợ đăng nhập bằng Email & Mật khẩu trực tiếp</span>
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -460,7 +440,7 @@ export function SlinkConnectionGuide({
                 onClick={() => handleOpenLightbox(0)}
                 className="text-indigo-600 hover:text-indigo-800 font-bold underline flex items-center gap-1 text-[11px] cursor-pointer"
               >
-                <span>Xem hướng dẫn (4 ảnh)</span>
+                <span>Xem ảnh hướng dẫn (2 ảnh)</span>
                 <ExternalLink className="w-3 h-3" />
               </button>
             </div>
@@ -609,12 +589,12 @@ export function SlinkConnectionGuide({
               </div>
             </div>
 
-            {/* Right Column: 4-Cards Visual Gallery (NO text overlaying the image) */}
+            {/* Right Column: 2-Cards Visual Gallery */}
             <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-2.5">
               <div className="font-bold text-slate-800 text-xs flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-1.5">
                   <Key className="w-3.5 h-3.5 text-purple-600" />
-                  <span>Ảnh minh họa (4 bước):</span>
+                  <span>Ảnh minh họa (Bước 2 & 3):</span>
                 </div>
                 <button
                   type="button"
