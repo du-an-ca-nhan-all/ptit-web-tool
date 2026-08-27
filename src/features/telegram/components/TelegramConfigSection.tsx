@@ -33,8 +33,11 @@ import {
   Lock,
   ShieldAlert,
   AlertTriangle,
+  Radio,
 } from 'lucide-react';
 import TelegramTopicSelectorModal from './TelegramTopicSelectorModal';
+import TelegramAutoDetectModal from './TelegramAutoDetectModal';
+import { parseTelegramInput, parseTopicInput } from '../utils/telegramParser';
 
 interface TelegramConfigSectionProps {
   currentUser?: LoginUser | null;
@@ -109,6 +112,9 @@ export default function TelegramConfigSection({
   // UI helpers
   const [showToken, setShowToken] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [isAutoDetectModalOpen, setIsAutoDetectModalOpen] = useState(false);
+  const [smartChatSuggestion, setSmartChatSuggestion] = useState<string | null>(null);
+  const [parsedNotice, setParsedNotice] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [testResult, setTestResult] = useState<{
@@ -197,6 +203,81 @@ export default function TelegramConfigSection({
   useEffect(() => {
     fetchConfig();
   }, [usernameToQuery]);
+
+  // Read URL query parameters (magic links from Telegram bot)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramChatId = urlParams.get('chatId');
+      const paramThreadId = urlParams.get('threadId');
+      const paramBotToken = urlParams.get('botToken');
+
+      if (paramChatId) {
+        setChatId(paramChatId);
+        if (paramThreadId) {
+          setThreadId(paramThreadId);
+          setSelectedTopicName(`Topic #${paramThreadId}`);
+        }
+        if (paramBotToken) {
+          setIsCustomBot(true);
+          setBotToken(paramBotToken);
+        }
+        setSuccessMsg(`Đã tự động điền Chat ID ${paramChatId}${paramThreadId ? ` (Topic #${paramThreadId})` : ''} từ liên kết Telegram!`);
+        setTimeout(() => setSuccessMsg(''), 5000);
+      }
+    }
+  }, []);
+
+  // Smart Chat ID Input Change Handler (Link parser & suggestions)
+  const handleChatIdChange = (val: string) => {
+    const clean = val.trim();
+    setSmartChatSuggestion(null);
+    setParsedNotice(null);
+
+    // Check if user pasted a Telegram link or topic link
+    const parsed = parseTelegramInput(clean);
+    if (parsed.isLink && parsed.chatId) {
+      setChatId(parsed.chatId);
+      if (parsed.threadId) {
+        setThreadId(parsed.threadId);
+        setSelectedTopicName(`Topic #${parsed.threadId}`);
+      }
+      setParsedNotice(parsed.explanation || `Đã trích xuất Chat ID: ${parsed.chatId}`);
+      setTimeout(() => setParsedNotice(null), 5000);
+      return;
+    }
+
+    if (parsed.username && parsed.isLink) {
+      setChatId(parsed.username);
+      if (parsed.threadId) {
+        setThreadId(parsed.threadId);
+        setSelectedTopicName(`Topic #${parsed.threadId}`);
+      }
+      setParsedNotice(`Đã nhận diện Kênh/Nhóm công khai: ${parsed.username}`);
+      setTimeout(() => setParsedNotice(null), 5000);
+      return;
+    }
+
+    setChatId(val);
+
+    // If user enters 9-11 digits without negative prefix, suggest adding -100
+    if (/^\d{9,11}$/.test(clean)) {
+      setSmartChatSuggestion(`-100${clean}`);
+    }
+  };
+
+  // Smart Thread ID Input Change Handler (Extract thread ID from topic links)
+  const handleThreadIdChange = (val: string) => {
+    const parsedTopic = parseTopicInput(val);
+    if (parsedTopic && parsedTopic !== val) {
+      setThreadId(parsedTopic);
+      setParsedNotice(`Đã trích xuất Topic ID: #${parsedTopic}`);
+      setTimeout(() => setParsedNotice(null), 4000);
+    } else {
+      setThreadId(val);
+    }
+    setSelectedTopicName(null);
+  };
 
   // Admin Save System Bot (Global Config)
   const handleSaveSystemBot = async (e: React.FormEvent) => {
@@ -692,48 +773,52 @@ export default function TelegramConfigSection({
       {/* Quick Setup Guide Accordion */}
       {showGuide && (
         <div className="bg-slate-50 border border-sky-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs animate-in fade-in duration-200">
-          <div className="flex items-center gap-2 mb-3.5 sm:mb-4 text-sky-800 font-black text-xs sm:text-sm">
-            <Sparkles className="w-4 h-4 text-sky-600" />
-            <span>Hướng Dẫn Sử Dụng Bot Telegram Trong 3 Bước</span>
+          <div className="flex items-center justify-between gap-2 mb-3.5 sm:mb-4">
+            <div className="flex items-center gap-2 text-sky-800 font-black text-xs sm:text-sm">
+              <Sparkles className="w-4 h-4 text-sky-600" />
+              <span>Hướng Dẫn Lấy Chat ID & Topic ID Dễ Dàng Nhất</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAutoDetectModalOpen(true)}
+              className="inline-flex items-center gap-1 px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
+            >
+              <Radio className="w-3 h-3 animate-pulse" />
+              <span>Mở Trợ Lý Bắt ID Tự Động ➜</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 text-xs">
-            <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 font-bold text-slate-800">
-                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px] shrink-0">1</span>
-                <span>Thêm Bot Vào Kênh / Chat Riêng</span>
+            {/* Case 1: Private */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-indigo-100 flex flex-col gap-1.5 shadow-2xs">
+              <div className="flex items-center gap-2 font-bold text-indigo-900">
+                <span className="w-5 h-5 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-[11px] shrink-0 font-bold">1</span>
+                <span>Nhận Tin Nhắn Cá Nhân</span>
               </div>
               <p className="text-slate-600 leading-relaxed text-[11px] sm:text-xs">
-                Nếu dùng <strong>Bot Hệ Thống</strong>, chỉ cần bấm nút <em>"Thêm Bot vào Nhóm"</em>. Nếu dùng Bot Riêng, tạo bot qua @BotFather và dán token.
+                Mở bot Telegram <strong className="text-indigo-600">@{activeBotUsername || 'PTIT_EduSync_Bot'}</strong> $\rightarrow$ Bấm <strong>Start</strong> $\rightarrow$ Bấm nút <em>"Trợ Lý Bắt ID"</em> ở dưới để hệ thống tự điền Chat ID.
               </p>
             </div>
 
-            <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 font-bold text-slate-800">
-                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px] shrink-0">2</span>
-                <span>Lấy Chat ID Nhận Tin</span>
+            {/* Case 2: Group & Topic */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-emerald-100 flex flex-col gap-1.5 shadow-2xs">
+              <div className="flex items-center gap-2 font-bold text-emerald-900">
+                <span className="w-5 h-5 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center text-[11px] shrink-0 font-bold">2</span>
+                <span>Nhóm Lớp & Forum Topic</span>
               </div>
               <p className="text-slate-600 leading-relaxed text-[11px] sm:text-xs">
-                Chat với{' '}
-                <a
-                  href="https://t.me/userinfobot"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold text-sky-600 hover:underline inline-flex items-center gap-0.5"
-                >
-                  @userinfobot <ExternalLink className="w-3 h-3" />
-                </a>{' '}
-                để lấy ID cá nhân (ví dụ: <code className="bg-slate-100 px-1 py-0.2 rounded font-mono text-indigo-600">987654321</code>). Nếu là Nhóm, ID thường có dấu trừ (<code className="bg-slate-100 px-1 py-0.2 rounded font-mono text-indigo-600">-100123456789</code>).
+                Thêm Bot vào nhóm $\rightarrow$ Gửi 1 tin nhắn vào Topic bạn muốn $\rightarrow$ Bấm <em>"Trợ Lý Bắt ID"</em> hoặc chỉ cần <strong>chuột phải vào Topic $\rightarrow$ Copy Link</strong> và dán thẳng vào ô bên dưới.
               </p>
             </div>
 
-            <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 font-bold text-slate-800">
-                <span className="w-5 h-5 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center text-[11px] shrink-0">3</span>
-                <span>Chọn Topic & Lưu</span>
+            {/* Case 3: Channel */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-amber-100 flex flex-col gap-1.5 shadow-2xs">
+              <div className="flex items-center gap-2 font-bold text-amber-900">
+                <span className="w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center text-[11px] shrink-0 font-bold">3</span>
+                <span>Kênh Thông Báo (Channel)</span>
               </div>
               <p className="text-slate-600 leading-relaxed text-[11px] sm:text-xs">
-                Nếu nhóm có bật <em>Forum Topics</em>, bấm nút <strong>"Quét Topic"</strong> để chọn chủ đề nhận thông báo, sau đó bấm <strong>"Gửi Thử Tin Nhắn"</strong> để kiểm tra.
+                Thêm Bot làm <strong>Quản trị viên (Admin)</strong> có quyền <em>Đăng bài (Post Messages)</em> $\rightarrow$ Đăng 1 bài lên kênh hoặc dán link Kênh (vd: <code className="bg-slate-100 px-1 py-0.2 rounded font-mono text-amber-800">t.me/c/...</code>) vào ô bên dưới.
               </p>
             </div>
           </div>
@@ -962,24 +1047,82 @@ export default function TelegramConfigSection({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
             {/* Input 1: Chat ID */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                   <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Chat ID / Group ID Nhận Tin</span>
+                  <span>Chat ID / Group ID / Channel ID</span>
                   <span className="text-rose-500">*</span>
                 </label>
-                <span className="text-[11px] text-slate-400">@userinfobot</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAutoDetectModalOpen(true)}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 hover:text-sky-800 bg-sky-100/80 hover:bg-sky-100 px-2.5 py-0.5 rounded-lg border border-sky-300 transition-colors cursor-pointer active:scale-95 shadow-2xs"
+                  >
+                    <Radio className="w-3 h-3 text-sky-600 animate-pulse" />
+                    <span>Trợ Lý Bắt ID</span>
+                  </button>
+                </div>
               </div>
-              <input
-                type="text"
-                value={chatId}
-                onChange={(e) => setChatId(e.target.value)}
-                placeholder="Ví dụ: 123456789 hoặc -100123456789"
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 text-base sm:text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
-                required
-              />
-              <p className="text-[11px] text-slate-500 mt-1">
-                ID tài khoản cá nhân hoặc ID của Nhóm/Kênh nhận thông báo.
+
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={chatId}
+                  onChange={(e) => handleChatIdChange(e.target.value)}
+                  placeholder="Nhập ID (vd: -100...) hoặc dán Link Telegram bất kỳ"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 pr-24 text-base sm:text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsAutoDetectModalOpen(true)}
+                  className="absolute right-2 px-2.5 py-1 bg-white hover:bg-sky-50 text-sky-600 text-[11px] font-bold border border-slate-200 rounded-lg sm:rounded-xl transition-colors cursor-pointer shadow-2xs flex items-center gap-1 active:scale-95"
+                  title="Mở Trợ lý tự động nhận diện ID từ Telegram"
+                >
+                  <Zap className="w-3 h-3 text-amber-500" />
+                  <span>Bắt ID</span>
+                </button>
+              </div>
+
+              {/* Parsed link badge */}
+              {parsedNotice && (
+                <div className="mt-1.5 flex items-center justify-between bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl text-[11px] text-emerald-800 font-medium animate-in fade-in">
+                  <span className="truncate flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{parsedNotice}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setParsedNotice(null)}
+                    className="p-0.5 text-emerald-600 hover:text-emerald-800 ml-1 cursor-pointer"
+                  >
+                    <CloseIcon className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+
+              {/* Smart Suggestion for Supergroup / Channel */}
+              {smartChatSuggestion && (
+                <div className="mt-1.5 flex items-center justify-between bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl text-[11px] text-amber-900 animate-in fade-in">
+                  <span className="truncate">
+                    💡 Nếu là Kênh/Nhóm, ID chuẩn là: <strong className="font-mono text-indigo-700">{smartChatSuggestion}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChatId(smartChatSuggestion);
+                      setSmartChatSuggestion(null);
+                    }}
+                    className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold shrink-0 ml-1.5 cursor-pointer shadow-2xs active:scale-95"
+                  >
+                    Áp Dụng
+                  </button>
+                </div>
+              )}
+
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                Hỗ trợ <strong>Dán link Telegram bất kỳ</strong> hoặc bấm <strong>"Trợ Lý Bắt ID"</strong> để tự động nhận diện.
               </p>
             </div>
 
@@ -1016,11 +1159,8 @@ export default function TelegramConfigSection({
                 <input
                   type="text"
                   value={threadId}
-                  onChange={(e) => {
-                    setThreadId(e.target.value);
-                    setSelectedTopicName(null);
-                  }}
-                  placeholder="Ví dụ: 24 (để trống nếu chat thường)"
+                  onChange={(e) => handleThreadIdChange(e.target.value)}
+                  placeholder="Ví dụ: 24 (hoặc dán Link Topic)"
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl sm:rounded-2xl px-4 py-2.5 pr-28 text-base sm:text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none transition-all"
                 />
                 <button
@@ -1064,7 +1204,7 @@ export default function TelegramConfigSection({
               )}
 
               <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                Bấm <strong>"Chọn Topic"</strong> để quét chủ đề trong nhóm hoặc tự nhập Thread ID.
+                Dán link Topic bất kỳ hoặc bấm <strong>"Chọn Topic"</strong> để chọn từ danh sách.
               </p>
             </div>
           </div>
@@ -1640,6 +1780,24 @@ export default function TelegramConfigSection({
           setSelectedTopicName(topic.name);
           setSuccessMsg(`Đã chọn Topic: "${topic.name}" (ID: ${topic.threadId})`);
           setTimeout(() => setSuccessMsg(''), 3000);
+        }}
+      />
+
+      {/* Auto Detect Chat & Topic ID Wizard Modal */}
+      <TelegramAutoDetectModal
+        isOpen={isAutoDetectModalOpen}
+        onClose={() => setIsAutoDetectModalOpen(false)}
+        botToken={isCustomBot ? botToken : undefined}
+        botUsername={activeBotUsername || systemBot?.botUsername}
+        onSelectChat={({ chatId: selectedChatId, chatTitle, chatType, threadId: selectedThreadId, topicName }) => {
+          setChatId(selectedChatId);
+          setSmartChatSuggestion(null);
+          if (selectedThreadId) {
+            setThreadId(selectedThreadId);
+            setSelectedTopicName(topicName || `Topic #${selectedThreadId}`);
+          }
+          setSuccessMsg(`Đã nhận diện: ${chatTitle} (${selectedChatId}${selectedThreadId ? ` - Topic #${selectedThreadId}` : ''})`);
+          setTimeout(() => setSuccessMsg(''), 4000);
         }}
       />
     </div>

@@ -46,9 +46,10 @@ import {
   Inbox,
   AlertTriangle,
   Gauge,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
+import TelegramAutoDetectModal from './TelegramAutoDetectModal';
+import { parseTelegramInput, parseTopicInput } from '../utils/telegramParser';
 
 interface SubscriberItem {
   id: number;
@@ -115,6 +116,8 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
   const [testThreadId, setTestThreadId] = useState('');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<any | null>(null);
+  const [isAdminAutoDetectOpen, setIsAdminAutoDetectOpen] = useState(false);
+  const [adminDetectTarget, setAdminDetectTarget] = useState<'TEST' | 'BACKUP'>('TEST');
 
   // Exam Reminders state
   const [isTriggeringReminders, setIsTriggeringReminders] = useState(false);
@@ -1092,14 +1095,39 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
 
               <form onSubmit={handleAdminTest} className="flex flex-col gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Chat ID người nhận
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-600">
+                      Chat ID người nhận
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAdminDetectTarget('TEST');
+                        setIsAdminAutoDetectOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-700 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 px-2 py-0.5 rounded-md border border-sky-200 cursor-pointer"
+                    >
+                      <Radio className="w-2.5 h-2.5 text-sky-600 animate-pulse" />
+                      <span>Bắt ID Tự Động</span>
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={testChatId}
-                    onChange={(e) => setTestChatId(e.target.value)}
-                    placeholder="Ví dụ: 123456789"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const parsed = parseTelegramInput(val);
+                      if (parsed.isLink && parsed.chatId) {
+                        setTestChatId(parsed.chatId);
+                        if (parsed.threadId) setTestThreadId(parsed.threadId);
+                      } else if (parsed.username && parsed.isLink) {
+                        setTestChatId(parsed.username);
+                        if (parsed.threadId) setTestThreadId(parsed.threadId);
+                      } else {
+                        setTestChatId(val);
+                      }
+                    }}
+                    placeholder="Ví dụ: 123456789 hoặc dán link Telegram"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                     required
                   />
@@ -1112,8 +1140,11 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
                   <input
                     type="text"
                     value={testThreadId}
-                    onChange={(e) => setTestThreadId(e.target.value)}
-                    placeholder="Ví dụ: 24"
+                    onChange={(e) => {
+                      const parsedTopic = parseTopicInput(e.target.value);
+                      setTestThreadId(parsedTopic || e.target.value);
+                    }}
+                    placeholder="Ví dụ: 24 (hoặc dán link topic)"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
@@ -1714,33 +1745,60 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
               {/* Destination: Chat ID & Thread ID */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                       <MessageSquare className="w-3.5 h-3.5 text-sky-600" />
-                      Chat ID / Kênh / Nhóm Admin <span className="text-rose-500">*</span>
-                    </span>
-                  </label>
+                      <span>Chat ID / Kênh / Nhóm Admin</span>
+                      <span className="text-rose-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAdminDetectTarget('BACKUP');
+                        setIsAdminAutoDetectOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-700 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 px-2 py-0.5 rounded-md border border-sky-200 cursor-pointer shadow-2xs"
+                    >
+                      <Radio className="w-2.5 h-2.5 text-sky-600 animate-pulse" />
+                      <span>Bắt ID Tự Động</span>
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={telChatId}
-                    onChange={(e) => setTelChatId(e.target.value)}
-                    placeholder="Ví dụ: -100123456789 hoặc 123456789"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const parsed = parseTelegramInput(val);
+                      if (parsed.isLink && parsed.chatId) {
+                        setTelChatId(parsed.chatId);
+                        if (parsed.threadId) setTelThreadId(parsed.threadId);
+                      } else if (parsed.username && parsed.isLink) {
+                        setTelChatId(parsed.username);
+                        if (parsed.threadId) setTelThreadId(parsed.threadId);
+                      } else {
+                        setTelChatId(val);
+                      }
+                    }}
+                    placeholder="Ví dụ: -100123456789 hoặc dán link Telegram"
                     className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none"
                     required
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">ID cá nhân của bạn, hoặc ID Group/Channel mà bạn thêm Bot vào làm Quản trị viên.</p>
+                  <p className="text-[11px] text-slate-400 mt-1">ID cá nhân, hoặc ID Group/Channel mà bạn thêm Bot vào làm Quản trị viên (có thể dán link).</p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                     <Hash className="w-3.5 h-3.5 text-sky-600" />
-                    Topic ID / Thread ID (Tùy chọn)
+                    <span>Topic ID / Thread ID (Tùy chọn)</span>
                   </label>
                   <input
                     type="text"
                     value={telThreadId}
-                    onChange={(e) => setTelThreadId(e.target.value)}
-                    placeholder="Để trống nếu không dùng Topic"
+                    onChange={(e) => {
+                      const parsedTopic = parseTopicInput(e.target.value);
+                      setTelThreadId(parsedTopic || e.target.value);
+                    }}
+                    placeholder="Để trống hoặc dán link Topic"
                     className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none"
                   />
                   <p className="text-[11px] text-slate-400 mt-1">Dành riêng cho nhóm Supergroup bật tính năng phân chủ đề (Topics/Forums).</p>
@@ -2396,6 +2454,25 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
           </div>
         </div>
       )}
+
+      {/* Auto Detect Chat ID Wizard Modal for Admin */}
+      <TelegramAutoDetectModal
+        isOpen={isAdminAutoDetectOpen}
+        onClose={() => setIsAdminAutoDetectOpen(false)}
+        botToken={useCustomBackupBot && adminDetectTarget === 'BACKUP' ? telBackupBotToken : undefined}
+        botUsername={systemBot?.botUsername}
+        onSelectChat={({ chatId: selectedChatId, chatTitle, chatType, threadId: selectedThreadId, topicName }) => {
+          if (adminDetectTarget === 'TEST') {
+            setTestChatId(selectedChatId);
+            if (selectedThreadId) setTestThreadId(selectedThreadId);
+          } else {
+            setTelChatId(selectedChatId);
+            if (selectedThreadId) setTelThreadId(selectedThreadId);
+          }
+          setSuccessMsg(`Đã áp dụng: ${chatTitle} (${selectedChatId}${selectedThreadId ? ` - Topic #${selectedThreadId}` : ''})`);
+          setTimeout(() => setSuccessMsg(''), 4000);
+        }}
+      />
     </div>
   );
 }

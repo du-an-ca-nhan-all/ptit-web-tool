@@ -7,6 +7,8 @@ import {
   verifyTelegramBot,
   pullForumTopics,
   createTelegramForumTopic,
+  resolveTelegramChatInfo,
+  detectRecentTelegramChats,
   getSystemTelegramBotPublicInfo,
   getSystemTelegramBotConfig,
   saveSystemTelegramBot,
@@ -947,6 +949,60 @@ export async function POST(req: NextRequest) {
         success: true,
         topic: createRes.topic,
         message: `Đã tạo Topic "${topicName}" (Thread ID: ${createRes.topic?.threadId}) thành công!`,
+      });
+    }
+
+    // ACTION: RESOLVE CHAT INFO (Lấy thông tin chi tiết và kiểm tra ID / Username)
+    if (action === 'RESOLVE_CHAT') {
+      const customToken = body.botToken?.trim() || null;
+      const identifier = body.identifier?.trim() || body.chatId?.trim();
+
+      if (!identifier) {
+        return NextResponse.json({ error: 'Vui lòng nhập Chat ID hoặc Username/Link cần kiểm tra' }, { status: 400 });
+      }
+
+      let effectiveToken: string;
+      try {
+        const resolved = await resolveEffectiveBotToken(customToken);
+        effectiveToken = resolved.token;
+      } catch (tokenErr: any) {
+        return NextResponse.json({ error: tokenErr.message }, { status: 400 });
+      }
+
+      const resolveRes = await resolveTelegramChatInfo(effectiveToken, identifier);
+      if (!resolveRes.success) {
+        return NextResponse.json({ success: false, error: resolveRes.error }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        chat: resolveRes.chat,
+        message: `Đã tìm thấy: ${resolveRes.chat?.title || identifier} (${resolveRes.chat?.type})`,
+      });
+    }
+
+    // ACTION: DETECT RECENT CHATS / UPDATES (Trợ lý tự động quét các cuộc trò chuyện & topic mới nhất)
+    if (action === 'DETECT_RECENT_CHATS') {
+      const customToken = body.botToken?.trim() || null;
+
+      let effectiveToken: string;
+      try {
+        const resolved = await resolveEffectiveBotToken(customToken);
+        effectiveToken = resolved.token;
+      } catch (tokenErr: any) {
+        return NextResponse.json({ error: tokenErr.message }, { status: 400 });
+      }
+
+      const detectRes = await detectRecentTelegramChats(effectiveToken);
+      if (!detectRes.success) {
+        return NextResponse.json({ success: false, error: detectRes.error }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        chats: detectRes.chats,
+        total: detectRes.chats.length,
+        message: `Đã phát hiện ${detectRes.chats.length} cuộc trò chuyện/kênh gần đây từ Telegram Bot.`,
       });
     }
 
