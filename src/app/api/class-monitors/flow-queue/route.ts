@@ -10,6 +10,7 @@ import {
   recoverStuckFlowQueueItems,
 } from '@/src/features/classes-monitor/server/monitorFlowQueueServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -189,6 +190,18 @@ export async function POST(req: NextRequest) {
         classCode: normClass,
       });
 
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: ACTIVITY_LOG_ACTIONS.CLEAR_COMPLETED_FLOW_QUEUE,
+        targetType: 'MONITOR_FLOW',
+        targetId: normClass,
+        description: `Lớp trưởng ${authUser.username} đã dọn dẹp ${clearRes.deletedCount} đợt chạy Flow của lớp ${normClass}`,
+        metadata: { classCode: normClass, deletedCount: clearRes.deletedCount },
+      });
+
       return NextResponse.json({
         success: true,
         message: `Đã dọn dẹp ${clearRes.deletedCount} đợt chạy đã hoàn thành.`,
@@ -203,6 +216,18 @@ export async function POST(req: NextRequest) {
         classCode: normClass,
         batchId,
         autoResumeWorker: true,
+      });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: ACTIVITY_LOG_ACTIONS.RECOVER_STUCK_QUEUE_JOBS,
+        targetType: 'MONITOR_FLOW',
+        targetId: normClass,
+        description: `${authUser.username} đã phục hồi ${recRes.recoveredCount} tác vụ Flow bị kẹt của lớp ${normClass}`,
+        metadata: { classCode: normClass, ...recRes },
       });
 
       return NextResponse.json({

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
 import { getStudentTimetableCalendar } from '@/src/features/external-portal/server/studentTimetableServerService';
 import { prisma } from '@/src/lib/prisma';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 
 export async function GET(req: NextRequest) {
   try {
@@ -38,6 +40,31 @@ export async function GET(req: NextRequest) {
       forceRefresh: refresh,
       semesterId,
     });
+
+    // Ghi log khi người dùng bấm Làm mới hoặc khi Cán sự/Admin tra cứu sinh viên khác
+    if (refresh || (targetUsername && targetUsername !== authUser.username.toUpperCase())) {
+      const isOther = targetUsername && targetUsername !== authUser.username.toUpperCase();
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: ACTIVITY_LOG_ACTIONS.PULL_STUDENT_TIMETABLE,
+        targetType: 'STUDENT_TIMETABLE',
+        targetId: usernameToQuery,
+        description: isOther
+          ? `${authUser.username} đã làm mới thời khóa biểu của sinh viên ${usernameToQuery}`
+          : `${authUser.username} đã làm mới thời khóa biểu cá nhân từ Cổng QLDTTX`,
+        metadata: {
+          targetStudent: usernameToQuery,
+          forcedRefresh: refresh,
+          semesterId,
+          isQueryOther: Boolean(isOther),
+          totalSubjects: (timetableData as any)?.uniqueSubjectsCount ?? (timetableData as any)?.subjects?.length ?? null,
+          totalEvents: (timetableData as any)?.totalEvents ?? (timetableData as any)?.events?.length ?? null,
+        },
+      });
+    }
 
     return NextResponse.json(timetableData);
   } catch (err: any) {

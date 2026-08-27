@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor, getUserRoles } from '@/src/lib/auth';
 import { prisma } from '@/src/lib/prisma';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 
 export async function GET(req: NextRequest) {
   try {
@@ -108,6 +110,21 @@ export async function PUT(req: NextRequest) {
       data: {
         soDienThoai: soDienThoai !== undefined ? String(soDienThoai).trim() : undefined,
         ghiChu: ghiChu !== undefined ? String(ghiChu).trim() : undefined,
+      },
+    });
+
+    await logActivity({
+      req,
+      userId: authUser.id,
+      username: authUser.username,
+      userRole: authUser.role,
+      action: ACTIVITY_LOG_ACTIONS.UPDATE_MY_PROFILE,
+      targetType: 'STUDENT',
+      targetId: authUser.username,
+      description: `${authUser.username} đã cập nhật thông tin liên hệ / ghi chú cá nhân`,
+      metadata: {
+        soDienThoai: updatedStudent.soDienThoai,
+        ghiChu: updatedStudent.ghiChu,
       },
     });
 

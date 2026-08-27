@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 
 export interface EnvelopeAssignment {
   id?: number;
@@ -225,21 +227,19 @@ export async function POST(req: NextRequest) {
     }
 
     // Save activity log
-    try {
-      await prisma.activityLog.create({
-        data: {
-          username: authUser.username,
-          userRole: authUser.role || 'lop_truong',
-          action: 'CLAIM_ENVELOPE',
-          targetType: 'ROOM_ENVELOPE_CONFIRMATION',
-          targetId: targetSessionId,
-          description: `${claimedByName} (${authUser.username}) đã xác nhận phụ trách nước uống phòng ${targetSessionId} cho lớp ${cleanClass}${
-            finalAssistantName ? ` (Gán SV hỗ trợ: ${finalAssistantName} - ${finalAssistantId})` : ''
-          }${finalCustomPrice ? ` (Định mức tùy chỉnh: ${finalCustomPrice.toLocaleString()} đ)` : ''}`,
-          metadata: JSON.stringify(savedRecord),
-        },
-      });
-    } catch {}
+    await logActivity({
+      req,
+      userId: authUser.id,
+      username: authUser.username,
+      userRole: authUser.role || 'lop_truong',
+      action: ACTIVITY_LOG_ACTIONS.CLAIM_ENVELOPE,
+      targetType: 'ROOM_ENVELOPE_CONFIRMATION',
+      targetId: targetSessionId,
+      description: `${claimedByName || authUser.username} (${authUser.username}) đã xác nhận phụ trách nước uống phòng ${targetSessionId} cho lớp ${cleanClass}${
+        finalAssistantName ? ` (Gán SV hỗ trợ: ${finalAssistantName} - ${finalAssistantId})` : ''
+      }${finalCustomPrice ? ` (Định mức tùy chỉnh: ${finalCustomPrice.toLocaleString('vi-VN')} đ)` : ''}`,
+      metadata: savedRecord,
+    });
 
     // Fetch all records to return updated map
     const records = await prisma.roomEnvelopeConfirmation.findMany({
@@ -300,7 +300,18 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền xóa toàn bộ xác nhận phụ trách' }, { status: 403 });
       }
 
-      await prisma.roomEnvelopeConfirmation.deleteMany({});
+      const deletedCount = await prisma.roomEnvelopeConfirmation.deleteMany({});
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role || 'admin',
+        action: ACTIVITY_LOG_ACTIONS.CLEAR_ALL_ENVELOPE_CLAIMS,
+        targetType: 'ROOM_ENVELOPE_CONFIRMATION',
+        description: `Quản trị viên ${authUser.username} đã xóa toàn bộ danh sách xác nhận phụ trách nước uống (${deletedCount.count} phòng)`,
+        metadata: { deletedCount: deletedCount.count },
+      });
 
       return NextResponse.json({
         success: true,
@@ -325,19 +336,17 @@ export async function DELETE(req: NextRequest) {
       });
 
       // Record activity log
-      try {
-        await prisma.activityLog.create({
-          data: {
-            username: authUser.username,
-            userRole: authUser.role || 'lop_truong',
-            action: 'CANCEL_ENVELOPE_CLAIM',
-            targetType: 'ROOM_ENVELOPE_CONFIRMATION',
-            targetId: targetSessionId,
-            description: `${authUser.username} đã hủy xác nhận phụ trách nước phòng ${targetSessionId} (Lớp: ${existing.assignedClass})`,
-            metadata: JSON.stringify(existing),
-          },
-        });
-      } catch {}
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role || 'lop_truong',
+        action: ACTIVITY_LOG_ACTIONS.CANCEL_ENVELOPE_CLAIM,
+        targetType: 'ROOM_ENVELOPE_CONFIRMATION',
+        targetId: targetSessionId,
+        description: `${authUser.username} đã hủy xác nhận phụ trách nước phòng ${targetSessionId} (Lớp: ${existing.assignedClass})`,
+        metadata: existing,
+      });
     }
 
     // Fetch updated list

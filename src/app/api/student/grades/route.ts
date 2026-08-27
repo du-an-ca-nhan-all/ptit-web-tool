@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
 import { getStudentGrades } from '@/src/features/external-portal/server/studentGradesServerService';
 import { getStudentSlinkGrades } from '@/src/features/external-portal/server/slinkGradesServerService';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 
 export async function GET(req: NextRequest) {
   try {
@@ -36,6 +38,32 @@ export async function GET(req: NextRequest) {
     const gradesData = source === 'slink'
       ? await getStudentSlinkGrades(usernameToQuery, { forceRefresh: refresh })
       : await getStudentGrades(usernameToQuery, { forceRefresh: refresh });
+
+    // Ghi log khi người dùng bấm Làm mới hoặc khi Cán sự/Admin tra cứu sinh viên khác
+    if (refresh || (targetUsername && targetUsername !== authUser.username.toUpperCase())) {
+      const isOther = targetUsername && targetUsername !== authUser.username.toUpperCase();
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: ACTIVITY_LOG_ACTIONS.PULL_STUDENT_GRADES,
+        targetType: 'STUDENT_GRADES',
+        targetId: usernameToQuery,
+        description: isOther
+          ? `${authUser.username} đã làm mới bảng điểm (${source === 'slink' ? 'S-Link' : 'QLDTTX'}) của sinh viên ${usernameToQuery}`
+          : `${authUser.username} đã làm mới kết quả học tập từ cổng ${source === 'slink' ? 'PTIT S-Link' : 'QLDTTX'}`,
+        metadata: {
+          targetStudent: usernameToQuery,
+          source,
+          forcedRefresh: refresh,
+          isQueryOther: Boolean(isOther),
+          gpa10: (gradesData as any)?.summary?.gpa10 ?? (gradesData as any)?.data?.stats?.gpa10 ?? null,
+          gpa4: (gradesData as any)?.summary?.gpa4 ?? (gradesData as any)?.data?.stats?.gpa4 ?? null,
+          totalSubjects: (gradesData as any)?.summary?.totalPassedCredits ?? (gradesData as any)?.courses?.length ?? null,
+        },
+      });
+    }
 
     return NextResponse.json(gradesData);
   } catch (err: any) {

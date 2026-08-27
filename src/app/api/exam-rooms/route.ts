@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
 import { DEFAULT_PRICING_CONFIG, PricingConfig } from '@/src/config/pricingConfig';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -137,6 +139,27 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    await logActivity({
+      req,
+      userId: authUser?.id,
+      username: authUser?.username,
+      userRole: authUser?.role,
+      action: ACTIVITY_LOG_ACTIONS.UPDATE_EXAM_ROOM_PRICE,
+      targetType: 'EXAM_ROOM',
+      targetId: examRoom.roomKey,
+      description: `${authUser?.username || 'Người dùng'} đã cập nhật định mức tiền phòng thi ${examRoom.mapThi} (${examRoom.tenMH || examRoom.maMH || examRoom.roomKey}) thành ${examRoom.customPrice.toLocaleString('vi-VN')} đ`,
+      metadata: {
+        roomKey: examRoom.roomKey,
+        mapThi: examRoom.mapThi,
+        maMH: examRoom.maMH,
+        tenMH: examRoom.tenMH,
+        ngayThi: examRoom.ngayThi,
+        gioThi: examRoom.gioThi,
+        customPrice: examRoom.customPrice,
+        note: examRoom.note,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Lưu mức giá phòng thi thành công',
@@ -175,6 +198,18 @@ export async function PUT(req: NextRequest) {
       },
     });
 
+    await logActivity({
+      req,
+      userId: authUser?.id,
+      username: authUser?.username,
+      userRole: authUser?.role,
+      action: ACTIVITY_LOG_ACTIONS.UPDATE_GLOBAL_PRICING_CONFIG,
+      targetType: 'GLOBAL_CONFIG',
+      targetId: 'pricing_config',
+      description: `Quản trị viên ${authUser?.username} đã cập nhật định mức tiền phòng chung: Phòng thường = ${commonRoom.toLocaleString('vi-VN')} đ, Vấn đáp TA = ${englishOralRoom.toLocaleString('vi-VN')} đ`,
+      metadata: { commonRoom, englishOralRoom },
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Cập nhật cấu hình định mức tiền phòng thành công',
@@ -200,7 +235,18 @@ export async function DELETE(req: NextRequest) {
     const clearAll = searchParams.get('clearAll') === 'true';
 
     if (clearAll) {
-      await prisma.examRoom.deleteMany({});
+      const deleteCount = await prisma.examRoom.deleteMany({});
+      await logActivity({
+        req,
+        userId: authUser?.id,
+        username: authUser?.username,
+        userRole: authUser?.role,
+        action: ACTIVITY_LOG_ACTIONS.CLEAR_ALL_EXAM_ROOMS,
+        targetType: 'EXAM_ROOM',
+        description: `Quản trị viên ${authUser?.username} đã xóa toàn bộ định mức giá tùy chỉnh của tất cả phòng thi (${deleteCount.count} phòng)`,
+        metadata: { deletedCount: deleteCount.count },
+      });
+
       return NextResponse.json({
         success: true,
         message: 'Đã xóa toàn bộ mức giá tùy chỉnh của các phòng thi',
@@ -208,9 +254,21 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (id) {
-      await prisma.examRoom.delete({
+      const deleted = await prisma.examRoom.delete({
         where: { id: parseInt(id, 10) },
       });
+      await logActivity({
+        req,
+        userId: authUser?.id,
+        username: authUser?.username,
+        userRole: authUser?.role,
+        action: ACTIVITY_LOG_ACTIONS.DELETE_EXAM_ROOM,
+        targetType: 'EXAM_ROOM',
+        targetId: deleted.roomKey,
+        description: `Quản trị viên ${authUser?.username} đã xóa mức giá tùy chỉnh của phòng thi ${deleted.mapThi} (${deleted.roomKey})`,
+        metadata: deleted,
+      });
+
       return NextResponse.json({
         success: true,
         message: 'Đã xóa mức giá tùy chỉnh của phòng thi',
@@ -218,9 +276,21 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (roomKey) {
-      await prisma.examRoom.delete({
+      const deleted = await prisma.examRoom.delete({
         where: { roomKey: String(roomKey).trim() },
       });
+      await logActivity({
+        req,
+        userId: authUser?.id,
+        username: authUser?.username,
+        userRole: authUser?.role,
+        action: ACTIVITY_LOG_ACTIONS.DELETE_EXAM_ROOM,
+        targetType: 'EXAM_ROOM',
+        targetId: deleted.roomKey,
+        description: `Quản trị viên ${authUser?.username} đã xóa mức giá tùy chỉnh của phòng thi ${deleted.mapThi} (${deleted.roomKey})`,
+        metadata: deleted,
+      });
+
       return NextResponse.json({
         success: true,
         message: 'Đã xóa mức giá tùy chỉnh của phòng thi',

@@ -11,6 +11,8 @@ import {
   recoverStuckGlobalSyncQueueItems,
 } from '@/src/features/external-portal/server/globalSyncQueueServerService';
 import { recoverStuckFlowQueueItems } from '@/src/features/classes-monitor/server/monitorFlowQueueServerService';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 
 let isSchedulerRunning = false;
 
@@ -33,6 +35,15 @@ export async function recoverAllStuckQueueJobs(maxStuckMinutes?: number) {
       console.log(
         `🔄 [QueueRecovery] Đã phục hồi ${total} tác vụ bị gián đoạn (Flow: ${flowRes.recoveredCount} re-queued, ${flowRes.failedCount} failed | Global: ${globalRes.recoveredCount} re-queued, ${globalRes.failedCount} failed)`
       );
+
+      await logActivity({
+        username: 'SYSTEM_SCHEDULER',
+        userRole: 'system',
+        action: ACTIVITY_LOG_ACTIONS.RECOVER_STUCK_QUEUE_JOBS,
+        targetType: 'SYSTEM_QUEUE',
+        description: `Hệ thống tự động phục hồi ${total} tác vụ hàng đợi bị gián đoạn (Flow Queue: ${flowRes.recoveredCount}, Global Sync: ${globalRes.recoveredCount})`,
+        metadata: { flowRes, globalRes, total },
+      });
     }
     return { flowRes, globalRes, total };
   } catch (err) {

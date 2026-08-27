@@ -2,6 +2,8 @@ import { LoginUser } from '../../../types';
 
 export type { LoginUser };
 
+export * from './activityLogActions';
+
 export interface ActivityLogItem {
   id: number;
   userId?: number | null;

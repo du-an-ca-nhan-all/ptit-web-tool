@@ -12,6 +12,7 @@ import {
 } from '@/src/features/external-portal/server/globalSyncQueueServerService';
 import { setGlobalConfig, GLOBAL_CONFIG_KEYS, GlobalNightlySyncConfigValue } from '@/src/lib/globalConfig';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -166,6 +167,17 @@ export async function POST(req: NextRequest) {
     // 6. ACTION: CLEAR_COMPLETED
     if (action === 'CLEAR_COMPLETED') {
       const clearRes = await clearCompletedGlobalBatches();
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: ACTIVITY_LOG_ACTIONS.CLEAR_COMPLETED_GLOBAL_QUEUE,
+        targetType: 'GLOBAL_JOB',
+        description: `Quản trị viên ${authUser.username} đã dọn dẹp ${clearRes.deletedCount} đợt đồng bộ Global đã hoàn thành`,
+        metadata: clearRes,
+      });
+
       return NextResponse.json({
         success: true,
         message: `Đã dọn dẹp ${clearRes.deletedCount} đợt chạy đã hoàn thành.`,
@@ -204,7 +216,7 @@ export async function POST(req: NextRequest) {
         userId: authUser.id,
         username: authUser.username,
         userRole: authUser.role,
-        action: 'UPDATE_GLOBAL_SYNC_CONFIG',
+        action: ACTIVITY_LOG_ACTIONS.UPDATE_GLOBAL_SYNC_CONFIG,
         targetType: 'GLOBAL_JOB',
         targetId: 'CONFIG',
         description: `Cập nhật cấu hình tự động đồng bộ dữ liệu ban đêm`,
@@ -223,6 +235,18 @@ export async function POST(req: NextRequest) {
       const recRes = await recoverStuckGlobalSyncQueueItems({
         batchId,
         autoResumeWorker: true,
+      });
+
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: ACTIVITY_LOG_ACTIONS.RECOVER_STUCK_QUEUE_JOBS,
+        targetType: 'GLOBAL_JOB',
+        targetId: batchId || 'ALL',
+        description: `${authUser.username} đã kích hoạt phục hồi ${recRes.recoveredCount} tác vụ bị kẹt trong Queue Global`,
+        metadata: recRes,
       });
 
       return NextResponse.json({

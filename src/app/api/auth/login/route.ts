@@ -50,11 +50,23 @@ export async function POST(req: NextRequest) {
       }
 
       if (!user.isActive) {
+        await logActivity({
+          req,
+          userId: user.id,
+          username: user.username,
+          userRole: user.role,
+          action: 'LOGIN_FAILED',
+          targetType: 'AUTH',
+          targetId: user.username,
+          description: `Đăng nhập thất bại: Tài khoản ${user.username} đang bị tạm khóa`,
+        });
         return NextResponse.json(
           { error: 'Tài khoản của bạn đang bị tạm khoá. Vui lòng liên hệ Quản trị viên.' },
           { status: 403 }
         );
       }
+
+      const isFirstLogin = !user.lastLogin;
 
       // Update last login
       await prisma.user.update({
@@ -83,10 +95,12 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         username: user.username,
         userRole: user.role,
-        action: 'LOGIN',
+        action: isFirstLogin ? 'LOGIN_FIRST_TIME' : 'LOGIN',
         targetType: 'AUTH',
         targetId: user.username,
-        description: `Người dùng ${user.username} (${authPayload.fullName}) đăng nhập thành công`,
+        description: isFirstLogin
+          ? `Người dùng ${user.username} (${authPayload.fullName}) đã đăng nhập lần đầu tiên vào hệ thống`
+          : `Người dùng ${user.username} (${authPayload.fullName}) đăng nhập thành công`,
       });
 
       const token = await createAuthToken(authPayload);

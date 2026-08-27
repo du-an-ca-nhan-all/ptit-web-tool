@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
 import { getStudentQldtExamSchedule } from '@/src/features/external-portal/server/studentExamScheduleServerService';
+import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 
 export async function GET(req: NextRequest) {
   try {
@@ -37,6 +39,30 @@ export async function GET(req: NextRequest) {
       forceRefresh: refresh,
       semesterId,
     });
+
+    // Ghi log khi người dùng bấm Làm mới hoặc khi Cán sự/Admin tra cứu sinh viên khác
+    if (refresh || (targetUsername && targetUsername !== authUser.username.toUpperCase())) {
+      const isOther = targetUsername && targetUsername !== authUser.username.toUpperCase();
+      await logActivity({
+        req,
+        userId: authUser.id,
+        username: authUser.username,
+        userRole: authUser.role,
+        action: ACTIVITY_LOG_ACTIONS.PULL_STUDENT_EXAM_SCHEDULE,
+        targetType: 'STUDENT_EXAM_SCHEDULE',
+        targetId: usernameToQuery,
+        description: isOther
+          ? `${authUser.username} đã làm mới lịch thi của sinh viên ${usernameToQuery}`
+          : `${authUser.username} đã làm mới lịch thi cá nhân từ Cổng QLDTTX`,
+        metadata: {
+          targetStudent: usernameToQuery,
+          forcedRefresh: refresh,
+          semesterId,
+          isQueryOther: Boolean(isOther),
+          totalExams: (examData as any)?.totalExams ?? (examData as any)?.exams?.length ?? null,
+        },
+      });
+    }
 
     return NextResponse.json(examData);
   } catch (err: any) {

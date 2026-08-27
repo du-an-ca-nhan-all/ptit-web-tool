@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
         userId: authUser.id,
         username: authUser.username,
         userRole: authUser.role,
-        action: 'UPDATE_BATCH',
+        action: 'SET_ACTIVE_BATCH',
         targetType: 'EXAM_BATCH',
         targetId: cleanCode,
         description: `Đặt đợt thi "${activated.name}" (${cleanCode}) làm đợt thi mặc định kích hoạt`,
@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
         userId: authUser.id,
         username: authUser.username,
         userRole: authUser.role,
-        action: 'UPDATE_BATCH',
+        action: 'TOGGLE_BATCH_STATUS',
         targetType: 'EXAM_BATCH',
         targetId: cleanCode,
         description: newActive

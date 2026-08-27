@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   History,
   Search,
@@ -24,8 +24,25 @@ import {
   Info,
   CheckCircle2,
   Trash2,
+  Bell,
+  Radio,
+  Send,
+  BookOpen,
+  GraduationCap,
+  DollarSign,
+  Users,
+  Layers,
+  RotateCcw,
+  Play,
+  Pause,
+  UserCheck,
+  UserX,
+  Archive,
+  Download,
+  Zap,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
+import { ACTION_CATEGORIES, ActionCategoryKey } from '../types/activityLogActions';
 
 interface ActivityLogItem {
   id: number;
@@ -48,211 +65,126 @@ interface ActivityLogsManagerProps {
 
 const ACTION_CONFIGS: Record<
   string,
-  { label: string; bg: string; text: string; border: string; icon: any }
+  { label: string; bg: string; text: string; border: string; icon: any; category: string }
 > = {
-  LOGIN: {
-    label: 'Đăng Nhập',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    border: 'border-emerald-200',
-    icon: CheckCircle2,
-  },
-  LOGIN_FIRST_TIME: {
-    label: 'Đăng Nhập Lần Đầu',
-    bg: 'bg-teal-50',
-    text: 'text-teal-700',
-    border: 'border-teal-200',
-    icon: CheckCircle2,
-  },
-  LOGIN_FAILED: {
-    label: 'Đăng Nhập Thất Bại',
-    bg: 'bg-rose-50',
-    text: 'text-rose-700',
-    border: 'border-rose-200',
-    icon: AlertTriangle,
-  },
-  LOGOUT: {
-    label: 'Đăng Xuất',
-    bg: 'bg-slate-100',
-    text: 'text-slate-700',
-    border: 'border-slate-300',
-    icon: User,
-  },
-  CHANGE_PASSWORD: {
-    label: 'Đổi Mật Khẩu',
-    bg: 'bg-purple-50',
-    text: 'text-purple-700',
-    border: 'border-purple-200',
-    icon: Key,
-  },
-  IMPERSONATE: {
-    label: 'Giả Lập Tài Khoản',
-    bg: 'bg-amber-50',
-    text: 'text-amber-700',
-    border: 'border-amber-300',
-    icon: Crown,
-  },
-  REVERT_IMPERSONATE: {
-    label: 'Thoát Giả Lập',
-    bg: 'bg-indigo-50',
-    text: 'text-indigo-700',
-    border: 'border-indigo-200',
-    icon: ArrowRightLeft,
-  },
-  SWITCH_ROLE: {
-    label: 'Chuyển Vai Trò',
-    bg: 'bg-blue-50',
-    text: 'text-blue-700',
-    border: 'border-blue-200',
-    icon: Shield,
-  },
-  UPDATE_STUDENT_INFO: {
-    label: 'Cập Nhật Sinh Viên',
-    bg: 'bg-sky-50',
-    text: 'text-sky-700',
-    border: 'border-sky-200',
-    icon: User,
-  },
-  RECEIVE_STUDENT: {
-    label: 'Tiếp Nhận Sinh Viên',
-    bg: 'bg-green-50',
-    text: 'text-green-700',
-    border: 'border-green-200',
-    icon: User,
-  },
-  EXCLUDE_STUDENT: {
-    label: 'Điều Chuyển / Bảo Lưu',
-    bg: 'bg-orange-50',
-    text: 'text-orange-700',
-    border: 'border-orange-200',
-    icon: ArrowRightLeft,
-  },
-  RESTORE_STUDENT: {
-    label: 'Khôi Phục Sinh Viên',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    border: 'border-emerald-200',
-    icon: CheckCircle2,
-  },
-  DELETE_STUDENT: {
-    label: 'Xóa Sinh Viên',
-    bg: 'bg-rose-50',
-    text: 'text-rose-700',
-    border: 'border-rose-200',
-    icon: Trash2,
-  },
-  CREATE_BATCH: {
-    label: 'Tạo Đợt Thi',
-    bg: 'bg-indigo-50',
-    text: 'text-indigo-700',
-    border: 'border-indigo-200',
-    icon: Database,
-  },
-  UPDATE_BATCH: {
-    label: 'Cập Nhật Đợt Thi',
-    bg: 'bg-blue-50',
-    text: 'text-blue-700',
-    border: 'border-blue-200',
-    icon: Database,
-  },
-  DELETE_BATCH: {
-    label: 'Xóa Đợt Thi',
-    bg: 'bg-rose-50',
-    text: 'text-rose-700',
-    border: 'border-rose-200',
-    icon: Trash2,
-  },
-  IMPORT_BATCH_FILE: {
-    label: 'Import Lịch Thi Đợt',
-    bg: 'bg-violet-50',
-    text: 'text-violet-700',
-    border: 'border-violet-200',
-    icon: FileSpreadsheet,
-  },
-  IMPORT_EXAM_SCHEDULE: {
-    label: 'Import Lịch Thi Tổng',
-    bg: 'bg-violet-50',
-    text: 'text-violet-700',
-    border: 'border-violet-200',
-    icon: FileSpreadsheet,
-  },
-  SAVE_EXTERNAL_ACCOUNT: {
-    label: 'Lưu Liên Kết QLĐT',
-    bg: 'bg-teal-50',
-    text: 'text-teal-700',
-    border: 'border-teal-200',
-    icon: Globe,
-  },
-  TEST_EXTERNAL_ACCOUNT: {
-    label: 'Kiểm Tra Token QLĐT',
-    bg: 'bg-cyan-50',
-    text: 'text-cyan-700',
-    border: 'border-cyan-200',
-    icon: Globe,
-  },
-  TEST_EXTERNAL_ACCOUNT_FAILED: {
-    label: 'Lỗi Token QLĐT',
-    bg: 'bg-rose-50',
-    text: 'text-rose-700',
-    border: 'border-rose-200',
-    icon: AlertTriangle,
-  },
-  BATCH_GET_TOKENS: {
-    label: 'Lấy Token Hàng Loạt',
-    bg: 'bg-purple-50',
-    text: 'text-purple-700',
-    border: 'border-purple-200',
-    icon: Globe,
-  },
-  DELETE_EXTERNAL_ACCOUNT: {
-    label: 'Hủy Liên Kết QLĐT',
-    bg: 'bg-slate-100',
-    text: 'text-slate-700',
-    border: 'border-slate-300',
-    icon: Trash2,
-  },
-  SYNC_COURSE_REGISTRATION: {
-    label: 'Đồng Bộ ĐKMH Cá Nhân',
-    bg: 'bg-cyan-50',
-    text: 'text-cyan-700',
-    border: 'border-cyan-200',
-    icon: Globe,
-  },
-  SYNC_CLASS_REGISTRATION: {
-    label: 'Đồng Bộ ĐKMH Cả Lớp',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    border: 'border-emerald-200',
-    icon: Globe,
-  },
-  SAVE_TELEGRAM_CONFIG: {
-    label: 'Lưu Cấu Hình Telegram',
-    bg: 'bg-sky-50',
-    text: 'text-sky-700',
-    border: 'border-sky-200',
-    icon: Globe,
-  },
-  TEST_TELEGRAM_CONFIG: {
-    label: 'Test Gửi Telegram',
-    bg: 'bg-sky-50',
-    text: 'text-sky-700',
-    border: 'border-sky-200',
-    icon: Globe,
-  },
-  TOGGLE_TELEGRAM_CONFIG: {
-    label: 'Bật/Tắt Telegram',
-    bg: 'bg-blue-50',
-    text: 'text-blue-700',
-    border: 'border-blue-200',
-    icon: Globe,
-  },
-  DELETE_TELEGRAM_CONFIG: {
-    label: 'Xóa Cấu Hình Telegram',
-    bg: 'bg-rose-50',
-    text: 'text-rose-700',
-    border: 'border-rose-200',
-    icon: Trash2,
-  },
+  // 1. Xác thực & Tài khoản
+  LOGIN: { label: 'Đăng Nhập', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle2, category: 'AUTH' },
+  LOGIN_SUCCESS: { label: 'Đăng Nhập Thành Công', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle2, category: 'AUTH' },
+  LOGIN_FIRST_TIME: { label: 'Đăng Nhập Lần Đầu', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', icon: Sparkles, category: 'AUTH' },
+  LOGIN_FAILED: { label: 'Đăng Nhập Thất Bại', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: AlertTriangle, category: 'AUTH' },
+  LOGOUT: { label: 'Đăng Xuất', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', icon: User, category: 'AUTH' },
+  CHANGE_PASSWORD: { label: 'Đổi Mật Khẩu', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: Key, category: 'AUTH' },
+  ADMIN_RESET_PASSWORD: { label: 'Admin Reset MK', bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', border: 'border-fuchsia-200', icon: Key, category: 'AUTH' },
+  IMPERSONATE: { label: 'Giả Lập Tài Khoản', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-300', icon: Crown, category: 'AUTH' },
+  REVERT_IMPERSONATE: { label: 'Thoát Giả Lập', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: ArrowRightLeft, category: 'AUTH' },
+  SWITCH_ROLE: { label: 'Chuyển Vai Trò', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Shield, category: 'AUTH' },
+  REGISTER_REQUEST: { label: 'Gửi Đăng Ký TK', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: User, category: 'AUTH' },
+  APPROVE_REGISTRATION: { label: 'Duyệt Đăng Ký', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: UserCheck, category: 'AUTH' },
+  REJECT_REGISTRATION: { label: 'Từ Chối Đăng Ký', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: UserX, category: 'AUTH' },
+  UPDATE_MY_PROFILE: { label: 'Cập Nhật Hồ Sơ', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: User, category: 'AUTH' },
+
+  // 2. Sinh viên, Lớp học & Lớp trưởng
+  UPDATE_STUDENT_INFO: { label: 'Cập Nhật Sinh Viên', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: User, category: 'STUDENT' },
+  RECEIVE_STUDENT: { label: 'Tiếp Nhận Sinh Viên', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', icon: UserCheck, category: 'STUDENT' },
+  EXCLUDE_STUDENT: { label: 'Điều Chuyển / Bảo Lưu', bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', icon: ArrowRightLeft, category: 'STUDENT' },
+  RESTORE_STUDENT: { label: 'Khôi Phục Sinh Viên', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle2, category: 'STUDENT' },
+  DELETE_STUDENT: { label: 'Xóa Sinh Viên', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'STUDENT' },
+  ASSIGN_MONITOR: { label: 'Phân Quyền Lớp Trưởng', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: Shield, category: 'STUDENT' },
+  REMOVE_MONITOR: { label: 'Hủy Quyền Lớp Trưởng', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', icon: ShieldAlert, category: 'STUDENT' },
+
+  // 3. Đợt thi, Lịch thi, Tiền phòng & Phong bì
+  CREATE_BATCH: { label: 'Tạo Đợt Thi', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: Calendar, category: 'EXAM' },
+  UPDATE_BATCH: { label: 'Cập Nhật Đợt Thi', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Calendar, category: 'EXAM' },
+  DELETE_BATCH: { label: 'Xóa Đợt Thi', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'EXAM' },
+  SET_ACTIVE_BATCH: { label: 'Chọn Đợt Thi Mặc Định', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle2, category: 'EXAM' },
+  TOGGLE_BATCH_STATUS: { label: 'Bật/Tắt Đợt Thi', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', icon: Calendar, category: 'EXAM' },
+  IMPORT_BATCH_FILE: { label: 'Import Lịch Thi Đợt', bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', icon: FileSpreadsheet, category: 'EXAM' },
+  IMPORT_EXAM_SCHEDULE: { label: 'Import Lịch Thi Tổng', bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', icon: FileSpreadsheet, category: 'EXAM' },
+  TOGGLE_EXAM_POSTPONE: { label: 'Bật/Tắt Hoãn Thi', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Clock, category: 'EXAM' },
+  MARK_EXAM_POSTPONED: { label: 'Đánh Dấu Hoãn Thi', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Clock, category: 'EXAM' },
+  UNMARK_EXAM_POSTPONED: { label: 'Hủy Đánh Dấu Hoãn Thi', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', icon: CheckCircle2, category: 'EXAM' },
+  UPDATE_EXAM_ROOM_PRICE: { label: 'Định Mức Tiền Phòng', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: DollarSign, category: 'EXAM' },
+  UPDATE_GLOBAL_PRICING_CONFIG: { label: 'Định Mức Giá Chung', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: DollarSign, category: 'EXAM' },
+  DELETE_EXAM_ROOM: { label: 'Xóa Giá Phòng Tùy Chỉnh', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'EXAM' },
+  CLEAR_ALL_EXAM_ROOMS: { label: 'Xóa Toàn Bộ Giá Phòng', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'EXAM' },
+  CLAIM_ENVELOPE: { label: 'Xác Nhận Nước / Phong Bì', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: DollarSign, category: 'EXAM' },
+  CANCEL_ENVELOPE_CLAIM: { label: 'Hủy Nhận Phong Bì', bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', icon: ArrowRightLeft, category: 'EXAM' },
+  CLEAR_ALL_ENVELOPE_CLAIMS: { label: 'Xóa Toàn Bộ Phong Bì', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'EXAM' },
+
+  // 4. Cổng trường & Dữ liệu Sinh viên
+  SAVE_EXTERNAL_ACCOUNT: { label: 'Lưu Liên Kết QLĐT', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', icon: Globe, category: 'PORTAL' },
+  SAVE_EXTERNAL_ACCOUNT_FAILED: { label: 'Lỗi Lưu Liên Kết QLĐT', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: AlertTriangle, category: 'PORTAL' },
+  TEST_EXTERNAL_ACCOUNT: { label: 'Kiểm Tra Token QLĐT', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', icon: Globe, category: 'PORTAL' },
+  TEST_EXTERNAL_ACCOUNT_CREDENTIALS: { label: 'Kiểm Tra MK Cổng Trường', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', icon: Key, category: 'PORTAL' },
+  TEST_EXTERNAL_ACCOUNT_FAILED: { label: 'Lỗi Token QLĐT', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: AlertTriangle, category: 'PORTAL' },
+  BATCH_GET_TOKENS: { label: 'Lấy Token Hàng Loạt', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: Globe, category: 'PORTAL' },
+  DELETE_EXTERNAL_ACCOUNT: { label: 'Hủy Liên Kết QLĐT', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', icon: Trash2, category: 'PORTAL' },
+  SYNC_COURSE_REGISTRATION: { label: 'Đồng Bộ ĐKMH Cá Nhân', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', icon: BookOpen, category: 'PORTAL' },
+  SYNC_CLASS_REGISTRATION: { label: 'Đồng Bộ ĐKMH Cả Lớp', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Users, category: 'PORTAL' },
+  DELETE_COURSE_REGISTRATION: { label: 'Xóa Cache ĐKMH', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'PORTAL' },
+  PULL_STUDENT_GRADES: { label: 'Làm Mới Điểm Số', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: GraduationCap, category: 'PORTAL' },
+  PULL_STUDENT_TIMETABLE: { label: 'Làm Mới Thời Khóa Biểu', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: Calendar, category: 'PORTAL' },
+  PULL_STUDENT_EXAM_SCHEDULE: { label: 'Làm Mới Lịch Thi Cá Nhân', bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', icon: FileSpreadsheet, category: 'PORTAL' },
+  QLDT_EXAM_SCHEDULE_CHANGED: { label: 'Lịch Thi QLĐT Thay Đổi', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Bell, category: 'PORTAL' },
+  COURSE_REGISTER: { label: 'Đăng Ký Môn Online', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: CheckCircle2, category: 'PORTAL' },
+  COURSE_CANCEL: { label: 'Hủy Môn Online', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'PORTAL' },
+  LMS_REFRESH_COURSES: { label: 'Làm Mới Khóa Học LMS', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: BookOpen, category: 'PORTAL' },
+  SLINK_FORGOT_PASSWORD: { label: 'S-Link Quên Mật Khẩu', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Key, category: 'PORTAL' },
+  SLINK_REFRESH_GRADES: { label: 'Làm Mới Điểm S-Link', bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', icon: GraduationCap, category: 'PORTAL' },
+  SLINK_SYNC_GRADES: { label: 'Đồng Bộ Điểm S-Link', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: RefreshCw, category: 'PORTAL' },
+  SLINK_REFRESH_NOTIFICATIONS: { label: 'Làm Mới Thông Báo S-Link', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: Bell, category: 'PORTAL' },
+  SLINK_MARK_NOTIFICATION_READ: { label: 'Đã Đọc Thông Báo S-Link', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', icon: Check, category: 'PORTAL' },
+
+  // 5. Flow Automation Lớp trưởng
+  UPDATE_MONITOR_FLOW_CONFIG: { label: 'Lưu Cấu Hình Flow', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Layers, category: 'FLOW' },
+  IMPORT_MONITOR_FLOW_CONFIG: { label: 'Import DS SV Flow', bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', icon: FileSpreadsheet, category: 'FLOW' },
+  ENQUEUE_MONITOR_FLOW_BATCH: { label: 'Tạo Hàng Đợi Flow', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: Play, category: 'FLOW' },
+  EXECUTE_MONITOR_FLOW_ACTION: { label: 'Thực Thi Lệnh Flow', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Zap, category: 'FLOW' },
+  PULL_CLASS_COURSE_REGISTRATION: { label: 'Kéo ĐKMH Cả Lớp (Flow)', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', icon: Users, category: 'FLOW' },
+  CANCEL_FLOW_QUEUE: { label: 'Hủy Hàng Đợi Flow', bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', icon: Pause, category: 'FLOW' },
+  RETRY_FLOW_QUEUE: { label: 'Thử Lại Queue Flow', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', icon: RotateCcw, category: 'FLOW' },
+  CLEAR_COMPLETED_FLOW_QUEUE: { label: 'Dọn Dẹp Queue Flow', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', icon: Trash2, category: 'FLOW' },
+
+  // 6. Global Sync & Cron Scheduler
+  ENQUEUE_GLOBAL_SYNC_JOB: { label: 'Batch Đồng Bộ Hệ Thống', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: Layers, category: 'SYNC' },
+  CANCEL_GLOBAL_QUEUE: { label: 'Hủy Queue Đồng Bộ', bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', icon: Pause, category: 'SYNC' },
+  RETRY_GLOBAL_QUEUE: { label: 'Thử Lại Queue Đồng Bộ', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', icon: RotateCcw, category: 'SYNC' },
+  UPDATE_GLOBAL_SYNC_CONFIG: { label: 'Cấu Hình Lịch Quét Đêm', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Clock, category: 'SYNC' },
+  CLEAR_COMPLETED_GLOBAL_QUEUE: { label: 'Dọn Dẹp Queue Global', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', icon: Trash2, category: 'SYNC' },
+  RECOVER_STUCK_QUEUE_JOBS: { label: 'Phục Hồi Tác Vụ Bị Kẹt', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: RotateCcw, category: 'SYNC' },
+  CRON_GLOBAL_SYNC_TRIGGER: { label: 'Cron Đồng Bộ Ban Đêm', bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', icon: Clock, category: 'SYNC' },
+  CRON_CLASS_REMINDERS: { label: 'Cron Nhắc Lịch Học', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: Bell, category: 'SYNC' },
+  CRON_NEAREST_CLASS_SCHEDULE: { label: 'Cron Quét Tiết Học Gần Nhất', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', icon: Clock, category: 'SYNC' },
+  CRON_EXAM_REMINDERS: { label: 'Cron Nhắc Lịch Thi', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Bell, category: 'SYNC' },
+
+  // 7. Telegram & Thông báo
+  SAVE_SYSTEM_TELEGRAM_BOT: { label: 'Lưu Bot Hệ Thống', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: Send, category: 'TELEGRAM' },
+  TOGGLE_SYSTEM_TELEGRAM_BOT: { label: 'Bật/Tắt Bot Hệ Thống', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Send, category: 'TELEGRAM' },
+  SAVE_TELEGRAM_ADMIN_CONFIG: { label: 'Lưu Nhóm Báo Cáo Admin', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: Send, category: 'TELEGRAM' },
+  CLEAR_TELEGRAM_QUEUE: { label: 'Xóa Queue Telegram', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'TELEGRAM' },
+  BROADCAST_TELEGRAM: { label: 'Phát Sóng Telegram', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Radio, category: 'TELEGRAM' },
+  CREATE_TELEGRAM_TOPIC: { label: 'Tạo Topic Telegram', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', icon: Send, category: 'TELEGRAM' },
+  CHECK_NEAREST_CLASS_SCHEDULE: { label: 'Kiểm Tra Tiết Học Gần Nhất', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: Clock, category: 'TELEGRAM' },
+  SAVE_TELEGRAM_CONFIG: { label: 'Lưu Cấu Hình Telegram', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: Send, category: 'TELEGRAM' },
+  TEST_TELEGRAM_CONFIG: { label: 'Test Gửi Telegram', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', icon: Send, category: 'TELEGRAM' },
+  TOGGLE_TELEGRAM_CONFIG: { label: 'Bật/Tắt Telegram', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Send, category: 'TELEGRAM' },
+  DELETE_TELEGRAM_CONFIG: { label: 'Xóa Cấu Hình Telegram', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'TELEGRAM' },
+  CREATE_ANNOUNCEMENT: { label: 'Tạo Thông Báo Web', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: Bell, category: 'TELEGRAM' },
+  UPDATE_ANNOUNCEMENT: { label: 'Cập Nhật Thông Báo Web', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Bell, category: 'TELEGRAM' },
+  TOGGLE_ANNOUNCEMENT_STATUS: { label: 'Bật/Tắt Thông Báo Web', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Bell, category: 'TELEGRAM' },
+  DELETE_ANNOUNCEMENT: { label: 'Xóa Thông Báo Web', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'TELEGRAM' },
+  BULK_DELETE_ANNOUNCEMENTS: { label: 'Xóa Loạt Thông Báo Web', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'TELEGRAM' },
+
+  // 8. Sao lưu & Quản trị Hệ thống
+  DOWNLOAD_BACKUP: { label: 'Tải Bản Sao Lưu', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Download, category: 'SYSTEM' },
+  EXPORT_SQL_DATABASE: { label: 'Xuất SQL Database', bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', icon: Database, category: 'SYSTEM' },
+  RESTORE_DATABASE: { label: 'Phục Hồi CSDL', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: RotateCcw, category: 'SYSTEM' },
+  SAVE_BACKUP_TELEGRAM_CONFIG: { label: 'Lưu Cấu Hình Auto Backup', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: Database, category: 'SYSTEM' },
+  TEST_BACKUP_TELEGRAM: { label: 'Test Gửi Backup Telegram', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', icon: Send, category: 'SYSTEM' },
+  SEND_BACKUP_TELEGRAM: { label: 'Gửi Backup Sang Telegram', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: Send, category: 'SYSTEM' },
+  CREATE_SERVER_BACKUP: { label: 'Tạo Bản Sao Lưu Máy Chủ', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: Archive, category: 'SYSTEM' },
+  DELETE_SERVER_BACKUP: { label: 'Xóa Bản Sao Lưu Máy Chủ', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'SYSTEM' },
+  DELETE_LOGS: { label: 'Dọn Dẹp / Xóa Nhật Ký', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', icon: Trash2, category: 'SYSTEM' },
 };
 
 export default function ActivityLogsManager({ currentUser }: ActivityLogsManagerProps) {
@@ -260,6 +192,7 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [availableActions, setAvailableActions] = useState<string[]>([]);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -268,6 +201,22 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
     totalPages: 1,
   });
   const [selectedLogMetadata, setSelectedLogMetadata] = useState<any | null>(null);
+
+  const filteredAvailableActions = useMemo(() => {
+    if (selectedCategory === 'ALL') return availableActions;
+    return availableActions.filter((act) => {
+      const config = ACTION_CONFIGS[act];
+      return config && config.category === selectedCategory;
+    });
+  }, [availableActions, selectedCategory]);
+
+  const displayedLogs = useMemo(() => {
+    if (selectedCategory === 'ALL' || actionFilter) return logs;
+    return logs.filter((l) => {
+      const config = ACTION_CONFIGS[l.action];
+      return config && config.category === selectedCategory;
+    });
+  }, [logs, selectedCategory, actionFilter]);
 
   const isAdmin = Boolean(
     currentUser?.isAdmin ||
@@ -462,6 +411,29 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
         </div>
       </div>
 
+      {/* Category Filter Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none no-scrollbar">
+        {Object.entries(ACTION_CATEGORIES).map(([key, cat]) => {
+          const isSelected = selectedCategory === key;
+          return (
+            <button
+              key={key}
+              onClick={() => {
+                setSelectedCategory(key);
+                setActionFilter('');
+              }}
+              className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+                isSelected
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Filter & Search Bar */}
       <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto flex-1">
@@ -482,8 +454,12 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
               onChange={(e) => setActionFilter(e.target.value)}
               className="pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer appearance-none"
             >
-              <option value="">Tất cả hành động ({availableActions.length})</option>
-              {availableActions.map((act) => {
+              <option value="">
+                {selectedCategory === 'ALL'
+                  ? `Tất cả hành động (${filteredAvailableActions.length})`
+                  : `Tất cả trong nhóm (${filteredAvailableActions.length})`}
+              </option>
+              {filteredAvailableActions.map((act) => {
                 const config = ACTION_CONFIGS[act] || { label: act };
                 return (
                   <option key={act} value={act}>
@@ -527,7 +503,7 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
             <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
             <p className="text-xs font-bold text-slate-500">Đang tải nhật ký hoạt động...</p>
           </div>
-        ) : logs.length === 0 ? (
+        ) : displayedLogs.length === 0 ? (
           <div className="py-20 flex flex-col items-center justify-center text-center p-6 gap-3">
             <div className="w-14 h-14 rounded-3xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
               <Info className="w-7 h-7" />
@@ -552,7 +528,7 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {logs.map((log) => {
+                {displayedLogs.map((log) => {
                   const actConfig = ACTION_CONFIGS[log.action] || {
                     label: log.action,
                     bg: 'bg-slate-50',
