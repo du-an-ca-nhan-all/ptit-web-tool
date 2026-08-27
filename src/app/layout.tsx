@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import PWAProvider from '../components/pwa/PWAProvider';
+import GoogleAnalytics from '@/src/components/analytics/GoogleAnalytics';
 
 export const viewport: Viewport = {
   themeColor: '#0F172A',
@@ -54,6 +55,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="font-sans antialiased select-text">
+        <GoogleAnalytics />
         <PWAProvider>
           {children}
         </PWAProvider>
