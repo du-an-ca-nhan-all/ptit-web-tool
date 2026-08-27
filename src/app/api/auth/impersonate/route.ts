@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { getAuthUser, createAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { impersonateSchema, validateZod } from '@/src/features/auth/schemas/auth.schema';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,13 +21,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { targetUsername } = body;
+    const validation = validateZod(impersonateSchema, body);
 
-    if (!targetUsername) {
-      return NextResponse.json({ error: 'Mã người dùng (targetUsername) là bắt buộc' }, { status: 400 });
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error, fieldErrors: validation.fieldErrors },
+        { status: 400 }
+      );
     }
 
-    const cleanUsername = String(targetUsername).trim().toUpperCase();
+    const { targetUsername: cleanUsername } = validation.data;
 
     // 1. Find user in database
     let targetUser = await prisma.user.findUnique({

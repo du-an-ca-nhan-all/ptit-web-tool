@@ -4,13 +4,16 @@ import { hashSHA512 } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { dispatchNewUserRegistered } from '@/src/features/telegram/server/telegramDispatcher';
 import { loginAndGetToken } from '@/src/features/external-portal/server/qldttxServerService';
+import { registerSchema, validateZod } from '@/src/features/auth/schemas/auth.schema';
+import { getClientIp, checkRateLimit, createRateLimitExceededResponse } from '@/src/lib/rate-limiter';
 
 // GET /api/auth/register?username=K25DTCN402
 // Lookup student existence, name, and class for registration auto-display
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username')?.trim().toUpperCase();
+    const rawUsername = searchParams.get('username');
+    const username = rawUsername ? rawUsername.trim().toUpperCase() : '';
 
     if (!username || username.length < 3) {
       return NextResponse.json({ found: false, error: 'Mã sinh viên không hợp lệ' }, { status: 400 });
@@ -59,39 +62,28 @@ export async function GET(req: NextRequest) {
 // Auto-approve & auto-configure ExternalAccount if password matches QLDTTX (QLHT)
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+
+    // Rate limit: 6 attempts per minute per IP
+    const rateLimit = checkRateLimit(`register:${ip}`, 6, 60);
+    if (!rateLimit.success) {
+      return createRateLimitExceededResponse(
+        'Bạn đã gửi quá nhiều yêu cầu đăng ký. Vui lòng đợi 1 phút trước khi thử lại.',
+        rateLimit.resetSeconds
+      );
+    }
+
     const body = await req.json();
-    const { username, password, confirmPassword, phoneNumber, note } = body;
+    const validation = validateZod(registerSchema, body);
 
-    if (!username || !password) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Vui lòng điền đầy đủ Mã sinh viên và Mật khẩu.' },
+        { error: validation.error, fieldErrors: validation.fieldErrors },
         { status: 400 }
       );
     }
 
-    const cleanUsername = String(username).trim().toUpperCase();
-    const cleanPassword = String(password).trim();
-
-    if (cleanUsername.length < 3) {
-      return NextResponse.json(
-        { error: 'Mã sinh viên phải có ít nhất 3 ký tự.' },
-        { status: 400 }
-      );
-    }
-
-    if (cleanPassword.length < 6) {
-      return NextResponse.json(
-        { error: 'Mật khẩu phải có độ dài tối thiểu 6 ký tự để đảm bảo an toàn.' },
-        { status: 400 }
-      );
-    }
-
-    if (confirmPassword && cleanPassword !== String(confirmPassword).trim()) {
-      return NextResponse.json(
-        { error: 'Mật khẩu nhập lại không trùng khớp.' },
-        { status: 400 }
-      );
-    }
+    const { username: cleanUsername, password: cleanPassword, phoneNumber, note } = validation.data;
 
     // 1. Check if student exists in Student table (MANDATORY)
     const student = await prisma.student.findUnique({
@@ -288,7 +280,7 @@ export async function POST(req: NextRequest) {
         phoneNumber: finalPhone,
         note: autoNote,
         status: 'APPROVED',
-        ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined,
+        ip,
       }).catch((err) => console.error('[Registration] Failed to dispatch telegram notification:', err));
 
       return NextResponse.json({
@@ -365,7 +357,7 @@ export async function POST(req: NextRequest) {
       phoneNumber: finalPhone,
       note: note ? String(note).trim() : null,
       status: regRequest.status,
-      ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined,
+      ip,
     }).catch((err) => console.error('[Registration] Failed to dispatch telegram notification:', err));
 
     return NextResponse.json({
@@ -389,4 +381,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { checkIsAdmin, getCurrentUserFromCookie, verifyAuthToken, hashSHA512 } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { adminResetPasswordSchema, validateZod } from '@/src/features/auth/schemas/auth.schema';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -18,7 +19,6 @@ async function getAuthUser(req: NextRequest) {
 function generateRandomPassword(length = 8): string {
   const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz';
   const numbers = '23456789';
-  const specials = '@#$%';
   
   let result = 'Pt';
   for (let i = 0; i < 4; i++) {
@@ -47,16 +47,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { username, mode = 'CUSTOM', newPassword } = body;
+    const validation = validateZod(adminResetPasswordSchema, body);
 
-    if (!username) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Vui lòng cung cấp Mã sinh viên / Tên đăng nhập của tài khoản cần reset mật khẩu' },
+        { error: validation.error, fieldErrors: validation.fieldErrors },
         { status: 400 }
       );
     }
 
-    const cleanUsername = String(username).trim().toUpperCase();
+    const { username: cleanUsername, mode, newPassword } = validation.data;
 
     // 1. Check if user or student exists
     let user = await prisma.user.findUnique({

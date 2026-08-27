@@ -2,24 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { verifyPassword, createAuthToken, checkIsAdmin, checkIsMonitor, getUserRoles } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { loginSchema, validateZod } from '@/src/features/auth/schemas/auth.schema';
+import { getClientIp, checkRateLimit, createRateLimitExceededResponse } from '@/src/lib/rate-limiter';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { username, password } = body;
+    const ip = getClientIp(req);
+    
+    // Rate limit: 15 attempts per minute per IP
+    const rateLimit = checkRateLimit(`login:${ip}`, 15, 60);
+    if (!rateLimit.success) {
+      return createRateLimitExceededResponse(
+        'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi 1 phút trước khi thử lại.',
+        rateLimit.resetSeconds
+      );
+    }
 
-    if (!username || !password) {
+    const body = await req.json();
+    const validation = validateZod(loginSchema, body);
+
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Vui lòng nhập đầy đủ tài khoản và mật khẩu' },
+        { error: validation.error, fieldErrors: validation.fieldErrors },
         { status: 400 }
       );
     }
 
-    const normalizedUsername = String(username).trim().toUpperCase();
+    const { username, password } = validation.data;
 
     // 1. Check in User table with Student profile
-    let user = await prisma.user.findUnique({
-      where: { username: normalizedUsername },
+    const user = await prisma.user.findUnique({
+      where: { username },
       include: { student: true },
     });
 
@@ -146,7 +159,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Check if student exists in Student database
     const student = await prisma.student.findUnique({
-      where: { maSV: normalizedUsername },
+      where: { maSV: username },
     });
 
     if (student) {
@@ -158,14 +171,14 @@ export async function POST(req: NextRequest) {
 
     await logActivity({
       req,
-      username: normalizedUsername,
+      username,
       action: 'LOGIN_FAILED',
       targetType: 'AUTH',
-      targetId: normalizedUsername,
-      description: `Đăng nhập thất bại: Không tìm thấy tài khoản hoặc sinh viên ${normalizedUsername}`,
+      targetId: username,
+      description: `Đăng nhập thất bại: Không tìm thấy tài khoản hoặc sinh viên ${username}`,
       metadata: {
         reason: 'USER_NOT_FOUND',
-        attemptUsername: normalizedUsername,
+        attemptUsername: username,
       },
     });
 

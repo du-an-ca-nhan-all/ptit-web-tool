@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 import { getAuthUser, verifyPassword, hashPassword } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { changePasswordSchema, validateZod } from '@/src/features/auth/schemas/auth.schema';
+import { getClientIp, checkRateLimit, createRateLimitExceededResponse } from '@/src/lib/rate-limiter';
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,22 +12,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vui lòng đăng nhập để thực hiện thao tác này' }, { status: 401 });
     }
 
+    const ip = getClientIp(req);
+    const rateLimit = checkRateLimit(`change-pass:${authUser.id}:${ip}`, 5, 60);
+    if (!rateLimit.success) {
+      return createRateLimitExceededResponse(
+        'Bạn đã thử đổi mật khẩu quá nhiều lần. Vui lòng đợi 1 phút trước khi thử lại.',
+        rateLimit.resetSeconds
+      );
+    }
+
     const body = await req.json();
-    const { currentPassword, newPassword, confirmPassword } = body;
+    const validation = validateZod(changePasswordSchema, body);
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Vui lòng điền đầy đủ mật khẩu hiện tại, mật khẩu mới và xác nhận mật khẩu mới' },
+        { error: validation.error, fieldErrors: validation.fieldErrors },
         { status: 400 }
       );
     }
 
-    if (newPassword !== confirmPassword) {
-      return NextResponse.json(
-        { error: 'Mật khẩu mới và xác nhận mật khẩu không khớp nhau' },
-        { status: 400 }
-      );
-    }
+    const { currentPassword, newPassword } = validation.data;
 
     // Find user in database
     const user = await prisma.user.findUnique({
@@ -41,13 +47,6 @@ export async function POST(req: NextRequest) {
     if (!isCurrentValid) {
       return NextResponse.json(
         { error: 'Mật khẩu hiện tại không chính xác' },
-        { status: 400 }
-      );
-    }
-
-    if (currentPassword === newPassword) {
-      return NextResponse.json(
-        { error: 'Mật khẩu mới không được trùng với mật khẩu hiện tại' },
         { status: 400 }
       );
     }
