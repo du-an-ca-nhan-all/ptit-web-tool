@@ -1873,9 +1873,14 @@ export async function dispatchNewUserRegistered(params: {
     }
 
     const nowVN = getVietnamTime();
-    const statusBadge = params.status === 'APPROVED' ? '✅ Đã được phê duyệt' : '⏳ Đang chờ Admin xét duyệt';
+    const isAutoApproved = params.status === 'APPROVED' || (params.note && params.note.includes('Tự động duyệt'));
+    const statusBadge = isAutoApproved
+      ? '⚡ <b>TỰ ĐỘNG KÍCH HOẠT & LIÊN KẾT QLHT (Mật khẩu khớp Cổng QLDTTX)</b>'
+      : params.status === 'APPROVED'
+      ? '✅ <b>Đã được phê duyệt</b>'
+      : '⏳ <b>Đang chờ Admin xét duyệt thủ công</b>';
 
-    const messageHtml = `✨ <b>[THÔNG BÁO] CÓ NGƯỜI ĐĂNG KÝ TÀI KHOẢN MỚI</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Họ và tên: <b>${params.fullName}</b>\n🎓 Mã sinh viên: <code>${params.username}</code>\n🏫 Lớp học: <b>${params.lop || 'Chưa phân lớp'}</b>\n📱 Số điện thoại: <code>${params.phoneNumber || 'Chưa cập nhật'}</code>\n📝 Trạng thái: <b>${statusBadge}</b>\n${params.note ? `💬 Ghi chú: <i>${params.note}</i>\n` : ''}${params.ip ? `🌐 Địa chỉ IP: <code>${params.ip}</code>\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Thời gian: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>\n🛡️ <i>Cổng quản trị PTIT EduSync</i>`;
+    const messageHtml = `✨ <b>[THÔNG BÁO] ${isAutoApproved ? 'TỰ ĐỘNG KÍCH HOẠT TÀI KHOẢN MỚI' : 'CÓ NGƯỜI ĐĂNG KÝ TÀI KHOẢN MỚI'}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Họ và tên: <b>${params.fullName}</b>\n🎓 Mã sinh viên: <code>${params.username}</code>\n🏫 Lớp học: <b>${params.lop || 'Chưa phân lớp'}</b>\n📱 Số điện thoại: <code>${params.phoneNumber || 'Chưa cập nhật'}</code>\n📝 Trạng thái: ${statusBadge}\n${params.note ? `💬 Ghi chú: <i>${params.note}</i>\n` : ''}${params.ip ? `🌐 Địa chỉ IP: <code>${params.ip}</code>\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Thời gian: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>\n🛡️ <i>Cổng quản trị PTIT EduSync</i>`;
 
     const sendRes = await sendTelegramMessage(effectiveToken, adminConfig.chatId, messageHtml, {
       threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,

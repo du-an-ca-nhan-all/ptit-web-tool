@@ -17,6 +17,7 @@ import {
   X,
   ShieldAlert,
   KeyRound,
+  Zap,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import AdminResetPasswordModal from './AdminResetPasswordModal';
@@ -551,15 +552,29 @@ export default function AdminRegistrationManager({ currentUser }: AdminRegistrat
                       </div>
 
                       {/* Status Tag */}
-                      <div className="shrink-0">
+                      <div className="shrink-0 text-right">
                         {item.status === 'PENDING' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                             <Clock className="w-3 h-3" /> Chờ Duyệt
                           </span>
                         ) : item.status === 'APPROVED' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3" /> Đã Duyệt
-                          </span>
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3" /> Đã Duyệt
+                            </span>
+                            {item.reviewedBy && (
+                              <span className={`text-[9px] ${item.reviewedBy.includes('TỰ ĐỘNG') ? 'text-indigo-600 font-bold inline-flex items-center gap-0.5' : 'text-slate-400'}`}>
+                                {item.reviewedBy.includes('TỰ ĐỘNG') ? (
+                                  <>
+                                    <Zap className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
+                                    {item.reviewedBy}
+                                  </>
+                                ) : (
+                                  `@{item.reviewedBy}`
+                                )}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                             <XCircle className="w-3 h-3" /> Đã Từ Chối
@@ -753,8 +768,15 @@ export default function AdminRegistrationManager({ currentUser }: AdminRegistrat
                                 <CheckCircle2 className="w-3.5 h-3.5" /> Đã Duyệt
                               </span>
                               {item.reviewedBy && (
-                                <span className="text-[10px] text-slate-400">
-                                  bởi @{item.reviewedBy}
+                                <span className={`text-[10px] ${item.reviewedBy.includes('TỰ ĐỘNG') ? 'text-indigo-600 font-bold inline-flex items-center gap-0.5' : 'text-slate-400'}`}>
+                                  {item.reviewedBy.includes('TỰ ĐỘNG') ? (
+                                    <>
+                                      <Zap className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
+                                      {item.reviewedBy}
+                                    </>
+                                  ) : (
+                                    `bởi @${item.reviewedBy}`
+                                  )}
                                 </span>
                               )}
                             </div>

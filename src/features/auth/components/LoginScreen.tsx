@@ -16,6 +16,9 @@ import {
   Loader2,
   Send,
   Download,
+  Zap,
+  Sparkles,
+  Clock,
 } from 'lucide-react';
 import { LoginUser, ExamRecord } from '../types/auth.types';
 import { usePWAContext } from '../../../components/pwa/PWAProvider';
@@ -60,6 +63,7 @@ export default function LoginScreen({
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirm, setShowRegConfirm] = useState(false);
   const [regSuccessMsg, setRegSuccessMsg] = useState('');
+  const [isAutoApproved, setIsAutoApproved] = useState(false);
   const [regError, setRegError] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
@@ -159,6 +163,7 @@ export default function LoginScreen({
     e.preventDefault();
     setRegError('');
     setRegSuccessMsg('');
+    setIsAutoApproved(false);
 
     if (!regUsername.trim() || !regPassword) {
       setRegError('Vui lòng điền Mã sinh viên và Mật khẩu');
@@ -198,9 +203,12 @@ export default function LoginScreen({
       const data = await res.json();
 
       if (res.ok && data.success) {
+        setIsAutoApproved(Boolean(data.autoApproved));
         setRegSuccessMsg(
           data.message ||
-            'Đăng ký tài khoản thành công! Yêu cầu của bạn đang chờ Quản trị viên xét duyệt.'
+            (data.autoApproved
+              ? 'Tài khoản của bạn đã được TỰ ĐỘNG KÍCH HOẠT và liên kết QLHT thành công!'
+              : 'Đăng ký tài khoản thành công! Yêu cầu của bạn đang chờ Quản trị viên xét duyệt.')
         );
         // Clear form
         setRegPassword('');
@@ -261,6 +269,7 @@ export default function LoginScreen({
                 setError('');
                 setRegError('');
                 setRegSuccessMsg('');
+                setIsAutoApproved(false);
               }}
               className={`py-2 sm:py-2.5 rounded-lg sm:rounded-xl transition-all cursor-pointer active:scale-[0.98] ${
                 mode === 'LOGIN'
@@ -277,6 +286,7 @@ export default function LoginScreen({
                 setError('');
                 setRegError('');
                 setRegSuccessMsg('');
+                setIsAutoApproved(false);
                 if (username && !regUsername) setRegUsername(username);
               }}
               className={`py-2 sm:py-2.5 rounded-lg sm:rounded-xl transition-all cursor-pointer active:scale-[0.98] ${
@@ -396,16 +406,36 @@ export default function LoginScreen({
         {mode === 'REGISTER' && (
           <div className="p-4 sm:p-7">
             {regSuccessMsg ? (
-              <div className="flex flex-col items-center justify-center py-3 text-center gap-3 sm:gap-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-emerald-100 text-emerald-600 rounded-2xl sm:rounded-3xl flex items-center justify-center shadow-xs">
-                  <CheckCircle2 className="w-7 h-7 sm:w-8 sm:h-8" />
+              <div className="flex flex-col items-center justify-center py-2 text-center gap-3 sm:gap-4">
+                <div
+                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl sm:rounded-3xl flex items-center justify-center shadow-xs ${
+                    isAutoApproved
+                      ? 'bg-gradient-to-br from-amber-400 to-emerald-500 text-white shadow-emerald-500/20'
+                      : 'bg-emerald-100 text-emerald-600'
+                  }`}
+                >
+                  {isAutoApproved ? (
+                    <Zap className="w-7 h-7 sm:w-8 sm:h-8 fill-current" />
+                  ) : (
+                    <CheckCircle2 className="w-7 h-7 sm:w-8 sm:h-8" />
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-800">Gửi Yêu Cầu Thành Công!</h3>
+                  <h3 className="text-base sm:text-lg font-black text-slate-800 tracking-tight flex items-center justify-center gap-1.5">
+                    {isAutoApproved ? (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        <span>Kích Hoạt Tự Động Thành Công!</span>
+                      </>
+                    ) : (
+                      <span>Gửi Yêu Cầu Thành Công!</span>
+                    )}
+                  </h3>
                   <p className="text-xs text-slate-600 mt-1.5 leading-relaxed max-w-sm">
                     {regSuccessMsg}
                   </p>
                 </div>
+
                 <div className="p-3 sm:p-3.5 bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200 text-xs text-slate-600 text-left w-full space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Mã SV:</span>
@@ -423,17 +453,38 @@ export default function LoginScreen({
                       <b className="text-indigo-700 font-bold">{studentInfo.maLop}</b>
                     </div>
                   )}
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/80">
+                    <span className="text-slate-500">Trạng thái:</span>
+                    {isAutoApproved ? (
+                      <span className="inline-flex items-center gap-1 font-bold text-[11px] text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md">
+                        <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
+                        Đã kích hoạt & Liên kết QLHT
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 font-bold text-[11px] text-amber-700 bg-amber-100/90 px-2 py-0.5 rounded-md">
+                        <Clock className="w-3 h-3 text-amber-600" />
+                        Chờ Admin duyệt
+                      </span>
+                    )}
+                  </div>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => {
                     setMode('LOGIN');
                     setUsername(regUsername);
                     setRegSuccessMsg('');
+                    setIsAutoApproved(false);
                   }}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl transition-all shadow-md shadow-blue-500/20 cursor-pointer active:scale-[0.99] touch-manipulation"
+                  className={`w-full py-3 text-white font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl transition-all shadow-md cursor-pointer active:scale-[0.99] touch-manipulation flex items-center justify-center gap-2 ${
+                    isAutoApproved
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-500/25'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'
+                  }`}
                 >
-                  Quay Lại Màn Hình Đăng Nhập
+                  <span>{isAutoApproved ? 'Đăng Nhập Ngay' : 'Quay Lại Màn Hình Đăng Nhập'}</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             ) : (
@@ -583,10 +634,11 @@ export default function LoginScreen({
                   />
                 </div>
 
-                <div className="p-2.5 sm:p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
-                  <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                {/* Instant Activation Tip Banner */}
+                <div className="p-2.5 sm:p-3 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-xl border border-indigo-200/80 text-xs text-slate-700 flex items-start gap-2 shadow-2xs">
+                  <Zap className="w-4 h-4 text-amber-500 fill-amber-400 shrink-0 mt-0.5" />
                   <span className="leading-snug">
-                    Sau khi đăng ký, yêu cầu sẽ được chuyển tới <strong>Quản trị viên</strong> để xét duyệt và kích hoạt mật khẩu của bạn.
+                    <strong className="text-indigo-900">Mẹo kích hoạt tức thì:</strong> Nhập mật khẩu trùng khớp với <strong>Cổng QLDTTX (QLHT)</strong> để hệ thống <strong>tự động kích hoạt tài khoản & liên kết QLHT ngay lập tức</strong> mà không cần chờ Admin duyệt.
                   </span>
                 </div>
 
@@ -596,7 +648,10 @@ export default function LoginScreen({
                   className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-xl sm:rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.99] touch-manipulation"
                 >
                   {isRegistering ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span className="text-xs">Đang kiểm tra & kích hoạt...</span>
+                    </div>
                   ) : (
                     <>
                       <UserPlus className="w-4 h-4" />
