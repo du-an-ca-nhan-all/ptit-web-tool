@@ -46,6 +46,7 @@ import {
   Inbox,
   AlertTriangle,
   Gauge,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import TelegramAutoDetectModal from './TelegramAutoDetectModal';
