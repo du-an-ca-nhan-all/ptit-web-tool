@@ -499,10 +499,17 @@ export async function checkAndDispatchQldtAnnouncements(options: {
         }
       }
 
-      // Find external account
-      const extAccount = await prisma.externalAccount.findFirst({
-        where: { username: sub.username },
-      });
+      // Find external account for QLDTTX
+      const extAccount =
+        (await prisma.externalAccount.findFirst({
+          where: {
+            username: sub.username.toUpperCase(),
+            systemKey: 'QLDTTX_PTTC1',
+          },
+        })) ||
+        (await prisma.externalAccount.findFirst({
+          where: { username: sub.username },
+        }));
 
       if (!extAccount || (!extAccount.extPassword && !extAccount.token)) {
         continue;
@@ -511,18 +518,30 @@ export async function checkAndDispatchQldtAnnouncements(options: {
       totalChecked++;
 
       try {
-        const { announcements } = await fetchStudentAnnouncementsFromQLDTTX({
+        const { announcements, newToken } = await fetchStudentAnnouncementsFromQLDTTX({
           username: extAccount.extUsername,
           password: extAccount.extPassword,
           token: extAccount.token,
         });
+
+        if (newToken && newToken !== extAccount.token) {
+          await prisma.externalAccount.update({
+            where: { id: extAccount.id },
+            data: {
+              token: newToken,
+              status: 'CONNECTED',
+              lastSyncAt: new Date(),
+              syncMessage: `Đã tự động làm mới Token QLDTTX lúc ${new Date().toLocaleTimeString('vi-VN')}`,
+            },
+          }).catch(() => {});
+        }
 
         if (!announcements || announcements.length === 0) {
           // Update last check time
           await prisma.telegramConfig.update({
             where: { id: sub.id },
             data: { lastQldtCheckedAt: new Date() },
-          });
+          }).catch(() => {});
           continue;
         }
 
@@ -545,8 +564,37 @@ export async function checkAndDispatchQldtAnnouncements(options: {
             },
           });
 
-          if (alreadyLogged && !options.forceCheck) {
+          if (alreadyLogged) {
             continue;
+          }
+
+          // Bỏ qua các thông báo cũ đã đọc từ hơn 7 ngày trước để tránh gửi dồn dập lịch sử cũ
+          const rawDate = ann.publishDate;
+          if (rawDate && ann.isRead === true) {
+            const notifDate = parseDateString(rawDate);
+            if (notifDate && !isNaN(notifDate.getTime())) {
+              const diffMs = Date.now() - notifDate.getTime();
+              const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+              if (diffMs > SEVEN_DAYS_MS) {
+                // Đánh dấu log để không xử lý lại
+                await prisma.qldtAnnouncementLog.upsert({
+                  where: {
+                    username_announcementId: {
+                      username: sub.username,
+                      announcementId: ann.id,
+                    },
+                  },
+                  create: {
+                    username: sub.username,
+                    announcementId: ann.id,
+                    title: ann.title,
+                    publishDate: ann.publishDate,
+                  },
+                  update: {},
+                }).catch(() => {});
+                continue;
+              }
+            }
           }
 
           const studentName = sub.user?.student?.hoTen || sub.username;
@@ -554,9 +602,32 @@ export async function checkAndDispatchQldtAnnouncements(options: {
           const rawSummary = ann.summary || ann.content || '';
           const cleanedSummary = cleanHtml(rawSummary);
           const cleanSummary = cleanedSummary ? (cleanedSummary.length > 350 ? cleanedSummary.slice(0, 350) + '...' : cleanedSummary) : '';
-          const senderDisplay = cleanHtml(ann.sender || 'Phòng Đào Tạo');
+          const senderDisplay = cleanHtml(ann.sender || 'Phòng Đào Tạo / Giảng Viên');
 
-          const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ CỔNG QLDTTX (PTTC1)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${escapeTelegramHtml(studentName)}</b> (<code>${escapeTelegramHtml(sub.username)}</code>)\n📌 <b>${escapeTelegramHtml(cleanTitle)}</b>\n\n${cleanSummary ? `📝 <i>${escapeTelegramHtml(cleanSummary)}</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${escapeTelegramHtml(senderDisplay)}</b>\n🗓️ Ngày đăng: <b>${escapeTelegramHtml(ann.publishDate || 'Gần đây')}</b>\n🔗 <a href="https://qldttx.pttc1.edu.vn/#/xemthongbao">Xem chi tiết trên QLDTTX (/#/xemthongbao)</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
+          // Định dạng ngày hiển thị
+          let dateDisplay = 'Gần đây';
+          if (ann.publishDate) {
+            try {
+              const d = new Date(ann.publishDate);
+              if (!isNaN(d.getTime())) {
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mo = String(d.getMonth() + 1).padStart(2, '0');
+                const yy = d.getFullYear();
+                dateDisplay = `${hh}:${mm} - ${dd}/${mo}/${yy}`;
+              } else {
+                dateDisplay = ann.publishDate;
+              }
+            } catch {
+              dateDisplay = ann.publishDate;
+            }
+          }
+
+          const unreadBadge = !ann.isRead ? ' 🔴 <i>(Chưa đọc)</i>' : '';
+          const mustReadBadge = ann.isMustRead ? ' ⚠️ <b>(Bắt buộc xem)</b>' : '';
+
+          const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ CỔNG QLDTTX (PTTC1)</b>${unreadBadge}${mustReadBadge}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${escapeTelegramHtml(studentName)}</b> (<code>${escapeTelegramHtml(sub.username)}</code>)\n📌 <b>${escapeTelegramHtml(cleanTitle)}</b>\n\n${cleanSummary ? `📝 <i>${escapeTelegramHtml(cleanSummary)}</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${escapeTelegramHtml(senderDisplay)}</b>\n🗓️ Thời gian: <b>${escapeTelegramHtml(dateDisplay)}</b>\n🔗 <a href="https://qldttx.pttc1.edu.vn/#/xemthongbao">Xem chi tiết trên Cổng QLDTTX (/#/xemthongbao)</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
 
           const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
             threadId: sub.threadId ? Number(sub.threadId) : undefined,
@@ -588,7 +659,7 @@ export async function checkAndDispatchQldtAnnouncements(options: {
         await prisma.telegramConfig.update({
           where: { id: sub.id },
           data: { lastQldtCheckedAt: new Date() },
-        });
+        }).catch(() => {});
       } catch (err: any) {
         errors.push(`${sub.username}: ${err.message}`);
       }

@@ -229,6 +229,8 @@ export async function fetchStudentCoursesFromQLDTTX(account: {
   };
 }
 
+export const QLDTTX_ANNOUNCEMENTS_API_URL = 'https://qldttx.pttc1.edu.vn/api/web/w-locdsthongbao';
+
 /**
  * Lấy danh sách thông báo từ cổng QLDTTX (https://qldttx.pttc1.edu.vn/#/xemthongbao)
  */
@@ -244,10 +246,19 @@ export async function fetchStudentAnnouncementsFromQLDTTX(account: {
     content?: string;
     publishDate?: string;
     sender?: string;
+    isRead?: boolean;
+    isMustRead?: boolean;
+    targetSearch?: string;
     link?: string;
   }>;
+  unreadCount: number;
+  totalCount: number;
+  newToken?: string;
 }> {
   let validToken = account.token;
+  let isNew = false;
+  let accumulatedToken: string | undefined;
+
   if (!validToken && account.password) {
     const res = await getValidTokenOrRefresh({
       username: account.username,
@@ -255,6 +266,8 @@ export async function fetchStudentAnnouncementsFromQLDTTX(account: {
       existingToken: account.token,
     });
     validToken = res.token;
+    isNew = res.isNew;
+    if (isNew) accumulatedToken = validToken;
   }
 
   if (!validToken) {
@@ -263,63 +276,80 @@ export async function fetchStudentAnnouncementsFromQLDTTX(account: {
 
   const rawToken = validToken.replace(/^Bearer\s+/i, '').trim();
 
-  // Candidate endpoints for /#/xemthongbao
-  const candidateEndpoints = [
-    'https://qldttx.pttc1.edu.vn/api/dkmh/w-locdsthongbaosinhvien',
-    'https://qldttx.pttc1.edu.vn/api/dkmh/w-locdsthongbaocanhan',
-    'https://qldttx.pttc1.edu.vn/api/dkmh/w-locdsthongbao',
-    'https://qldttx.pttc1.edu.vn/api/qldt/w-locdsthongbaosinhvien',
-  ];
-
-  let rawList: any[] = [];
-
-  for (const endpoint of candidateEndpoints) {
-    try {
-      let response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          ...STATIC_HEADERS,
-          Authorization: `Bearer ${rawToken}`,
-          Cookie: `access_token=${rawToken}`,
+  const bodyPayload = {
+    filter: {
+      id: null,
+      is_noi_dung: true,
+      is_web: true,
+    },
+    additional: {
+      paging: {
+        limit: 100,
+        page: 1,
+      },
+      ordering: [
+        {
+          name: 'ngay_gui',
+          order_type: 1,
         },
-        body: JSON.stringify({ is_CVHT: false, is_Clear: false, limit: 20 }),
-      });
+      ],
+    },
+  };
 
-      if ((response.status === 401 || response.status === 403) && account.password) {
-        const fresh = await loginAndGetToken({
-          username: account.username,
-          password: account.password,
-        });
-        const freshRaw = fresh.replace(/^Bearer\s+/i, '').trim();
-        response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            ...STATIC_HEADERS,
-            Authorization: `Bearer ${freshRaw}`,
-            Cookie: `access_token=${freshRaw}`,
-          },
-          body: JSON.stringify({ is_CVHT: false, is_Clear: false, limit: 20 }),
-        });
-      }
+  let response = await fetch(QLDTTX_ANNOUNCEMENTS_API_URL, {
+    method: 'POST',
+    headers: {
+      ...STATIC_HEADERS,
+      Authorization: `Bearer ${rawToken}`,
+      Cookie: `access_token=${rawToken}`,
+    },
+    body: JSON.stringify(bodyPayload),
+  });
 
-      if (response.ok) {
-        const json = await response.json();
-        const items =
-          json?.data?.ds_thong_bao ||
-          json?.data?.ds_thongbao ||
-          json?.data?.items ||
-          (Array.isArray(json?.data) ? json.data : []) ||
-          (Array.isArray(json) ? json : []);
-
-        if (Array.isArray(items) && items.length > 0) {
-          rawList = items;
-          break;
-        }
-      }
-    } catch {
-      // Continue to next endpoint fallback
-    }
+  // If token expired (401/403) and password available, auto refresh token & retry
+  if ((response.status === 401 || response.status === 403) && account.password) {
+    const fresh = await loginAndGetToken({
+      username: account.username,
+      password: account.password,
+    });
+    accumulatedToken = fresh;
+    const freshRaw = fresh.replace(/^Bearer\s+/i, '').trim();
+    response = await fetch(QLDTTX_ANNOUNCEMENTS_API_URL, {
+      method: 'POST',
+      headers: {
+        ...STATIC_HEADERS,
+        Authorization: `Bearer ${freshRaw}`,
+        Cookie: `access_token=${freshRaw}`,
+      },
+      body: JSON.stringify(bodyPayload),
+    });
   }
+
+  const text = await response.text();
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = text;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Cổng QLDTTX phản hồi lỗi (${response.status}): ${typeof parsed === 'string' ? parsed : JSON.stringify(parsed)}`
+    );
+  }
+
+  const dataObj = parsed?.data || {};
+  const rawList: any[] = Array.isArray(dataObj?.ds_thong_bao)
+    ? dataObj.ds_thong_bao
+    : Array.isArray(dataObj?.items)
+    ? dataObj.items
+    : Array.isArray(dataObj)
+    ? dataObj
+    : [];
+
+  const unreadCount = typeof dataObj?.notification === 'number' ? dataObj.notification : 0;
+  const totalCount = typeof dataObj?.total_items === 'number' ? dataObj.total_items : rawList.length;
 
   const announcements = rawList.map((item: any, idx: number) => {
     const id = String(
@@ -328,7 +358,7 @@ export async function fetchStudentAnnouncementsFromQLDTTX(account: {
       item.ma_thong_bao ||
       item.id_tb ||
       item.guid ||
-      `${item.tieu_de || item.title || 'tb'}-${item.ngay_tao || item.ngay_dang || idx}`
+      `${item.tieu_de || item.title || 'tb'}-${item.ngay_gui || item.ngay_tao || item.ngay_dang || idx}`
     );
 
     const title =
@@ -336,7 +366,7 @@ export async function fetchStudentAnnouncementsFromQLDTTX(account: {
       item.title ||
       item.ten_thong_bao ||
       item.subject ||
-      'Thông báo mới từ Học viện PTIT';
+      'Thông báo mới từ Cổng QLDTTX (PTTC1)';
 
     const content =
       item.noi_dung ||
@@ -349,20 +379,24 @@ export async function fetchStudentAnnouncementsFromQLDTTX(account: {
       item.noi_dung_tom_tat ||
       item.tom_tat ||
       item.summary ||
-      (content ? content.replace(/<[^>]+>/g, '').slice(0, 250) : '');
+      (content ? content.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim().slice(0, 350) : '');
 
     const publishDate =
+      item.ngay_gui ||
       item.ngay_dang ||
       item.ngay_tao ||
       item.created_at ||
-      item.ngay_gui ||
-      new Date().toLocaleDateString('vi-VN');
+      new Date().toISOString();
 
     const sender =
       item.nguoi_gui ||
       item.tac_gia ||
       item.don_vi_gui ||
-      'Phòng Đào tạo / Học viện PTIT';
+      'Phòng Đào tạo / Giảng viên PTIT';
+
+    const isRead = item.is_da_doc !== undefined ? Boolean(item.is_da_doc) : true;
+    const isMustRead = Boolean(item.is_phai_xem);
+    const targetSearch = item.doi_tuong_search || item.phan_cap_search || '';
 
     return {
       id,
@@ -371,11 +405,19 @@ export async function fetchStudentAnnouncementsFromQLDTTX(account: {
       content,
       publishDate,
       sender,
+      isRead,
+      isMustRead,
+      targetSearch,
       link: 'https://qldttx.pttc1.edu.vn/#/xemthongbao',
     };
   });
 
-  return { announcements };
+  return {
+    announcements,
+    unreadCount,
+    totalCount,
+    newToken: accumulatedToken,
+  };
 }
 
 export const QLDTTX_SEMESTER_API_URL = 'https://qldttx.pttc1.edu.vn/api/sch/w-locdshockytkbuser';
