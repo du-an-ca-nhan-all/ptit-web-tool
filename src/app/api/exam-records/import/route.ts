@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import Papa from 'papaparse';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
@@ -59,13 +60,8 @@ export async function POST(req: NextRequest) {
       if (!maSV) return;
 
       const maLop = studentMainClassMap.get(maSV) || row.MaLop;
-      const batchCode = row.MaDotThi ? String(row.MaDotThi).trim() : null;
-      const batchName = row.TenDotThi ? String(row.TenDotThi).trim() : (batchCode || 'Đợt thi chính thức');
 
-      if (batchCode && !batchesMap.has(batchCode)) {
-        batchesMap.set(batchCode, batchName);
-      }
-
+      // Extract unique students
       if (!studentMap.has(maSV)) {
         const hoLot = row.HoLotSV ? String(row.HoLotSV).trim() : '';
         const ten = row.TenSV ? String(row.TenSV).trim() : '';
@@ -83,9 +79,17 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // Extract batches
+      const maDotThi = row.MaDotThi ? String(row.MaDotThi).trim().toUpperCase() : 'DEFAULT';
+      const tenDotThi = row.TenDotThi ? String(row.TenDotThi).trim() : 'Đợt thi mặc định';
+      if (!batchesMap.has(maDotThi)) {
+        batchesMap.set(maDotThi, tenDotThi);
+      }
+
+      // Build exam record
       examRecordsList.push({
         maSV,
-        batchCode: batchCode || null,
+        batchCode: maDotThi,
         nhomThi: row.NhomThi ? String(row.NhomThi).trim() : null,
         mapThi: row.MAPTHI ? String(row.MAPTHI).trim() : null,
         maMH: row.MaMH ? String(row.MaMH).trim() : null,
@@ -97,8 +101,8 @@ export async function POST(req: NextRequest) {
         ngayThi: row.NgayThi ? String(row.NgayThi).trim() : null,
         gioThi: row.GioThi ? String(row.GioThi).trim() : null,
         soPhutThi: row.SoPhutThi ? String(row.SoPhutThi).trim() : null,
-        maDotThi: batchCode,
-        tenDotThi: batchName,
+        maDotThi: maDotThi,
+        tenDotThi: tenDotThi,
         isPostponed:
           row.isPostponed === true ||
           row.isPostponed === 'true' ||
@@ -110,18 +114,19 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    // If replace mode, clear old exam records
     if (mode === 'replace') {
-      await prisma.examRecord.deleteMany();
+      await prisma.examRecord.deleteMany({});
     }
 
-    // Upsert batches to guarantee PostgreSQL foreign key integrity
-    for (const [bCode, bName] of batchesMap.entries()) {
+    // Ensure ExamBatches exist
+    for (const [code, name] of batchesMap.entries()) {
       await prisma.examBatch.upsert({
-        where: { code: bCode },
-        update: { name: bName },
+        where: { code },
+        update: { name },
         create: {
-          code: bCode,
-          name: bName,
+          code,
+          name,
           isActive: true,
         },
       });
@@ -176,6 +181,10 @@ export async function POST(req: NextRequest) {
       description: `Nhập ${examRecordsList.length} bản ghi lịch thi từ file "${file.name}" (Chế độ: ${mode})`,
       metadata: { fileName: file.name, mode, totalRecords: examRecordsList.length, totalStudents: studentArray.length },
     });
+
+    // Invalidate caches
+    revalidateTag('metadata-filters', { expire: 0 });
+    revalidateTag('exam-batches', { expire: 0 });
 
     return NextResponse.json({
       success: true,

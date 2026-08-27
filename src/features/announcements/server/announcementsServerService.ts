@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { prisma } from '@/src/lib/prisma';
 import { AnnouncementItem } from '../types/announcement.types';
 
@@ -25,47 +26,61 @@ function formatAnnouncement(item: any): AnnouncementItem {
   };
 }
 
+async function fetchActiveAnnouncementsRaw() {
+  const now = new Date();
+  const rawList = await (prisma as any).announcement.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        { startDate: null },
+        { startDate: { lte: now } },
+      ],
+      AND: [
+        {
+          OR: [
+            { endDate: null },
+            { endDate: { gte: now } },
+          ],
+        },
+      ],
+    },
+    orderBy: [
+      { isPinned: 'desc' },
+      { createdAt: 'desc' },
+    ],
+    take: 50,
+  });
+
+  return rawList.map(formatAnnouncement);
+}
+
+const getCachedActiveAnnouncements = unstable_cache(
+  fetchActiveAnnouncementsRaw,
+  ['announcements-active-list'],
+  {
+    revalidate: 300,
+    tags: ['announcements'],
+  }
+);
+
 export const announcementsService = {
   /**
-   * Lấy danh sách các thông báo đang có hiệu lực dành cho người dùng
+   * Lấy danh sách các thông báo đang có hiệu lực dành cho người dùng (Cached with Next.js Cache)
    */
   async getActiveAnnouncements(options?: {
     role?: string | null;
     classCode?: string | null;
     limit?: number;
   }): Promise<AnnouncementItem[]> {
-    const now = new Date();
     const limit = options?.limit || 20;
-
     const role = options?.role || 'sinh_vien';
     const classCode = options?.classCode?.trim();
 
     try {
-      const rawList = await (prisma as any).announcement.findMany({
-        where: {
-          isActive: true,
-          OR: [
-            { startDate: null },
-            { startDate: { lte: now } },
-          ],
-          AND: [
-            {
-              OR: [
-                { endDate: null },
-                { endDate: { gte: now } },
-              ],
-            },
-          ],
-        },
-        orderBy: [
-          { isPinned: 'desc' },
-          { createdAt: 'desc' },
-        ],
-        take: limit,
-      });
+      const activeList = await getCachedActiveAnnouncements();
 
       // Lọc theo targetRole và targetClass phía application logic
-      const filtered = rawList.filter((item: any) => {
+      const filtered = activeList.filter((item) => {
         if (item.targetRole && item.targetRole !== 'ALL') {
           const itemRoles = item.targetRole.split(',').map((r: string) => r.trim());
           const userRoles = role.split(',').map((r: string) => r.trim());
@@ -82,7 +97,7 @@ export const announcementsService = {
         return true;
       });
 
-      return filtered.map(formatAnnouncement);
+      return filtered.slice(0, limit);
     } catch (err) {
       console.error('getActiveAnnouncements error:', err);
       return [];

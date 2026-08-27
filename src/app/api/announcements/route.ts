@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import {
   getActiveAnnouncements,
@@ -161,6 +162,9 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Invalidate cache
+      revalidateTag('announcements', { expire: 0 });
+
       return NextResponse.json({
         success: true,
         message: 'Đã tạo thông báo mới thành công!',
@@ -221,6 +225,9 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Invalidate cache
+      revalidateTag('announcements', { expire: 0 });
+
       return NextResponse.json({
         success: true,
         message: 'Đã cập nhật thông báo thành công!',
@@ -253,6 +260,9 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Invalidate cache
+      revalidateTag('announcements', { expire: 0 });
+
       return NextResponse.json({
         success: true,
         message: `Đã ${isActive ? 'kích hoạt' : 'tạm dừng'} thông báo thành công!`,
@@ -281,6 +291,9 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Invalidate cache
+      revalidateTag('announcements', { expire: 0 });
+
       return NextResponse.json({
         success: true,
         message: 'Đã xóa thông báo thành công!',
@@ -304,6 +317,9 @@ export async function POST(req: NextRequest) {
         description: `Admin ${authUser.username} xóa hàng loạt ${count} thông báo`,
         metadata: { ids, count },
       });
+
+      // Invalidate cache
+      revalidateTag('announcements', { expire: 0 });
 
       return NextResponse.json({
         success: true,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import Papa from 'papaparse';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
@@ -181,6 +182,10 @@ export async function POST(req: NextRequest) {
       description: `Nhập ${examRecordsList.length} bản ghi lịch thi từ file "${file.name}" vào đợt thi "${batch.name}" (Chế độ: ${mode})`,
       metadata: { fileName: file.name, batchCode: cleanBatchCode, mode, totalRecords: examRecordsList.length, totalStudents: studentArray.length },
     });
+
+    // Invalidate caches
+    revalidateTag('metadata-filters', { expire: 0 });
+    revalidateTag('exam-batches', { expire: 0 });
 
     // Asynchronously dispatch Telegram notifications to registered students
     dispatchExamScheduleUpdated({

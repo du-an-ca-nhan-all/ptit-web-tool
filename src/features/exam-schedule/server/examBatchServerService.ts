@@ -1,36 +1,33 @@
+import { unstable_cache } from 'next/cache';
 import { prisma } from '@/src/lib/prisma';
 import { ExamBatchItem } from '../types/exam.types';
 
-export const examBatchService = {
-  /**
-   * Get all exam batches with counts
-   */
-  async getBatches() {
-    const batches = await prisma.examBatch.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: {
-          select: { examRecords: true },
-        },
+async function fetchBatchesRaw(): Promise<ExamBatchItem[]> {
+  const batches = await prisma.examBatch.findMany({
+    orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+    include: {
+      _count: {
+        select: { examRecords: true },
       },
-    });
+    },
+  });
 
-    const result: ExamBatchItem[] = [];
+  return Promise.all(
+    batches.map(async (b) => {
+      const [distinctStudents, distinctRooms] = await Promise.all([
+        prisma.examRecord.findMany({
+          where: { batchCode: b.code },
+          distinct: ['maSV'],
+          select: { maSV: true },
+        }),
+        prisma.examRecord.findMany({
+          where: { batchCode: b.code, mapThi: { not: null } },
+          distinct: ['mapThi'],
+          select: { mapThi: true },
+        }),
+      ]);
 
-    for (const b of batches) {
-      const distinctStudents = await prisma.examRecord.findMany({
-        where: { batchCode: b.code },
-        distinct: ['maSV'],
-        select: { maSV: true },
-      });
-
-      const distinctRooms = await prisma.examRecord.findMany({
-        where: { batchCode: b.code },
-        distinct: ['mapThi'],
-        select: { mapThi: true },
-      });
-
-      result.push({
+      return {
         id: b.id,
         code: b.code,
         name: b.name,
@@ -45,10 +42,26 @@ export const examBatchService = {
         totalRooms: distinctRooms.length,
         createdAt: b.createdAt.toISOString(),
         updatedAt: b.updatedAt.toISOString(),
-      });
-    }
+      };
+    })
+  );
+}
 
-    return result;
+const getCachedBatches = unstable_cache(
+  fetchBatchesRaw,
+  ['exam-batches-list'],
+  {
+    revalidate: 3600,
+    tags: ['exam-batches'],
+  }
+);
+
+export const examBatchService = {
+  /**
+   * Get all exam batches with counts (Cached with Next.js Cache)
+   */
+  async getBatches(): Promise<ExamBatchItem[]> {
+    return getCachedBatches();
   },
 
   /**

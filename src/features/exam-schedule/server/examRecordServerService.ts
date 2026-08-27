@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { prisma } from '@/src/lib/prisma';
 import { ExamRecord } from '../types/exam.types';
 
@@ -45,43 +46,59 @@ export function formatExamRecord(r: any): ExamRecord {
   };
 }
 
-export const examRecordService = {
-  /**
-   * Get distinct classes, subjects, and dates for filters
-   */
-  async getFilterMetadata(batchCode?: string) {
-    const classesRaw = await prisma.student.findMany({
+async function fetchFilterMetadataRaw(batchCode?: string) {
+  const batchFilter = batchCode && batchCode !== 'ALL' ? { batchCode } : {};
+
+  const [classesRaw, subjectsRaw, datesRaw] = await Promise.all([
+    prisma.student.findMany({
       where: { maLop: { not: null } },
       distinct: ['maLop'],
       select: { maLop: true },
-    });
-    const classes = classesRaw.map((r) => r.maLop!).sort();
-
-    const batchFilter = batchCode && batchCode !== 'ALL' ? { batchCode } : {};
-
-    const subjectsRaw = await prisma.examRecord.findMany({
+    }),
+    prisma.examRecord.findMany({
       where: { ...batchFilter, maMH: { not: null }, tenMH: { not: null } },
       distinct: ['maMH'],
       select: { maMH: true, tenMH: true },
-    });
-    const subjects = subjectsRaw
-      .map((r) => ({ code: r.maMH!, name: r.tenMH! }))
-      .sort((a, b) => a.code.localeCompare(b.code));
-
-    const datesRaw = await prisma.examRecord.findMany({
+    }),
+    prisma.examRecord.findMany({
       where: { ...batchFilter, ngayThi: { not: null } },
       distinct: ['ngayThi'],
       select: { ngayThi: true },
-    });
-    const dates = datesRaw.map((r) => r.ngayThi!).sort((a, b) => {
-      const [d1, m1, y1] = a.split('/').map(Number);
-      const [d2, m2, y2] = b.split('/').map(Number);
-      if (y1 !== y2) return (y1 || 0) - (y2 || 0);
-      if (m1 !== m2) return (m1 || 0) - (m2 || 0);
-      return (d1 || 0) - (d2 || 0);
-    });
+    }),
+  ]);
 
-    return { classes, subjects, dates };
+  const classes = classesRaw.map((r) => r.maLop!).sort();
+
+  const subjects = subjectsRaw
+    .map((r) => ({ code: r.maMH!, name: r.tenMH! }))
+    .sort((a, b) => a.code.localeCompare(b.code));
+
+  const dates = datesRaw.map((r) => r.ngayThi!).sort((a, b) => {
+    const [d1, m1, y1] = a.split('/').map(Number);
+    const [d2, m2, y2] = b.split('/').map(Number);
+    if (y1 !== y2) return (y1 || 0) - (y2 || 0);
+    if (m1 !== m2) return (m1 || 0) - (m2 || 0);
+    return (d1 || 0) - (d2 || 0);
+  });
+
+  return { classes, subjects, dates };
+}
+
+export const examRecordService = {
+  /**
+   * Get distinct classes, subjects, and dates for filters (Cached with Next.js Cache)
+   */
+  async getFilterMetadata(batchCode?: string) {
+    const cacheKey = `metadata-filters-${batchCode || 'ALL'}`;
+    const getCached = unstable_cache(
+      () => fetchFilterMetadataRaw(batchCode),
+      [cacheKey],
+      {
+        revalidate: 3600,
+        tags: ['metadata-filters', `metadata-filters-${batchCode || 'ALL'}`],
+      }
+    );
+    return getCached();
   },
 
   /**

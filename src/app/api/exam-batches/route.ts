@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { examBatchService } from '@/src/features/exam-schedule/server/examBatchServerService';
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -16,51 +18,10 @@ async function getAuthUser(req: NextRequest) {
 }
 
 // GET /api/exam-batches
-// Returns all exam batches with summary statistics
-export async function GET(req: NextRequest) {
+// Returns all exam batches with summary statistics (Cached)
+export async function GET() {
   try {
-    const batches = await prisma.examBatch.findMany({
-      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
-      include: {
-        _count: {
-          select: { examRecords: true },
-        },
-      },
-    });
-
-    // Compute student and room counts per batch
-    const batchesWithStats = await Promise.all(
-      batches.map(async (b) => {
-        const studentCountRaw = await prisma.examRecord.findMany({
-          where: { batchCode: b.code },
-          distinct: ['maSV'],
-          select: { maSV: true },
-        });
-
-        const roomCountRaw = await prisma.examRecord.findMany({
-          where: { batchCode: b.code, mapThi: { not: null } },
-          distinct: ['mapThi'],
-          select: { mapThi: true },
-        });
-
-        return {
-          id: b.id,
-          code: b.code,
-          name: b.name,
-          semester: b.semester || '',
-          academicYear: b.academicYear || '',
-          startDate: b.startDate || '',
-          endDate: b.endDate || '',
-          isActive: b.isActive,
-          description: b.description || '',
-          totalRecords: b._count.examRecords,
-          totalStudents: studentCountRaw.length,
-          totalRooms: roomCountRaw.length,
-          createdAt: b.createdAt.toISOString(),
-          updatedAt: b.updatedAt.toISOString(),
-        };
-      })
-    );
+    const batchesWithStats = await examBatchService.getBatches();
 
     return NextResponse.json({
       batches: batchesWithStats,
@@ -131,6 +92,9 @@ export async function POST(req: NextRequest) {
         metadata: { cleanCode, name, semester, academicYear, isActive },
       });
 
+      revalidateTag('exam-batches', { expire: 0 });
+      revalidateTag('metadata-filters', { expire: 0 });
+
       return NextResponse.json({
         success: true,
         message: `Đã tạo thành công đợt thi ${newBatch.name}`,
@@ -165,6 +129,9 @@ export async function POST(req: NextRequest) {
         targetId: cleanCode,
         description: `Đặt đợt thi "${activated.name}" (${cleanCode}) làm đợt thi mặc định kích hoạt`,
       });
+
+      revalidateTag('exam-batches', { expire: 0 });
+      revalidateTag('metadata-filters', { expire: 0 });
 
       return NextResponse.json({
         success: true,
@@ -203,6 +170,9 @@ export async function POST(req: NextRequest) {
           ? `BẬT trạng thái đợt thi "${updated.name}" (${cleanCode})`
           : `TẮT trạng thái đợt thi "${updated.name}" (${cleanCode})`,
       });
+
+      revalidateTag('exam-batches', { expire: 0 });
+      revalidateTag('metadata-filters', { expire: 0 });
 
       return NextResponse.json({
         success: true,
@@ -249,6 +219,9 @@ export async function POST(req: NextRequest) {
         description: `Cập nhật thông tin đợt thi: ${updated.name} (${cleanCode})`,
         metadata: { cleanCode, name, semester, academicYear, isActive },
       });
+
+      revalidateTag('exam-batches', { expire: 0 });
+      revalidateTag('metadata-filters', { expire: 0 });
 
       return NextResponse.json({
         success: true,
@@ -311,6 +284,9 @@ export async function POST(req: NextRequest) {
           : `Xóa đợt thi ${cleanCode} (bảo lưu dữ liệu lịch thi)`,
         metadata: { cleanCode, deleteRecords },
       });
+
+      revalidateTag('exam-batches', { expire: 0 });
+      revalidateTag('metadata-filters', { expire: 0 });
 
       return NextResponse.json({
         success: true,
