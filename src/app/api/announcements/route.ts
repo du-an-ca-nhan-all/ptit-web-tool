@@ -243,6 +243,14 @@ export async function POST(req: NextRequest) {
         targetType: 'ANNOUNCEMENT',
         targetId: String(id),
         description: `Admin ${authUser.username} ${isActive ? 'bật' : 'tắt'} thông báo ID #${id} "${announcement.title}"`,
+        metadata: {
+          announcementId: id,
+          title: announcement.title,
+          isActive: announcement.isActive,
+          type: announcement.type,
+          displayMode: announcement.displayMode,
+          updatedBy: authUser.username,
+        },
       });
 
       return NextResponse.json({
@@ -267,6 +275,10 @@ export async function POST(req: NextRequest) {
         targetType: 'ANNOUNCEMENT',
         targetId: String(id),
         description: `Admin ${authUser.username} xóa thông báo ID #${id}`,
+        metadata: {
+          announcementId: id,
+          deletedBy: authUser.username,
+        },
       });
 
       return NextResponse.json({

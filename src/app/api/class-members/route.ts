@@ -224,7 +224,17 @@ export async function POST(req: NextRequest) {
       targetType: 'STUDENT',
       targetId: cleanMaSV,
       description: `Cập nhật thông tin sinh viên ${cleanMaSV} (${saved.hoTen || ''}) thuộc lớp ${cleanLop}`,
-      metadata: { cleanMaSV, cleanLop, phone, note, trangThai },
+      metadata: {
+        maSV: cleanMaSV,
+        hoTen: saved.hoTen,
+        maLop: cleanLop,
+        soDienThoai: phone || saved.soDienThoai,
+        gioiTinh: saved.gioiTinh,
+        ngaySinh: saved.ngaySinh,
+        ghiChu: note || saved.ghiChu,
+        trangThai: trangThai || saved.trangThai,
+        updatedBy: authUser.username,
+      },
     });
 
     return NextResponse.json({ success: true, student: saved });
@@ -284,8 +294,13 @@ export async function DELETE(req: NextRequest) {
       action: 'DELETE_STUDENT',
       targetType: 'STUDENT',
       targetId: cleanMaSV,
-      description: `Đã xóa sinh viên ${cleanMaSV} khỏi lớp ${targetClass || ''}`,
-      metadata: { cleanMaSV, targetClass },
+      description: `Đã xóa sinh viên ${cleanMaSV} (${student?.hoTen || ''}) khỏi lớp ${targetClass || ''}`,
+      metadata: {
+        maSV: cleanMaSV,
+        hoTen: student?.hoTen,
+        targetClass,
+        deletedBy: authUser.username,
+      },
     });
 
     return NextResponse.json({ success: true, message: 'Đã xóa sinh viên khỏi danh sách' });

@@ -40,9 +40,120 @@ import {
   Archive,
   Download,
   Zap,
+  Copy,
+  CheckCheck,
+  Code2,
+  Laptop,
+  Server,
+  Eye,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import { ACTION_CATEGORIES, ActionCategoryKey } from '../types/activityLogActions';
+
+const FIELD_LABELS: Record<string, string> = {
+  maSV: 'Mã Sinh Viên',
+  username: 'Tên Đăng Nhập',
+  targetUsername: 'Tài Khoản Mục Tiêu',
+  fullName: 'Họ và Tên',
+  userFullName: 'Họ và Tên',
+  targetFullName: 'Họ Tên Mục Tiêu',
+  studentName: 'Họ Tên Sinh Viên',
+  hoTen: 'Họ và Tên',
+  maLop: 'Lớp Sinh Hoạt',
+  lop: 'Lớp Sinh Hoạt',
+  cleanLop: 'Mã Lớp',
+  targetClass: 'Lớp Mục Tiêu',
+  currentClass: 'Lớp Hiện Tại',
+  oldClass: 'Lớp Cũ',
+  soDienThoai: 'Số Điện Thoại',
+  phone: 'Số Điện Thoại',
+  studentPhone: 'Số Điện Thoại Sinh Viên',
+  gioiTinh: 'Giới Tính',
+  ngaySinh: 'Ngày Sinh',
+  ghiChu: 'Ghi Chú',
+  note: 'Ghi Chú',
+  statusNote: 'Ghi Chú Trạng Thái',
+  transferNote: 'Ghi Chú Tiếp Nhận',
+  reason: 'Lý Do Thao Tác',
+  trangThai: 'Trạng Thái Học Tập',
+  targetTrangThai: 'Trạng Thái Mục Tiêu',
+  previousStatus: 'Trạng Thái Trước Đó',
+  actionType: 'Loại Thao Tác',
+  mode: 'Chế Độ Thực Hiện',
+  role: 'Vai Trò',
+  userRole: 'Vai Trò Người Dùng',
+  targetRole: 'Vai Trò Mục Tiêu',
+  roles: 'Danh Sách Vai Trò',
+  isFirstLogin: 'Đăng Nhập Lần Đầu',
+  previousLastLogin: 'Lần Đăng Nhập Trước',
+  lastLogin: 'Lần Đăng Nhập Cuối',
+  batchCode: 'Mã Đợt Thi',
+  cleanBatchCode: 'Mã Đợt Thi',
+  batchName: 'Tên Đợt Thi',
+  fileName: 'Tên Tệp',
+  filename: 'Tên Tệp',
+  totalRecords: 'Tổng Số Bản Ghi',
+  totalStudents: 'Tổng Số Sinh Viên',
+  deletedCount: 'Số Bản Ghi Đã Xóa',
+  successCount: 'Số Lượng Thành Công',
+  failCount: 'Số Lượng Thất Bại',
+  recoveredCount: 'Số Lượng Phục Hồi',
+  size: 'Dung Lượng (Bytes)',
+  fileSize: 'Dung Lượng (Bytes)',
+  gpa10: 'Điểm GPA Hệ 10',
+  gpa4: 'Điểm GPA Hệ 4',
+  totalSubjects: 'Tổng Số Môn Học',
+  totalCourses: 'Tổng Số Môn Học',
+  totalCredits: 'Tổng Số Tín Chỉ',
+  totalExams: 'Tổng Số Môn Thi',
+  totalEvents: 'Tổng Số Tiết Học',
+  tuitionFee: 'Học Phí (VNĐ)',
+  semestersCount: 'Số Lượng Học Kỳ',
+  chatId: 'ID Nhóm Telegram',
+  threadId: 'Topic ID Telegram',
+  isEnabled: 'Trạng Thái Bật/Tắt',
+  status: 'Trạng Thái Kết Nối',
+  hasToken: 'Đã Cấp Token',
+  systemKey: 'Mã Cổng Ngoài',
+  finalSystemName: 'Tên Cổng Trường',
+  announcementId: 'ID Thông Báo',
+  title: 'Tiêu Đề',
+  displayMode: 'Chế Độ Hiển Thị',
+  isActive: 'Kích Hoạt',
+  adminUsername: 'Admin Thực Hiện',
+  executedBy: 'Người Thực Hiện',
+  updatedBy: 'Người Cập Nhật',
+  deletedBy: 'Người Xóa',
+  error: 'Thông Tin Lỗi',
+  isQueryOther: 'Tra Cứu Sinh Viên Khác',
+  forcedRefresh: 'Yêu Cầu Làm Mới Nhanh',
+  source: 'Nguồn Cổng Dữ Liệu',
+  pricePerStudent: 'Định Mức Giá / SV',
+  waterFeePerRoom: 'Tiền Nước / Phòng',
+  envelopeFeePerRoom: 'Tiền Phong Bì / Phòng',
+  roomCode: 'Mã Phòng Thi',
+  classCode: 'Mã Lớp Học',
+};
+
+const parseUserAgent = (ua?: string | null) => {
+  if (!ua) return 'Không xác định';
+  if (ua.includes('Postman')) return 'Postman API Client';
+  if (ua.includes('node-fetch') || ua.includes('axios')) return 'Internal Server Worker';
+  let browser = 'Trình duyệt web';
+  if (ua.includes('Chrome/')) browser = 'Chrome';
+  else if (ua.includes('Safari/') && !ua.includes('Chrome/')) browser = 'Safari';
+  else if (ua.includes('Firefox/')) browser = 'Firefox';
+  else if (ua.includes('Edge/')) browser = 'Edge';
+
+  let os = '';
+  if (ua.includes('Mac OS')) os = 'macOS';
+  else if (ua.includes('Windows')) os = 'Windows';
+  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+  else if (ua.includes('Android')) os = 'Android';
+  else if (ua.includes('Linux')) os = 'Linux';
+
+  return os ? `${browser} (${os})` : browser;
+};
 
 interface ActivityLogItem {
   id: number;
@@ -201,6 +312,18 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
     totalPages: 1,
   });
   const [selectedLogMetadata, setSelectedLogMetadata] = useState<any | null>(null);
+  const [copiedJson, setCopiedJson] = useState(false);
+  const [metadataViewTab, setMetadataViewTab] = useState<'VISUAL' | 'JSON'>('VISUAL');
+
+  const handleCopyJson = (data: any) => {
+    try {
+      navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      setCopiedJson(true);
+      setTimeout(() => setCopiedJson(false), 2000);
+    } catch (err) {
+      console.error('Copy failed', err);
+    }
+  };
 
   const filteredAvailableActions = useMemo(() => {
     if (selectedCategory === 'ALL') return availableActions;
@@ -613,16 +736,18 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
 
                       {/* Metadata Action */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                        {log.metadata ? (
-                          <button
-                            onClick={() => setSelectedLogMetadata(log)}
-                            className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
-                          >
-                            Xem Data
-                          </button>
-                        ) : (
-                          <span className="text-slate-300 text-[11px]">-</span>
-                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedLogMetadata(log);
+                            setMetadataViewTab('VISUAL');
+                            setCopiedJson(false);
+                          }}
+                          className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs border border-indigo-200/60"
+                          title="Xem chi tiết toàn bộ dữ liệu hoạt động"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Chi Tiết</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -662,73 +787,306 @@ export default function ActivityLogsManager({ currentUser }: ActivityLogsManager
       </div>
 
       {/* Metadata Detail Modal */}
-      {selectedLogMetadata && (
-        <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedLogMetadata(null);
-          }}
-        >
-          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 flex flex-col animate-in zoom-in-95 duration-200 max-h-[85vh]">
-            <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Info className="w-5 h-5 text-indigo-400" />
-                <h4 className="font-bold text-sm">Chi Tiết Dữ Liệu Hoạt Động #{selectedLogMetadata.id}</h4>
-              </div>
-              <button
-                onClick={() => setSelectedLogMetadata(null)}
-                className="text-slate-400 hover:text-white cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+      {selectedLogMetadata && (() => {
+        const modalConfig = ACTION_CONFIGS[selectedLogMetadata.action] || {
+          label: selectedLogMetadata.action,
+          bg: 'bg-slate-50',
+          text: 'text-slate-700',
+          border: 'border-slate-200',
+          icon: Info,
+          category: 'SYSTEM',
+        };
+        const ModalActIcon = modalConfig.icon;
+        const metaObj = selectedLogMetadata.metadata;
+        const hasMetadata = metaObj && typeof metaObj === 'object' && Object.keys(metaObj).length > 0;
 
-            <div className="p-6 flex flex-col gap-4 overflow-y-auto">
-              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex flex-col gap-1.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-slate-400 font-bold">Hành động:</span>
-                  <span className="font-bold text-slate-800">{selectedLogMetadata.action}</span>
+        return (
+          <div
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setSelectedLogMetadata(null);
+            }}
+          >
+            <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 flex flex-col animate-in zoom-in-95 duration-200 max-h-[90vh]">
+              {/* Modal Header */}
+              <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-2xl border ${modalConfig.bg} ${modalConfig.text} ${modalConfig.border} shrink-0`}>
+                    <ModalActIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-black text-base tracking-tight text-white">{modalConfig.label}</h4>
+                      <span className="px-2 py-0.5 bg-white/10 text-indigo-200 text-[10px] font-mono font-bold rounded-lg border border-white/15">
+                        {selectedLogMetadata.action}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Bản ghi ID: <span className="font-mono text-indigo-300 font-bold">#{selectedLogMetadata.id}</span> • Phân loại:{' '}
+                      <span className="font-bold text-slate-300">
+                        {ACTION_CATEGORIES[modalConfig.category as ActionCategoryKey]?.label || modalConfig.category}
+                      </span>
+                    </p>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400 font-bold">Người thực hiện:</span>
-                  <span className="font-mono font-bold text-slate-800">{selectedLogMetadata.username}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400 font-bold">Thời gian:</span>
-                  <span className="text-slate-800">{formatDateTime(selectedLogMetadata.createdAt)}</span>
-                </div>
+                <button
+                  onClick={() => setSelectedLogMetadata(null)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer text-sm font-bold shrink-0"
+                >
+                  ✕
+                </button>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Dữ liệu Metadata (JSON):
-                </label>
-                <pre className="bg-slate-900 text-emerald-300 p-4 rounded-2xl text-[11px] font-mono overflow-x-auto max-h-60 leading-relaxed">
-                  {JSON.stringify(selectedLogMetadata.metadata, null, 2)}
-                </pre>
-              </div>
-
-              {selectedLogMetadata.userAgent && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Thiết bị & Trình duyệt:</label>
-                  <p className="text-[11px] text-slate-500 font-mono bg-slate-50 p-2.5 rounded-xl border border-slate-200 break-all">
-                    {selectedLogMetadata.userAgent}
+              {/* Modal Body */}
+              <div className="p-6 flex flex-col gap-5 overflow-y-auto">
+                {/* Description Banner */}
+                <div className="bg-gradient-to-br from-indigo-50/70 via-slate-50 to-blue-50/50 p-4 rounded-2xl border border-indigo-100/80 flex flex-col gap-1.5 shadow-2xs">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600">
+                    Mô tả hoạt động
+                  </span>
+                  <p className="text-xs font-semibold text-slate-800 leading-relaxed">
+                    {selectedLogMetadata.description}
                   </p>
                 </div>
-              )}
-            </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
-              <button
-                onClick={() => setSelectedLogMetadata(null)}
-                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold cursor-pointer"
-              >
-                Đóng
-              </button>
+                {/* Core Meta 4-Grid Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {/* User */}
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-slate-200 overflow-hidden ring-1 ring-slate-300 shrink-0">
+                      <img
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedLogMetadata.username || 'sys'}`}
+                        alt={selectedLogMetadata.username || 'System'}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Người thực hiện</span>
+                      <span className="font-mono font-bold text-slate-800 text-xs truncate block">
+                        {selectedLogMetadata.username || 'Hệ Thống'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        {selectedLogMetadata.userRole?.includes('admin')
+                          ? '👑 Quản Trị Viên'
+                          : selectedLogMetadata.userRole?.includes('lop_truong')
+                          ? '🛡️ Cán Bộ Lớp'
+                          : '🎓 Sinh Viên'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Target */}
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200/60 flex items-center justify-center text-indigo-600 shrink-0">
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Đối tượng tác động</span>
+                      <span className="font-mono font-bold text-slate-800 text-xs truncate block">
+                        {selectedLogMetadata.targetId || 'Không có ID'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        Loại: <span className="font-semibold text-slate-700">{selectedLogMetadata.targetType || 'N/A'}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Time */}
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/60 flex items-center justify-center text-emerald-600 shrink-0">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Thời gian ghi nhận</span>
+                      <span className="font-bold text-slate-800 text-xs block">
+                        {formatDateTime(selectedLogMetadata.createdAt)}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono truncate block">
+                        {new Date(selectedLogMetadata.createdAt).toISOString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Network / IP */}
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-cyan-50 border border-cyan-200/60 flex items-center justify-center text-cyan-600 shrink-0">
+                      <Laptop className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Địa chỉ IP & Thiết bị</span>
+                      <span className="font-mono font-bold text-slate-800 text-xs block">
+                        {selectedLogMetadata.ipAddress || 'Internal Worker'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 truncate block font-medium" title={selectedLogMetadata.userAgent || ''}>
+                        {parseUserAgent(selectedLogMetadata.userAgent)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metadata Section with Tabs */}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-indigo-600" />
+                        <span>Dữ Liệu Chi Tiết (Metadata)</span>
+                      </label>
+                      {hasMetadata && (
+                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold rounded-md">
+                          {Object.keys(metaObj).length} thông số
+                        </span>
+                      )}
+                    </div>
+
+                    {hasMetadata && (
+                      <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                        <button
+                          onClick={() => setMetadataViewTab('VISUAL')}
+                          className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                            metadataViewTab === 'VISUAL'
+                              ? 'bg-white text-indigo-700 shadow-2xs'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          Trực Quan
+                        </button>
+                        <button
+                          onClick={() => setMetadataViewTab('JSON')}
+                          className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                            metadataViewTab === 'JSON'
+                              ? 'bg-white text-indigo-700 shadow-2xs'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          <Code2 className="w-3 h-3" />
+                          <span>Mã JSON</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {!hasMetadata ? (
+                    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-center flex flex-col items-center justify-center gap-2 text-slate-400">
+                      <Info className="w-6 h-6 text-slate-300" />
+                      <p className="text-xs font-medium">Hoạt động này không có payload dữ liệu metadata mở rộng.</p>
+                    </div>
+                  ) : metadataViewTab === 'VISUAL' ? (
+                    <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 text-xs">
+                        <div className="divide-y divide-slate-200/70">
+                          {Object.entries(metaObj)
+                            .filter((_, idx) => idx % 2 === 0)
+                            .map(([key, val]) => (
+                              <div key={key} className="p-3 flex flex-col gap-0.5 hover:bg-slate-100/60 transition-colors">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                  {FIELD_LABELS[key] || key}
+                                </span>
+                                <div className="font-medium text-slate-800 text-xs break-all">
+                                  {typeof val === 'boolean' ? (
+                                    <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold ${val ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                      {val ? '✓ Đúng / Kích hoạt' : '✕ Sai / Vô hiệu'}
+                                    </span>
+                                  ) : typeof val === 'number' ? (
+                                    <span className="font-mono font-bold text-indigo-600">
+                                      {val.toLocaleString('vi-VN')}
+                                    </span>
+                                  ) : typeof val === 'object' && val !== null ? (
+                                    <pre className="text-[10px] font-mono bg-white p-1.5 rounded border border-slate-200 overflow-x-auto max-h-24">
+                                      {JSON.stringify(val, null, 2)}
+                                    </pre>
+                                  ) : (
+                                    <span className="font-mono text-slate-800">{String(val ?? '-')}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+
+                        <div className="divide-y divide-slate-200/70">
+                          {Object.entries(metaObj)
+                            .filter((_, idx) => idx % 2 === 1)
+                            .map(([key, val]) => (
+                              <div key={key} className="p-3 flex flex-col gap-0.5 hover:bg-slate-100/60 transition-colors">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                  {FIELD_LABELS[key] || key}
+                                </span>
+                                <div className="font-medium text-slate-800 text-xs break-all">
+                                  {typeof val === 'boolean' ? (
+                                    <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold ${val ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                      {val ? '✓ Đúng / Kích hoạt' : '✕ Sai / Vô hiệu'}
+                                    </span>
+                                  ) : typeof val === 'number' ? (
+                                    <span className="font-mono font-bold text-indigo-600">
+                                      {val.toLocaleString('vi-VN')}
+                                    </span>
+                                  ) : typeof val === 'object' && val !== null ? (
+                                    <pre className="text-[10px] font-mono bg-white p-1.5 rounded border border-slate-200 overflow-x-auto max-h-24">
+                                      {JSON.stringify(val, null, 2)}
+                                    </pre>
+                                  ) : (
+                                    <span className="font-mono text-slate-800">{String(val ?? '-')}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <pre className="bg-slate-900 text-emerald-300 p-4 rounded-2xl text-[11px] font-mono overflow-x-auto max-h-64 leading-relaxed border border-slate-800 shadow-inner">
+                        {JSON.stringify(metaObj, null, 2)}
+                      </pre>
+                      <button
+                        onClick={() => handleCopyJson(metaObj)}
+                        className="absolute top-3 right-3 px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[11px] font-bold transition-all flex items-center gap-1.5 backdrop-blur-md cursor-pointer border border-white/20"
+                      >
+                        {copiedJson ? (
+                          <>
+                            <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-300">Đã Sao Chép</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-slate-300" />
+                            <span>Sao Chép JSON</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Full User-Agent inspection if available */}
+                {selectedLogMetadata.userAgent && (
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                      User-Agent Đầy Đủ
+                    </label>
+                    <p className="text-[11px] text-slate-600 font-mono bg-slate-50 p-3 rounded-2xl border border-slate-200 break-all leading-relaxed">
+                      {selectedLogMetadata.userAgent}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+                <div className="text-[11px] text-slate-400 font-medium">
+                  Hoạt động #{selectedLogMetadata.id} • {modalConfig.label}
+                </div>
+                <button
+                  onClick={() => setSelectedLogMetadata(null)}
+                  className="px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                >
+                  Đóng Cửa Sổ
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL: DỌN DẸP & XOÁ NHẬT KÝ HOẠT ĐỘNG */}
       {showDeleteModal && (

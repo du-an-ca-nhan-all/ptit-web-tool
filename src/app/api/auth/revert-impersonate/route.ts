@@ -56,7 +56,13 @@ export async function POST(req: NextRequest) {
       targetType: 'USER',
       targetId: authUser.username,
       description: `Admin ${adminUsername} đã thoát chế độ giả lập từ tài khoản ${authUser.username} và trở về tài khoản Admin`,
-      metadata: { fromUsername: authUser.username },
+      metadata: {
+        adminUsername,
+        fromUsername: authUser.username,
+        fromFullName: authUser.fullName,
+        fromRole: authUser.role,
+        fromLop: authUser.lop,
+      },
     });
 
     const token = await createAuthToken(adminPayload);

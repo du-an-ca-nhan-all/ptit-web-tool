@@ -86,7 +86,13 @@ export async function POST(req: NextRequest) {
       targetType: 'USER',
       targetId: targetUser.username,
       description: `Admin ${originalAdmin} đăng nhập với tư cách sinh viên ${targetPayload.fullName} (${targetPayload.username})`,
-      metadata: { targetUsername: targetUser.username, targetRole: targetUser.role },
+      metadata: {
+        adminUsername: originalAdmin,
+        targetUsername: targetUser.username,
+        targetFullName: targetPayload.fullName,
+        targetRole: targetUser.role,
+        targetLop: targetPayload.lop,
+      },
     });
 
     const token = await createAuthToken(targetPayload);

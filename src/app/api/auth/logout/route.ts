@@ -15,6 +15,12 @@ export async function POST(req: NextRequest) {
         targetType: 'AUTH',
         targetId: authUser.username,
         description: `Người dùng ${authUser.username} (${authUser.fullName || ''}) đăng xuất khỏi hệ thống`,
+        metadata: {
+          username: authUser.username,
+          fullName: authUser.fullName,
+          role: authUser.role,
+          lop: authUser.lop,
+        },
       });
     }
   } catch {}

@@ -70,6 +70,11 @@ export async function POST(req: NextRequest) {
       targetType: 'USER',
       targetId: user.username,
       description: `Người dùng ${user.username} đã thay đổi mật khẩu tài khoản thành công`,
+      metadata: {
+        username: user.username,
+        role: user.role,
+        updatedAt: new Date().toISOString(),
+      },
     });
 
     return NextResponse.json({

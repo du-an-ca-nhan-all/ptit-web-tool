@@ -162,8 +162,16 @@ export async function POST(req: NextRequest) {
         action: 'RECEIVE_STUDENT',
         targetType: 'STUDENT',
         targetId: cleanMaSV,
-        description: `Tiếp nhận sinh viên ${cleanMaSV} vào lớp ${cleanTargetClass} (${transferNote})`,
-        metadata: { cleanMaSV, cleanTargetClass, oldClass, reason },
+        description: `Tiếp nhận sinh viên ${cleanMaSV} (${student.hoTen || ''}) vào lớp ${cleanTargetClass} (${transferNote})`,
+        metadata: {
+          maSV: cleanMaSV,
+          hoTen: student.hoTen,
+          targetClass: cleanTargetClass,
+          oldClass,
+          reason,
+          transferNote,
+          executedBy: authUser.username,
+        },
       });
 
       return NextResponse.json({
@@ -243,8 +251,18 @@ export async function POST(req: NextRequest) {
         action: 'EXCLUDE_STUDENT',
         targetType: 'STUDENT',
         targetId: cleanMaSV,
-        description: `Điều chuyển/cập nhật trạng thái sinh viên ${cleanMaSV} thuộc lớp ${cleanCurrentClass}: ${statusNote}`,
-        metadata: { cleanMaSV, cleanCurrentClass, actionType, targetTrangThai, targetClass, reason },
+        description: `Điều chuyển/cập nhật trạng thái sinh viên ${cleanMaSV} (${existingStudent?.hoTen || ''}) thuộc lớp ${cleanCurrentClass}: ${statusNote}`,
+        metadata: {
+          maSV: cleanMaSV,
+          hoTen: existingStudent?.hoTen,
+          currentClass: cleanCurrentClass,
+          actionType,
+          targetTrangThai,
+          targetClass,
+          reason,
+          statusNote,
+          executedBy: authUser.username,
+        },
       });
 
       return NextResponse.json({
@@ -290,8 +308,14 @@ export async function POST(req: NextRequest) {
         action: 'RESTORE_STUDENT',
         targetType: 'STUDENT',
         targetId: cleanMaSV,
-        description: `Khôi phục sinh viên ${cleanMaSV} quay trở lại học tại lớp ${cleanTargetClass}`,
-        metadata: { cleanMaSV, cleanTargetClass },
+        description: `Khôi phục sinh viên ${cleanMaSV} (${existingStudent?.hoTen || ''}) quay trở lại học tại lớp ${cleanTargetClass}`,
+        metadata: {
+          maSV: cleanMaSV,
+          hoTen: existingStudent?.hoTen,
+          targetClass: cleanTargetClass,
+          previousStatus: existingStudent?.trangThai,
+          executedBy: authUser.username,
+        },
       });
 
       return NextResponse.json({

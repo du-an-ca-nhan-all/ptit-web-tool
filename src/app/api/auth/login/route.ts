@@ -42,6 +42,13 @@ export async function POST(req: NextRequest) {
           targetType: 'AUTH',
           targetId: user.username,
           description: `Đăng nhập thất bại cho tài khoản ${user.username}: Sai mật khẩu`,
+          metadata: {
+            reason: 'INVALID_PASSWORD',
+            attemptUsername: user.username,
+            role: user.role,
+            userFullName: user.student?.hoTen || user.student?.ten,
+            lop: user.student?.maLop,
+          },
         });
         return NextResponse.json(
           { error: 'Tài khoản hoặc mật khẩu không chính xác' },
@@ -59,6 +66,13 @@ export async function POST(req: NextRequest) {
           targetType: 'AUTH',
           targetId: user.username,
           description: `Đăng nhập thất bại: Tài khoản ${user.username} đang bị tạm khóa`,
+          metadata: {
+            reason: 'ACCOUNT_LOCKED',
+            attemptUsername: user.username,
+            role: user.role,
+            userFullName: user.student?.hoTen || user.student?.ten,
+            lop: user.student?.maLop,
+          },
         });
         return NextResponse.json(
           { error: 'Tài khoản của bạn đang bị tạm khoá. Vui lòng liên hệ Quản trị viên.' },
@@ -101,6 +115,15 @@ export async function POST(req: NextRequest) {
         description: isFirstLogin
           ? `Người dùng ${user.username} (${authPayload.fullName}) đã đăng nhập lần đầu tiên vào hệ thống`
           : `Người dùng ${user.username} (${authPayload.fullName}) đăng nhập thành công`,
+        metadata: {
+          username: user.username,
+          fullName: authPayload.fullName,
+          lop: authPayload.lop,
+          role: authPayload.role,
+          roles: authPayload.roles,
+          isFirstLogin,
+          previousLastLogin: user.lastLogin?.toISOString() || null,
+        },
       });
 
       const token = await createAuthToken(authPayload);
@@ -140,6 +163,10 @@ export async function POST(req: NextRequest) {
       targetType: 'AUTH',
       targetId: normalizedUsername,
       description: `Đăng nhập thất bại: Không tìm thấy tài khoản hoặc sinh viên ${normalizedUsername}`,
+      metadata: {
+        reason: 'USER_NOT_FOUND',
+        attemptUsername: normalizedUsername,
+      },
     });
 
     return NextResponse.json(
