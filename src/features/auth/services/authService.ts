@@ -12,6 +12,18 @@ export const authService = {
   },
 
   /**
+   * Reset / Recover password via QLHT credentials (Client)
+   */
+  async forgotPasswordQlht(usernameInput: string, qlhtPasswordInput: string) {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: usernameInput, qlhtPassword: qlhtPasswordInput }),
+    });
+    return res.json();
+  },
+
+  /**
    * Impersonate another user (Admin action) (Client)
    */
   async impersonate(targetUsernameInput: string) {

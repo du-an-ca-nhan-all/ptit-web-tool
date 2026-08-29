@@ -7,3 +7,4 @@ export { default as ImpersonateModal } from './components/ImpersonateModal';
 export { default as ImpersonationBanner } from './components/ImpersonationBanner';
 export { default as AdminResetPasswordModal } from './components/AdminResetPasswordModal';
 export { default as AdminRegistrationManager } from './components/AdminRegistrationManager';
+export { default as ForgotPasswordModal } from './components/ForgotPasswordModal';

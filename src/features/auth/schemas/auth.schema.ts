@@ -86,6 +86,19 @@ export const adminResetPasswordSchema = z.object({
 
 export type AdminResetPasswordInput = z.infer<typeof adminResetPasswordSchema>;
 
+export const forgotPasswordQlhtSchema = z.object({
+  username: z
+    .string()
+    .min(3, 'Mã sinh viên phải có tối thiểu 3 ký tự')
+    .max(50, 'Mã sinh viên không được vượt quá 50 ký tự')
+    .transform((val) => val.trim().toUpperCase()),
+  qlhtPassword: z
+    .string()
+    .min(1, 'Vui lòng nhập mật khẩu Cổng QLHT'),
+});
+
+export type ForgotPasswordQlhtInput = z.infer<typeof forgotPasswordQlhtSchema>;
+
 export const impersonateSchema = z.object({
   targetUsername: z
     .string()

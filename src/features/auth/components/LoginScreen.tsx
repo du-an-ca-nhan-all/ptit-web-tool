@@ -19,10 +19,12 @@ import {
   Zap,
   Sparkles,
   Clock,
+  KeyRound,
 } from 'lucide-react';
 import { LoginUser, ExamRecord } from '../types/auth.types';
 import { usePWAContext } from '../../../components/pwa/PWAProvider';
 import SlinkForgotPasswordModal from '@/src/features/external-portal/components/SlinkForgotPasswordModal';
+import ForgotPasswordModal from './ForgotPasswordModal';
 
 interface LoginScreenProps {
   users?: LoginUser[];
@@ -47,6 +49,7 @@ export default function LoginScreen({
   const [error, setError] = useState(initialError || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isSlinkModalOpen, setIsSlinkModalOpen] = useState(false);
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   useEffect(() => {
     if (initialError) {
@@ -99,7 +102,7 @@ export default function LoginScreen({
             setRegPhone(data.student.soDienThoai);
           }
           if (data.student.hasPassword) {
-            setStudentLookupError('Tài khoản này đã có mật khẩu hoạt động. Nếu bạn quên mật khẩu, vui lòng liên hệ Admin.');
+            setStudentLookupError('Tài khoản này đã có mật khẩu hoạt động. Nếu bạn quên mật khẩu, có thể khôi phục ngay bằng Mật khẩu Cổng QLHT.');
           } else {
             setStudentLookupError('');
           }
@@ -332,9 +335,19 @@ export default function LoginScreen({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1 sm:mb-1.5 uppercase tracking-wider">
-                  Mật Khẩu
-                </label>
+                <div className="flex items-center justify-between mb-1 sm:mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Mật Khẩu
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotModalOpen(true)}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <KeyRound className="w-3 h-3" />
+                    <span>Quên mật khẩu?</span>
+                  </button>
+                </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                     <Lock className="h-4 w-4 text-slate-400" />
@@ -373,7 +386,7 @@ export default function LoginScreen({
                 )}
               </button>
 
-              <div className="pt-3.5 border-t border-slate-100 text-center space-y-1.5">
+              <div className="pt-3.5 border-t border-slate-100 text-center space-y-2">
                 <p className="text-xs text-slate-500">
                   Chưa kích hoạt mật khẩu?{' '}
                   <button
@@ -387,16 +400,24 @@ export default function LoginScreen({
                     Đăng ký kích hoạt ngay
                   </button>
                 </p>
-                <p className="text-[11px] text-slate-400">
-                  Quên mật khẩu Cổng S-Link?{' '}
+                <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotModalOpen(true)}
+                    className="text-blue-600 font-semibold hover:underline cursor-pointer inline-flex items-center gap-1"
+                  >
+                    <KeyRound className="w-3 h-3" />
+                    <span>Quên mật khẩu Portal (QLHT)</span>
+                  </button>
+                  <span className="text-slate-300">•</span>
                   <button
                     type="button"
                     onClick={() => setIsSlinkModalOpen(true)}
                     className="text-purple-600 font-semibold hover:underline cursor-pointer"
                   >
-                    Gửi yêu cầu reset S-Link
+                    Quên mật khẩu S-Link
                   </button>
-                </p>
+                </div>
               </div>
             </form>
           </div>
@@ -540,9 +561,23 @@ export default function LoginScreen({
                   )}
 
                   {studentLookupError && (
-                    <div className="mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2 animate-in fade-in">
-                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                      <span className="leading-snug">{studentLookupError}</span>
+                    <div className="mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex flex-col gap-2 animate-in fade-in">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span className="leading-snug">{studentLookupError}</span>
+                      </div>
+                      {studentInfo?.hasPassword && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsForgotModalOpen(true);
+                          }}
+                          className="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>Lấy Lại Mật Khẩu Bằng Cổng QLHT</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -723,6 +758,22 @@ export default function LoginScreen({
         isOpen={isSlinkModalOpen}
         onClose={() => setIsSlinkModalOpen(false)}
         defaultUsername=""
+      />
+
+      {/* Portal Forgot Password Modal (QLHT) */}
+      <ForgotPasswordModal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        defaultUsername={username || regUsername}
+        onSuccess={(resetUser, newPass) => {
+          setMode('LOGIN');
+          setUsername(resetUser);
+          if (newPass) {
+            setPassword(newPass);
+          }
+          setError('');
+          setIsForgotModalOpen(false);
+        }}
       />
     </div>
   );

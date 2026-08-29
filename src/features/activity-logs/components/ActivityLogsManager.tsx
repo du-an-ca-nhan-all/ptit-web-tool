@@ -186,6 +186,8 @@ const ACTION_CONFIGS: Record<
   LOGOUT: { label: 'Đăng Xuất', bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', icon: User, category: 'AUTH' },
   CHANGE_PASSWORD: { label: 'Đổi Mật Khẩu', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: Key, category: 'AUTH' },
   ADMIN_RESET_PASSWORD: { label: 'Admin Reset MK', bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', border: 'border-fuchsia-200', icon: Key, category: 'AUTH' },
+  FORGOT_PASSWORD_RESET_QLHT: { label: 'Quên MK (QLHT)', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Key, category: 'AUTH' },
+  AUTO_APPROVE_REGISTRATION: { label: 'Tự Động Kích Hoạt QLHT', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', icon: Sparkles, category: 'AUTH' },
   IMPERSONATE: { label: 'Giả Lập Tài Khoản', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-300', icon: Crown, category: 'AUTH' },
   REVERT_IMPERSONATE: { label: 'Thoát Giả Lập', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', icon: ArrowRightLeft, category: 'AUTH' },
   SWITCH_ROLE: { label: 'Chuyển Vai Trò', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Shield, category: 'AUTH' },
