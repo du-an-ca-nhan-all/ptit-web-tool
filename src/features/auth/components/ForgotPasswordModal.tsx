@@ -205,7 +205,7 @@ export default function ForgotPasswordModal({
                   <span>Cách thức khôi phục mật khẩu tự động:</span>
                 </div>
                 <p className="text-slate-600 text-[11.5px] leading-relaxed">
-                  Nhập đúng <strong>Mã sinh viên</strong> và <strong>Mật khẩu Cổng QLDTTX (QLHT)</strong>. Hệ thống sẽ kiểm tra trực tiếp với cổng trường. Nếu chính xác, mật khẩu đăng nhập portal của bạn sẽ <strong>tự động được đặt thành mật khẩu QLHT</strong> ngay lập tức.
+                  Nhập đúng <strong>Mã sinh viên</strong> và <strong>Mật khẩu Cổng QLDTTX (QLHT)</strong>. Hệ thống sẽ kiểm tra trực tiếp với cổng trường. Nếu chính xác, mật khẩu đăng nhập EduSync của bạn sẽ <strong>tự động được đặt thành mật khẩu QLHT</strong> ngay lập tức.
                 </p>
               </div>
 
@@ -384,7 +384,7 @@ export default function ForgotPasswordModal({
                   </div>
                 )}
                 <div className="flex items-center justify-between pt-1.5 border-t border-slate-200">
-                  <span className="text-slate-500">Mật khẩu portal mới:</span>
+                  <span className="text-slate-500">Mật khẩu EduSync mới:</span>
                   <span className="inline-flex items-center gap-1 font-bold text-[11px] text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md">
                     <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
                     Trùng khớp Mật khẩu Cổng QLHT

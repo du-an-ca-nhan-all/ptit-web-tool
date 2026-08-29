@@ -71,7 +71,7 @@ export function ProfileSecurityTab() {
         </div>
         <div>
           <h3 className="text-base sm:text-lg font-black text-slate-800">Bảo Mật Tài Khoản PTIT EduSync</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Đổi mật khẩu đăng nhập cổng portal sinh viên</p>
+          <p className="text-xs text-slate-500 mt-0.5">Đổi mật khẩu đăng nhập hệ thống EduSync</p>
         </div>
       </div>
 
@@ -79,7 +79,7 @@ export function ProfileSecurityTab() {
         <Shield className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
         <div>
           <strong className="block font-bold mb-0.5">Lưu ý về mật khẩu đăng nhập:</strong>
-          Mật khẩu khởi tạo ban đầu là <strong>Mã sinh viên</strong> (viết in hoa). Bạn có thể đổi sang bất kỳ mật khẩu nào tùy ý và nhập lại 2 lần để xác nhận.
+          Mật khẩu tài khoản EduSync có thể đổi sang bất kỳ mật khẩu nào tùy ý (tối thiểu 6 ký tự). Nhập lại 2 lần để xác nhận mật khẩu mới.
         </div>
       </div>
 

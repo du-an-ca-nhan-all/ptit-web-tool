@@ -407,7 +407,7 @@ export default function LoginScreen({
                     className="text-blue-600 font-semibold hover:underline cursor-pointer inline-flex items-center gap-1"
                   >
                     <KeyRound className="w-3 h-3" />
-                    <span>Quên mật khẩu Portal (QLHT)</span>
+                    <span>Quên mật khẩu EduSync (QLHT)</span>
                   </button>
                   <span className="text-slate-300">•</span>
                   <button
