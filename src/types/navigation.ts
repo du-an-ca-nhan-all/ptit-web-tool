@@ -24,7 +24,8 @@ export type NavigationTab =
   | 'course_compare'
   | 'course_registration'
   | 'monitor_flow'
-  | 'global_jobs';
+  | 'global_jobs'
+  | 'reminders';
 
 export type ProfileSubTab =
   | 'OVERVIEW'
@@ -84,6 +85,7 @@ export const VALID_NAVIGATION_TABS: NavigationTab[] = [
   'course_registration',
   'monitor_flow',
   'global_jobs',
+  'reminders',
 ];
 
 export const PROFILE_SUBTAB_MAP: Record<string, ProfileSubTab> = {
@@ -159,6 +161,9 @@ export const PATH_TO_TAB_MAP: Record<string, NavigationTab> = {
   announcements: 'announcements_admin',
   announcements_admin: 'announcements_admin',
   'announcements-admin': 'announcements_admin',
+  reminders: 'reminders',
+  nhachen: 'reminders',
+  'nhac-hen': 'reminders',
 };
 
 export const MONITOR_SUBPATH_MAP: Record<string, NavigationTab> = {
@@ -253,6 +258,9 @@ export const getNavigationPath = (
       break;
     case 'registered_courses':
       basePath = '/courses';
+      break;
+    case 'reminders':
+      basePath = '/reminders';
       break;
     case 'course_registration':
       basePath = '/course-registration';

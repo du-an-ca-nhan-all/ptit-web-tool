@@ -38,6 +38,7 @@ import {
 import { ActivityLogsManager } from '../../features/activity-logs';
 import { DatabaseBackupManager } from '../../features/database-backup';
 import { DashboardOverview } from '../../features/dashboard';
+import { RemindersManager } from '../../features/reminders';
 import Footer from './Footer';
 import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
 import { NavigationTab, ProfileSubTab, TabChangeOptions } from '../../types/navigation';
@@ -229,6 +230,12 @@ export default function HomeMainContent({
           }
           courseCompareData={courseCompareData}
           onReloadCourseCompare={fetchCourseCompareData}
+        />
+      ) : activeTab === 'reminders' && effectiveUser ? (
+        <RemindersManager
+          currentUser={effectiveUser}
+          onNavigateToTelegramConfig={() => handleTabChange('profile', 'TELEGRAM')}
+          onNavigateToCalendar={() => handleTabChange('profile', 'SCHEDULE')}
         />
       ) : activeTab === 'external_accounts_admin' && isAdmin ? (
         <AdminExternalAccounts currentUser={effectiveUser!} />

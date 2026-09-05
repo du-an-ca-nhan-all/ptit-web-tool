@@ -66,7 +66,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json(timetableData);
+    const { getRemindersForUser } = await import('@/src/features/reminders');
+    const reminders = await getRemindersForUser(usernameToQuery, { status: 'ACTIVE' }).catch(() => []);
+
+    return NextResponse.json({
+      ...timetableData,
+      reminders,
+    });
   } catch (err: any) {
     console.error('[API student/timetable GET error]:', err);
     return NextResponse.json(

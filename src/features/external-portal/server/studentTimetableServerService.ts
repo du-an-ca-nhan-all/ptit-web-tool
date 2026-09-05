@@ -60,6 +60,7 @@ export interface StudentTimetableCalendarResult {
   subjects: TimetableSubjectSummary[];
   events: TimetableCalendarEvent[];
   upcomingEvents: TimetableCalendarEvent[];
+  reminders?: import('@/src/features/reminders').ReminderItemDto[];
   errorType?: 'NOT_CONFIGURED' | 'INVALID_CREDENTIALS' | 'SERVER_ERROR';
   error?: string;
 }

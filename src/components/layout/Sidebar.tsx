@@ -29,6 +29,7 @@ import {
   GitFork,
   Clock,
   Coffee,
+  Bell,
 } from 'lucide-react';
 import { LoginUser } from '../../types';
 import { NavigationTab } from '../../types/navigation';
@@ -179,6 +180,20 @@ export default function Sidebar({
                 }`}
               >
                 <BookOpen className="w-4 h-4 text-emerald-400" /> Môn Học Đã Đăng Ký
+              </button>
+            )}
+
+            {/* Lịch nhắc hẹn & Báo thức */}
+            {currentUser && (
+              <button
+                onClick={() => onTabChange('reminders')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'reminders'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold shadow-xs shadow-amber-500/10'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Bell className="w-4 h-4 text-amber-400" /> Lịch Nhắc Hẹn
               </button>
             )}
 

@@ -531,6 +531,7 @@ export default function UserProfileScreen({
         <StudentTimetableCalendar
           currentUser={currentUser}
           onNavigateToExternalAccounts={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
+          onNavigateToReminders={() => (onNavigateTab ? onNavigateTab('reminders') : undefined)}
         />
       )}
 

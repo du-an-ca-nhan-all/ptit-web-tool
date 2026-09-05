@@ -13,6 +13,7 @@ import {
 import { recoverStuckFlowQueueItems } from '@/src/features/classes-monitor/server/monitorFlowQueueServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
+import { runPendingReminderAlerts } from '@/src/features/reminders';
 
 let isSchedulerRunning = false;
 
@@ -81,6 +82,9 @@ export async function runTelegramSchedulerTasks() {
   });
   runGlobalNightlySyncScheduler().catch((err) => {
     console.error('[Global Sync Scheduler] Periodic nightly sync check error:', err);
+  });
+  runPendingReminderAlerts().catch((err) => {
+    console.error('[Telegram Scheduler] Periodic reminder alerts check error:', err);
   });
 }
 

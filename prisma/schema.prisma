@@ -41,6 +41,12 @@ model User {
   // Quan hệ 1-1 với StudentSlinkGradeRecord
   slinkGradeRecord StudentSlinkGradeRecord?
   
+  // Quan hệ 1-N với ReminderItem do user tạo
+  createdReminders     ReminderItem[]        @relation("UserCreatedReminders")
+  
+  // Quan hệ 1-N với ReminderParticipant được gán vào lịch cá nhân của user
+  reminderParticipants ReminderParticipant[] @relation("UserReminderParticipants")
+  
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -695,4 +701,103 @@ model StudentSlinkGradeRecord {
   @@index([lastPulledAt])
 }
 
+// 29. Bảng ReminderItem: Lưu lịch nhắc hẹn cá nhân và nhắc hẹn theo môn học/tổ/lớp
+model ReminderItem {
+  id              Int                       @id @default(autoincrement())
+  title           String                    // Tiêu đề nhắc hẹn (vd: "Nộp bài tập lớn", "Thi giữa kỳ môn Cấu trúc dữ liệu")
+  description     String?                   // Nội dung dặn dò, ghi chú chi tiết
+  location        String?                   // Phòng học, địa điểm hoặc link học online (Google Meet, Zoom, P.lopmonhoc27...)
+  type            String                    @default("PERSONAL") // 'PERSONAL' (Cá nhân) | 'COURSE' (Môn học / Tổ học) | 'CLASS' (Lớp quản lý)
+  
+  // Thông tin chi tiết tổ học / môn học khớp với API Cổng QLDTTX (to_hoc)
+  idToHoc         String?                   // ID tổ học duy nhất từ QLDTTX: to_hoc.id_to_hoc (vd: "-7160060757125947688")
+  idMon           String?                   // ID môn học từ QLDTTX: to_hoc.id_mon (vd: "-5237792968118306182")
+  maMon           String?                   // Mã môn học: to_hoc.ma_mon (vd: "INT1306")
+  tenMon          String?                   // Tên môn học: to_hoc.ten_mon (vd: "Cấu trúc dữ liệu và giải thuật")
+  nhomTo          String?                   // Nhóm/Tổ học: to_hoc.nhom_to (vd: "03")
+  lop             String?                   // Mã lớp học: to_hoc.lop hoặc lớp quản lý (vd: "D25TXCN11-K")
+  tkbRaw          String?                   // Chuỗi TKB phân rã từ cổng QLDTTX: to_hoc.tkb
+  giangVien       String?                   // Giảng viên phụ trách nếu có
+  
+  eventTime       DateTime                  // Thời điểm diễn ra sự kiện / deadline nhắc hẹn
+  
+  creatorUsername String                    // Mã SV người tạo
+  creator         User                      @relation("UserCreatedReminders", fields: [creatorUsername], references: [username], onDelete: Cascade)
+  
+  status          String                    @default("ACTIVE") // 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
+  isCompleted     Boolean                   @default(false)
+  
+  alerts          ReminderAlert[]
+  participants    ReminderParticipant[]
+  logs            ReminderNotificationLog[]
+  
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
 
+  @@index([creatorUsername])
+  @@index([type])
+  @@index([idToHoc])
+  @@index([maMon])
+  @@index([nhomTo])
+  @@index([lop])
+  @@index([eventTime])
+  @@index([status])
+}
+
+// 30. Bảng ReminderAlert: Các mốc cảnh báo trước cho từng nhắc hẹn (hỗ trợ nhiều mốc: trước 3 ngày, 1 ngày, 5 giờ, 1 giờ...)
+model ReminderAlert {
+  id            Int          @id @default(autoincrement())
+  reminderId    Int
+  reminder      ReminderItem @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  
+  offsetMinutes Int          // Số phút báo trước sự kiện: 4320 (3 ngày), 2880 (2 ngày), 1440 (1 ngày), 360 (6 giờ), 300 (5 giờ), 60 (1 giờ)...
+  label         String?      // Nhãn hiển thị: "Trước 3 ngày", "Trước 5 giờ", "Trước 1 giờ"...
+  triggerTime   DateTime     // Thời điểm phát thông báo = eventTime - offsetMinutes
+  
+  isSent        Boolean      @default(false) // Trạng thái đã phát thông báo
+  sentAt        DateTime?
+  
+  createdAt     DateTime     @default(now())
+
+  @@index([reminderId])
+  @@index([triggerTime])
+  @@index([isSent])
+}
+
+// 31. Bảng ReminderParticipant: Gán nhắc hẹn vào lịch cá nhân của các sinh viên (tất cả bạn cùng môn/lớp/tổ)
+model ReminderParticipant {
+  id          Int          @id @default(autoincrement())
+  reminderId  Int
+  reminder    ReminderItem @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  
+  username    String       // Mã sinh viên được thêm vào lịch cá nhân
+  user        User         @relation("UserReminderParticipants", fields: [username], references: [username], onDelete: Cascade)
+  
+  isCreator   Boolean      @default(false) // Là người tạo hay thành viên cùng lớp/môn
+  isDismissed Boolean      @default(false) // Sinh viên có tự ẩn khỏi lịch cá nhân không
+  
+  createdAt   DateTime     @default(now())
+
+  @@unique([reminderId, username])
+  @@index([username])
+  @@index([reminderId])
+}
+
+// 32. Bảng ReminderNotificationLog: Nhật ký gửi thông báo Telegram tránh gửi lặp đến từng sinh viên
+model ReminderNotificationLog {
+  id            Int          @id @default(autoincrement())
+  reminderId    Int
+  reminder      ReminderItem @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  
+  alertId       Int?         // ID ReminderAlert tương ứng nếu có
+  username      String       // Mã SV người nhận
+  offsetMinutes Int          // Mốc phút đã gửi
+  sentAt        DateTime     @default(now())
+  status        String       @default("SUCCESS") // 'SUCCESS' | 'FAILED'
+  errorMessage  String?
+
+  @@unique([reminderId, offsetMinutes, username])
+  @@index([username])
+  @@index([reminderId])
+  @@index([offsetMinutes])
+}
