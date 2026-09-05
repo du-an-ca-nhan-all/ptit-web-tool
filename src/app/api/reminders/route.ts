@@ -4,6 +4,7 @@ import {
   createReminder,
   getRemindersForUser,
   runPendingReminderAlerts,
+  sendReminderCreatedNotification,
 } from '@/src/features/reminders';
 
 export const dynamic = 'force-dynamic';
@@ -78,7 +79,14 @@ export async function POST(req: NextRequest) {
       offsetMinutesList: Array.isArray(body.offsetMinutesList) ? body.offsetMinutesList : [1440, 60],
     });
 
-    // Kích hoạt quét phát thông báo nếu có mốc trùng giờ hiện tại
+    // 1. Gửi thông báo tức thì về Telegram:
+    // - Cá nhân: gửi riêng cho người tạo (nếu bật Telegram)
+    // - Môn học: gửi cho toàn bộ bạn cùng lớp/tổ đã liên kết Telegram
+    sendReminderCreatedNotification(reminder.id).catch((notifErr) => {
+      console.warn('[API /api/reminders POST] sendReminderCreatedNotification error:', notifErr);
+    });
+
+    // 2. Kích hoạt quét phát thông báo nếu có mốc trùng giờ hiện tại
     runPendingReminderAlerts().catch((alertErr) => {
       console.warn('[API /api/reminders POST] Background alert trigger error:', alertErr);
     });

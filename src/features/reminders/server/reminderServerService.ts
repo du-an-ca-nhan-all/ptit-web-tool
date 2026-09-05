@@ -5,6 +5,7 @@ import {
   formatOffsetMinutes,
 } from '../types/reminder.types';
 import { findEnrolledStudentsForCourse } from './reminderParticipantService';
+import { sendReminderCreatedNotification } from './reminderDispatcher';
 
 /**
  * Chuyển đổi bản ghi DB sang ReminderItemDto hoàn chỉnh
@@ -181,6 +182,13 @@ export async function createReminder(
       alerts: { orderBy: { triggerTime: 'asc' } },
       participants: { include: { user: { include: { student: true } } } },
     },
+  });
+
+  // 5. Gửi thông báo ngay sau khi tạo lịch về Telegram:
+  // - Cá nhân: gửi riêng cho người tạo (nếu bật Telegram)
+  // - Môn học: gửi cho tất cả bạn cùng lớp/tổ đã liên kết Telegram
+  sendReminderCreatedNotification(reminder.id).catch((notifErr) => {
+    console.warn('[createReminder] sendReminderCreatedNotification error:', notifErr);
   });
 
   return await mapReminderToDto(fullReminder, cleanCreator);

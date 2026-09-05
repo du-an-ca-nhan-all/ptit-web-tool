@@ -239,3 +239,219 @@ export async function runPendingReminderAlerts(): Promise<{
     };
   }
 }
+
+/**
+ * Gửi thông báo Telegram ngay sau khi tạo lịch nhắc hẹn thành công:
+ * - Với lịch CÁ NHÂN: Chỉ gửi thông báo cho chính người tạo (nếu đã cấu hình và bật Telegram).
+ * - Với lịch MÔN HỌC: Gửi cho TẤT CẢ sinh viên học cùng môn/tổ/lớp (kể cả người tạo),
+ *   những người đã cấu hình và bật Telegram hợp lệ.
+ */
+export async function sendReminderCreatedNotification(reminderId: number): Promise<{
+  success: boolean;
+  sentCount: number;
+  recipientUsernames: string[];
+  errors: string[];
+}> {
+  const errors: string[] = [];
+  let sentCount = 0;
+
+  try {
+    const reminder = await prisma.reminderItem.findUnique({
+      where: { id: reminderId },
+      include: {
+        creator: {
+          include: { student: true },
+        },
+        alerts: {
+          orderBy: { offsetMinutes: 'desc' },
+        },
+        participants: {
+          where: { isDismissed: false },
+          include: {
+            user: {
+              include: { student: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!reminder) {
+      return {
+        success: false,
+        sentCount: 0,
+        recipientUsernames: [],
+        errors: ['Không tìm thấy lịch nhắc hẹn'],
+      };
+    }
+
+    const isPersonal = reminder.type === 'PERSONAL';
+
+    // 1. Xác định danh sách username người nhận thông báo
+    let targetUsernames: string[] = [];
+    if (isPersonal) {
+      targetUsernames = [reminder.creatorUsername];
+    } else {
+      // Môn học: Gửi cho tất cả bạn học cùng lớp/tổ đã được map vào reminder
+      targetUsernames = (reminder.participants || []).map((p) => p.username);
+      // Đảm bảo có creator trong danh sách
+      if (!targetUsernames.includes(reminder.creatorUsername)) {
+        targetUsernames.push(reminder.creatorUsername);
+      }
+    }
+
+    if (targetUsernames.length === 0) {
+      return { success: true, sentCount: 0, recipientUsernames: [], errors: [] };
+    }
+
+    // 2. CHỈ LẤY CÁC USER ĐÃ CẤU HÌNH VÀ BẬT THÔNG BÁO TELEGRAM
+    const telegramSubscribers = await prisma.telegramConfig.findMany({
+      where: {
+        username: { in: targetUsernames },
+        isEnabled: true,
+        chatId: { not: '' },
+      },
+      include: {
+        user: {
+          include: { student: true },
+        },
+      },
+    });
+
+    if (telegramSubscribers.length === 0) {
+      return { success: true, sentCount: 0, recipientUsernames: [], errors: [] };
+    }
+
+    const creatorName =
+      reminder.creator?.student?.hoTen ||
+      reminder.creatorUsername;
+    const formattedEventTime = formatDateTimeVN(reminder.eventTime);
+    const offsetLabels = (reminder.alerts || [])
+      .map((a) => a.label || formatOffsetMinutes(a.offsetMinutes))
+      .join(', ');
+
+    // 3. Gửi tin nhắn Telegram theo batch (tránh tắc nghẽn và tuân thủ rate limit)
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < telegramSubscribers.length; i += BATCH_SIZE) {
+      const batch = telegramSubscribers.slice(i, i + BATCH_SIZE);
+
+      await Promise.allSettled(
+        batch.map(async (sub) => {
+          // Tránh gửi lặp thông báo tạo nhắc hẹn (dùng offsetMinutes = -1 làm cờ CREATED)
+          const alreadySent = await prisma.reminderNotificationLog.findUnique({
+            where: {
+              reminderId_offsetMinutes_username: {
+                reminderId: reminder.id,
+                offsetMinutes: -1,
+                username: sub.username,
+              },
+            },
+          });
+
+          if (alreadySent && alreadySent.status === 'SUCCESS') {
+            return;
+          }
+
+          let effectiveToken: string;
+          try {
+            const resolved = await resolveEffectiveBotToken(sub.botToken);
+            effectiveToken = resolved.token;
+          } catch (tokenErr: any) {
+            errors.push(`${sub.username}: ${tokenErr.message}`);
+            return;
+          }
+
+          const studentName =
+            sub.user?.student?.hoTen || sub.username;
+          let messageHtml = '';
+
+          if (isPersonal) {
+            messageHtml = `🔔 <b>[ĐÃ TẠO NHẮC HẸN CÁ NHÂN] PTIT EDUSYNC</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${escapeTelegramHtml(studentName)}</b> (<code>${escapeTelegramHtml(sub.username)}</code>)\n📌 Tiêu đề: <b>${escapeTelegramHtml(reminder.title)}</b>\n🗓️ Thời gian hẹn: <b>${formattedEventTime}</b>\n${reminder.location ? `🏛️ Địa điểm / Link: <code>${escapeTelegramHtml(reminder.location)}</code>\n` : ''}${reminder.description ? `📝 Ghi chú: <i>${escapeTelegramHtml(reminder.description)}</i>\n` : ''}⏰ Các mốc sẽ báo trước: <b>${escapeTelegramHtml(offsetLabels || 'Đúng giờ')}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n💡 <i>Lịch nhắc hẹn đã được lưu vào lịch cá nhân của bạn trên PTIT Web Tool. Hệ thống sẽ tiếp tục thông báo Telegram khi đến các mốc báo trước đã chọn.</i>\n⏰ <i>Tạo lúc: ${new Date().toLocaleTimeString('vi-VN')} - ${new Date().toLocaleDateString('vi-VN')}</i>`;
+          } else {
+            const subjectHeader = reminder.tenMon
+              ? `${reminder.tenMon} (${reminder.maMon || ''})`
+              : reminder.maMon || 'Môn học';
+
+            messageHtml = `📢 <b>[LỊCH NHẮC HẸN MÔN HỌC MỚI ĐÃ ĐƯỢC TẠO] PTIT EDUSYNC</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Người nhận: <b>${escapeTelegramHtml(studentName)}</b> (<code>${escapeTelegramHtml(sub.username)}</code>)\n📖 Môn học: <b>${escapeTelegramHtml(subjectHeader)}</b>\n${reminder.nhomTo ? `🏷️ Nhóm/Tổ: <b>${escapeTelegramHtml(reminder.nhomTo)}</b>` : ''}${reminder.lop ? ` | Lớp: <b>${escapeTelegramHtml(reminder.lop)}</b>` : ''}\n${reminder.giangVien ? `👨‍🏫 Giảng viên: <b>${escapeTelegramHtml(reminder.giangVien)}</b>\n` : '\n'}📌 Tiêu đề nhắc hẹn: <b>${escapeTelegramHtml(reminder.title)}</b>\n🗓️ Thời điểm diễn ra: <b>${formattedEventTime}</b>\n${reminder.location ? `🏛️ Phòng / Link: <code>${escapeTelegramHtml(reminder.location)}</code>\n` : ''}${reminder.description ? `📝 Chi tiết: <i>${escapeTelegramHtml(reminder.description)}</i>\n` : ''}⏰ Các mốc sẽ nhắc trước: <b>${escapeTelegramHtml(offsetLabels || 'Đúng giờ')}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👥 Người tạo: <b>${escapeTelegramHtml(creatorName)}</b> (<code>${escapeTelegramHtml(reminder.creatorUsername)}</code>)\n💡 <i>Lịch nhắc hẹn này đã được tự động thêm vào lịch học & thời khóa biểu của bạn trên PTIT Web Tool. Hệ thống sẽ tự động gửi thông báo Telegram đến các bạn cùng lớp theo các mốc đã cài đặt.</i>\n⏰ <i>Tạo lúc: ${new Date().toLocaleTimeString('vi-VN')} - ${new Date().toLocaleDateString('vi-VN')}</i>`;
+          }
+
+          const sendRes = await sendTelegramMessage(
+            effectiveToken,
+            sub.chatId,
+            messageHtml,
+            {
+              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            }
+          );
+
+          if (sendRes.success) {
+            sentCount++;
+            await prisma.reminderNotificationLog
+              .upsert({
+                where: {
+                  reminderId_offsetMinutes_username: {
+                    reminderId: reminder.id,
+                    offsetMinutes: -1,
+                    username: sub.username,
+                  },
+                },
+                create: {
+                  reminderId: reminder.id,
+                  alertId: null,
+                  username: sub.username,
+                  offsetMinutes: -1,
+                  status: 'SUCCESS',
+                },
+                update: {
+                  sentAt: new Date(),
+                  status: 'SUCCESS',
+                },
+              })
+              .catch(() => {});
+          } else {
+            const errMsg = sendRes.error || 'Lỗi gửi Telegram';
+            errors.push(`${sub.username}: ${errMsg}`);
+            await prisma.reminderNotificationLog
+              .upsert({
+                where: {
+                  reminderId_offsetMinutes_username: {
+                    reminderId: reminder.id,
+                    offsetMinutes: -1,
+                    username: sub.username,
+                  },
+                },
+                create: {
+                  reminderId: reminder.id,
+                  alertId: null,
+                  username: sub.username,
+                  offsetMinutes: -1,
+                  status: 'FAILED',
+                  errorMessage: errMsg,
+                },
+                update: {
+                  status: 'FAILED',
+                  errorMessage: errMsg,
+                },
+              })
+              .catch(() => {});
+          }
+        })
+      );
+    }
+
+    return {
+      success: true,
+      sentCount,
+      recipientUsernames: telegramSubscribers.map((s) => s.username),
+      errors,
+    };
+  } catch (err: any) {
+    console.error('[sendReminderCreatedNotification] Lỗi gửi thông báo tạo nhắc hẹn:', err);
+    return {
+      success: false,
+      sentCount,
+      recipientUsernames: [],
+      errors: [err.message || String(err)],
+    };
+  }
+}

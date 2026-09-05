@@ -298,10 +298,16 @@ export default function RemindersManager({
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setSuccessMsg(editingReminder ? 'Đã cập nhật nhắc hẹn' : 'Đã tạo nhắc hẹn thành công!');
+        setSuccessMsg(
+          editingReminder
+            ? 'Đã cập nhật nhắc hẹn thành công!'
+            : formData.type === 'PERSONAL'
+            ? 'Đã tạo nhắc hẹn cá nhân và gửi thông báo xác nhận về Telegram của bạn!'
+            : 'Đã tạo nhắc hẹn môn học, chia sẻ vào lịch và gửi thông báo Telegram đến các bạn cùng lớp!'
+        );
         setIsModalOpen(false);
         fetchReminders();
-        setTimeout(() => setSuccessMsg(''), 4000);
+        setTimeout(() => setSuccessMsg(''), 6000);
       } else {
         alert(data.error || 'Có lỗi xảy ra');
       }
