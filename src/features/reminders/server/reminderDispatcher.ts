@@ -119,18 +119,20 @@ export async function runPendingReminderAlerts(): Promise<{
 
       // Gửi tin nhắn đến từng sinh viên đủ điều kiện
       for (const sub of telegramSubscribers) {
-        // Kiểm tra log đã gửi trước đó chưa (tránh gửi lặp)
-        const alreadyLogged = await prisma.reminderNotificationLog.findUnique({
-          where: {
-            reminderId_offsetMinutes_username: {
+        // ATOMIC LOCK: Tạo trước bản ghi với trạng thái 'SENDING'
+        // Do có UNIQUE index (reminderId, offsetMinutes, username), nếu luồng khác đã bắt đầu hoặc đã gửi,
+        // lệnh create() sẽ ném ngoại lệ -> bỏ qua ngay lập tức để chống gửi trùng lặp tuyệt đối.
+        try {
+          await prisma.reminderNotificationLog.create({
+            data: {
               reminderId: reminder.id,
-              offsetMinutes: alert.offsetMinutes,
+              alertId: alert.id,
               username: sub.username,
+              offsetMinutes: alert.offsetMinutes,
+              status: 'SENDING',
             },
-          },
-        });
-
-        if (alreadyLogged && alreadyLogged.status === 'SUCCESS') {
+          });
+        } catch (dupErr) {
           continue;
         }
 
@@ -166,7 +168,7 @@ export async function runPendingReminderAlerts(): Promise<{
 
         if (sendRes.success) {
           totalMessagesSent++;
-          await prisma.reminderNotificationLog.upsert({
+          await prisma.reminderNotificationLog.update({
             where: {
               reminderId_offsetMinutes_username: {
                 reminderId: reminder.id,
@@ -174,14 +176,7 @@ export async function runPendingReminderAlerts(): Promise<{
                 username: sub.username,
               },
             },
-            create: {
-              reminderId: reminder.id,
-              alertId: alert.id,
-              username: sub.username,
-              offsetMinutes: alert.offsetMinutes,
-              status: 'SUCCESS',
-            },
-            update: {
+            data: {
               sentAt: new Date(),
               status: 'SUCCESS',
             },
@@ -189,7 +184,7 @@ export async function runPendingReminderAlerts(): Promise<{
         } else {
           const errMsg = sendRes.error || 'Lỗi gửi tin Telegram';
           errors.push(`${sub.username}: ${errMsg}`);
-          await prisma.reminderNotificationLog.upsert({
+          await prisma.reminderNotificationLog.update({
             where: {
               reminderId_offsetMinutes_username: {
                 reminderId: reminder.id,
@@ -197,15 +192,7 @@ export async function runPendingReminderAlerts(): Promise<{
                 username: sub.username,
               },
             },
-            create: {
-              reminderId: reminder.id,
-              alertId: alert.id,
-              username: sub.username,
-              offsetMinutes: alert.offsetMinutes,
-              status: 'FAILED',
-              errorMessage: errMsg,
-            },
-            update: {
+            data: {
               status: 'FAILED',
               errorMessage: errMsg,
             },
@@ -300,6 +287,9 @@ export async function sendReminderCreatedNotification(reminderId: number): Promi
       }
     }
 
+    // Khử trùng lặp username
+    targetUsernames = Array.from(new Set(targetUsernames));
+
     if (targetUsernames.length === 0) {
       return { success: true, sentCount: 0, recipientUsernames: [], errors: [] };
     }
@@ -337,18 +327,20 @@ export async function sendReminderCreatedNotification(reminderId: number): Promi
 
       await Promise.allSettled(
         batch.map(async (sub) => {
-          // Tránh gửi lặp thông báo tạo nhắc hẹn (dùng offsetMinutes = -1 làm cờ CREATED)
-          const alreadySent = await prisma.reminderNotificationLog.findUnique({
-            where: {
-              reminderId_offsetMinutes_username: {
+          // ATOMIC LOCK: Tạo trước bản ghi log với trạng thái 'SENDING'
+          // Do có UNIQUE index (reminderId, offsetMinutes, username), nếu luồng khác đã tạo hoặc gửi,
+          // lệnh create() sẽ ném ngoại lệ -> bỏ qua ngay lập tức để chống gửi trùng lặp tuyệt đối.
+          try {
+            await prisma.reminderNotificationLog.create({
+              data: {
                 reminderId: reminder.id,
-                offsetMinutes: -1,
+                alertId: null,
                 username: sub.username,
+                offsetMinutes: -1,
+                status: 'SENDING',
               },
-            },
-          });
-
-          if (alreadySent && alreadySent.status === 'SUCCESS') {
+            });
+          } catch (dupErr) {
             return;
           }
 
@@ -387,7 +379,7 @@ export async function sendReminderCreatedNotification(reminderId: number): Promi
           if (sendRes.success) {
             sentCount++;
             await prisma.reminderNotificationLog
-              .upsert({
+              .update({
                 where: {
                   reminderId_offsetMinutes_username: {
                     reminderId: reminder.id,
@@ -395,14 +387,7 @@ export async function sendReminderCreatedNotification(reminderId: number): Promi
                     username: sub.username,
                   },
                 },
-                create: {
-                  reminderId: reminder.id,
-                  alertId: null,
-                  username: sub.username,
-                  offsetMinutes: -1,
-                  status: 'SUCCESS',
-                },
-                update: {
+                data: {
                   sentAt: new Date(),
                   status: 'SUCCESS',
                 },
@@ -412,7 +397,7 @@ export async function sendReminderCreatedNotification(reminderId: number): Promi
             const errMsg = sendRes.error || 'Lỗi gửi Telegram';
             errors.push(`${sub.username}: ${errMsg}`);
             await prisma.reminderNotificationLog
-              .upsert({
+              .update({
                 where: {
                   reminderId_offsetMinutes_username: {
                     reminderId: reminder.id,
@@ -420,15 +405,7 @@ export async function sendReminderCreatedNotification(reminderId: number): Promi
                     username: sub.username,
                   },
                 },
-                create: {
-                  reminderId: reminder.id,
-                  alertId: null,
-                  username: sub.username,
-                  offsetMinutes: -1,
-                  status: 'FAILED',
-                  errorMessage: errMsg,
-                },
-                update: {
+                data: {
                   status: 'FAILED',
                   errorMessage: errMsg,
                 },
