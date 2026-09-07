@@ -1732,20 +1732,42 @@ export default function StudentTimetableCalendar({
                       )}
 
                       {rem?.location && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-500 flex items-center gap-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-500 flex items-center gap-1.5 shrink-0">
                             <MapPin className="w-3.5 h-3.5 text-rose-500" /> Địa điểm / Link:
                           </span>
-                          <span className="font-bold text-slate-800 truncate max-w-[200px]">
-                            {rem.location}
-                          </span>
+                          {(() => {
+                            const loc = rem.location.trim();
+                            const isHttp = /^https?:\/\//i.test(loc);
+                            const isDomain = /^(?:www\.|meet\.google\.com|zoom\.us|teams\.microsoft\.com|[a-zA-Z0-9-]+\.(?:edu|com|org|net|vn|io|app|me|gg|link)\b)/i.test(loc);
+                            if (isHttp || isDomain) {
+                              const href = isHttp ? loc : `https://${loc}`;
+                              return (
+                                <a
+                                  href={href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-bold text-blue-600 hover:underline flex items-center gap-1 truncate max-w-[220px]"
+                                  title={loc}
+                                >
+                                  <span className="truncate">{loc}</span>
+                                  <ExternalLink className="w-3 h-3 shrink-0" />
+                                </a>
+                              );
+                            }
+                            return (
+                              <span className="font-bold text-slate-800 truncate max-w-[200px]" title={loc}>
+                                {loc}
+                              </span>
+                            );
+                          })()}
                         </div>
                       )}
 
                       {rem?.description && (
                         <div className="pt-2 border-t border-slate-200">
                           <span className="text-slate-500 font-semibold block mb-1">Ghi chú / Mô tả:</span>
-                          <p className="text-slate-700 whitespace-pre-line leading-relaxed bg-white p-2.5 rounded-xl border border-slate-200 text-xs">
+                          <p className="text-slate-700 whitespace-pre-line break-words leading-relaxed bg-white p-2.5 rounded-xl border border-slate-200 text-xs max-h-60 overflow-y-auto">
                             {rem.description}
                           </p>
                         </div>

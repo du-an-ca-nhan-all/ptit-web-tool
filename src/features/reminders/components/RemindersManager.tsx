@@ -28,6 +28,11 @@ import {
   Check,
   CalendarCheck,
   Flame,
+  Eye,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Copy,
 } from 'lucide-react';
 import {
   ReminderItemDto,
@@ -38,6 +43,58 @@ import {
   formatOffsetMinutes,
 } from '../types/reminder.types';
 import { LoginUser } from '@/src/types';
+
+/**
+ * Phân tích và render văn bản chứa URL thành các liên kết clickable an toàn
+ */
+function FormattedTextWithLinks({ text }: { text: string }) {
+  const urlRegex = /(https?:\/\/[^\s]+|(?:\b(?:www\.|meet\.google\.com|zoom\.us|teams\.microsoft\.com|[a-zA-Z0-9-]+\.(?:edu|com|org|net|vn|io|app|me|gg|link)\b)[^\s]*))/gi;
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const rawUrl = match[0];
+    const href = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `https://${rawUrl}`;
+    parts.push(
+      <a
+        key={match.index}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="text-blue-600 hover:text-blue-800 underline font-semibold inline-flex items-center gap-0.5 break-all"
+      >
+        <span>{rawUrl}</span>
+        <ExternalLink className="w-2.5 h-2.5 shrink-0 inline ml-0.5" />
+      </a>
+    );
+    lastIndex = urlRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? <>{parts}</> : <>{text}</>;
+}
+
+/**
+ * Kiểm tra và chuyển đổi một chuỗi địa điểm thành URL hợp lệ nếu có dạng liên kết
+ */
+function parseUrl(text?: string | null): string | null {
+  if (!text) return null;
+  const trimmed = text.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^(?:www\.|meet\.google\.com|zoom\.us|teams\.microsoft\.com|[a-zA-Z0-9-]+\.(?:edu|com|org|net|vn|io|app|me|gg|link)\b)/i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return null;
+}
 
 interface RemindersManagerProps {
   currentUser: LoginUser;
@@ -55,6 +112,27 @@ export default function RemindersManager({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Expand / Collapse descriptions per card
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<number>>(new Set());
+  const toggleExpandDescription = (id: number) => {
+    setExpandedDescriptions((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Detail Modal State (Xem chi tiết đầy đủ)
+  const [viewingReminder, setViewingReminder] = useState<ReminderItemDto | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string>('');
+  const handleCopyText = (text: string, key: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(''), 2000);
+  };
 
   // Filter & Search
   const [activeTab, setActiveTab] = useState<'ALL' | 'PERSONAL' | 'COURSE'>('ALL');
@@ -331,6 +409,7 @@ export default function RemindersManager({
         setReminders((prev) =>
           prev.map((r) => (r.id === reminder.id ? data.reminder : r))
         );
+        setViewingReminder((prev) => (prev && prev.id === reminder.id ? data.reminder : prev));
       }
     } catch (err) {
       console.error('Toggle complete error:', err);
@@ -348,6 +427,7 @@ export default function RemindersManager({
       const data = await res.json();
       if (res.ok && data.success) {
         setReminders((prev) => prev.filter((r) => r.id !== reminder.id));
+        if (viewingReminder?.id === reminder.id) setViewingReminder(null);
         setSuccessMsg('Đã xóa nhắc hẹn');
         setTimeout(() => setSuccessMsg(''), 3000);
       }
@@ -369,6 +449,7 @@ export default function RemindersManager({
       const data = await res.json();
       if (res.ok && data.success) {
         setReminders((prev) => prev.filter((r) => r.id !== reminder.id));
+        if (viewingReminder?.id === reminder.id) setViewingReminder(null);
       }
     } catch (err) {
       console.error('Dismiss reminder error:', err);
@@ -706,9 +787,11 @@ export default function RemindersManager({
                   {/* Title & Info */}
                   <div>
                     <h4
-                      className={`font-bold text-sm sm:text-base leading-snug ${
+                      onClick={() => setViewingReminder(reminder)}
+                      className={`font-bold text-sm sm:text-base leading-snug cursor-pointer hover:text-indigo-600 transition-colors ${
                         reminder.isCompleted ? 'line-through text-slate-500' : 'text-slate-900'
                       }`}
+                      title="Bấm để xem chi tiết đầy đủ"
                     >
                       {reminder.title}
                     </h4>
@@ -743,27 +826,66 @@ export default function RemindersManager({
                   {reminder.location && (
                     <div className="flex items-center gap-2 text-xs text-slate-600">
                       <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                      {reminder.location.startsWith('http') ? (
-                        <a
-                          href={reminder.location}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline flex items-center gap-1 truncate"
-                        >
-                          <span className="truncate">{reminder.location}</span>
-                          <ExternalLink className="w-3 h-3 shrink-0" />
-                        </a>
-                      ) : (
-                        <span className="truncate">{reminder.location}</span>
-                      )}
+                      {(() => {
+                        const parsedUrl = parseUrl(reminder.location);
+                        if (parsedUrl) {
+                          return (
+                            <a
+                              href={parsedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-blue-600 hover:underline flex items-center gap-1 truncate font-semibold"
+                              title={reminder.location}
+                            >
+                              <span className="truncate">{reminder.location}</span>
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                            </a>
+                          );
+                        }
+                        return <span className="truncate" title={reminder.location}>{reminder.location}</span>;
+                      })()}
                     </div>
                   )}
 
                   {/* Description */}
                   {reminder.description && (
-                    <p className="text-xs text-slate-600 line-clamp-2 italic bg-slate-50/50 p-2 rounded-lg">
-                      &ldquo;{reminder.description}&rdquo;
-                    </p>
+                    <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl p-2.5 text-xs text-slate-700">
+                      <div className="flex items-center justify-between gap-1 mb-1 text-[11px] font-semibold text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <FileText className="w-3 h-3 text-indigo-500" />
+                          <span>Ghi chú chi tiết:</span>
+                        </span>
+                        {(reminder.description.length > 80 || reminder.description.includes('\n')) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpandDescription(reminder.id);
+                            }}
+                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <span>{expandedDescriptions.has(reminder.id) ? 'Thu gọn' : 'Xem thêm'}</span>
+                            {expandedDescriptions.has(reminder.id) ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+
+                      <div
+                        className={`leading-relaxed whitespace-pre-line break-words ${
+                          !expandedDescriptions.has(reminder.id) &&
+                          (reminder.description.length > 80 || reminder.description.includes('\n'))
+                            ? 'line-clamp-2 text-slate-600'
+                            : 'text-slate-800 max-h-60 overflow-y-auto pr-1'
+                        }`}
+                      >
+                        <FormattedTextWithLinks text={reminder.description} />
+                      </div>
+                    </div>
                   )}
 
                   {/* Notification Alerts List */}
@@ -826,6 +948,14 @@ export default function RemindersManager({
                   </div>
 
                   <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setViewingReminder(reminder)}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-200 rounded-lg transition-all cursor-pointer"
+                      title="Xem chi tiết đầy đủ nhắc hẹn"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+
                     <button
                       onClick={() => handleToggleComplete(reminder)}
                       className={`p-1.5 rounded-lg transition-all cursor-pointer ${
@@ -1046,11 +1176,14 @@ export default function RemindersManager({
                 </label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Phòng 302-A2, hoặc link Zoom / Google Meet / LMS"
+                  placeholder="Ví dụ: Phòng 302-A2, hoặc link Zoom / Google Meet / LMS..."
                   value={formData.location}
                   onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
                   className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
+                <p className="text-[11px] text-slate-400">
+                  💡 Nhập link (Google Meet, Zoom, MS Teams...), tin nhắn Telegram sẽ tự động tạo đường link có thể bấm trực tiếp.
+                </p>
               </div>
 
               {/* Description */}
@@ -1059,12 +1192,15 @@ export default function RemindersManager({
                   Dặn dò / Ghi chú chi tiết (tùy chọn):
                 </label>
                 <textarea
-                  rows={2}
+                  rows={4}
                   placeholder="Chi tiết đề bài, nội dung cần chuẩn bị, dặn dò của giáo viên..."
                   value={formData.description}
                   onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                  className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+                  className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-y min-h-[90px]"
                 />
+                <p className="text-[11px] text-slate-400">
+                  💡 Hỗ trợ xuống dòng và tự động nhận diện các liên kết (Drive, Docs, LMS...) để có thể bấm trực tiếp.
+                </p>
               </div>
 
               {/* ── NOTIFICATION OFFSETS CONFIGURATION ── */}
@@ -1175,6 +1311,308 @@ export default function RemindersManager({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── DETAIL VIEW MODAL (Xem chi tiết nhắc hẹn) ── */}
+      {viewingReminder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                    viewingReminder.type === 'PERSONAL'
+                      ? 'bg-blue-100 text-blue-600'
+                      : 'bg-amber-100 text-amber-600'
+                  }`}
+                >
+                  {viewingReminder.type === 'PERSONAL' ? <User className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-800 text-base sm:text-lg">
+                    Chi Tiết Lịch Nhắc Hẹn
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {viewingReminder.type === 'PERSONAL'
+                      ? 'Nhắc hẹn cá nhân'
+                      : `Môn học: ${viewingReminder.tenMon || viewingReminder.maMon || 'Chung'}`}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setViewingReminder(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
+                title="Đóng"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 flex flex-col gap-4 scrollbar-thin">
+              {/* Badges & Status */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border flex items-center gap-1.5 ${
+                      viewingReminder.type === 'PERSONAL'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                        : 'bg-amber-50 text-amber-800 border-amber-200'
+                    }`}
+                  >
+                    {viewingReminder.type === 'PERSONAL' ? <User className="w-3.5 h-3.5 text-blue-600" /> : <BookOpen className="w-3.5 h-3.5 text-amber-600" />}
+                    <span>{viewingReminder.type === 'PERSONAL' ? 'Cá Nhân' : 'Môn Học'}</span>
+                  </span>
+
+                  <span
+                    className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
+                      viewingReminder.isCompleted
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {viewingReminder.isCompleted ? '✓ Đã hoàn thành' : 'Đang theo dõi'}
+                  </span>
+                </div>
+
+                <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  {getCountdownLabel(viewingReminder.eventTime)}
+                </span>
+              </div>
+
+              {/* Title */}
+              <div>
+                <h2
+                  className={`text-lg sm:text-xl font-black leading-snug ${
+                    viewingReminder.isCompleted ? 'line-through text-slate-500' : 'text-slate-900'
+                  }`}
+                >
+                  {viewingReminder.title}
+                </h2>
+
+                {viewingReminder.type === 'COURSE' && (
+                  <div className="mt-2 p-3 bg-amber-50/60 rounded-xl border border-amber-200/60 text-xs text-amber-900 space-y-1">
+                    <div className="font-bold text-sm text-amber-950">
+                      {viewingReminder.tenMon || viewingReminder.maMon} {viewingReminder.maMon && `(${viewingReminder.maMon})`}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-amber-800">
+                      {viewingReminder.nhomTo && <span>Nhóm/Tổ: <b>{viewingReminder.nhomTo}</b></span>}
+                      {viewingReminder.lop && <span>Lớp: <b>{viewingReminder.lop}</b></span>}
+                      {viewingReminder.giangVien && <span>GV: <b>{viewingReminder.giangVien}</b></span>}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Event Time */}
+              <div className="flex items-center gap-2.5 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs sm:text-sm">
+                <Clock className="w-5 h-5 text-indigo-600 shrink-0" />
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Thời gian diễn ra</div>
+                  <div className="font-bold text-slate-800">
+                    {new Date(viewingReminder.eventTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} -{' '}
+                    {new Date(viewingReminder.eventTime).toLocaleDateString('vi-VN', {
+                      weekday: 'long',
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Location or Online link */}
+              {viewingReminder.location && (
+                <div className="flex flex-col gap-1.5 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Địa điểm / Đường dẫn học online</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(viewingReminder.location || '', 'loc')}
+                      className="text-[11px] text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>{copiedKey === 'loc' ? 'Đã chép!' : 'Sao chép'}</span>
+                    </button>
+                  </div>
+
+                  {(() => {
+                    const parsedUrl = parseUrl(viewingReminder.location);
+                    if (parsedUrl) {
+                      return (
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <a
+                            href={parsedUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5 font-bold break-all"
+                          >
+                            <span>{viewingReminder.location}</span>
+                            <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                          </a>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="font-bold text-slate-800 break-words mt-0.5">
+                        {viewingReminder.location}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Full Description / Notes */}
+              {viewingReminder.description ? (
+                <div className="flex flex-col gap-1.5 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Dặn dò / Ghi chú chi tiết</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(viewingReminder.description || '', 'desc')}
+                      className="text-[11px] text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>{copiedKey === 'desc' ? 'Đã chép!' : 'Sao chép'}</span>
+                    </button>
+                  </div>
+
+                  <div className="mt-1 text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-line break-words max-h-72 overflow-y-auto pr-1">
+                    <FormattedTextWithLinks text={viewingReminder.description} />
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400 italic">
+                  Không có ghi chú dặn dò bổ sung.
+                </div>
+              )}
+
+              {/* Notification Alerts List */}
+              <div className="flex flex-col gap-2 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <Send className="w-3.5 h-3.5 text-sky-500" />
+                  <span>Các mốc thông báo Telegram ({viewingReminder.alerts?.length || 0})</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                  {viewingReminder.alerts && viewingReminder.alerts.length > 0 ? (
+                    viewingReminder.alerts.map((alert, idx) => (
+                      <span
+                        key={idx}
+                        className={`text-xs px-2.5 py-1 rounded-lg border font-medium flex items-center gap-1.5 ${
+                          alert.isSent
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-white text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {alert.isSent ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        )}
+                        <span>{alert.label || formatOffsetMinutes(alert.offsetMinutes)}</span>
+                        {alert.isSent && <span className="text-[10px] text-emerald-600 font-normal">(Đã phát)</span>}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-slate-400 italic text-xs">Không có mốc báo trước</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Meta: Creator & Participants */}
+              <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <span>
+                  Người tạo: <b>{viewingReminder.creatorName || viewingReminder.creatorUsername}</b>
+                  {viewingReminder.createdAt && ` (${new Date(viewingReminder.createdAt).toLocaleDateString('vi-VN')})`}
+                </span>
+                {viewingReminder.type === 'COURSE' && (
+                  <span className="text-emerald-600 font-medium">
+                    {viewingReminder.totalParticipants || 1} bạn học • {viewingReminder.telegramRecipientCount || 0} nhận Telegram
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleToggleComplete(viewingReminder);
+                    setViewingReminder((prev) => prev ? ({ ...prev, isCompleted: !prev.isCompleted }) : null);
+                  }}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    viewingReminder.isCompleted
+                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>{viewingReminder.isCompleted ? 'Đánh dấu chưa xong' : 'Đánh dấu hoàn thành'}</span>
+                </button>
+
+                {viewingReminder.creatorUsername === currentUser.username ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const r = viewingReminder;
+                        setViewingReminder(null);
+                        handleOpenEditModal(r);
+                      }}
+                      className="px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-indigo-200/60"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>Sửa</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const r = viewingReminder;
+                        setViewingReminder(null);
+                        handleDeleteReminder(r);
+                      }}
+                      className="px-3 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-rose-200/60"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Xóa</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const r = viewingReminder;
+                      setViewingReminder(null);
+                      handleDismissReminder(r);
+                    }}
+                    className="px-3 py-2 bg-amber-50 text-amber-800 hover:bg-amber-100 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-amber-200/60"
+                  >
+                    <EyeOff className="w-3.5 h-3.5" />
+                    <span>Ẩn khỏi lịch</span>
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewingReminder(null)}
+                className="px-4 py-2 bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}
