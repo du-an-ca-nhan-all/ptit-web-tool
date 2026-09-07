@@ -96,6 +96,15 @@ function parseUrl(text?: string | null): string | null {
   return null;
 }
 
+/**
+ * Chuyển đổi Date object thành chuỗi định dạng 'YYYY-MM-DDTHH:mm' theo giờ địa phương
+ * để gán làm giá trị cho input datetime-local
+ */
+function formatToDateTimeLocal(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 interface RemindersManagerProps {
   currentUser: LoginUser;
   onNavigateToTelegramConfig?: () => void;
@@ -224,11 +233,11 @@ export default function RemindersManager({
 
   // Open Create Modal
   const handleOpenCreateModal = (prefillType?: ReminderType) => {
-    const now = new Date();
-    // Default time: tomorrow at 08:00
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    tomorrow.setHours(8, 0, 0, 0);
-    const defaultTimeStr = tomorrow.toISOString().slice(0, 16);
+    // Default time: Ngày mai lúc 19:00 (giờ địa phương)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(19, 0, 0, 0);
+    const defaultTimeStr = formatToDateTimeLocal(tomorrow);
 
     setEditingReminder(null);
     setFormData({
@@ -253,8 +262,7 @@ export default function RemindersManager({
   const handleOpenEditModal = (reminder: ReminderItemDto) => {
     setEditingReminder(reminder);
     const d = new Date(reminder.eventTime);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const localIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const localIso = formatToDateTimeLocal(d);
 
     // Find course key if matches
     const courseMatch = enrolledCourses.find(
