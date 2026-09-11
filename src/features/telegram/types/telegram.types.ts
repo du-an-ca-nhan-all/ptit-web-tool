@@ -60,6 +60,8 @@ export interface TelegramQueueStats {
   isPaused: boolean;
   minGlobalIntervalMs: number;
   minPerChatIntervalMs: number;
+  maxRetriesDefault?: number;
+  maxRetries429?: number;
   lastSentAt: string | null;
   rateLimitedUntil: string | null;
   recentHistory: TelegramQueueHistoryItem[];

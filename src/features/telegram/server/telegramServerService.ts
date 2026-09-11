@@ -286,13 +286,14 @@ export async function sendTelegramMessage(
     disableWebPagePreview?: boolean;
     priority?: import('./telegramQueueServerService').TelegramMessagePriority;
     sendImmediately?: boolean;
+    maxAttempts?: number;
   }
 ): Promise<TelegramSendResult> {
   if (options?.sendImmediately) {
     return await sendRawTelegramMessage(botToken, chatId, text, options);
   }
   const { enqueueTelegramMessage } = await import('./telegramQueueServerService');
-  return await enqueueTelegramMessage(botToken, chatId, text, options, options?.priority || 'NORMAL');
+  return await enqueueTelegramMessage(botToken, chatId, text, options, options?.priority || 'NORMAL', options?.maxAttempts);
 }
 
 /**
@@ -309,13 +310,14 @@ export async function sendTelegramDocument(
     parseMode?: 'HTML' | 'MarkdownV2' | 'Markdown';
     priority?: import('./telegramQueueServerService').TelegramMessagePriority;
     sendImmediately?: boolean;
+    maxAttempts?: number;
   }
 ): Promise<TelegramSendResult> {
   if (options?.sendImmediately) {
     return await sendRawTelegramDocument(botToken, chatId, fileBuffer, filename, options);
   }
   const { enqueueTelegramDocument } = await import('./telegramQueueServerService');
-  return await enqueueTelegramDocument(botToken, chatId, fileBuffer, filename, options, options?.priority || 'NORMAL');
+  return await enqueueTelegramDocument(botToken, chatId, fileBuffer, filename, options, options?.priority || 'NORMAL', options?.maxAttempts);
 }
 
 /**

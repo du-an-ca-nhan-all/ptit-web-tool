@@ -2327,15 +2327,15 @@ export default function AdminTelegramBotManager({ currentUser }: AdminTelegramBo
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-1.5">
                 <div className="flex items-center gap-2 text-amber-300 font-bold">
                   <Sparkles className="w-4 h-4" />
-                  <span>Cơ chế Xếp hàng Ưu tiên</span>
+                  <span>Cơ chế Xếp hàng & Thử lại (Retry)</span>
                 </div>
                 <div className="text-slate-200 font-semibold text-[11px] leading-relaxed">
-                  <span className="text-rose-300 font-bold">CRITICAL / HIGH</span> (Ping test, khẩn cấp) &gt;{' '}
-                  <span className="text-indigo-300 font-bold">NORMAL</span> (Nhắc lịch thi, thông báo) &gt;{' '}
-                  <span className="text-slate-400 font-bold">BULK</span> (Phát thanh hàng loạt).
+                  <span className="text-rose-300 font-bold">CRITICAL / HIGH</span> &gt;{' '}
+                  <span className="text-indigo-300 font-bold">NORMAL</span> &gt;{' '}
+                  <span className="text-slate-400 font-bold">BULK</span>
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  Tự động đọc `retry_after` nếu gặp 429 và tạm dừng hàng đợi đúng số giây yêu cầu.
+                  Lỗi thông thường: Retry tối đa <b>{queueStats?.maxRetriesDefault ?? 20} lần</b>. Nếu gặp 429 Too Many Requests: Cho phép retry tối đa <b>{queueStats?.maxRetries429 ?? 1000} lần</b> theo thời gian `retry_after`.
                 </div>
               </div>
             </div>

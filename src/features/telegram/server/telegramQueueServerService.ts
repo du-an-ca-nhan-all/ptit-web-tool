@@ -41,10 +41,18 @@ export interface TelegramQueueStats {
   isPaused: boolean;
   minGlobalIntervalMs: number;
   minPerChatIntervalMs: number;
+  maxRetriesDefault: number;
+  maxRetries429: number;
   lastSentAt: string | null;
   rateLimitedUntil: string | null;
   recentHistory: TelegramQueueHistoryItem[];
 }
+
+// Tối đa retry cho lỗi thông thường (mạng, timeout, 5xx, ngoại lệ): 20 lần
+export const MAX_QUEUE_RETRIES_DEFAULT = 20;
+
+// Tối đa retry khi gặp mã lỗi HTTP 429 (Too Many Requests / Rate Limit): 1000 lần
+export const MAX_QUEUE_RETRIES_429 = 1000;
 
 export interface TelegramQueueItem {
   id: string;
@@ -59,6 +67,8 @@ export interface TelegramQueueItem {
   status: 'PENDING' | 'SENDING' | 'SUCCESS' | 'FAILED';
   attempts: number;
   maxAttempts: number;
+  retryCountGeneral?: number;
+  retryCount429?: number;
   createdAt: number;
   scheduledFor: number;
   error?: string;
@@ -323,7 +333,7 @@ async function processNextQueueItem() {
       const retryAfter = result.rawResponse?.parameters?.retry_after;
 
       // 1. Rate limited by Telegram (HTTP 429 Too Many Requests)
-      if (errorCode === 429 || typeof retryAfter === 'number') {
+      if (errorCode === 429 || typeof retryAfter === 'number' || rawDesc.toLowerCase().includes('too many requests')) {
         const pauseSeconds = Math.max(retryAfter || 5, 2);
         const pauseMs = pauseSeconds * 1000 + 500;
 
@@ -335,7 +345,10 @@ async function processNextQueueItem() {
           `⚠️ [Telegram Queue] Hit rate limit 429 on chat ${item.chatId}. Pausing queue for ${pauseSeconds}s (Retry-After)`
         );
 
-        if (item.attempts + 1 < item.maxAttempts) {
+        const current429Retries = item.retryCount429 || 0;
+
+        if (current429Retries < MAX_QUEUE_RETRIES_429) {
+          item.retryCount429 = current429Retries + 1;
           item.attempts++;
           item.status = 'PENDING';
           item.scheduledFor = Date.now() + pauseMs;
@@ -351,7 +364,7 @@ async function processNextQueueItem() {
             attempts: item.attempts,
             textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
             filename: item.filename,
-            error: `Rate limit 429 (Tạm dừng ${pauseSeconds}s rồi thử lại)`,
+            error: `Rate limit 429 (Tạm dừng ${pauseSeconds}s, thử lại lần ${item.retryCount429}/${MAX_QUEUE_RETRIES_429})`,
             durationMs,
             completedAt,
           });
@@ -360,7 +373,7 @@ async function processNextQueueItem() {
           triggerWorker(pauseMs + 50);
           return;
         } else {
-          // Max attempts reached on 429
+          // Max attempts reached on 429 (1000 retries)
           state.failedCount++;
           item.status = 'FAILED';
           recordHistory({
@@ -373,7 +386,7 @@ async function processNextQueueItem() {
             attempts: item.attempts + 1,
             textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
             filename: item.filename,
-            error: `Rate limit 429: Đã thử lại ${item.maxAttempts} lần không thành công`,
+            error: `Rate limit 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
             durationMs,
             completedAt,
           });
@@ -390,11 +403,15 @@ async function processNextQueueItem() {
           rawDesc.toLowerCase().includes('unauthorized') ||
           rawDesc.toLowerCase().includes('can\'t parse');
 
-        if (!isFatalError && item.attempts + 1 < item.maxAttempts) {
+        const maxRetries = item.maxAttempts ?? MAX_QUEUE_RETRIES_DEFAULT;
+        const currentGeneralRetries = item.retryCountGeneral || 0;
+
+        if (!isFatalError && currentGeneralRetries < maxRetries) {
           // Transient network / 5xx error: Exponential backoff
+          item.retryCountGeneral = currentGeneralRetries + 1;
           item.attempts++;
           item.status = 'PENDING';
-          const backoffDelay = Math.min(30000, 1000 * Math.pow(2, item.attempts));
+          const backoffDelay = Math.min(30000, 1000 * Math.pow(1.5, Math.min(currentGeneralRetries, 8)));
           item.scheduledFor = Date.now() + backoffDelay;
           insertItemByPriority(state.queue, item);
 
@@ -408,7 +425,7 @@ async function processNextQueueItem() {
             attempts: item.attempts,
             textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
             filename: item.filename,
-            error: `${result.error || 'Lỗi mạng'} (Thử lại lần ${item.attempts}/${item.maxAttempts})`,
+            error: `${result.error || 'Lỗi mạng'} (Thử lại lần ${item.retryCountGeneral}/${maxRetries})`,
             durationMs,
             completedAt,
           });
@@ -420,6 +437,10 @@ async function processNextQueueItem() {
           state.failedCount++;
           item.status = 'FAILED';
 
+          const failReason = isFatalError
+            ? (result.error || 'Lỗi không thể gửi')
+            : `${result.error || 'Gửi thất bại'}: Đã thử lại tối đa ${maxRetries} lần không thành công`;
+
           recordHistory({
             id: item.id,
             type: item.type,
@@ -430,7 +451,7 @@ async function processNextQueueItem() {
             attempts: item.attempts + 1,
             textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
             filename: item.filename,
-            error: result.error || 'Gửi thất bại',
+            error: failReason,
             durationMs,
             completedAt,
           });
@@ -443,10 +464,49 @@ async function processNextQueueItem() {
     const durationMs = Date.now() - startTime;
     const completedAt = new Date().toISOString();
 
-    if (item.attempts + 1 < item.maxAttempts) {
+    const isErr429 =
+      err?.status === 429 ||
+      (typeof err?.message === 'string' &&
+        (err.message.includes('429') || err.message.toLowerCase().includes('too many requests')));
+
+    if (isErr429) {
+      const current429Retries = item.retryCount429 || 0;
+      if (current429Retries < MAX_QUEUE_RETRIES_429) {
+        item.retryCount429 = current429Retries + 1;
+        item.attempts++;
+        item.status = 'PENDING';
+        item.scheduledFor = Date.now() + 5000;
+        insertItemByPriority(state.queue, item);
+
+        recordHistory({
+          id: item.id,
+          type: item.type,
+          chatId: item.chatId,
+          threadId: item.options?.threadId,
+          priority: item.priority,
+          status: 'RETRYING',
+          attempts: item.attempts,
+          textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
+          filename: item.filename,
+          error: `Ngoại lệ 429: ${err.message || 'Too Many Requests'} (Thử lại lần ${item.retryCount429}/${MAX_QUEUE_RETRIES_429})`,
+          durationMs,
+          completedAt,
+        });
+
+        triggerWorker(5000);
+        return;
+      }
+    }
+
+    const maxRetries = item.maxAttempts ?? MAX_QUEUE_RETRIES_DEFAULT;
+    const currentGeneralRetries = item.retryCountGeneral || 0;
+
+    if (currentGeneralRetries < maxRetries) {
+      item.retryCountGeneral = currentGeneralRetries + 1;
       item.attempts++;
       item.status = 'PENDING';
-      item.scheduledFor = Date.now() + 2000;
+      const backoffDelay = Math.min(30000, 1000 * Math.pow(1.5, Math.min(currentGeneralRetries, 8)));
+      item.scheduledFor = Date.now() + Math.max(2000, backoffDelay);
       insertItemByPriority(state.queue, item);
 
       recordHistory({
@@ -459,7 +519,7 @@ async function processNextQueueItem() {
         attempts: item.attempts,
         textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
         filename: item.filename,
-        error: `Ngoại lệ: ${err.message || 'Lỗi không xác định'}`,
+        error: `Ngoại lệ: ${err.message || 'Lỗi không xác định'} (Thử lại lần ${item.retryCountGeneral}/${maxRetries})`,
         durationMs,
         completedAt,
       });
@@ -477,7 +537,7 @@ async function processNextQueueItem() {
         attempts: item.attempts + 1,
         textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
         filename: item.filename,
-        error: `Ngoại lệ: ${err.message || 'Lỗi không xác định'}`,
+        error: `Ngoại lệ: ${err.message || 'Lỗi không xác định'} (Đã thử lại tối đa ${maxRetries} lần không thành công)`,
         durationMs,
         completedAt,
       });
@@ -504,7 +564,7 @@ export function enqueueTelegramMessage(
   text: string,
   options?: TelegramQueueItemOptions,
   priority: TelegramMessagePriority = 'NORMAL',
-  maxAttempts: number = 3
+  maxAttempts: number = MAX_QUEUE_RETRIES_DEFAULT
 ): Promise<TelegramSendResult> {
   const state = getQueueState();
   state.itemCounter++;
@@ -522,6 +582,8 @@ export function enqueueTelegramMessage(
       status: 'PENDING',
       attempts: 0,
       maxAttempts: Math.max(1, maxAttempts),
+      retryCountGeneral: 0,
+      retryCount429: 0,
       createdAt: Date.now(),
       scheduledFor: Date.now(),
       resolve,
@@ -543,7 +605,7 @@ export function enqueueTelegramDocument(
   filename: string,
   options?: TelegramQueueItemOptions,
   priority: TelegramMessagePriority = 'NORMAL',
-  maxAttempts: number = 3
+  maxAttempts: number = MAX_QUEUE_RETRIES_DEFAULT
 ): Promise<TelegramSendResult> {
   const state = getQueueState();
   state.itemCounter++;
@@ -562,6 +624,8 @@ export function enqueueTelegramDocument(
       status: 'PENDING',
       attempts: 0,
       maxAttempts: Math.max(1, maxAttempts),
+      retryCountGeneral: 0,
+      retryCount429: 0,
       createdAt: Date.now(),
       scheduledFor: Date.now(),
       resolve,
@@ -583,6 +647,7 @@ export function enqueueBatchTelegramMessages(
     text: string;
     options?: TelegramQueueItemOptions;
     priority?: TelegramMessagePriority;
+    maxAttempts?: number;
   }>
 ): { queuedCount: number; itemIds: string[] } {
   const state = getQueueState();
@@ -603,7 +668,9 @@ export function enqueueBatchTelegramMessages(
       priority: it.priority || 'LOW',
       status: 'PENDING',
       attempts: 0,
-      maxAttempts: 3,
+      maxAttempts: it.maxAttempts ?? MAX_QUEUE_RETRIES_DEFAULT,
+      retryCountGeneral: 0,
+      retryCount429: 0,
       createdAt: Date.now(),
       scheduledFor: Date.now(),
     };
@@ -633,6 +700,8 @@ export function getTelegramQueueStats(): TelegramQueueStats {
     isPaused: state.isPaused,
     minGlobalIntervalMs: MIN_GLOBAL_INTERVAL_MS,
     minPerChatIntervalMs: MIN_PER_CHAT_INTERVAL_MS,
+    maxRetriesDefault: MAX_QUEUE_RETRIES_DEFAULT,
+    maxRetries429: MAX_QUEUE_RETRIES_429,
     lastSentAt: state.lastGlobalSendAt ? new Date(state.lastGlobalSendAt).toISOString() : null,
     rateLimitedUntil: state.globalRateLimitedUntil > now ? new Date(state.globalRateLimitedUntil).toISOString() : null,
     recentHistory: [...state.recentHistory],
