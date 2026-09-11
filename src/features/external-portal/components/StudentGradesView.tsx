@@ -337,6 +337,7 @@ export default function StudentGradesView({
   // Copy grade summary text
   const handleCopySummary = () => {
     if (!data?.summary) return;
+    const s = data.summary;
     const gpa4Exp = s.gpa4Expected !== null && s.gpa4Expected !== undefined ? s.gpa4Expected.toFixed(2) : null;
     const gpa10Exp = s.gpa10Expected !== null && s.gpa10Expected !== undefined ? s.gpa10Expected.toFixed(2) : null;
     const text = `📊 KẾT QUẢ HỌC TẬP PTIT EDUSYNC - SINH VIÊN ${currentUser.username}
