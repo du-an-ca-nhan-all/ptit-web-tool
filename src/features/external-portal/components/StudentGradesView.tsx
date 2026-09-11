@@ -334,7 +334,7 @@ export default function StudentGradesView({
     URL.revokeObjectURL(url);
   };
 
-  // Copy grade summary text
+  // Copy grade summary text 1
   const handleCopySummary = () => {
     if (!data?.summary) return;
     const s = data.summary;
