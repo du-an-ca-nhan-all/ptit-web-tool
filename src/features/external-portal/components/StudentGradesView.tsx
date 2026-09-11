@@ -144,7 +144,9 @@ export default function StudentGradesView({
 
   const [selectedCourseModal, setSelectedCourseModal] = useState<StudentCourseGrade | null>(null);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
+  const [showGpaModal, setShowGpaModal] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
+  const [gpaScaleView, setGpaScaleView] = useState<'scale4' | 'scale10'>('scale4');
 
   // Sync filters to URL query params
   useEffect(() => {
@@ -334,13 +336,14 @@ export default function StudentGradesView({
   // Copy grade summary text
   const handleCopySummary = () => {
     if (!data?.summary) return;
-    const s = data.summary;
+    const gpa4Exp = s.gpa4Expected !== null && s.gpa4Expected !== undefined ? s.gpa4Expected.toFixed(2) : null;
+    const gpa10Exp = s.gpa10Expected !== null && s.gpa10Expected !== undefined ? s.gpa10Expected.toFixed(2) : null;
     const text = `📊 KẾT QUẢ HỌC TẬP PTIT EDUSYNC - SINH VIÊN ${currentUser.username}
 • Họ và tên: ${currentUser.fullName || currentUser.username}
-• Điểm TB tích lũy hệ 4: ${s.gpa4 !== null ? s.gpa4.toFixed(2) : '—'} / 4.0
-• Điểm TB tích lũy hệ 10: ${s.gpa10 !== null ? s.gpa10.toFixed(2) : '—'} / 10.0
+• Điểm TB tích lũy hệ 4: ${s.gpa4 !== null ? s.gpa4.toFixed(2) : '—'} / 4.0${gpa4Exp && gpa4Exp !== s.gpa4?.toFixed(2) ? ` (Dự kiến: ${gpa4Exp})` : ''}
+• Điểm TB tích lũy hệ 10: ${s.gpa10 !== null ? s.gpa10.toFixed(2) : '—'} / 10.0${gpa10Exp && gpa10Exp !== s.gpa10?.toFixed(2) ? ` (Dự kiến: ${gpa10Exp})` : ''}
 • Xếp loại học lực: ${s.classification}
-• Số tín chỉ tích lũy: ${s.totalCreditsAccumulated} / ${s.curriculumTargetCredits} TC (${s.graduationProgressRate}%)
+• Số tín chỉ tích lũy: ${s.totalCreditsAccumulated} / ${s.curriculumTargetCredits} TC (${s.graduationProgressRate}%)${s.totalCreditsAccumulatedExpected ? ` • Dự kiến đạt: ${s.totalCreditsAccumulatedExpected} TC (${s.graduationProgressRateExpected ?? s.graduationProgressRate}%)` : ''}
 • Tỉ lệ hoàn thành môn: ${s.passRate}% (${s.totalPassedSubjects} môn đạt, ${s.totalInProgressSubjects} môn đang học)
 • Cập nhật lần cuối: ${formatSyncDateTime(data.lastSyncAt)}`;
 
@@ -663,26 +666,84 @@ export default function StudentGradesView({
         <>
           {/* OVERVIEW KEY STATS CARDS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: GPA Cumulative */}
+            {/* Card 1: GPA Cumulative & Expected (Dual Scale: Hệ 4 & Hệ 10) */}
             <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-900 text-white rounded-3xl p-5 shadow-sm border border-indigo-700/50 flex flex-col justify-between relative overflow-hidden">
               <div className="absolute right-0 top-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider">GPA Tích Lũy</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-900 shadow-xs">
-                    {summary?.classification || 'Khá'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider">GPA Tích Lũy</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowGpaModal(true)}
+                      className="p-1 hover:bg-white/10 rounded-full text-indigo-300 hover:text-white transition cursor-pointer"
+                      title="Xem giải thích chi tiết điểm GPA Hệ 4 & Hệ 10 (Đã chốt vs Dự kiến)"
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowGpaModal(true)}
+                    className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-indigo-100 hover:bg-white/20 border border-white/20 transition cursor-pointer"
+                  >
+                    Chi tiết
+                  </button>
                 </div>
-                <div className="flex items-baseline gap-2 mt-3">
-                  <span className="text-3xl sm:text-4xl font-black tracking-tight font-mono text-white">
-                    {summary?.gpa4 !== null ? summary?.gpa4.toFixed(2) : '—'}
-                  </span>
-                  <span className="text-xs text-indigo-200 font-bold">/ 4.0</span>
+
+                <div className="mt-2.5">
+                  {/* Primary: Đã chốt chính thức */}
+                  <div className="flex items-baseline justify-between">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl sm:text-3xl font-black tracking-tight font-mono text-white">
+                          {summary?.gpa4 !== null && summary?.gpa4 !== undefined ? summary.gpa4.toFixed(2) : '—'}
+                        </span>
+                        <span className="text-xs text-indigo-200 font-bold">/ 4.0</span>
+                      </div>
+                      <div className="flex items-baseline gap-1 text-indigo-100 bg-white/10 px-2 py-0.5 rounded-lg border border-white/10">
+                        <span className="text-[11px] text-indigo-200">Hệ 10:</span>
+                        <span className="font-mono font-bold text-sm text-white">
+                          {summary?.gpa10 !== null && summary?.gpa10 !== undefined ? summary.gpa10.toFixed(2) : '—'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-500/40 flex items-center gap-1 shrink-0">
+                      <Lock className="w-2.5 h-2.5 text-emerald-400" /> Đã chốt
+                    </span>
+                  </div>
+
+                  {/* Secondary: Dự kiến (toàn bộ môn đạt) */}
+                  <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-dashed border-indigo-700/60 text-xs">
+                    <span className="text-indigo-200 font-medium flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span>Dự kiến:</span>
+                    </span>
+                    <div className="flex items-baseline gap-2 font-mono text-xs">
+                      <span className="font-bold text-amber-300">
+                        {summary?.gpa4Expected !== null && summary?.gpa4Expected !== undefined
+                          ? summary.gpa4Expected.toFixed(2)
+                          : summary?.gpa4 !== null && summary?.gpa4 !== undefined
+                          ? summary.gpa4.toFixed(2)
+                          : '—'}
+                        <span className="text-[10px] text-indigo-200 font-normal ml-0.5">/ 4.0</span>
+                      </span>
+                      <span className="text-indigo-300">•</span>
+                      <span className="font-bold text-cyan-300">
+                        Hệ 10: {summary?.gpa10Expected !== null && summary?.gpa10Expected !== undefined
+                          ? summary.gpa10Expected.toFixed(2)
+                          : summary?.gpa10 !== null && summary?.gpa10 !== undefined
+                          ? summary.gpa10.toFixed(2)
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="pt-3 mt-3 border-t border-indigo-700/60 flex items-center justify-between text-xs text-indigo-200">
-                <span>Hệ 10: <b className="text-white font-mono">{summary?.gpa10 !== null ? summary?.gpa10.toFixed(2) : '—'}</b></span>
-                <span>Học lực: <b className="text-emerald-300">{summary?.classification}</b></span>
+
+              <div className="pt-2.5 mt-2 border-t border-indigo-700/60 flex items-center justify-between text-xs text-indigo-200">
+                <span>Học lực: <b className="text-emerald-300">{summary?.classification || 'Khá'}</b></span>
+                <span className="text-[11px] text-indigo-300">Hệ 4.0 & Hệ 10.0</span>
               </div>
             </div>
 
@@ -877,9 +938,51 @@ export default function StudentGradesView({
             {/* TAB 1: GPA PROGRESSION CHART / TIMELINE */}
             {activeAnalyticsTab === 'PROGRESSION' && (
               <div className="flex flex-col gap-6">
+                {/* Scale View Toggle Bar */}
+                <div className="flex items-center justify-between gap-3 flex-wrap bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-700">Thang Điểm Xem:</span>
+                    <div className="bg-slate-200/80 p-0.5 rounded-xl flex items-center text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setGpaScaleView('scale4')}
+                        className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                          gpaScaleView === 'scale4'
+                            ? 'bg-white text-indigo-700 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Thang 4.0
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGpaScaleView('scale10')}
+                        className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                          gpaScaleView === 'scale10'
+                            ? 'bg-white text-indigo-700 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Thang 10.0
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-slate-500 font-medium">
+                    Đang hiển thị biểu đồ & thẻ kỳ học theo: <b className="text-indigo-600 font-bold">{gpaScaleView === 'scale4' ? 'Hệ 4.0 (Tín chỉ chuẩn)' : 'Hệ 10.0'}</b>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {data?.gpaProgression.map((prog, idx) => {
                     const isCurrent = idx === data.gpaProgression.length - 1;
+                    const semPrimary = gpaScaleView === 'scale4' ? prog.gpa4 : prog.gpa10;
+                    const cumPrimary = gpaScaleView === 'scale4' ? prog.gpaCumulative4 : prog.gpaCumulative10;
+                    const semSecondary = gpaScaleView === 'scale4' ? prog.gpa10 : prog.gpa4;
+                    const cumSecondary = gpaScaleView === 'scale4' ? prog.gpaCumulative10 : prog.gpaCumulative4;
+                    const scaleSuffix = gpaScaleView === 'scale4' ? '/ 4.0' : '/ 10.0';
+                    const secondaryLabel = gpaScaleView === 'scale4' ? 'Hệ 10' : 'Hệ 4';
+
                     return (
                       <div
                         key={prog.semesterId}
@@ -898,19 +1001,23 @@ export default function StudentGradesView({
                           <div className="bg-white p-2.5 rounded-xl border border-slate-200/80">
                             <span className="text-[10px] text-slate-400 uppercase font-bold block">GPA Học Kỳ</span>
                             <div className="text-lg font-black font-mono text-indigo-600 mt-0.5">
-                              {prog.gpa4 !== null ? prog.gpa4.toFixed(2) : '—'}
-                              <span className="text-[10px] font-normal text-slate-400 ml-1">/ 4.0</span>
+                              {semPrimary !== null && semPrimary !== undefined ? semPrimary.toFixed(2) : '—'}
+                              <span className="text-[10px] font-normal text-slate-400 ml-1">{scaleSuffix}</span>
                             </div>
-                            <span className="text-[10px] text-slate-500 font-mono">Hệ 10: {prog.gpa10 !== null ? prog.gpa10.toFixed(2) : '—'}</span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {secondaryLabel}: {semSecondary !== null && semSecondary !== undefined ? semSecondary.toFixed(2) : '—'}
+                            </span>
                           </div>
 
                           <div className="bg-white p-2.5 rounded-xl border border-slate-200/80">
                             <span className="text-[10px] text-slate-400 uppercase font-bold block">GPA Tích Lũy</span>
                             <div className="text-lg font-black font-mono text-emerald-600 mt-0.5">
-                              {prog.gpaCumulative4 !== null ? prog.gpaCumulative4.toFixed(2) : '—'}
-                              <span className="text-[10px] font-normal text-slate-400 ml-1">/ 4.0</span>
+                              {cumPrimary !== null && cumPrimary !== undefined ? cumPrimary.toFixed(2) : '—'}
+                              <span className="text-[10px] font-normal text-slate-400 ml-1">{scaleSuffix}</span>
                             </div>
-                            <span className="text-[10px] text-slate-500 font-mono">Hệ 10: {prog.gpaCumulative10 !== null ? prog.gpaCumulative10.toFixed(2) : '—'}</span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {secondaryLabel}: {cumSecondary !== null && cumSecondary !== undefined ? cumSecondary.toFixed(2) : '—'}
+                            </span>
                           </div>
                         </div>
 
@@ -953,8 +1060,10 @@ export default function StudentGradesView({
 
                 {/* Visual Height Progression Comparison */}
                 <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Biểu Đồ Tương Quan GPA Qua Từng Kỳ</span>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Biểu Đồ Tương Quan GPA Qua Từng Kỳ ({gpaScaleView === 'scale4' ? 'Thang 4.0' : 'Thang 10.0'})
+                    </span>
                     <div className="flex items-center gap-3 text-xs">
                       <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-indigo-600" /> GPA Kỳ</div>
                       <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-emerald-500" /> GPA Tích Lũy</div>
@@ -963,10 +1072,13 @@ export default function StudentGradesView({
 
                   <div className="grid grid-cols-3 gap-6 pt-6 pb-2 items-end min-h-[160px]">
                     {data?.gpaProgression.map((prog) => {
-                      const semGpa = prog.gpa4 ?? 0;
-                      const cumGpa = prog.gpaCumulative4 ?? 0;
-                      const semHeight = Math.max(10, (semGpa / 4.0) * 120);
-                      const cumHeight = Math.max(10, (cumGpa / 4.0) * 120);
+                      const maxScale = gpaScaleView === 'scale4' ? 4.0 : 10.0;
+                      const semVal = gpaScaleView === 'scale4' ? (prog.gpa4 ?? 0) : (prog.gpa10 ?? 0);
+                      const cumVal = gpaScaleView === 'scale4' ? (prog.gpaCumulative4 ?? 0) : (prog.gpaCumulative10 ?? 0);
+                      const semDisplay = gpaScaleView === 'scale4' ? prog.gpa4 : prog.gpa10;
+                      const cumDisplay = gpaScaleView === 'scale4' ? prog.gpaCumulative4 : prog.gpaCumulative10;
+                      const semHeight = Math.max(10, (semVal / maxScale) * 120);
+                      const cumHeight = Math.max(10, (cumVal / maxScale) * 120);
 
                       return (
                         <div key={prog.semesterId} className="flex flex-col items-center gap-2">
@@ -974,7 +1086,7 @@ export default function StudentGradesView({
                             {/* Semester GPA Bar */}
                             <div className="flex flex-col items-center gap-1">
                               <span className="text-[10px] font-mono font-bold text-indigo-700">
-                                {prog.gpa4 !== null ? prog.gpa4.toFixed(2) : ''}
+                                {semDisplay !== null && semDisplay !== undefined ? semDisplay.toFixed(2) : ''}
                               </span>
                               <div
                                 className="w-8 sm:w-12 bg-indigo-600 rounded-t-xl transition-all duration-500 shadow-sm"
@@ -985,7 +1097,7 @@ export default function StudentGradesView({
                             {/* Cumulative GPA Bar */}
                             <div className="flex flex-col items-center gap-1">
                               <span className="text-[10px] font-mono font-bold text-emerald-700">
-                                {prog.gpaCumulative4 !== null ? prog.gpaCumulative4.toFixed(2) : ''}
+                                {cumDisplay !== null && cumDisplay !== undefined ? cumDisplay.toFixed(2) : ''}
                               </span>
                               <div
                                 className="w-8 sm:w-12 bg-emerald-500 rounded-t-xl transition-all duration-500 shadow-sm"
@@ -1147,18 +1259,30 @@ export default function StudentGradesView({
                           </span>
                         </div>
 
-                        <div className="my-3">
+                        <div className="my-3 space-y-1.5">
                           <span className="text-[11px] text-slate-500 uppercase font-bold block">GPA Yêu Cầu Các Kỳ Tới</span>
-                          <div className="text-2xl font-black font-mono text-slate-800 mt-1">
-                            {goal.requiredGpaOnRemaining !== null ? (
-                              <span className={goal.requiredGpaOnRemaining <= 3.2 ? 'text-blue-600' : 'text-amber-600'}>
-                                {goal.requiredGpaOnRemaining.toFixed(2)}
-                              </span>
-                            ) : (
-                              <span className="text-emerald-600">Đã Hoàn Thành</span>
-                            )}
-                            {goal.requiredGpaOnRemaining !== null && (
-                              <span className="text-xs text-slate-400 font-normal ml-1">/ 4.0</span>
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <div className="text-2xl font-black font-mono text-slate-800">
+                              {goal.requiredGpaOnRemaining !== null ? (
+                                <span className={goal.requiredGpaOnRemaining <= 3.2 ? 'text-blue-600' : 'text-amber-600'}>
+                                  {goal.requiredGpaOnRemaining.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-600">Đã Hoàn Thành</span>
+                              )}
+                              {goal.requiredGpaOnRemaining !== null && (
+                                <span className="text-xs text-slate-400 font-normal ml-1">/ 4.0</span>
+                              )}
+                            </div>
+
+                            {goal.requiredGpa10OnRemaining !== null && goal.requiredGpa10OnRemaining !== undefined && (
+                              <div className="text-xs font-bold font-mono text-slate-700 bg-white/80 px-2.5 py-1 rounded-xl border border-slate-200/80 shadow-2xs">
+                                <span className="text-slate-500">Hệ 10: </span>
+                                <span className={goal.requiredGpa10OnRemaining <= 8.0 ? 'text-blue-600 font-black' : 'text-amber-600 font-black'}>
+                                  {goal.requiredGpa10OnRemaining.toFixed(2)}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-normal"> / 10.0</span>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1256,6 +1380,9 @@ export default function StudentGradesView({
                         <div className="bg-white/10 px-3 py-1 rounded-xl flex items-center gap-1.5">
                           <span className="text-slate-300">GPA Kỳ:</span>
                           <span className="font-mono font-black text-amber-300">{sem.gpa4Semester.toFixed(2)}</span>
+                          {sem.gpa10Semester !== null && sem.gpa10Semester !== undefined && (
+                            <span className="text-[10px] text-slate-300 font-mono">(H10: {sem.gpa10Semester.toFixed(2)})</span>
+                          )}
                         </div>
                       )}
 
@@ -1263,6 +1390,9 @@ export default function StudentGradesView({
                         <div className="bg-white/10 px-3 py-1 rounded-xl flex items-center gap-1.5">
                           <span className="text-slate-300">GPA TL:</span>
                           <span className="font-mono font-black text-emerald-300">{sem.gpa4Cumulative.toFixed(2)}</span>
+                          {sem.gpa10Cumulative !== null && sem.gpa10Cumulative !== undefined && (
+                            <span className="text-[10px] text-slate-300 font-mono">(H10: {sem.gpa10Cumulative.toFixed(2)})</span>
+                          )}
                         </div>
                       )}
 
@@ -1770,6 +1900,108 @@ export default function StudentGradesView({
 
             <button
               onClick={() => setShowCreditsModal(false)}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition cursor-pointer shadow-sm"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* GPA EXPLANATION MODAL (GIẢI THÍCH CHI TIẾT ĐIỂM GPA HỆ 4 VÀ HỆ 10: ĐÃ CHỐT VS DỰ KIẾN) */}
+      {showGpaModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-50 text-indigo-700 rounded-2xl">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800">Giải Thích Điểm Trung Bình GPA</h3>
+                  <p className="text-xs text-slate-500">Chi tiết cách tính Hệ 4.0, Hệ 10.0 và số liệu Đã chốt vs Dự kiến</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowGpaModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3.5">
+              {/* Item 1: GPA Đã chốt chính thức */}
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>GPA Tích Lũy (Đã Chốt Chính Thức):</span>
+                  </span>
+                  <div className="flex items-center gap-1.5 font-mono font-black text-xs">
+                    <span className="text-emerald-800 bg-white px-2 py-0.5 rounded-lg border border-emerald-300">
+                      Hệ 4: {summary?.gpa4 !== null && summary?.gpa4 !== undefined ? summary.gpa4.toFixed(2) : '—'}
+                    </span>
+                    <span className="text-slate-700 bg-white px-2 py-0.5 rounded-lg border border-emerald-300">
+                      Hệ 10: {summary?.gpa10 !== null && summary?.gpa10 !== undefined ? summary.gpa10.toFixed(2) : '—'}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  Đây là điểm trung bình tích lũy chính thức được <b>Phòng Đào tạo Học viện xét duyệt và ghi nhận trong học bạ</b> (tính trên <b>{summary?.totalCreditsAccumulated || 0} tín chỉ đã chốt</b>). Học lực hiện tại của bạn được xếp loại: <b className="font-bold">{summary?.classification || 'Khá'}</b>.
+                </p>
+              </div>
+
+              {/* Item 2: GPA Dự kiến */}
+              <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-amber-900 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-700" />
+                    <span>GPA Dự Kiến (Toàn Bộ Môn Đã Thi Đạt):</span>
+                  </span>
+                  <div className="flex items-center gap-1.5 font-mono font-black text-xs">
+                    <span className="text-amber-800 bg-white px-2 py-0.5 rounded-lg border border-amber-300">
+                      Hệ 4: {summary?.gpa4Expected !== null && summary?.gpa4Expected !== undefined ? summary.gpa4Expected.toFixed(2) : summary?.gpa4?.toFixed(2) ?? '—'}
+                    </span>
+                    <span className="text-slate-700 bg-white px-2 py-0.5 rounded-lg border border-amber-300">
+                      Hệ 10: {summary?.gpa10Expected !== null && summary?.gpa10Expected !== undefined ? summary.gpa10Expected.toFixed(2) : summary?.gpa10?.toFixed(2) ?? '—'}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Điểm trung bình được tính trên <b>toàn bộ các môn học bạn đã có điểm thi Đạt</b> (kể cả các môn học kỳ gần nhất vừa công bố kết quả nhưng chưa được nhà trường khóa sổ vào đợt xét tiếp theo, tương ứng với <b>{summary?.totalCreditsAccumulatedExpected ?? summary?.totalCreditsAccumulated ?? 0} tín chỉ</b>).
+                </p>
+              </div>
+
+              {/* Item 3: Quy chuẩn xếp loại học lực */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-2">
+                <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Quy Chuẩn Xếp Loại Học Lực (PTIT):</span>
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2 rounded-xl bg-white border border-slate-200/80">
+                    <b className="text-emerald-700 block font-bold">• Xuất sắc:</b>
+                    <span className="text-slate-600 font-mono text-[11px]">GPA 3.60 - 4.00 (Hệ 10: ≥ 9.0)</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white border border-slate-200/80">
+                    <b className="text-teal-700 block font-bold">• Giỏi:</b>
+                    <span className="text-slate-600 font-mono text-[11px]">GPA 3.20 - 3.59 (Hệ 10: 8.0 - 8.9)</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white border border-slate-200/80">
+                    <b className="text-blue-700 block font-bold">• Khá:</b>
+                    <span className="text-slate-600 font-mono text-[11px]">GPA 2.50 - 3.19 (Hệ 10: 7.0 - 7.9)</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white border border-slate-200/80">
+                    <b className="text-amber-700 block font-bold">• Trung bình:</b>
+                    <span className="text-slate-600 font-mono text-[11px]">GPA 2.00 - 2.49 (Hệ 10: 5.5 - 6.9)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowGpaModal(false)}
               className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition cursor-pointer shadow-sm"
             >
               Đã hiểu

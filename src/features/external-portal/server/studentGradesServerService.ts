@@ -74,8 +74,10 @@ export interface GradeDistributionBucket {
 export interface AcademicTargetGoal {
   label: string; // "Bằng Khá", "Bằng Giỏi", "Bằng Xuất sắc"
   targetGpa4: number; // 2.5, 3.2, 3.6
+  targetGpa10?: number; // 7.0, 8.0, 9.0
   isAchievable: boolean;
   requiredGpaOnRemaining: number | null;
+  requiredGpa10OnRemaining?: number | null;
   status: 'ACHIEVED' | 'POSSIBLE' | 'CHALLENGING' | 'UNACHIEVABLE';
   note: string;
 }
@@ -91,6 +93,8 @@ export interface StudentGradesResult {
   summary: {
     gpa10: number | null;
     gpa4: number | null;
+    gpa10Expected?: number | null; // GPA hệ 10 dự kiến (toàn bộ môn Đạt + isCalculatedInGpa, kể cả chưa chốt)
+    gpa4Expected?: number | null;  // GPA hệ 4 dự kiến (toàn bộ môn Đạt + isCalculatedInGpa, kể cả chưa chốt)
     totalCreditsAccumulated: number; // Tín chỉ tích lũy chính thức (Đã chốt)
     totalCreditsAccumulatedExpected?: number; // Tín chỉ tích lũy dự kiến (Toàn bộ môn đạt tính vào GPA)
     totalPassedCredits: number; // Tổng tín chỉ các môn đã đạt
@@ -420,25 +424,31 @@ export function buildGradeResultFromRawData(
   // Tính toán Dự Báo Mục Tiêu Học Tập
   const remainingCredits = Math.max(0, curriculumTargetCredits - totalCreditsAccumulated);
   const targetGoals: AcademicTargetGoal[] = [
-    { label: 'Bằng Khá (GPA ≥ 2.50)', targetGpa4: 2.5, isAchievable: true, requiredGpaOnRemaining: null, status: 'ACHIEVED', note: '' },
-    { label: 'Bằng Giỏi (GPA ≥ 3.20)', targetGpa4: 3.2, isAchievable: true, requiredGpaOnRemaining: null, status: 'POSSIBLE', note: '' },
-    { label: 'Bằng Xuất Sắc (GPA ≥ 3.60)', targetGpa4: 3.6, isAchievable: true, requiredGpaOnRemaining: null, status: 'CHALLENGING', note: '' },
+    { label: 'Bằng Khá (GPA ≥ 2.50 / Hệ 10 ≥ 7.0)', targetGpa4: 2.5, targetGpa10: 7.0, isAchievable: true, requiredGpaOnRemaining: null, requiredGpa10OnRemaining: null, status: 'ACHIEVED', note: '' },
+    { label: 'Bằng Giỏi (GPA ≥ 3.20 / Hệ 10 ≥ 8.0)', targetGpa4: 3.2, targetGpa10: 8.0, isAchievable: true, requiredGpaOnRemaining: null, requiredGpa10OnRemaining: null, status: 'POSSIBLE', note: '' },
+    { label: 'Bằng Xuất Sắc (GPA ≥ 3.60 / Hệ 10 ≥ 9.0)', targetGpa4: 3.6, targetGpa10: 9.0, isAchievable: true, requiredGpaOnRemaining: null, requiredGpa10OnRemaining: null, status: 'CHALLENGING', note: '' },
   ];
 
   targetGoals.forEach((goal) => {
     if (gpa4 !== null) {
       if (gpa4 >= goal.targetGpa4) {
         goal.status = 'ACHIEVED';
-        goal.note = `Hiện tại bạn đã đạt mức điểm này (${gpa4.toFixed(2)} / ${goal.targetGpa4.toFixed(2)}). Tiếp tục duy trì phong độ!`;
+        goal.note = `Hiện tại bạn đã đạt mức điểm này (GPA ${gpa4.toFixed(2)} / ${goal.targetGpa4.toFixed(2)}${gpa10 !== null ? ` • Hệ 10: ${gpa10.toFixed(2)}` : ''}). Tiếp tục duy trì phong độ!`;
       } else if (remainingCredits > 0) {
         const totalTargetCredits = totalCreditsAccumulated + remainingCredits;
         const requiredGpa = (goal.targetGpa4 * totalTargetCredits - gpa4 * totalCreditsAccumulated) / remainingCredits;
         goal.requiredGpaOnRemaining = Math.round(requiredGpa * 100) / 100;
 
+        if (goal.targetGpa10 && gpa10 !== null) {
+          const requiredGpa10 = (goal.targetGpa10 * totalTargetCredits - gpa10 * totalCreditsAccumulated) / remainingCredits;
+          goal.requiredGpa10OnRemaining = Math.round(requiredGpa10 * 100) / 100;
+        }
+
         if (requiredGpa <= 4.0 && requiredGpa > 0) {
           goal.isAchievable = true;
           goal.status = requiredGpa <= 3.4 ? 'POSSIBLE' : 'CHALLENGING';
-          goal.note = `Cần đạt trung bình GPA ${goal.requiredGpaOnRemaining.toFixed(2)} cho ${remainingCredits} tín chỉ còn lại để đạt danh hiệu này.`;
+          const gpa10Str = goal.requiredGpa10OnRemaining !== null && goal.requiredGpa10OnRemaining !== undefined ? ` • Hệ 10: ${goal.requiredGpa10OnRemaining.toFixed(2)}` : '';
+          goal.note = `Cần đạt trung bình GPA ${goal.requiredGpaOnRemaining.toFixed(2)}${gpa10Str} cho ${remainingCredits} tín chỉ còn lại để đạt danh hiệu này.`;
         } else {
           goal.isAchievable = false;
           goal.status = 'UNACHIEVABLE';
@@ -459,6 +469,8 @@ export function buildGradeResultFromRawData(
     summary: {
       gpa10,
       gpa4,
+      gpa10Expected: fallbackCumGpa10,
+      gpa4Expected: fallbackCumGpa4,
       totalCreditsAccumulated,
       totalPassedCredits,
       totalCreditsRegistered,
