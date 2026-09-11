@@ -146,8 +146,8 @@ export default function StudentGradesView({
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showGpaModal, setShowGpaModal] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
-  const [gpaScaleView, setGpaScaleView] = useState<'scale4' | 'scale10' | 'both'>('scale4');
-  const [gpaModeView, setGpaModeView] = useState<'OFFICIAL' | 'EXPECTED' | 'BOTH'>('OFFICIAL');
+  const [gpaScaleView, setGpaScaleView] = useState<'scale4' | 'scale10' | 'both'>('both');
+  const [gpaModeView, setGpaModeView] = useState<'OFFICIAL' | 'EXPECTED' | 'BOTH'>('BOTH');
 
   // Sync filters to URL query params
   useEffect(() => {
@@ -1300,26 +1300,36 @@ export default function StudentGradesView({
                           <div className="flex items-end gap-1.5 sm:gap-2 h-[130px]">
                             {/* Semester GPA Bar */}
                             <div className="flex flex-col items-center gap-1">
-                              <span className="text-[10px] font-mono font-bold text-indigo-700">
+                              <span className="text-[10px] font-mono font-bold text-indigo-700 text-center leading-tight">
                                 {semDisplay !== null && semDisplay !== undefined ? semDisplay.toFixed(2) : ''}
+                                {gpaScaleView === 'both' && prog.gpa10 !== null && (
+                                  <span className="block text-[8px] font-normal text-slate-500 font-sans">
+                                    ({prog.gpa10.toFixed(1)})
+                                  </span>
+                                )}
                               </span>
                               <div
                                 className="w-6 sm:w-10 bg-indigo-600 rounded-t-xl transition-all duration-500 shadow-sm"
                                 style={{ height: `${semHeight}px` }}
-                                title={`GPA Kỳ: ${semDisplay?.toFixed(2) ?? '—'}`}
+                                title={`GPA Kỳ: ${prog.gpa4?.toFixed(2) ?? '—'} / 4.0 (Hệ 10: ${prog.gpa10?.toFixed(2) ?? '—'})`}
                               />
                             </div>
 
                             {/* Cumulative Official Bar */}
                             {gpaModeView !== 'EXPECTED' && (
                               <div className="flex flex-col items-center gap-1">
-                                <span className="text-[10px] font-mono font-bold text-emerald-700">
+                                <span className="text-[10px] font-mono font-bold text-emerald-700 text-center leading-tight">
                                   {cumOffDisplay !== null && cumOffDisplay !== undefined ? cumOffDisplay.toFixed(2) : ''}
+                                  {gpaScaleView === 'both' && prog.gpaCumulative10 !== null && (
+                                    <span className="block text-[8px] font-normal text-slate-500 font-sans">
+                                      ({prog.gpaCumulative10.toFixed(1)})
+                                    </span>
+                                  )}
                                 </span>
                                 <div
                                   className="w-6 sm:w-10 bg-emerald-500 rounded-t-xl transition-all duration-500 shadow-sm"
                                   style={{ height: `${cumOffHeight}px` }}
-                                  title={`GPA Tích Lũy Đã Chốt: ${cumOffDisplay?.toFixed(2) ?? '—'}`}
+                                  title={`GPA Tích Lũy Đã Chốt: ${prog.gpaCumulative4?.toFixed(2) ?? '—'} / 4.0 (Hệ 10: ${prog.gpaCumulative10?.toFixed(2) ?? '—'})`}
                                 />
                               </div>
                             )}
@@ -1327,13 +1337,18 @@ export default function StudentGradesView({
                             {/* Cumulative Expected Bar */}
                             {gpaModeView !== 'OFFICIAL' && (
                               <div className="flex flex-col items-center gap-1">
-                                <span className="text-[10px] font-mono font-bold text-amber-700">
+                                <span className="text-[10px] font-mono font-bold text-amber-700 text-center leading-tight">
                                   {cumExpDisplay !== null && cumExpDisplay !== undefined ? cumExpDisplay.toFixed(2) : ''}
+                                  {gpaScaleView === 'both' && (prog.gpaCumulativeExpected10 ?? prog.gpaCumulative10) !== null && (
+                                    <span className="block text-[8px] font-normal text-slate-500 font-sans">
+                                      ({(prog.gpaCumulativeExpected10 ?? prog.gpaCumulative10)?.toFixed(1)})
+                                    </span>
+                                  )}
                                 </span>
                                 <div
                                   className="w-6 sm:w-10 bg-amber-500 rounded-t-xl transition-all duration-500 shadow-sm"
                                   style={{ height: `${cumExpHeight}px` }}
-                                  title={`GPA Tích Lũy Dự Kiến: ${cumExpDisplay?.toFixed(2) ?? '—'}`}
+                                  title={`GPA Tích Lũy Dự Kiến: ${(prog.gpaCumulativeExpected4 ?? prog.gpaCumulative4)?.toFixed(2) ?? '—'} / 4.0 (Hệ 10: ${(prog.gpaCumulativeExpected10 ?? prog.gpaCumulative10)?.toFixed(2) ?? '—'})`}
                                 />
                               </div>
                             )}
