@@ -334,7 +334,14 @@ async function processNextQueueItem() {
 
       // 1. Rate limited by Telegram (HTTP 429 Too Many Requests)
       if (errorCode === 429 || typeof retryAfter === 'number' || rawDesc.toLowerCase().includes('too many requests')) {
-        const pauseSeconds = Math.max(retryAfter || 5, 2);
+        let pauseSeconds = typeof retryAfter === 'number' ? retryAfter : 0;
+        if (!pauseSeconds) {
+          const match = rawDesc.match(/retry after (\d+)/i);
+          if (match && match[1]) {
+            pauseSeconds = parseInt(match[1], 10);
+          }
+        }
+        pauseSeconds = Math.max(pauseSeconds || 5, 2);
         const pauseMs = pauseSeconds * 1000 + 500;
 
         state.rateLimitPauses++;
@@ -390,7 +397,11 @@ async function processNextQueueItem() {
             durationMs,
             completedAt,
           });
-          item.resolve?.(result);
+          item.resolve?.({
+            ...result,
+            error: `Rate limit 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
+          });
+          return;
         }
       } else {
         // 2. Other errors: check if transient/retryable
@@ -470,12 +481,23 @@ async function processNextQueueItem() {
         (err.message.includes('429') || err.message.toLowerCase().includes('too many requests')));
 
     if (isErr429) {
+      let pauseSeconds = 5;
+      const match = typeof err?.message === 'string' ? err.message.match(/retry after (\d+)/i) : null;
+      if (match && match[1]) {
+        pauseSeconds = Math.max(parseInt(match[1], 10), 2);
+      }
+      const pauseMs = pauseSeconds * 1000 + 500;
+
+      state.rateLimitPauses++;
+      state.globalRateLimitedUntil = Date.now() + pauseMs;
+      state.perChatRateLimitedUntil.set(item.chatId, Date.now() + pauseMs);
+
       const current429Retries = item.retryCount429 || 0;
       if (current429Retries < MAX_QUEUE_RETRIES_429) {
         item.retryCount429 = current429Retries + 1;
         item.attempts++;
         item.status = 'PENDING';
-        item.scheduledFor = Date.now() + 5000;
+        item.scheduledFor = Date.now() + pauseMs;
         insertItemByPriority(state.queue, item);
 
         recordHistory({
@@ -488,12 +510,35 @@ async function processNextQueueItem() {
           attempts: item.attempts,
           textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
           filename: item.filename,
-          error: `Ngoại lệ 429: ${err.message || 'Too Many Requests'} (Thử lại lần ${item.retryCount429}/${MAX_QUEUE_RETRIES_429})`,
+          error: `Ngoại lệ 429: ${err.message || 'Too Many Requests'} (Tạm dừng ${pauseSeconds}s, thử lại lần ${item.retryCount429}/${MAX_QUEUE_RETRIES_429})`,
           durationMs,
           completedAt,
         });
 
-        triggerWorker(5000);
+        triggerWorker(pauseMs + 50);
+        return;
+      } else {
+        state.failedCount++;
+        item.status = 'FAILED';
+        recordHistory({
+          id: item.id,
+          type: item.type,
+          chatId: item.chatId,
+          threadId: item.options?.threadId,
+          priority: item.priority,
+          status: 'FAILED',
+          attempts: item.attempts + 1,
+          textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
+          filename: item.filename,
+          error: `Ngoại lệ 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
+          durationMs,
+          completedAt,
+        });
+
+        item.resolve?.({
+          success: false,
+          error: `Lỗi 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
+        });
         return;
       }
     }
