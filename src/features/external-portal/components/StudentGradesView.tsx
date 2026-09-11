@@ -146,7 +146,8 @@ export default function StudentGradesView({
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showGpaModal, setShowGpaModal] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
-  const [gpaScaleView, setGpaScaleView] = useState<'scale4' | 'scale10'>('scale4');
+  const [gpaScaleView, setGpaScaleView] = useState<'scale4' | 'scale10' | 'both'>('scale4');
+  const [gpaModeView, setGpaModeView] = useState<'OFFICIAL' | 'EXPECTED' | 'BOTH'>('OFFICIAL');
 
   // Sync filters to URL query params
   useEffect(() => {
@@ -938,50 +939,111 @@ export default function StudentGradesView({
             {/* TAB 1: GPA PROGRESSION CHART / TIMELINE */}
             {activeAnalyticsTab === 'PROGRESSION' && (
               <div className="flex flex-col gap-6">
-                {/* Scale View Toggle Bar */}
-                <div className="flex items-center justify-between gap-3 flex-wrap bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-700">Thang Điểm Xem:</span>
-                    <div className="bg-slate-200/80 p-0.5 rounded-xl flex items-center text-xs font-bold">
-                      <button
-                        type="button"
-                        onClick={() => setGpaScaleView('scale4')}
-                        className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                          gpaScaleView === 'scale4'
-                            ? 'bg-white text-indigo-700 shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Thang 4.0
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setGpaScaleView('scale10')}
-                        className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                          gpaScaleView === 'scale10'
-                            ? 'bg-white text-indigo-700 shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Thang 10.0
-                      </button>
+                {/* Scale & Mode View Controls Bar */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-200">
+                  <div className="flex items-center gap-3.5 flex-wrap">
+                    {/* Thang Điểm */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-700">Thang Điểm:</span>
+                      <div className="bg-slate-200/80 p-0.5 rounded-xl flex items-center text-xs font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setGpaScaleView('scale4')}
+                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                            gpaScaleView === 'scale4'
+                              ? 'bg-white text-indigo-700 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Hệ 4.0
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGpaScaleView('scale10')}
+                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                            gpaScaleView === 'scale10'
+                              ? 'bg-white text-indigo-700 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Hệ 10.0
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGpaScaleView('both')}
+                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                            gpaScaleView === 'both'
+                              ? 'bg-white text-indigo-700 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Cả Hai (Song Song)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Chế Độ Điểm: Đã Chốt vs Dự Kiến vs So Sánh */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-700">Chế Độ Điểm:</span>
+                      <div className="bg-slate-200/80 p-0.5 rounded-xl flex items-center text-xs font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setGpaModeView('OFFICIAL')}
+                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                            gpaModeView === 'OFFICIAL'
+                              ? 'bg-white text-emerald-700 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <Lock className="w-3 h-3 text-emerald-600" />
+                          <span>Đã Chốt</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGpaModeView('EXPECTED')}
+                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                            gpaModeView === 'EXPECTED'
+                              ? 'bg-white text-amber-700 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <Clock className="w-3 h-3 text-amber-600" />
+                          <span>Dự Kiến</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGpaModeView('BOTH')}
+                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                            gpaModeView === 'BOTH'
+                              ? 'bg-white text-indigo-700 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>So Sánh Cả Hai</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="text-xs text-slate-500 font-medium">
-                    Đang hiển thị biểu đồ & thẻ kỳ học theo: <b className="text-indigo-600 font-bold">{gpaScaleView === 'scale4' ? 'Hệ 4.0 (Tín chỉ chuẩn)' : 'Hệ 10.0'}</b>
+                  <div className="text-[11px] text-slate-500 font-medium self-end md:self-auto">
+                    Hiển thị: <b className="text-indigo-600 font-bold">{gpaScaleView === 'scale4' ? 'Hệ 4.0' : gpaScaleView === 'scale10' ? 'Hệ 10.0' : 'Hệ 4 & 10'}</b> • <b className={gpaModeView === 'OFFICIAL' ? 'text-emerald-700' : gpaModeView === 'EXPECTED' ? 'text-amber-700' : 'text-indigo-700'}>{gpaModeView === 'OFFICIAL' ? 'Chính thức đã chốt' : gpaModeView === 'EXPECTED' ? 'Toàn bộ dự kiến đạt' : 'So sánh Đã chốt & Dự kiến'}</b>
                   </div>
                 </div>
 
+                {/* Semester Cards Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {data?.gpaProgression.map((prog, idx) => {
                     const isCurrent = idx === data.gpaProgression.length - 1;
-                    const semPrimary = gpaScaleView === 'scale4' ? prog.gpa4 : prog.gpa10;
-                    const cumPrimary = gpaScaleView === 'scale4' ? prog.gpaCumulative4 : prog.gpaCumulative10;
-                    const semSecondary = gpaScaleView === 'scale4' ? prog.gpa10 : prog.gpa4;
-                    const cumSecondary = gpaScaleView === 'scale4' ? prog.gpaCumulative10 : prog.gpaCumulative4;
-                    const scaleSuffix = gpaScaleView === 'scale4' ? '/ 4.0' : '/ 10.0';
-                    const secondaryLabel = gpaScaleView === 'scale4' ? 'Hệ 10' : 'Hệ 4';
+
+                    // GPA Học Kỳ
+                    const semGpa4 = prog.gpa4;
+                    const semGpa10 = prog.gpa10;
+
+                    // GPA Tích Lũy: Đã chốt vs Dự kiến
+                    const cumOfficial4 = prog.gpaCumulative4;
+                    const cumOfficial10 = prog.gpaCumulative10;
+                    const cumExpected4 = prog.gpaCumulativeExpected4 ?? prog.gpaCumulative4;
+                    const cumExpected10 = prog.gpaCumulativeExpected10 ?? prog.gpaCumulative10;
 
                     return (
                       <div
@@ -998,29 +1060,164 @@ export default function StudentGradesView({
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 my-3">
-                          <div className="bg-white p-2.5 rounded-xl border border-slate-200/80">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold block">GPA Học Kỳ</span>
-                            <div className="text-lg font-black font-mono text-indigo-600 mt-0.5">
-                              {semPrimary !== null && semPrimary !== undefined ? semPrimary.toFixed(2) : '—'}
-                              <span className="text-[10px] font-normal text-slate-400 ml-1">{scaleSuffix}</span>
+                          {/* Col 1: GPA Học Kỳ */}
+                          <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 flex flex-col justify-between">
+                            <div>
+                              <span className="text-[10px] text-slate-400 uppercase font-bold block">GPA Học Kỳ</span>
+                              {gpaScaleView === 'scale4' ? (
+                                <>
+                                  <div className="text-lg font-black font-mono text-indigo-600 mt-0.5">
+                                    {semGpa4 !== null && semGpa4 !== undefined ? semGpa4.toFixed(2) : '—'}
+                                    <span className="text-[10px] font-normal text-slate-400 ml-1">/ 4.0</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                                    Hệ 10: {semGpa10 !== null && semGpa10 !== undefined ? semGpa10.toFixed(2) : '—'}
+                                  </span>
+                                </>
+                              ) : gpaScaleView === 'scale10' ? (
+                                <>
+                                  <div className="text-lg font-black font-mono text-indigo-600 mt-0.5">
+                                    {semGpa10 !== null && semGpa10 !== undefined ? semGpa10.toFixed(2) : '—'}
+                                    <span className="text-[10px] font-normal text-slate-400 ml-1">/ 10.0</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                                    Hệ 4: {semGpa4 !== null && semGpa4 !== undefined ? semGpa4.toFixed(2) : '—'}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="text-base font-black font-mono text-indigo-600 mt-0.5">
+                                    {semGpa4 !== null && semGpa4 !== undefined ? semGpa4.toFixed(2) : '—'}
+                                    <span className="text-[9px] font-normal text-slate-400 ml-0.5">/ 4</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-700 font-mono font-bold block mt-0.5">
+                                    Hệ 10: {semGpa10 !== null && semGpa10 !== undefined ? semGpa10.toFixed(2) : '—'}
+                                  </span>
+                                </>
+                              )}
                             </div>
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              {secondaryLabel}: {semSecondary !== null && semSecondary !== undefined ? semSecondary.toFixed(2) : '—'}
-                            </span>
+                            <span className="text-[9px] text-slate-400 mt-1">Điểm kỳ này</span>
                           </div>
 
-                          <div className="bg-white p-2.5 rounded-xl border border-slate-200/80">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold block">GPA Tích Lũy</span>
-                            <div className="text-lg font-black font-mono text-emerald-600 mt-0.5">
-                              {cumPrimary !== null && cumPrimary !== undefined ? cumPrimary.toFixed(2) : '—'}
-                              <span className="text-[10px] font-normal text-slate-400 ml-1">{scaleSuffix}</span>
+                          {/* Col 2: GPA Tích Lũy (Chốt / Dự kiến / So sánh) */}
+                          <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-slate-400 uppercase font-bold block">GPA Tích Lũy</span>
+                                {gpaModeView === 'OFFICIAL' ? (
+                                  <span className="text-[9px] font-bold text-emerald-700 flex items-center gap-0.5">
+                                    <Lock className="w-2.5 h-2.5" /> Chốt
+                                  </span>
+                                ) : gpaModeView === 'EXPECTED' ? (
+                                  <span className="text-[9px] font-bold text-amber-700 flex items-center gap-0.5">
+                                    <Clock className="w-2.5 h-2.5" /> Dự kiến
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-bold text-indigo-600">Đã chốt & DK</span>
+                                )}
+                              </div>
+
+                              {gpaModeView === 'OFFICIAL' ? (
+                                gpaScaleView === 'scale4' ? (
+                                  <>
+                                    <div className="text-lg font-black font-mono text-emerald-600 mt-0.5">
+                                      {cumOfficial4 !== null && cumOfficial4 !== undefined ? cumOfficial4.toFixed(2) : '—'}
+                                      <span className="text-[10px] font-normal text-slate-400 ml-1">/ 4.0</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                                      Hệ 10: {cumOfficial10 !== null && cumOfficial10 !== undefined ? cumOfficial10.toFixed(2) : '—'}
+                                    </span>
+                                  </>
+                                ) : gpaScaleView === 'scale10' ? (
+                                  <>
+                                    <div className="text-lg font-black font-mono text-emerald-600 mt-0.5">
+                                      {cumOfficial10 !== null && cumOfficial10 !== undefined ? cumOfficial10.toFixed(2) : '—'}
+                                      <span className="text-[10px] font-normal text-slate-400 ml-1">/ 10.0</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                                      Hệ 4: {cumOfficial4 !== null && cumOfficial4 !== undefined ? cumOfficial4.toFixed(2) : '—'}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="text-base font-black font-mono text-emerald-600 mt-0.5">
+                                      {cumOfficial4 !== null && cumOfficial4 !== undefined ? cumOfficial4.toFixed(2) : '—'}
+                                      <span className="text-[9px] font-normal text-slate-400 ml-0.5">/ 4</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-700 font-mono font-bold block mt-0.5">
+                                      Hệ 10: {cumOfficial10 !== null && cumOfficial10 !== undefined ? cumOfficial10.toFixed(2) : '—'}
+                                    </span>
+                                  </>
+                                )
+                              ) : gpaModeView === 'EXPECTED' ? (
+                                gpaScaleView === 'scale4' ? (
+                                  <>
+                                    <div className="text-lg font-black font-mono text-amber-600 mt-0.5">
+                                      {cumExpected4 !== null && cumExpected4 !== undefined ? cumExpected4.toFixed(2) : '—'}
+                                      <span className="text-[10px] font-normal text-slate-400 ml-1">/ 4.0</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                                      Hệ 10: {cumExpected10 !== null && cumExpected10 !== undefined ? cumExpected10.toFixed(2) : '—'}
+                                    </span>
+                                  </>
+                                ) : gpaScaleView === 'scale10' ? (
+                                  <>
+                                    <div className="text-lg font-black font-mono text-amber-600 mt-0.5">
+                                      {cumExpected10 !== null && cumExpected10 !== undefined ? cumExpected10.toFixed(2) : '—'}
+                                      <span className="text-[10px] font-normal text-slate-400 ml-1">/ 10.0</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                                      Hệ 4: {cumExpected4 !== null && cumExpected4 !== undefined ? cumExpected4.toFixed(2) : '—'}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="text-base font-black font-mono text-amber-600 mt-0.5">
+                                      {cumExpected4 !== null && cumExpected4 !== undefined ? cumExpected4.toFixed(2) : '—'}
+                                      <span className="text-[9px] font-normal text-slate-400 ml-0.5">/ 4</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-700 font-mono font-bold block mt-0.5">
+                                      Hệ 10: {cumExpected10 !== null && cumExpected10 !== undefined ? cumExpected10.toFixed(2) : '—'}
+                                    </span>
+                                  </>
+                                )
+                              ) : (
+                                /* BOTH: So sánh Đã chốt vs Dự kiến */
+                                <div className="mt-1 space-y-1 text-xs">
+                                  <div className="flex items-baseline justify-between">
+                                    <span className="text-[10px] text-emerald-800 font-bold flex items-center gap-0.5">
+                                      <Lock className="w-2.5 h-2.5 text-emerald-600" /> Chốt:
+                                    </span>
+                                    <span className="font-mono font-black text-emerald-700">
+                                      {gpaScaleView === 'scale10'
+                                        ? (cumOfficial10 !== null && cumOfficial10 !== undefined ? cumOfficial10.toFixed(2) : '—')
+                                        : (cumOfficial4 !== null && cumOfficial4 !== undefined ? cumOfficial4.toFixed(2) : '—')}
+                                      {gpaScaleView === 'both' && (
+                                        <span className="text-[10px] font-normal text-slate-500 ml-1">({cumOfficial10?.toFixed(2) ?? '—'})</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-baseline justify-between pt-1 border-t border-dashed border-slate-200">
+                                    <span className="text-[10px] text-amber-800 font-bold flex items-center gap-0.5">
+                                      <Clock className="w-2.5 h-2.5 text-amber-600" /> Dự kiến:
+                                    </span>
+                                    <span className="font-mono font-black text-amber-700">
+                                      {gpaScaleView === 'scale10'
+                                        ? (cumExpected10 !== null && cumExpected10 !== undefined ? cumExpected10.toFixed(2) : '—')
+                                        : (cumExpected4 !== null && cumExpected4 !== undefined ? cumExpected4.toFixed(2) : '—')}
+                                      {gpaScaleView === 'both' && (
+                                        <span className="text-[10px] font-normal text-slate-500 ml-1">({cumExpected10?.toFixed(2) ?? '—'})</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              {secondaryLabel}: {cumSecondary !== null && cumSecondary !== undefined ? cumSecondary.toFixed(2) : '—'}
-                            </span>
+                            <span className="text-[9px] text-slate-400 mt-1">Lũy kế đến kỳ này</span>
                           </div>
                         </div>
 
+                        {/* Credits Strip */}
                         <div className="flex flex-col gap-1 text-xs text-slate-600 pt-2.5 border-t border-slate-200/60">
                           <div className="flex items-center justify-between">
                             <span className="flex items-center gap-1 text-emerald-800 font-bold">
@@ -1062,48 +1259,84 @@ export default function StudentGradesView({
                 <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex flex-col gap-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Biểu Đồ Tương Quan GPA Qua Từng Kỳ ({gpaScaleView === 'scale4' ? 'Thang 4.0' : 'Thang 10.0'})
+                      Biểu Đồ Tương Quan GPA Qua Từng Kỳ ({gpaScaleView === 'scale4' ? 'Thang 4.0' : gpaScaleView === 'scale10' ? 'Thang 10.0' : 'Hệ 4.0 & 10.0'} • {gpaModeView === 'OFFICIAL' ? 'Đã Chốt' : gpaModeView === 'EXPECTED' ? 'Dự Kiến' : 'So Sánh Cả Hai'})
                     </span>
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center gap-3 text-xs flex-wrap">
                       <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-indigo-600" /> GPA Kỳ</div>
-                      <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-emerald-500" /> GPA Tích Lũy</div>
+                      {gpaModeView !== 'EXPECTED' && (
+                        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-emerald-500" /> GPA TL Đã Chốt</div>
+                      )}
+                      {gpaModeView !== 'OFFICIAL' && (
+                        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-amber-500" /> GPA TL Dự Kiến</div>
+                      )}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-6 pt-6 pb-2 items-end min-h-[160px]">
                     {data?.gpaProgression.map((prog) => {
-                      const maxScale = gpaScaleView === 'scale4' ? 4.0 : 10.0;
-                      const semVal = gpaScaleView === 'scale4' ? (prog.gpa4 ?? 0) : (prog.gpa10 ?? 0);
-                      const cumVal = gpaScaleView === 'scale4' ? (prog.gpaCumulative4 ?? 0) : (prog.gpaCumulative10 ?? 0);
-                      const semDisplay = gpaScaleView === 'scale4' ? prog.gpa4 : prog.gpa10;
-                      const cumDisplay = gpaScaleView === 'scale4' ? prog.gpaCumulative4 : prog.gpaCumulative10;
+                      const maxScale = gpaScaleView === 'scale10' ? 10.0 : 4.0;
+
+                      // Kỳ
+                      const semVal = gpaScaleView === 'scale10' ? (prog.gpa10 ?? 0) : (prog.gpa4 ?? 0);
+                      const semDisplay = gpaScaleView === 'scale10' ? prog.gpa10 : prog.gpa4;
                       const semHeight = Math.max(10, (semVal / maxScale) * 120);
-                      const cumHeight = Math.max(10, (cumVal / maxScale) * 120);
+
+                      // TL Đã chốt
+                      const cumOffVal = gpaScaleView === 'scale10' ? (prog.gpaCumulative10 ?? 0) : (prog.gpaCumulative4 ?? 0);
+                      const cumOffDisplay = gpaScaleView === 'scale10' ? prog.gpaCumulative10 : prog.gpaCumulative4;
+                      const cumOffHeight = Math.max(10, (cumOffVal / maxScale) * 120);
+
+                      // TL Dự kiến
+                      const cumExpVal = gpaScaleView === 'scale10'
+                        ? (prog.gpaCumulativeExpected10 ?? prog.gpaCumulative10 ?? 0)
+                        : (prog.gpaCumulativeExpected4 ?? prog.gpaCumulative4 ?? 0);
+                      const cumExpDisplay = gpaScaleView === 'scale10'
+                        ? (prog.gpaCumulativeExpected10 ?? prog.gpaCumulative10)
+                        : (prog.gpaCumulativeExpected4 ?? prog.gpaCumulative4);
+                      const cumExpHeight = Math.max(10, (cumExpVal / maxScale) * 120);
 
                       return (
                         <div key={prog.semesterId} className="flex flex-col items-center gap-2">
-                          <div className="flex items-end gap-2 h-[130px]">
+                          <div className="flex items-end gap-1.5 sm:gap-2 h-[130px]">
                             {/* Semester GPA Bar */}
                             <div className="flex flex-col items-center gap-1">
                               <span className="text-[10px] font-mono font-bold text-indigo-700">
                                 {semDisplay !== null && semDisplay !== undefined ? semDisplay.toFixed(2) : ''}
                               </span>
                               <div
-                                className="w-8 sm:w-12 bg-indigo-600 rounded-t-xl transition-all duration-500 shadow-sm"
+                                className="w-6 sm:w-10 bg-indigo-600 rounded-t-xl transition-all duration-500 shadow-sm"
                                 style={{ height: `${semHeight}px` }}
+                                title={`GPA Kỳ: ${semDisplay?.toFixed(2) ?? '—'}`}
                               />
                             </div>
 
-                            {/* Cumulative GPA Bar */}
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="text-[10px] font-mono font-bold text-emerald-700">
-                                {cumDisplay !== null && cumDisplay !== undefined ? cumDisplay.toFixed(2) : ''}
-                              </span>
-                              <div
-                                className="w-8 sm:w-12 bg-emerald-500 rounded-t-xl transition-all duration-500 shadow-sm"
-                                style={{ height: `${cumHeight}px` }}
-                              />
-                            </div>
+                            {/* Cumulative Official Bar */}
+                            {gpaModeView !== 'EXPECTED' && (
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="text-[10px] font-mono font-bold text-emerald-700">
+                                  {cumOffDisplay !== null && cumOffDisplay !== undefined ? cumOffDisplay.toFixed(2) : ''}
+                                </span>
+                                <div
+                                  className="w-6 sm:w-10 bg-emerald-500 rounded-t-xl transition-all duration-500 shadow-sm"
+                                  style={{ height: `${cumOffHeight}px` }}
+                                  title={`GPA Tích Lũy Đã Chốt: ${cumOffDisplay?.toFixed(2) ?? '—'}`}
+                                />
+                              </div>
+                            )}
+
+                            {/* Cumulative Expected Bar */}
+                            {gpaModeView !== 'OFFICIAL' && (
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="text-[10px] font-mono font-bold text-amber-700">
+                                  {cumExpDisplay !== null && cumExpDisplay !== undefined ? cumExpDisplay.toFixed(2) : ''}
+                                </span>
+                                <div
+                                  className="w-6 sm:w-10 bg-amber-500 rounded-t-xl transition-all duration-500 shadow-sm"
+                                  style={{ height: `${cumExpHeight}px` }}
+                                  title={`GPA Tích Lũy Dự Kiến: ${cumExpDisplay?.toFixed(2) ?? '—'}`}
+                                />
+                              </div>
+                            )}
                           </div>
                           <span className="text-[11px] font-bold text-slate-700 text-center truncate max-w-[120px]">
                             {prog.semesterId}

@@ -446,8 +446,10 @@ export function buildSlinkGradeResultFromRawData(
     a.semesterId.localeCompare(b.semesterId, undefined, { numeric: true })
   );
 
-  // Tín chỉ tích lũy dự kiến lũy kế qua từng kỳ (tính tất cả các môn Đạt & isCalculatedInGpa)
+  // Tín chỉ và GPA tích lũy dự kiến lũy kế qua từng kỳ (tính tất cả các môn Đạt & isCalculatedInGpa)
   let runningCumulativeExpectedCredits = 0;
+  const runningPassedCourses: StudentCourseGrade[] = [];
+
   for (const s of progressionSemesters) {
     const semAccExpectedCredits = s.courses
       .filter((c) => c.isPassed === true && c.isCalculatedInGpa)
@@ -459,6 +461,22 @@ export function buildSlinkGradeResultFromRawData(
     if (!s.creditsCumulative || s.creditsCumulative === 0) {
       s.creditsCumulative = s.creditsAccumulatedCumulativeOfficial || runningCumulativeExpectedCredits;
     }
+
+    const semPassed = s.courses.filter(
+      (c) => c.isPassed === true && c.isCalculatedInGpa && c.credits > 0 && c.finalScore4 !== null
+    );
+    runningPassedCourses.push(...semPassed);
+
+    const totalRunCreds = runningPassedCourses.reduce((sum, c) => sum + c.credits, 0);
+    const runGpa4 = totalRunCreds > 0
+      ? Math.round((runningPassedCourses.reduce((sum, c) => sum + (c.finalScore4 || 0) * c.credits, 0) / totalRunCreds) * 100) / 100
+      : null;
+    const runGpa10 = totalRunCreds > 0
+      ? Math.round((runningPassedCourses.reduce((sum, c) => sum + (c.finalScore10 || 0) * c.credits, 0) / totalRunCreds) * 100) / 100
+      : null;
+
+    s.gpa4CumulativeExpected = runGpa4;
+    s.gpa10CumulativeExpected = runGpa10;
   }
 
   const gpaProgression: GpaTrendItem[] = progressionSemesters.map((s) => ({
@@ -468,6 +486,8 @@ export function buildSlinkGradeResultFromRawData(
     gpa4: s.gpa4Semester,
     gpaCumulative10: s.gpa10Cumulative,
     gpaCumulative4: s.gpa4Cumulative,
+    gpaCumulativeExpected10: s.gpa10CumulativeExpected ?? s.gpa10Cumulative,
+    gpaCumulativeExpected4: s.gpa4CumulativeExpected ?? s.gpa4Cumulative,
     creditsSemester: s.creditsPassedSemester,
     creditsAccumulatedSemester: s.creditsAccumulatedSemester,
     creditsPendingSemester: s.creditsPendingSemester,

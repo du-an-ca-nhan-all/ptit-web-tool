@@ -35,6 +35,8 @@ export interface SemesterGradeSummary {
   gpa4Semester: number | null;
   gpa10Cumulative: number | null;
   gpa4Cumulative: number | null;
+  gpa10CumulativeExpected?: number | null; // GPA tích lũy dự kiến hệ 10
+  gpa4CumulativeExpected?: number | null;  // GPA tích lũy dự kiến hệ 4
   creditsPassedSemester: number; // Tổng số tín chỉ môn đạt trong kỳ
   creditsCumulative: number; // Tín chỉ tích lũy lũy kế
   creditsAccumulatedSemester?: number; // Tín chỉ đã chốt chính thức trong kỳ
@@ -55,6 +57,8 @@ export interface GpaTrendItem {
   gpa4: number | null;
   gpaCumulative10: number | null;
   gpaCumulative4: number | null;
+  gpaCumulativeExpected10?: number | null; // GPA tích lũy dự kiến hệ 10
+  gpaCumulativeExpected4?: number | null;  // GPA tích lũy dự kiến hệ 4
   creditsSemester: number;
   creditsAccumulatedSemester?: number;
   creditsPendingSemester?: number;
@@ -327,8 +331,10 @@ export function buildGradeResultFromRawData(
     a.semesterId.localeCompare(b.semesterId, undefined, { numeric: true })
   );
 
-  // Tín chỉ tích lũy qua từng kỳ: chỉ tính môn Đạt và isCalculatedInGpa
+  // Tín chỉ và GPA tích lũy dự kiến qua từng kỳ: chỉ tính môn Đạt và isCalculatedInGpa
   let runningCumulativeCredits = 0;
+  const runningPassedCourses: StudentCourseGrade[] = [];
+
   for (const s of progressionSemesters) {
     const semAccCredits = s.courses
       .filter((c) => c.isPassed === true && c.isCalculatedInGpa)
@@ -336,6 +342,22 @@ export function buildGradeResultFromRawData(
     runningCumulativeCredits += semAccCredits;
     s.creditsCumulative = runningCumulativeCredits;
     s.creditsAccumulatedCumulativeExpected = runningCumulativeCredits;
+
+    const semPassedGpa = s.courses.filter(
+      (c) => c.isPassed === true && c.isCalculatedInGpa && c.credits > 0 && c.finalScore4 !== null
+    );
+    runningPassedCourses.push(...semPassedGpa);
+
+    const totalRunCreds = runningPassedCourses.reduce((sum, c) => sum + c.credits, 0);
+    const runGpa4 = totalRunCreds > 0
+      ? Math.round((runningPassedCourses.reduce((sum, c) => sum + (c.finalScore4 || 0) * c.credits, 0) / totalRunCreds) * 100) / 100
+      : null;
+    const runGpa10 = totalRunCreds > 0
+      ? Math.round((runningPassedCourses.reduce((sum, c) => sum + (c.finalScore10 || 0) * c.credits, 0) / totalRunCreds) * 100) / 100
+      : null;
+
+    s.gpa4CumulativeExpected = runGpa4;
+    s.gpa10CumulativeExpected = runGpa10;
   }
 
   const gpaProgression: GpaTrendItem[] = progressionSemesters.map((s) => ({
@@ -345,6 +367,8 @@ export function buildGradeResultFromRawData(
     gpa4: s.gpa4Semester,
     gpaCumulative10: s.gpa10Cumulative,
     gpaCumulative4: s.gpa4Cumulative,
+    gpaCumulativeExpected10: s.gpa10CumulativeExpected ?? s.gpa10Cumulative,
+    gpaCumulativeExpected4: s.gpa4CumulativeExpected ?? s.gpa4Cumulative,
     creditsSemester: s.creditsPassedSemester,
     creditsAccumulatedSemester: s.creditsAccumulatedSemester,
     creditsPendingSemester: s.creditsPendingSemester,
