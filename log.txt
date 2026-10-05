@@ -1,0 +1,17 @@
+
+> ptit-exam-portal@1.0.0 build
+> prisma generate && next build --webpack
+
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 126ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
+
+▲ Next.js 16.3.1 (webpack)
+- Environments: .env
+✓ Running next.config.mjs took 7ms
+
+  Creating an optimized production build ...

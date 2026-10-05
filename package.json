@@ -17,6 +17,7 @@
     "db:fix-dates": "tsx scripts/fix-exam-dates.ts",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
+    "tsc": "tsc",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
