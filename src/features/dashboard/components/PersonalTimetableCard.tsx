@@ -166,9 +166,19 @@ export default function PersonalTimetableCard({
                   )}
                 </div>
 
-                <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700">
-                  {primarySession.subjectCode}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {primarySession.sessionNumber && primarySession.subjectProgress && (
+                    <span
+                      className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700"
+                      title={`Buổi thứ ${primarySession.sessionNumber} trên tổng ${primarySession.subjectProgress.total} buổi của môn này`}
+                    >
+                      Buổi {primarySession.sessionNumber}/{primarySession.subjectProgress.total}
+                    </span>
+                  )}
+                  <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700">
+                    {primarySession.subjectCode}
+                  </span>
+                </div>
               </div>
 
               {/* Subject Title */}
@@ -176,8 +186,31 @@ export default function PersonalTimetableCard({
                 {primarySession.subjectName}
               </h4>
 
+              {/* Subject Session Progress Bar */}
+              {primarySession.subjectProgress && (
+                <div className="mt-2.5 pt-2 border-t border-slate-200/60">
+                  <div className="flex items-center justify-between text-[11px] mb-1">
+                    <span className="text-slate-500 font-medium">Tiến độ môn:</span>
+                    <span className="font-mono text-slate-700 font-bold">
+                      <b className="text-emerald-700">Đã học {primarySession.subjectProgress.completed}</b>/{primarySession.subjectProgress.total} buổi{' '}
+                      <span className="text-slate-400 font-normal">
+                        (Còn {primarySession.subjectProgress.remaining})
+                      </span>
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-emerald-600 h-1.5 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.min(100, Math.max(0, primarySession.subjectProgress.percentage))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Key Specs Bar: Time & Room */}
-              <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-slate-200/60 text-xs">
+              <div className="grid grid-cols-2 gap-2 mt-2.5 pt-2 border-t border-slate-200/60 text-xs">
                 <div className="flex items-center gap-1.5 text-slate-700 font-mono">
                   <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span className="font-bold">
@@ -255,12 +288,75 @@ export default function PersonalTimetableCard({
                     </span>
                   </div>
 
-                  {/* Time & Room */}
+                  {/* Progress Badge, Time & Room */}
                   <div className="flex items-center gap-2 shrink-0 font-mono text-[11px] text-slate-500">
+                    {evt.sessionNumber && evt.subjectProgress && (
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-white text-indigo-700 border border-slate-200 shrink-0"
+                        title={`Buổi thứ ${evt.sessionNumber}/${evt.subjectProgress.total} - Đã học ${evt.subjectProgress.completed} buổi`}
+                      >
+                        B.{evt.sessionNumber}/{evt.subjectProgress.total}
+                      </span>
+                    )}
                     <span className="text-slate-700 font-bold">{evt.startTime}</span>
                     <span className="text-slate-300">•</span>
                     <span className="text-slate-600 truncate max-w-[70px] sm:max-w-[90px]" title={evt.room}>
                       {evt.room || 'Online'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Subjects Progress List on Dashboard */}
+        {timetable.subjectsProgress && timetable.subjectsProgress.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Tiến độ từng môn ({timetable.subjectsProgress.length} môn)</span>
+              </span>
+              <button
+                type="button"
+                onClick={onNavigateToSchedule}
+                className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+              >
+                Xem chi tiết
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {timetable.subjectsProgress.map((sub) => (
+                <div
+                  key={sub.subjectCode}
+                  onClick={onNavigateToSchedule}
+                  className="p-2.5 rounded-xl bg-slate-50/90 hover:bg-indigo-50/50 border border-slate-200/70 hover:border-indigo-200 transition-all cursor-pointer group flex flex-col justify-between gap-1.5 shadow-2xs"
+                  title={`Nhấn để mở lịch môn ${sub.subjectName}`}
+                >
+                  <div className="flex items-start justify-between gap-1.5">
+                    <span className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+                      {sub.subjectName}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-indigo-700 bg-white px-1.5 py-0.2 rounded border border-slate-200 shrink-0">
+                      {sub.percentage}%
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-slate-200/80 rounded-full h-1 overflow-hidden">
+                    <div
+                      className={`h-1 rounded-full transition-all ${sub.isFinished ? 'bg-emerald-500' : 'bg-indigo-600'}`}
+                      style={{ width: `${Math.min(100, Math.max(0, sub.percentage))}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                    <span>
+                      Đã học: <b className="text-emerald-700">{sub.completed}</b>/{sub.total}
+                    </span>
+                    <span className={sub.isFinished ? 'text-emerald-700 font-bold' : 'text-amber-700 font-semibold'}>
+                      {sub.isFinished ? '✓ Hoàn thành' : `Còn ${sub.remaining} buổi`}
                     </span>
                   </div>
                 </div>

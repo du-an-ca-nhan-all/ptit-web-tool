@@ -150,6 +150,17 @@ export interface TelegramSyncStatus {
   botUsername?: string | null;
 }
 
+export interface TimetableSubjectProgressSummary {
+  subjectCode: string;
+  subjectName: string;
+  group?: string;
+  total: number;
+  completed: number;
+  remaining: number;
+  percentage: number;
+  isFinished: boolean;
+}
+
 export interface TimetableEventItem {
   id: string;
   date: string; // YYYY-MM-DD
@@ -166,6 +177,13 @@ export interface TimetableEventItem {
   lecturer?: string;
   shift: 'MORNING' | 'AFTERNOON' | 'EVENING';
   isToday?: boolean;
+  subjectProgress?: {
+    total: number;
+    completed: number;
+    remaining: number;
+    percentage: number;
+  };
+  sessionNumber?: number;
 }
 
 export interface TimetableSummary {
@@ -178,6 +196,7 @@ export interface TimetableSummary {
   progressPercentage?: number;
   todayEvents: TimetableEventItem[];
   upcomingEvents: TimetableEventItem[];
+  subjectsProgress?: TimetableSubjectProgressSummary[];
   lastSyncAt?: string | null;
 }
 

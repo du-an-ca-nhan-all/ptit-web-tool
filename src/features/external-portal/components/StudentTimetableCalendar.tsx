@@ -461,6 +461,24 @@ export default function StudentTimetableCalendar({
     return map;
   }, [subjectsProgressList]);
 
+  // Map mỗi buổi học với số thứ tự buổi trong môn (VD: Buổi 3/12)
+  const eventSessionNumberMap = useMemo(() => {
+    const map = new Map<string, { current: number; total: number }>();
+    const eventsBySubject = new Map<string, TimetableCalendarEvent[]>();
+    for (const ev of classEventsOnly) {
+      const code = ev.subjectCode || 'UNKNOWN';
+      if (!eventsBySubject.has(code)) eventsBySubject.set(code, []);
+      eventsBySubject.get(code)!.push(ev);
+    }
+    eventsBySubject.forEach((evts) => {
+      evts.sort((a, b) => (a.date !== b.date ? a.date.localeCompare(b.date) : a.startMinutes - b.startMinutes));
+      evts.forEach((ev, idx) => {
+        map.set(ev.id, { current: idx + 1, total: evts.length });
+      });
+    });
+    return map;
+  }, [classEventsOnly]);
+
   const currentContextStats = useMemo(() => {
     if (selectedSubjectFilter !== 'ALL') {
       const sub = subjectProgressMap.get(selectedSubjectFilter);
@@ -1260,6 +1278,9 @@ export default function StudentTimetableCalendar({
                     <div className="flex flex-col gap-3 overflow-y-auto max-h-[500px] pr-1">
                       {selectedDayEvents.map((ev) => {
                         const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                        const sessionInfo = eventSessionNumberMap.get(ev.id);
+                        const subProg = subjectProgressMap.get(ev.subjectCode);
+
                         return (
                           <div
                             key={ev.id}
@@ -1269,10 +1290,40 @@ export default function StudentTimetableCalendar({
                               <span className="text-xs font-black leading-tight">
                                 {ev.subjectName}
                               </span>
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-white/80 border border-slate-200 shrink-0">
-                                {ev.subjectCode}
-                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {sessionInfo && (
+                                  <span
+                                    className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700"
+                                    title={`Buổi thứ ${sessionInfo.current} trên tổng ${sessionInfo.total} buổi của môn này`}
+                                  >
+                                    Buổi {sessionInfo.current}/{sessionInfo.total}
+                                  </span>
+                                )}
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-white/80 border border-slate-200">
+                                  {ev.subjectCode}
+                                </span>
+                              </div>
                             </div>
+
+                            {/* Subject Progress Mini Bar */}
+                            {subProg && (
+                              <div className="bg-white/80 rounded-xl p-2 border border-slate-200/60 flex flex-col gap-1">
+                                <div className="flex items-center justify-between text-[10px] font-mono text-slate-600">
+                                  <span>
+                                    Tiến độ môn: <b className="text-emerald-700">Đã học {subProg.stats.completed}</b>/{subProg.stats.total}
+                                  </span>
+                                  <span className={subProg.isFinished ? 'text-emerald-700 font-bold' : 'text-amber-700 font-semibold'}>
+                                    {subProg.isFinished ? '✓ Đã xong' : `Còn ${subProg.stats.remaining} buổi (${subProg.stats.percentage}%)`}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-slate-200/80 rounded-full h-1 overflow-hidden">
+                                  <div
+                                    className={`h-1 rounded-full transition-all ${subProg.isFinished ? 'bg-emerald-500' : 'bg-indigo-600'}`}
+                                    style={{ width: `${Math.min(100, Math.max(0, subProg.stats.percentage))}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
 
                             <div className="flex flex-col gap-1 text-[11px] opacity-90">
                               <div className="flex items-center gap-1.5 font-bold">
@@ -1592,18 +1643,40 @@ export default function StudentTimetableCalendar({
                         <div className="flex flex-col gap-2.5">
                           {dayItem.events.map((ev) => {
                             const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                            const sessionInfo = eventSessionNumberMap.get(ev.id);
+                            const subProg = subjectProgressMap.get(ev.subjectCode);
+
                             return (
                               <div
                                 key={ev.id}
                                 onClick={() => setSelectedEventModal(ev)}
                                 className={`p-3 rounded-2xl border ${pal.bg} ${pal.accentBorder} border-l-3 flex flex-col gap-1.5 transition cursor-pointer hover:shadow-xs`}
                               >
-                                <div className="text-xs font-bold leading-tight line-clamp-2">
-                                  {ev.subjectName}
+                                <div className="flex items-start justify-between gap-1">
+                                  <div className="text-xs font-bold leading-tight line-clamp-2">
+                                    {ev.subjectName}
+                                  </div>
+                                  {sessionInfo && (
+                                    <span
+                                      className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-white text-indigo-700 border border-indigo-200 shrink-0"
+                                      title={`Buổi ${sessionInfo.current}/${sessionInfo.total}`}
+                                    >
+                                      B.{sessionInfo.current}/{sessionInfo.total}
+                                    </span>
+                                  )}
                                 </div>
 
+                                {subProg && (
+                                  <div className="text-[9px] font-mono text-slate-600 flex items-center justify-between border-t border-slate-200/50 pt-1">
+                                    <span>
+                                      Đã học: <b className="text-emerald-700">{subProg.stats.completed}</b>/{subProg.stats.total}
+                                    </span>
+                                    <span className="text-indigo-700 font-bold">{subProg.stats.percentage}%</span>
+                                  </div>
+                                )}
+
                                 <div className="flex items-center gap-1 font-mono text-[10px] font-bold text-slate-700">
-                                  <Clock className="w-3 h-3 text-indigo-600" />
+                                  <Clock className="w-3 h-3 text-indigo-600 shrink-0" />
                                   <span>{ev.startTime} - {ev.endTime}</span>
                                 </div>
 
@@ -1668,6 +1741,9 @@ export default function StudentTimetableCalendar({
                         <div className="mt-2.5 flex flex-col gap-2">
                           {dayItem.events.map((ev) => {
                             const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                            const sessionInfo = eventSessionNumberMap.get(ev.id);
+                            const subProg = subjectProgressMap.get(ev.subjectCode);
+
                             return (
                               <div
                                 key={ev.id}
@@ -1678,10 +1754,31 @@ export default function StudentTimetableCalendar({
                                   <h4 className="text-xs font-black text-slate-900 leading-snug">
                                     {ev.subjectName}
                                   </h4>
-                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-white/80 border border-slate-200 shrink-0">
-                                    {ev.subjectCode}
-                                  </span>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {sessionInfo && (
+                                      <span
+                                        className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                        title={`Buổi ${sessionInfo.current}/${sessionInfo.total}`}
+                                      >
+                                        Buổi {sessionInfo.current}/{sessionInfo.total}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-white/80 border border-slate-200">
+                                      {ev.subjectCode}
+                                    </span>
+                                  </div>
                                 </div>
+
+                                {subProg && (
+                                  <div className="flex items-center justify-between text-[10px] font-mono bg-white/60 px-2 py-0.5 rounded border border-slate-200/50">
+                                    <span>
+                                      Đã học: <b className="text-emerald-700">{subProg.stats.completed}</b>/{subProg.stats.total} buổi
+                                    </span>
+                                    <span className={subProg.isFinished ? 'text-emerald-700 font-bold' : 'text-amber-700 font-semibold'}>
+                                      {subProg.isFinished ? '✓ Đã xong' : `Còn ${subProg.stats.remaining} (${subProg.stats.percentage}%)`}
+                                    </span>
+                                  </div>
+                                )}
 
                                 <div className="flex items-center gap-3 text-[11px] font-mono text-slate-700">
                                   <div className="flex items-center gap-1 font-bold">
@@ -1722,6 +1819,8 @@ export default function StudentTimetableCalendar({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {filteredEvents.map((ev) => {
                   const pal = SUBJECT_COLOR_PALETTES[ev.colorIndex % SUBJECT_COLOR_PALETTES.length];
+                  const sessionInfo = eventSessionNumberMap.get(ev.id);
+                  const subProg = subjectProgressMap.get(ev.subjectCode);
                   const isToday = ev.date === todayIso;
 
                   return (
@@ -1735,11 +1834,21 @@ export default function StudentTimetableCalendar({
                           <span className="text-[11px] sm:text-xs font-mono font-bold text-indigo-600 bg-white/90 px-2 py-0.5 rounded-lg border border-slate-200">
                             {ev.dayOfWeekStr}, {new Date(ev.date).toLocaleDateString('vi-VN')}
                           </span>
-                          {isToday && (
-                            <span className="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-bold rounded-full">
-                              Hôm nay
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            {sessionInfo && (
+                              <span
+                                className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-white text-indigo-700 border border-indigo-200 shadow-2xs"
+                                title={`Buổi ${sessionInfo.current} trên tổng ${sessionInfo.total} buổi`}
+                              >
+                                Buổi {sessionInfo.current}/{sessionInfo.total}
+                              </span>
+                            )}
+                            {isToday && (
+                              <span className="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-bold rounded-full">
+                                Hôm nay
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <h4 className="text-xs font-black text-slate-800 leading-snug">
@@ -1748,6 +1857,26 @@ export default function StudentTimetableCalendar({
                         <div className="text-[11px] text-slate-500 font-mono mt-0.5">
                           Mã: {ev.subjectCode} • Nhóm: {ev.group}
                         </div>
+
+                        {/* Subject Progress Bar */}
+                        {subProg && (
+                          <div className="mt-2 pt-1.5 border-t border-slate-200/50 flex flex-col gap-1">
+                            <div className="flex items-center justify-between text-[10px] font-mono text-slate-600">
+                              <span>
+                                Đã học: <b className="text-emerald-700">{subProg.stats.completed}</b>/{subProg.stats.total} buổi
+                              </span>
+                              <span className={subProg.isFinished ? 'text-emerald-700 font-bold' : 'text-amber-700 font-semibold'}>
+                                {subProg.isFinished ? '✓ Đã xong' : `Còn ${subProg.stats.remaining} (${subProg.stats.percentage}%)`}
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-200/70 rounded-full h-1 overflow-hidden">
+                              <div
+                                className={`h-1 rounded-full transition-all ${subProg.isFinished ? 'bg-emerald-500' : 'bg-indigo-600'}`}
+                                style={{ width: `${Math.min(100, Math.max(0, subProg.stats.percentage))}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="pt-2 border-t border-slate-200/60 flex flex-col gap-1 text-[11px] text-slate-700">
@@ -1949,19 +2078,67 @@ export default function StudentTimetableCalendar({
               })()
             ) : (
               <>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
-                    <BookOpen className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider font-mono">
-                      {selectedEventModal.subjectCode} • Tổ {selectedEventModal.group}
-                    </span>
-                    <h3 className="text-base font-black text-slate-800 leading-tight">
-                      {selectedEventModal.subjectName}
-                    </h3>
-                  </div>
-                </div>
+                {(() => {
+                  const modalSessionInfo = eventSessionNumberMap.get(selectedEventModal.id);
+                  const modalSubProg = subjectProgressMap.get(selectedEventModal.subjectCode);
+
+                  return (
+                    <>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                          <BookOpen className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider font-mono">
+                              {selectedEventModal.subjectCode} • Tổ {selectedEventModal.group}
+                            </span>
+                            {modalSessionInfo && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                Buổi {modalSessionInfo.current}/{modalSessionInfo.total}
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="text-base font-black text-slate-800 leading-tight mt-0.5">
+                            {selectedEventModal.subjectName}
+                          </h3>
+                        </div>
+                      </div>
+
+                      {/* Subject Progress Card in Modal */}
+                      {modalSubProg && (
+                        <div className="mb-3.5 p-3 bg-gradient-to-br from-indigo-50/80 to-slate-50 border border-indigo-100/90 rounded-2xl flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between text-xs font-mono">
+                            <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                              <GraduationCap className="w-4 h-4 text-indigo-600" />
+                              <span>Tiến độ môn học:</span>
+                            </span>
+                            <span className="text-indigo-700 font-bold">
+                              Đã học {modalSubProg.stats.completed}/{modalSubProg.stats.total} buổi ({modalSubProg.stats.percentage}%)
+                            </span>
+                          </div>
+
+                          <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-emerald-600 h-1.5 rounded-full transition-all duration-300"
+                              style={{ width: `${Math.min(100, Math.max(0, modalSubProg.stats.percentage))}%` }}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+                            <span>✓ Đã học: <b className="text-emerald-700">{modalSubProg.stats.completed}</b> buổi</span>
+                            <span>•</span>
+                            <span>⏳ Còn: <b className="text-amber-700">{modalSubProg.stats.remaining}</b> buổi</span>
+                            <span>•</span>
+                            <span className={modalSubProg.isFinished ? 'text-emerald-700 font-bold' : 'text-slate-600 font-medium'}>
+                              {modalSubProg.isFinished ? 'Đã hoàn thành môn' : 'Đang học'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 <div className="space-y-3 bg-slate-50 rounded-2xl p-4 border border-slate-200 text-xs">
                   <div className="flex items-center justify-between">
