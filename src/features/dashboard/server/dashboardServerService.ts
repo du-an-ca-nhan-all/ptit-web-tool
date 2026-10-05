@@ -3,9 +3,15 @@ import { parseDateString } from '@/src/lib/date-utils';
 import { checkIsAdmin, checkIsMonitor, getUserRoles } from '@/src/lib/auth';
 import { getGlobalConfig, GLOBAL_CONFIG_KEYS, TelegramBotConfigValue } from '@/src/lib/globalConfig';
 import { getStudentTimetableCalendar } from '@/src/features/external-portal/server/studentTimetableServerService';
+import { calculateTimetableProgress } from '@/src/features/external-portal/utils/timetableProgress';
 import { getOrFetchStudentLmsOverview } from '@/src/features/external-portal/server/lmsServerService';
 import { AnnouncementItem } from '@/src/features/announcements';
-import { DashboardData, LmsDashboardSummary, StudentMonitorFlowSummary } from '../types/dashboard.types';
+import {
+  DashboardData,
+  LmsDashboardSummary,
+  StudentMonitorFlowSummary,
+  TimetableSummary,
+} from '../types/dashboard.types';
 
 /**
  * Calculates time difference and exam status relative to now
@@ -554,14 +560,17 @@ export async function getDashboardData(
   };
 
   // Timetable & Schedule Summary
-  let timetableSummary = {
+  let timetableSummary: TimetableSummary = {
     hasData: false,
-    semesterName: undefined as string | undefined,
+    semesterName: undefined,
     totalSubjects: 0,
     totalEvents: 0,
-    todayEvents: [] as any[],
-    upcomingEvents: [] as any[],
-    lastSyncAt: null as string | null,
+    completedEvents: 0,
+    remainingEvents: 0,
+    progressPercentage: 0,
+    todayEvents: [],
+    upcomingEvents: [],
+    lastSyncAt: null,
   };
 
   if (timetableRes && timetableRes.success && Array.isArray(timetableRes.events) && timetableRes.events.length > 0) {
@@ -611,11 +620,16 @@ export async function getDashboardData(
         isToday: false,
       }));
 
+    const progress = calculateTimetableProgress(timetableRes.events, now);
+
     timetableSummary = {
       hasData: true,
       semesterName: timetableRes.semesterName,
       totalSubjects: timetableRes.uniqueSubjectsCount,
       totalEvents: timetableRes.totalEvents,
+      completedEvents: progress.completed,
+      remainingEvents: progress.remaining,
+      progressPercentage: progress.percentage,
       todayEvents: todayEvts,
       upcomingEvents: upcomingEvts,
       lastSyncAt: timetableRes.lastSyncAt,

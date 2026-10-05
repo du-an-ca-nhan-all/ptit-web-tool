@@ -40,6 +40,7 @@ import {
   Smartphone,
   Share2,
   Bell,
+  GraduationCap,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import {
@@ -47,6 +48,13 @@ import {
   TimetableSubjectSummary,
   StudentTimetableCalendarResult,
 } from '../server/studentTimetableServerService';
+import {
+  calculateTimetableProgress,
+  deriveSubjectsProgress,
+  SubjectProgressItem,
+  TimetableProgressStats,
+} from '../utils/timetableProgress';
+import SubjectsProgressModal from './SubjectsProgressModal';
 
 interface StudentTimetableCalendarProps {
   currentUser: LoginUser;
@@ -231,6 +239,7 @@ export default function StudentTimetableCalendar({
   const [copiedLink, setCopiedLink] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [copiedIcsUrl, setCopiedIcsUrl] = useState(false);
+  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
 
   // Sync viewMode, selectedSubjectFilter, selectedDay, searchQuery to URL query params
   useEffect(() => {
@@ -430,6 +439,35 @@ export default function StudentTimetableCalendar({
 
     return [...classEvents, ...reminderEvents];
   }, [data]);
+
+  // Pure Derived State: Session Progress & Subject Breakdown
+  const classEventsOnly = useMemo(() => {
+    return (data?.events || []).filter((e) => !e.rawSession?.isReminder);
+  }, [data?.events]);
+
+  const overallProgressStats = useMemo(() => {
+    return calculateTimetableProgress(classEventsOnly);
+  }, [classEventsOnly]);
+
+  const subjectsProgressList = useMemo(() => {
+    return deriveSubjectsProgress(classEventsOnly, data?.subjects || []);
+  }, [classEventsOnly, data?.subjects]);
+
+  const subjectProgressMap = useMemo(() => {
+    const map = new Map<string, SubjectProgressItem>();
+    for (const item of subjectsProgressList) {
+      map.set(item.subjectCode, item);
+    }
+    return map;
+  }, [subjectsProgressList]);
+
+  const currentContextStats = useMemo(() => {
+    if (selectedSubjectFilter !== 'ALL') {
+      const sub = subjectProgressMap.get(selectedSubjectFilter);
+      if (sub) return sub.stats;
+    }
+    return overallProgressStats;
+  }, [selectedSubjectFilter, subjectProgressMap, overallProgressStats]);
 
   const filteredEvents = useMemo(() => {
     return allEvents.filter((ev) => {
@@ -665,9 +703,66 @@ export default function StudentTimetableCalendar({
                 </span>
               )}
             </div>
-            <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-relaxed">
-              Cổng: <strong className="text-indigo-600 font-mono">qldttx.pttc1.edu.vn</strong> • {data?.semesterName || 'Học kỳ hiện tại'} • <b>{data?.uniqueSubjectsCount || 0} môn học</b> ({data?.totalEvents || 0} buổi học)
-            </p>
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap text-[11px] sm:text-xs text-slate-500 leading-relaxed">
+              <span>
+                Cổng: <strong className="text-indigo-600 font-mono">qldttx.pttc1.edu.vn</strong> • {data?.semesterName || 'Học kỳ hiện tại'} • <b>{data?.uniqueSubjectsCount || 0} môn học</b>
+              </span>
+
+              <span className="hidden sm:inline text-slate-300">•</span>
+
+              {/* Session Progress Stats Badge */}
+              <div
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-700 shadow-2xs cursor-pointer hover:bg-slate-100/80 transition"
+                onClick={() => setIsProgressModalOpen(true)}
+                title="Nhấn để xem bảng chi tiết tiến độ buổi học từng môn"
+              >
+                <span className="font-semibold text-slate-800">
+                  {selectedSubjectFilter !== 'ALL' ? (
+                    <>Môn <strong className="font-mono text-indigo-700">{selectedSubjectFilter}</strong>: </>
+                  ) : (
+                    <>Tổng: </>
+                  )}
+                  <strong className="font-mono text-slate-900">{currentContextStats.total}</strong> buổi
+                </span>
+                <span className="text-slate-300">|</span>
+                <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
+                  <span>✓ Đã học:</span>
+                  <strong className="font-mono">{currentContextStats.completed}</strong>
+                </span>
+                <span className="text-slate-300">|</span>
+                <span className="inline-flex items-center gap-1 text-amber-700 font-bold">
+                  <span>⏳ Còn:</span>
+                  <strong className="font-mono">{currentContextStats.remaining}</strong>
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-extrabold border border-indigo-200/60">
+                  {currentContextStats.percentage}%
+                </span>
+              </div>
+
+              {selectedSubjectFilter !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedSubjectFilter('ALL')}
+                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                  title="Hủy lọc môn học để xem tiến độ toàn khóa"
+                >
+                  (Xem toàn kỳ)
+                </button>
+              )}
+            </div>
+
+            {/* Mini Progress Bar for current scope */}
+            {currentContextStats.total > 0 && (
+              <div
+                className="mt-2 w-full max-w-md bg-slate-100 rounded-full h-1.5 overflow-hidden border border-slate-200/70"
+                title={`Tiến độ: ${currentContextStats.completed}/${currentContextStats.total} buổi (${currentContextStats.percentage}%)`}
+              >
+                <div
+                  className="bg-gradient-to-r from-indigo-600 via-sky-500 to-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, Math.max(0, currentContextStats.percentage))}%` }}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -685,6 +780,20 @@ export default function StudentTimetableCalendar({
               <Zap className="w-3.5 h-3.5 fill-current text-amber-300" />
             )}
             <span>{isRefreshing ? 'Đang kéo...' : 'Kéo Lại QLDTTX'}</span>
+          </button>
+
+          {/* Tiến Độ Môn Học Button */}
+          <button
+            type="button"
+            onClick={() => setIsProgressModalOpen(true)}
+            className="flex-1 sm:flex-initial px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-xs shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+            title="Xem bảng chi tiết tiến độ các môn học trong kỳ (Tổng buổi, Đã học, Còn lại)"
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Tiến Độ Môn</span>
+            <span className="ml-0.5 px-1.5 py-0.5 bg-white/25 text-white text-[10px] font-black rounded-full font-mono">
+              {overallProgressStats.percentage}%
+            </span>
           </button>
 
           {/* Sync to External Calendars (Google / Apple / Outlook) */}
@@ -862,12 +971,20 @@ export default function StudentTimetableCalendar({
               onChange={(e) => setSelectedSubjectFilter(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 appearance-none outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-8"
             >
-              <option value="ALL">Tất Cả Môn Học ({data?.uniqueSubjectsCount || 0})</option>
-              {data?.subjects.map((sub) => (
-                <option key={sub.subjectCode} value={sub.subjectCode}>
-                  {sub.subjectName} ({sub.subjectCode})
-                </option>
-              ))}
+              <option value="ALL">
+                Tất Cả Môn ({data?.uniqueSubjectsCount || 0}) — Đã học {overallProgressStats.completed}/{overallProgressStats.total} buổi ({overallProgressStats.percentage}%)
+              </option>
+              {data?.subjects.map((sub) => {
+                const subProg = subjectProgressMap.get(sub.subjectCode);
+                const progressText = subProg
+                  ? ` — Đã học ${subProg.stats.completed}/${subProg.stats.total} buổi (${subProg.stats.percentage}%)`
+                  : '';
+                return (
+                  <option key={sub.subjectCode} value={sub.subjectCode}>
+                    {sub.subjectName} ({sub.subjectCode}){progressText}
+                  </option>
+                );
+              })}
             </select>
             <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -2115,6 +2232,17 @@ export default function StudentTimetableCalendar({
           </div>
         </div>
       )}
+
+      {/* SUBJECTS PROGRESS MODAL */}
+      <SubjectsProgressModal
+        isOpen={isProgressModalOpen}
+        onClose={() => setIsProgressModalOpen(false)}
+        subjectsProgress={subjectsProgressList}
+        overallStats={overallProgressStats}
+        semesterName={data?.semesterName}
+        onSelectSubject={(code) => setSelectedSubjectFilter(code)}
+        selectedSubjectCode={selectedSubjectFilter}
+      />
     </div>
   );
 }

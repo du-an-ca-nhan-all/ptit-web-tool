@@ -114,9 +114,20 @@ export default function PersonalTimetableCard({
                   </span>
                 )}
               </div>
-              <span className="text-[11px] text-slate-500 font-medium">
-                {totalSubjects} môn học • {totalEvents} buổi học
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-500 font-medium">
+                <span>{totalSubjects} môn</span>
+                <span>•</span>
+                {timetable.completedEvents !== undefined ? (
+                  <span>
+                    Đã học: <strong className="text-emerald-700">{timetable.completedEvents}</strong>/{totalEvents} buổi
+                    <span className="ml-1 text-[10px] font-bold text-indigo-700 font-mono bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-100">
+                      {timetable.progressPercentage}%
+                    </span>
+                  </span>
+                ) : (
+                  <span>{totalEvents} buổi học</span>
+                )}
+              </div>
             </div>
           </div>
 

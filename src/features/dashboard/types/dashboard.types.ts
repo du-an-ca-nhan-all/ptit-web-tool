@@ -173,6 +173,9 @@ export interface TimetableSummary {
   semesterName?: string;
   totalSubjects: number;
   totalEvents: number;
+  completedEvents?: number;
+  remainingEvents?: number;
+  progressPercentage?: number;
   todayEvents: TimetableEventItem[];
   upcomingEvents: TimetableEventItem[];
   lastSyncAt?: string | null;
