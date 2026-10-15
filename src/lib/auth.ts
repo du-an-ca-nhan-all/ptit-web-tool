@@ -8,6 +8,10 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'ptit-secret-key-exam-portal-secure-token-2026'
 );
 
+// Token & cookie lifetime: 10 years
+export const AUTH_TOKEN_EXPIRY = '10y';
+export const AUTH_COOKIE_MAX_AGE = 10 * 365 * 24 * 60 * 60; // 315,360,000 seconds
+
 export interface AuthUser {
   id: number;
   username: string;
@@ -88,7 +92,7 @@ export async function createAuthToken(user: AuthUser): Promise<string> {
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime(AUTH_TOKEN_EXPIRY)
     .sign(JWT_SECRET);
 }
 

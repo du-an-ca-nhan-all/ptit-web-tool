@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { getAuthUser, createAuthToken, checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
+import { getAuthUser, createAuthToken, checkIsAdmin, checkIsMonitor, AUTH_COOKIE_MAX_AGE } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { impersonateSchema, validateZod } from '@/src/features/auth/schemas/auth.schema';
 
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       value: token,
       httpOnly: true,
       path: '/',
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: AUTH_COOKIE_MAX_AGE,
       sameSite: 'lax',
     });
 

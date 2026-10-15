@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
-import { verifyPassword, createAuthToken, checkIsAdmin, checkIsMonitor, getUserRoles } from '@/src/lib/auth';
+import { verifyPassword, createAuthToken, checkIsAdmin, checkIsMonitor, getUserRoles, AUTH_COOKIE_MAX_AGE } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { loginSchema, validateZod } from '@/src/features/auth/schemas/auth.schema';
 import { getClientIp, checkRateLimit, createRateLimitExceededResponse } from '@/src/lib/rate-limiter';
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60,
+        maxAge: AUTH_COOKIE_MAX_AGE,
         path: '/',
       });
 
