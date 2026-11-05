@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Sparkles,
   GraduationCap,
@@ -14,6 +14,8 @@ import {
   Clock,
   BookOpen,
   Smartphone,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import { ExternalAccountStatus, TelegramSyncStatus } from '../types/dashboard.types';
@@ -41,6 +43,8 @@ export default function StudentHeroBanner({
   isLoading,
   onNavigateTab,
 }: StudentHeroBannerProps) {
+  const [copiedFormat, setCopiedFormat] = useState(false);
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Chào buổi sáng';
@@ -49,6 +53,21 @@ export default function StudentHeroBanner({
   };
 
   const displayName = user.fullName || user.username;
+  const formattedStudentInfo = user.fullName && user.fullName !== user.username
+    ? `${user.username} - ${user.fullName}`
+    : user.username;
+
+  const handleCopyFormattedInfo = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(formattedStudentInfo);
+        setCopiedFormat(true);
+        setTimeout(() => setCopiedFormat(false), 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy student info: ', err);
+    }
+  };
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800/80">
@@ -103,6 +122,24 @@ export default function StudentHeroBanner({
               <span className="font-mono font-bold text-sky-300 bg-sky-950/60 px-2 py-0.5 rounded-md border border-sky-800/60">
                 {user.username}
               </span>
+              <button
+                type="button"
+                onClick={handleCopyFormattedInfo}
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 text-slate-200 hover:text-white border border-slate-700/80 transition-all cursor-pointer shadow-xs"
+                title={`Sao chép định dạng: ${formattedStudentInfo}`}
+              >
+                {copiedFormat ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    <span className="text-emerald-400 font-semibold">Đã chép</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3 text-slate-400" />
+                    <span>Sao chép MSV - Tên</span>
+                  </>
+                )}
+              </button>
               {user.lop && (
                 <>
                   <span className="text-slate-500">•</span>
