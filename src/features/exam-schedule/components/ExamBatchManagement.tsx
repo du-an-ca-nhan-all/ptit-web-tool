@@ -5,6 +5,7 @@ import {
   Layers,
   Plus,
   Upload,
+  Download,
   CheckCircle2,
   AlertCircle,
   FileSpreadsheet,
@@ -20,6 +21,7 @@ import {
   Power,
 } from 'lucide-react';
 import { ExamBatchItem, LoginUser } from '../types/exam.types';
+import { downloadExamBatchSampleCsv } from '../utils/examSampleCsv';
 
 interface ExamBatchManagementProps {
   currentUser: LoginUser;
@@ -51,10 +53,7 @@ export default function ExamBatchManagement({
 
   // Form states for Create/Edit
   const [formData, setFormData] = useState({
-    code: '',
     name: '',
-    semester: 'HK2',
-    academicYear: '2025-2026',
     startDate: '',
     endDate: '',
     description: '',
@@ -173,23 +172,21 @@ export default function ExamBatchManagement({
   // Handle Save / Create Batch
   const handleSaveBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.code.trim() || !formData.name.trim()) {
-      showToast('Vui lòng nhập đầy đủ Mã đợt thi và Tên đợt thi', 'error');
+    if (!formData.name.trim()) {
+      showToast('Vui lòng nhập Tên đợt thi', 'error');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const isEdit = !editingBatch;
+      const isEdit = Boolean(editingBatch);
       const res = await fetch('/api/exam-batches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: isEdit ? 'UPDATE' : 'CREATE',
-          code: formData.code.trim().toUpperCase(),
+          ...(isEdit && editingBatch ? { code: editingBatch.code } : {}),
           name: formData.name.trim(),
-          semester: formData.semester.trim(),
-          academicYear: formData.academicYear.trim(),
           startDate: formData.startDate.trim() || null,
           endDate: formData.endDate.trim() || null,
           description: formData.description.trim() || null,
@@ -242,6 +239,12 @@ export default function ExamBatchManagement({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle Download Sample CSV
+  const handleDownloadSampleCSV = (batch?: ExamBatchItem | null) => {
+    const fileName = downloadExamBatchSampleCsv(batch);
+    showToast(`Đã tải xuống tệp mẫu "${fileName}"`);
   };
 
   // Handle CSV Import
@@ -319,6 +322,16 @@ export default function ExamBatchManagement({
         {/* Action Controls */}
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <button
+            type="button"
+            onClick={() => handleDownloadSampleCSV(activeBatch)}
+            className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3.5 py-2.5 rounded-xl transition-colors shadow-sm whitespace-nowrap cursor-pointer"
+            title="Tải tệp CSV ví dụ định dạng chuẩn PTIT (tương thích Excel tiếng Việt)"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            Tải CSV Mẫu
+          </button>
+
+          <button
             onClick={fetchBatches}
             disabled={isLoading}
             className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 px-3.5 py-2.5 rounded-xl transition-colors shadow-sm whitespace-nowrap cursor-pointer"
@@ -332,10 +345,7 @@ export default function ExamBatchManagement({
             onClick={() => {
               setEditingBatch(null);
               setFormData({
-                code: '',
                 name: '',
-                semester: 'HK2',
-                academicYear: '2025-2026',
                 startDate: '',
                 endDate: '',
                 description: '',
@@ -458,10 +468,18 @@ export default function ExamBatchManagement({
                           <span className="bg-slate-100 px-2 py-0.5 rounded-md font-bold text-slate-700">
                             {batch.code}
                           </span>
-                          <span>•</span>
-                          <span>{batch.semester || 'HK2'}</span>
-                          <span>•</span>
-                          <span>{batch.academicYear || '2025-2026'}</span>
+                          {batch.semester && (
+                            <>
+                              <span>•</span>
+                              <span>{batch.semester}</span>
+                            </>
+                          )}
+                          {batch.academicYear && (
+                            <>
+                              <span>•</span>
+                              <span>{batch.academicYear}</span>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -570,10 +588,7 @@ export default function ExamBatchManagement({
                         onClick={() => {
                           setEditingBatch(batch);
                           setFormData({
-                            code: batch.code,
                             name: batch.name,
-                            semester: batch.semester || 'HK2',
-                            academicYear: batch.academicYear || '2025-2026',
                             startDate: batch.startDate || '',
                             endDate: batch.endDate || '',
                             description: batch.description || '',
@@ -635,24 +650,6 @@ export default function ExamBatchManagement({
             <form onSubmit={handleSaveBatch} className="p-6 flex flex-col gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Mã đợt thi (Code) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  disabled={!editingBatch}
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  placeholder="Ví dụ: 20252_TX, DOT1_HK2_2526"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-800 uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Mã duy nhất dùng để liên kết các bản ghi thi từ tệp CSV
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Tên đợt thi <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -663,36 +660,6 @@ export default function ExamBatchManagement({
                   placeholder="Ví dụ: ĐHTX HK2 2025-2026, Đợt Thi Chính Thức Kỳ 2"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Học kỳ
-                  </label>
-                  <select
-                    value={formData.semester}
-                    onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="HK1">Học kỳ 1 (HK1)</option>
-                    <option value="HK2">Học kỳ 2 (HK2)</option>
-                    <option value="HK3">Học kỳ hè / phụ (HK3)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Năm học
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.academicYear}
-                    onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
-                    placeholder="2025-2026"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -800,9 +767,20 @@ export default function ExamBatchManagement({
             <form onSubmit={handleImportCSV} className="p-6 flex flex-col gap-4">
               {/* File Selector */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Chọn tệp CSV dữ liệu thi <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Chọn tệp CSV dữ liệu thi <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadSampleCSV(importingBatch)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
+                    title="Tải tệp CSV mẫu có sẵn dữ liệu ví dụ cho đợt thi này"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-600" />
+                    Tải file CSV mẫu
+                  </button>
+                </div>
                 <label className="border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50 hover:bg-indigo-50/40 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-colors text-center">
                   <FileSpreadsheet className="w-10 h-10 text-indigo-500 mb-2" />
                   <span className="text-sm font-bold text-slate-700">

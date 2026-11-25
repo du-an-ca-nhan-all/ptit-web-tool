@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Đợt thi ${cleanBatchCode} không tồn tại` }, { status: 404 });
     }
 
-    const csvText = await file.text();
+    const csvText = (await file.text()).replace(/^\uFEFF/, '');
     const parsed = Papa.parse<any>(csvText, {
       header: true,
       skipEmptyLines: true,

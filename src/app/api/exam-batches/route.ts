@@ -17,6 +17,29 @@ async function getAuthUser(req: NextRequest) {
   return authUser;
 }
 
+async function generateUniqueBatchCode(name: string): Promise<string> {
+  const normalized = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 32);
+
+  const baseCode = normalized || `DOT_THI_${Date.now()}`;
+  let candidate = baseCode;
+  let counter = 2;
+
+  while (await prisma.examBatch.findUnique({ where: { code: candidate }, select: { id: true } })) {
+    candidate = `${baseCode}_${counter}`;
+    counter += 1;
+  }
+
+  return candidate;
+}
+
 // GET /api/exam-batches
 // Returns all exam batches with summary statistics (Cached)
 export async function GET() {
@@ -51,15 +74,21 @@ export async function POST(req: NextRequest) {
 
     // 1. ACTION: CREATE
     if (action === 'CREATE') {
-      if (!code || !name) {
-        return NextResponse.json({ error: 'Mã đợt thi (code) và Tên đợt thi (name) là bắt buộc' }, { status: 400 });
+      const cleanName = name ? String(name).trim() : '';
+      if (!cleanName) {
+        return NextResponse.json({ error: 'Tên đợt thi (name) là bắt buộc' }, { status: 400 });
       }
 
-      const cleanCode = String(code).trim().toUpperCase();
+      const rawCode = code ? String(code).trim().toUpperCase() : '';
+      let cleanCode = rawCode;
 
-      const existing = await prisma.examBatch.findUnique({ where: { code: cleanCode } });
-      if (existing) {
-        return NextResponse.json({ error: `Mã đợt thi ${cleanCode} đã tồn tại` }, { status: 400 });
+      if (cleanCode) {
+        const existing = await prisma.examBatch.findUnique({ where: { code: cleanCode } });
+        if (existing) {
+          return NextResponse.json({ error: `Mã đợt thi ${cleanCode} đã tồn tại` }, { status: 400 });
+        }
+      } else {
+        cleanCode = await generateUniqueBatchCode(cleanName);
       }
 
       if (isActive) {
@@ -70,7 +99,7 @@ export async function POST(req: NextRequest) {
       const newBatch = await prisma.examBatch.create({
         data: {
           code: cleanCode,
-          name: String(name).trim(),
+          name: cleanName,
           semester: semester ? String(semester).trim() : null,
           academicYear: academicYear ? String(academicYear).trim() : null,
           startDate: startDate ? String(startDate).trim() : null,
