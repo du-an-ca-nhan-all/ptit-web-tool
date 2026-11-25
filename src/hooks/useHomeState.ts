@@ -329,6 +329,7 @@ const TABS_REQUIRING_EXAM_RECORDS: NavigationTab[] = [
 
       if (activeTab === 'personal_schedule' && effectiveUser?.username) {
         params.set('maSV', effectiveUser.username);
+        params.set('includeClassmatesCount', 'true');
       } else if ((activeTab === 'members' || activeTab === 'monitor') && monitorClass && monitorClass !== 'ALL') {
         params.set('classCode', monitorClass);
       }

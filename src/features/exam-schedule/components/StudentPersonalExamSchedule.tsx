@@ -239,6 +239,42 @@ export default function StudentPersonalExamSchedule({
     } catch {}
   };
 
+  // Map room classmate stats from batch DB records so QLDTTX views can also display them when matched
+  const roomClassStatsLookup = useMemo(() => {
+    const normalizeDateKey = (dateStr?: string) => {
+      if (!dateStr) return '';
+      const parts = dateStr.trim().split('/');
+      if (parts.length !== 3) return dateStr.trim();
+      return `${Number(parts[0])}/${Number(parts[1])}/${Number(parts[2])}`;
+    };
+
+    const byFullKey = new Map<string, { classmates: number; total?: number }>();
+    const bySubjectRoom = new Map<string, { classmates: number; total?: number }>();
+
+    for (const rec of records) {
+      if (rec.roomClassmateCount === undefined) continue;
+      const maMH = String(rec.MaMH || '').trim().toUpperCase();
+      const mapThi = String(rec.MAPTHI || '').trim().toUpperCase();
+      const ngay = normalizeDateKey(rec.NgayThi);
+      const stat = { classmates: rec.roomClassmateCount, total: rec.roomTotalCount };
+
+      if (maMH && mapThi && ngay) {
+        byFullKey.set(`${maMH}|${ngay}|${mapThi}`, stat);
+      }
+      if (maMH && mapThi) {
+        bySubjectRoom.set(`${maMH}|${mapThi}`, stat);
+      }
+    }
+
+    return (maMon?: string, ngayThi?: string, maPhong?: string) => {
+      const mh = String(maMon || '').trim().toUpperCase();
+      const rm = String(maPhong || '').trim().toUpperCase();
+      const dt = normalizeDateKey(ngayThi);
+      if (!mh || !rm) return null;
+      return byFullKey.get(`${mh}|${dt}|${rm}`) || bySubjectRoom.get(`${mh}|${rm}`) || null;
+    };
+  }, [records]);
+
   // Sync QLDTTX filters and view modes to URL query parameters
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1199,6 +1235,26 @@ export default function StudentPersonalExamSchedule({
                               {exam.maCoSo && (
                                 <span className="block text-[10px] text-slate-400 font-mono mt-0.5">{exam.maCoSo}</span>
                               )}
+                              {(() => {
+                                const roomStat = roomClassStatsLookup(exam.maMon, exam.ngayThi, exam.maPhong);
+                                if (!roomStat) return null;
+                                return (
+                                  <span
+                                    title={`Có ${roomStat.classmates} sinh viên lớp bạn${
+                                      roomStat.total !== undefined ? ` / tổng ${roomStat.total} SV` : ''
+                                    } trong phòng ${exam.maPhong}`}
+                                    className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                      roomStat.classmates > 1
+                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                                    }`}
+                                  >
+                                    <Users className="w-3 h-3 shrink-0" />
+                                    {roomStat.classmates} SV cùng lớp
+                                    {roomStat.total !== undefined ? ` / ${roomStat.total}` : ''}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="py-3.5 px-4 font-mono">
                               <div className="text-slate-900 font-bold">Tổ {exam.toThi || '-'}</div>
@@ -1957,14 +2013,26 @@ export default function StudentPersonalExamSchedule({
                         </div>
 
                         {/* Footer Link: View classmates in this room */}
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                          <span className="text-indigo-600 font-bold flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5" />
-                            <span>Xem Bạn Cùng Phòng Thi</span>
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] flex-wrap">
+                          <span
+                            className={`font-bold flex items-center gap-1 ${
+                              rec.roomClassmateCount !== undefined && rec.roomClassmateCount > 1
+                                ? 'text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full'
+                                : 'text-indigo-600'
+                            }`}
+                          >
+                            <Users className="w-3.5 h-3.5 shrink-0" />
+                            <span>
+                              {rec.roomClassmateCount !== undefined
+                                ? `Cùng lớp: ${rec.roomClassmateCount} SV${
+                                    rec.roomTotalCount !== undefined ? ` / ${rec.roomTotalCount} SV` : ''
+                                  }`
+                                : 'Xem Bạn Cùng Phòng Thi'}
+                            </span>
                           </span>
 
                           <span className="text-indigo-600 font-bold flex items-center gap-0.5">
-                            Chi tiết &rarr;
+                            Xem phòng thi &rarr;
                           </span>
                         </div>
                       </div>
@@ -2028,6 +2096,7 @@ export default function StudentPersonalExamSchedule({
                   onTogglePostpone={handleToggleExamPostpone}
                   canEditPostpone={canAccessMonitorTools}
                   hideStatusColumn={true}
+                  showRoomClassmatesColumn={true}
                   isLoading={isLoadingBatchData}
                 />
               </div>

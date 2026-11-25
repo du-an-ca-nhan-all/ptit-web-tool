@@ -21,6 +21,8 @@ export interface ExamRecord {
   TenDotThi: string;
   batchCode?: string;
   isPostponed?: boolean; // true nếu không thi môn này hoặc hoãn thi (không chia tiền đầu người)
+  roomClassmateCount?: number; // Số sinh viên cùng lớp trong phòng thi này (tính cả bản thân)
+  roomTotalCount?: number; // Tổng số sinh viên trong phòng thi này
   [key: string]: any;
 }
 

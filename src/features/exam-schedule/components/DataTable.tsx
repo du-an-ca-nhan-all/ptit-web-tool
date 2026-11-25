@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { ExamRecord, SortKey, SortDirection } from '../types/exam.types';
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Users } from 'lucide-react';
 
 export type { SortKey, SortDirection };
 
@@ -22,6 +22,7 @@ interface DataTableProps {
   onTogglePostpone?: (record: ExamRecord, newStatus: boolean) => Promise<void> | void;
   canEditPostpone?: boolean;
   hideStatusColumn?: boolean;
+  showRoomClassmatesColumn?: boolean;
   isLoading?: boolean;
 }
 
@@ -41,6 +42,7 @@ export default function DataTable({
   onTogglePostpone,
   canEditPostpone = false,
   hideStatusColumn = false,
+  showRoomClassmatesColumn = false,
   isLoading = false,
 }: DataTableProps) {
   const isServerPaginated = Boolean(onPageChange);
@@ -283,6 +285,11 @@ export default function DataTable({
               <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 text-center">
                 HT
               </th>
+              {showRoomClassmatesColumn && (
+                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 text-center">
+                  Cùng lớp trong phòng
+                </th>
+              )}
               {!hideStatusColumn && (
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 text-center">
                   Trạng thái thi
@@ -352,6 +359,32 @@ export default function DataTable({
                     {record.MaHTThi || 'Thi'}
                   </span>
                 </td>
+                {showRoomClassmatesColumn && (
+                  <td className="px-6 py-4 text-center">
+                    {record.roomClassmateCount !== undefined ? (
+                      <span
+                        title={`Có ${record.roomClassmateCount} sinh viên lớp ${record.MaLop || 'của bạn'}${
+                          record.roomTotalCount !== undefined ? ` / tổng ${record.roomTotalCount} SV` : ''
+                        } trong phòng ${record.MAPTHI || ''}. Bấm để xem danh sách phòng thi.`}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                          record.roomClassmateCount > 1
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        <Users className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {record.roomClassmateCount} SV
+                          {record.roomTotalCount !== undefined && (
+                            <span className="font-medium opacity-75"> / {record.roomTotalCount}</span>
+                          )}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </td>
+                )}
                 {!hideStatusColumn && (
                   <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                     {onTogglePostpone && canEditPostpone ? (

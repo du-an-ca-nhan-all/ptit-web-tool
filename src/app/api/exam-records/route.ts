@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     const gioThi = searchParams.get('gioThi') || undefined;
     const maSV = searchParams.get('maSV') || undefined;
     const search = searchParams.get('search') || undefined;
+    const includeClassmatesCount = searchParams.get('includeClassmatesCount') === 'true';
     const distinct = searchParams.get('distinct');
 
     // Distinct filter metadata
@@ -148,6 +149,112 @@ export async function GET(req: NextRequest) {
       orderBy = [{ ngayThi: sortDir }, { gioThi: sortDir }];
     }
 
+    const enrichWithRoomClassStats = async (formattedRecords: ReturnType<typeof formatRecord>[]) => {
+      if (!includeClassmatesCount || formattedRecords.length === 0) {
+        return formattedRecords;
+      }
+
+      const makeRoomKey = (b: string, mh: string, dt: string, tm: string, rm: string) =>
+        `${b}|${mh}|${dt}|${tm}|${rm}`;
+
+      const uniqueRoomConditions = new Map<
+        string,
+        { batchCode?: string; maMH: string; ngayThi: string; gioThi: string; mapThi: string }
+      >();
+
+      for (const rec of formattedRecords) {
+        if (!rec.MaMH || !rec.NgayThi || !rec.MAPTHI) continue;
+        const bCode = rec.batchCode || '';
+        const key = makeRoomKey(bCode, rec.MaMH, rec.NgayThi, rec.GioThi || '', rec.MAPTHI);
+        if (!uniqueRoomConditions.has(key)) {
+          uniqueRoomConditions.set(key, {
+            ...(bCode ? { batchCode: bCode } : {}),
+            maMH: rec.MaMH,
+            ngayThi: rec.NgayThi,
+            gioThi: rec.GioThi || '',
+            mapThi: rec.MAPTHI,
+          });
+        }
+      }
+
+      if (uniqueRoomConditions.size === 0) {
+        return formattedRecords;
+      }
+
+      const roomRows = await prisma.examRecord.findMany({
+        where: {
+          OR: Array.from(uniqueRoomConditions.values()).map((cond) => ({
+            ...(cond.batchCode ? { batchCode: cond.batchCode } : {}),
+            maMH: cond.maMH,
+            ngayThi: cond.ngayThi,
+            ...(cond.gioThi ? { gioThi: cond.gioThi } : {}),
+            mapThi: cond.mapThi,
+          })),
+        },
+        select: {
+          batchCode: true,
+          maMH: true,
+          ngayThi: true,
+          gioThi: true,
+          mapThi: true,
+          maSV: true,
+          maLopMH: true,
+          student: {
+            select: {
+              maLop: true,
+            },
+          },
+        },
+      });
+
+      // Group unique students per room and per (room, class)
+      const roomTotalMap = new Map<string, Set<string>>();
+      const roomClassMap = new Map<string, Map<string, Set<string>>>();
+
+      for (const row of roomRows) {
+        const key = makeRoomKey(
+          row.batchCode || '',
+          row.maMH || '',
+          row.ngayThi || '',
+          row.gioThi || '',
+          row.mapThi || ''
+        );
+        const studentId = String(row.maSV || '').trim().toUpperCase();
+        if (!studentId) continue;
+
+        if (!roomTotalMap.has(key)) {
+          roomTotalMap.set(key, new Set());
+        }
+        roomTotalMap.get(key)!.add(studentId);
+
+        const rowClass = String(row.student?.maLop || row.maLopMH || '').trim().toUpperCase();
+        if (rowClass) {
+          if (!roomClassMap.has(key)) {
+            roomClassMap.set(key, new Map());
+          }
+          const classMap = roomClassMap.get(key)!;
+          if (!classMap.has(rowClass)) {
+            classMap.set(rowClass, new Set());
+          }
+          classMap.get(rowClass)!.add(studentId);
+        }
+      }
+
+      return formattedRecords.map((rec) => {
+        if (!rec.MaMH || !rec.NgayThi || !rec.MAPTHI) return rec;
+        const key = makeRoomKey(rec.batchCode || '', rec.MaMH, rec.NgayThi, rec.GioThi || '', rec.MAPTHI);
+        const totalSet = roomTotalMap.get(key);
+        const myClass = String(rec.MaLop || '').trim().toUpperCase();
+        const classmateSet = myClass ? roomClassMap.get(key)?.get(myClass) : undefined;
+
+        return {
+          ...rec,
+          roomTotalCount: totalSet ? totalSet.size : undefined,
+          roomClassmateCount: classmateSet ? classmateSet.size : totalSet ? 0 : undefined,
+        };
+      });
+    };
+
     if (all) {
       const records = await prisma.examRecord.findMany({
         where,
@@ -157,8 +264,10 @@ export async function GET(req: NextRequest) {
         orderBy,
       });
 
+      const formatted = await enrichWithRoomClassStats(records.map(formatRecord));
+
       return NextResponse.json({
-        records: records.map(formatRecord),
+        records: formatted,
         total: records.length,
       });
     }
@@ -180,8 +289,10 @@ export async function GET(req: NextRequest) {
       prisma.examRecord.count({ where }),
     ]);
 
+    const formatted = await enrichWithRoomClassStats(records.map(formatRecord));
+
     return NextResponse.json({
-      records: records.map(formatRecord),
+      records: formatted,
       total,
       page,
       totalPages: Math.ceil(total / limit),
