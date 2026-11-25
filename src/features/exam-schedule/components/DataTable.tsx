@@ -21,6 +21,7 @@ interface DataTableProps {
   onRowClick?: (record: ExamRecord) => void;
   onTogglePostpone?: (record: ExamRecord, newStatus: boolean) => Promise<void> | void;
   canEditPostpone?: boolean;
+  hideStatusColumn?: boolean;
   isLoading?: boolean;
 }
 
@@ -39,6 +40,7 @@ export default function DataTable({
   onRowClick,
   onTogglePostpone,
   canEditPostpone = false,
+  hideStatusColumn = false,
   isLoading = false,
 }: DataTableProps) {
   const isServerPaginated = Boolean(onPageChange);
@@ -281,9 +283,11 @@ export default function DataTable({
               <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 text-center">
                 HT
               </th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 text-center">
-                Trạng thái thi
-              </th>
+              {!hideStatusColumn && (
+                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 text-center">
+                  Trạng thái thi
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -348,38 +352,40 @@ export default function DataTable({
                     {record.MaHTThi || 'Thi'}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                  {onTogglePostpone && canEditPostpone ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onTogglePostpone(record, !record.isPostponed);
-                      }}
-                      title={
-                        record.isPostponed
-                          ? 'Bấm để chuyển về Dự thi (sẽ tính tiền)'
-                          : 'Bấm để đánh dấu Hoãn thi / Không thi (không tính chia tiền)'
-                      }
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                        record.isPostponed
-                          ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 shadow-xs'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300'
-                      }`}
-                    >
-                      {record.isPostponed ? '✕ Hoãn thi' : '✓ Dự thi'}
-                    </button>
-                  ) : (
-                    <span
-                      className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold border ${
-                        record.isPostponed
-                          ? 'bg-amber-100 text-amber-800 border-amber-300'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      }`}
-                    >
-                      {record.isPostponed ? 'Hoãn thi' : 'Dự thi'}
-                    </span>
-                  )}
-                </td>
+                {!hideStatusColumn && (
+                  <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                    {onTogglePostpone && canEditPostpone ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTogglePostpone(record, !record.isPostponed);
+                        }}
+                        title={
+                          record.isPostponed
+                            ? 'Bấm để chuyển về Dự thi (sẽ tính tiền)'
+                            : 'Bấm để đánh dấu Hoãn thi / Không thi (không tính chia tiền)'
+                        }
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                          record.isPostponed
+                            ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 shadow-xs'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300'
+                        }`}
+                      >
+                        {record.isPostponed ? '✕ Hoãn thi' : '✓ Dự thi'}
+                      </button>
+                    ) : (
+                      <span
+                        className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold border ${
+                          record.isPostponed
+                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}
+                      >
+                        {record.isPostponed ? 'Hoãn thi' : 'Dự thi'}
+                      </span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

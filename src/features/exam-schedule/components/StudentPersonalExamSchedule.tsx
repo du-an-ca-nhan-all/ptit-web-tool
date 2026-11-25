@@ -2027,6 +2027,7 @@ export default function StudentPersonalExamSchedule({
                   onRowClick={setSelectedExamRoom}
                   onTogglePostpone={handleToggleExamPostpone}
                   canEditPostpone={canAccessMonitorTools}
+                  hideStatusColumn={true}
                   isLoading={isLoadingBatchData}
                 />
               </div>
