@@ -1,3 +1,9 @@
+export interface ExamRoomReviewMember {
+  maSV: string;
+  hoTen: string;
+  maLop: string;
+}
+
 export interface ExamRecord {
   id?: number;
   MaSV: string;
@@ -26,6 +32,8 @@ export interface ExamRecord {
   isUserInReviewBatch?: boolean; // Người dùng hiện tại có trong danh sách đăng ký ôn tập đợt này không
   roomReviewSameClassCount?: number; // Số SV lớp mình đăng ký ôn tập trong phòng thi này
   roomReviewOtherClassCount?: number; // Số SV lớp khác đăng ký ôn tập trong phòng thi này
+  roomReviewSameClassMembers?: ExamRoomReviewMember[]; // Danh sách SV lớp mình đăng ký ôn tập trong phòng
+  roomReviewOtherClassMembers?: ExamRoomReviewMember[]; // Danh sách SV lớp khác đăng ký ôn tập trong phòng
   [key: string]: any;
 }
 

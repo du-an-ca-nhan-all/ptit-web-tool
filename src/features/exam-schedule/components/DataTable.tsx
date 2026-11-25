@@ -23,6 +23,7 @@ interface DataTableProps {
   canEditPostpone?: boolean;
   hideStatusColumn?: boolean;
   showRoomClassmatesColumn?: boolean;
+  onViewRoomReviewMembers?: (record: ExamRecord) => void;
   isLoading?: boolean;
 }
 
@@ -43,6 +44,7 @@ export default function DataTable({
   canEditPostpone = false,
   hideStatusColumn = false,
   showRoomClassmatesColumn = false,
+  onViewRoomReviewMembers,
   isLoading = false,
 }: DataTableProps) {
   const isServerPaginated = Boolean(onPageChange);
@@ -382,15 +384,18 @@ export default function DataTable({
                           </span>
                         </span>
                         {record.isUserInReviewBatch && record.roomReviewSameClassCount !== undefined && (
-                          <span
-                            title={`Đăng ký ôn tập trong phòng ${record.MAPTHI || ''}: ${
-                              record.roomReviewSameClassCount
-                            } SV lớp mình và ${record.roomReviewOtherClassCount ?? 0} SV lớp khác`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onViewRoomReviewMembers?.(record);
+                            }}
+                            title={`Bấm để xem danh sách tên đăng ký ôn tập trong phòng ${record.MAPTHI || ''}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
                           >
                             Ôn tập: {record.roomReviewSameClassCount} lớp mình •{' '}
                             {record.roomReviewOtherClassCount ?? 0} lớp khác
-                          </span>
+                          </button>
                         )}
                       </div>
                     ) : (

@@ -230,6 +230,7 @@ export default function StudentPersonalExamSchedule({
 
   // Modal & Copy
   const [selectedExamModal, setSelectedExamModal] = useState<StudentQldtExamItem | null>(null);
+  const [reviewMembersModalRecord, setReviewMembersModalRecord] = useState<ExamRecord | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [allStudentFileRecords, setAllStudentFileRecords] = useState<ExamRecord[]>([]);
 
@@ -1326,15 +1327,18 @@ export default function StudentPersonalExamSchedule({
                                     </button>
                                     {roomStat.record.isUserInReviewBatch &&
                                       roomStat.record.roomReviewSameClassCount !== undefined && (
-                                        <span
-                                          title={`Đăng ký ôn tập trong phòng ${roomStat.record.MAPTHI || exam.maPhong}: ${
-                                            roomStat.record.roomReviewSameClassCount
-                                          } lớp mình và ${roomStat.record.roomReviewOtherClassCount ?? 0} lớp khác`}
-                                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setReviewMembersModalRecord(roomStat.record);
+                                          }}
+                                          title={`Bấm để xem danh sách tên đăng ký ôn tập trong phòng ${roomStat.record.MAPTHI || exam.maPhong}`}
+                                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition cursor-pointer"
                                         >
                                           Ôn tập: {roomStat.record.roomReviewSameClassCount} lớp mình •{' '}
                                           {roomStat.record.roomReviewOtherClassCount ?? 0} lớp khác
-                                        </span>
+                                        </button>
                                       )}
                                   </div>
                                 );
@@ -1512,10 +1516,18 @@ export default function StudentPersonalExamSchedule({
                                     <span className="text-emerald-700 font-semibold text-[11px]">
                                       Ôn tập trong phòng:
                                     </span>
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setReviewMembersModalRecord(roomStat.record);
+                                      }}
+                                      title="Bấm để xem danh sách tên đăng ký ôn tập trong phòng"
+                                      className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition cursor-pointer"
+                                    >
                                       {roomStat.record.roomReviewSameClassCount} lớp mình •{' '}
                                       {roomStat.record.roomReviewOtherClassCount ?? 0} lớp khác
-                                    </span>
+                                    </button>
                                   </div>
                                 )}
                             </>
@@ -1666,10 +1678,18 @@ export default function StudentPersonalExamSchedule({
                                       </button>
                                       {roomStat.record.isUserInReviewBatch &&
                                         roomStat.record.roomReviewSameClassCount !== undefined && (
-                                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setReviewMembersModalRecord(roomStat.record);
+                                            }}
+                                            title="Bấm để xem danh sách tên đăng ký ôn tập trong phòng"
+                                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition cursor-pointer"
+                                          >
                                             Ôn tập: {roomStat.record.roomReviewSameClassCount} lớp mình •{' '}
                                             {roomStat.record.roomReviewOtherClassCount ?? 0} lớp khác
-                                          </span>
+                                          </button>
                                         )}
                                     </>
                                   );
@@ -1926,6 +1946,13 @@ export default function StudentPersonalExamSchedule({
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200">
                                   {roomStat.record.roomReviewOtherClassCount ?? 0} lớp khác
                                 </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setReviewMembersModalRecord(roomStat.record)}
+                                  className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer"
+                                >
+                                  Xem tên &rarr;
+                                </button>
                               </div>
                             </div>
                           )}
@@ -2250,10 +2277,17 @@ export default function StudentPersonalExamSchedule({
 
                           {rec.isUserInReviewBatch && rec.roomReviewSameClassCount !== undefined && (
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReviewMembersModalRecord(rec);
+                                }}
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition cursor-pointer"
+                              >
                                 Ôn tập: {rec.roomReviewSameClassCount} lớp mình •{' '}
-                                {rec.roomReviewOtherClassCount ?? 0} lớp khác
-                              </span>
+                                {rec.roomReviewOtherClassCount ?? 0} lớp khác (Xem tên)
+                              </button>
                             </div>
                           )}
                         </div>
@@ -2319,11 +2353,171 @@ export default function StudentPersonalExamSchedule({
                   canEditPostpone={canAccessMonitorTools}
                   hideStatusColumn={true}
                   showRoomClassmatesColumn={true}
+                  onViewRoomReviewMembers={setReviewMembersModalRecord}
                   isLoading={isLoadingBatchData}
                 />
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Modal Danh Sách Sinh Viên Đăng Ký Ôn Tập Trong Phòng Thi */}
+      {reviewMembersModalRecord && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 print:hidden"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setReviewMembersModalRecord(null);
+          }}
+        >
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-4 sm:p-5 text-white flex items-start justify-between gap-3 shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">
+                  <Users className="w-5 h-5 shrink-0" />
+                  <span>Danh Sách Ôn Tập • Phòng {reviewMembersModalRecord.MAPTHI || '—'}</span>
+                </h3>
+                <p className="text-emerald-100 text-xs mt-1">
+                  <b className="text-white">{reviewMembersModalRecord.TenMH || reviewMembersModalRecord.MaMH}</b>
+                  {reviewMembersModalRecord.NgayThi ? ` • ${reviewMembersModalRecord.NgayThi}` : ''}
+                  {reviewMembersModalRecord.GioThi ? ` (${reviewMembersModalRecord.GioThi})` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewMembersModalRecord(null)}
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-full transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-5">
+              {/* Group 1: Same Class */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    Lớp mình ({reviewMembersModalRecord.MaLop || currentUser.lop || 'Cùng lớp'})
+                  </h4>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {reviewMembersModalRecord.roomReviewSameClassMembers?.length ??
+                      reviewMembersModalRecord.roomReviewSameClassCount ??
+                      0}{' '}
+                    SV
+                  </span>
+                </div>
+
+                {reviewMembersModalRecord.roomReviewSameClassMembers &&
+                reviewMembersModalRecord.roomReviewSameClassMembers.length > 0 ? (
+                  <div className="divide-y divide-slate-100 rounded-2xl border border-emerald-100 bg-emerald-50/30 overflow-hidden">
+                    {reviewMembersModalRecord.roomReviewSameClassMembers.map((member, idx) => {
+                      const isMe =
+                        member.maSV.toUpperCase() === String(currentUser.username || '').trim().toUpperCase();
+                      return (
+                        <div
+                          key={member.maSV}
+                          className="px-3.5 py-2.5 flex items-center justify-between gap-2 text-xs"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="text-[11px] font-mono font-bold text-slate-400 w-5 text-center shrink-0">
+                              {idx + 1}
+                            </span>
+                            <span className="font-bold text-slate-800 truncate">{member.hoTen}</span>
+                            {isMe && (
+                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-white shrink-0">
+                                Bạn
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-mono font-semibold text-indigo-700 text-[11px] shrink-0">
+                            {member.maSV}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    Không có sinh viên lớp mình đăng ký ôn tập trong phòng này.
+                  </p>
+                )}
+              </div>
+
+              {/* Group 2: Other Classes */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-black text-teal-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-teal-500" />
+                    Lớp khác
+                  </h4>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                    {reviewMembersModalRecord.roomReviewOtherClassMembers?.length ??
+                      reviewMembersModalRecord.roomReviewOtherClassCount ??
+                      0}{' '}
+                    SV
+                  </span>
+                </div>
+
+                {reviewMembersModalRecord.roomReviewOtherClassMembers &&
+                reviewMembersModalRecord.roomReviewOtherClassMembers.length > 0 ? (
+                  <div className="divide-y divide-slate-100 rounded-2xl border border-teal-100 bg-teal-50/20 overflow-hidden">
+                    {reviewMembersModalRecord.roomReviewOtherClassMembers.map((member, idx) => (
+                      <div
+                        key={member.maSV}
+                        className="px-3.5 py-2.5 flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-[11px] font-mono font-bold text-slate-400 w-5 text-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-800 truncate">{member.hoTen}</div>
+                            {member.maLop && (
+                              <span className="inline-block mt-0.5 text-[10px] font-mono font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.2 rounded">
+                                {member.maLop}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="font-mono font-semibold text-slate-600 text-[11px] shrink-0">
+                          {member.maSV}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    Không có sinh viên lớp khác đăng ký ôn tập trong phòng này.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = reviewMembersModalRecord;
+                  setReviewMembersModalRecord(null);
+                  handleOpenRoomMembersFromQldt(target);
+                }}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+              >
+                Xem toàn bộ phòng thi &rarr;
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewMembersModalRecord(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

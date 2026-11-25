@@ -202,15 +202,21 @@ export async function GET(req: NextRequest) {
           student: {
             select: {
               maLop: true,
+              hoLot: true,
+              ten: true,
+              hoTen: true,
             },
           },
         },
       });
 
-      // Group unique students per room and per (room, class), and track student class per room
+      // Group unique students per room and per (room, class), and track student info per room
       const roomTotalMap = new Map<string, Set<string>>();
       const roomClassMap = new Map<string, Map<string, Set<string>>>();
-      const roomStudentClassMap = new Map<string, Map<string, string>>();
+      const roomStudentInfoMap = new Map<
+        string,
+        Map<string, { maSV: string; hoTen: string; ten: string; maLop: string }>
+      >();
       const allStudentIds = new Set<string>();
       const batchCodeSet = new Set<string>();
 
@@ -238,11 +244,22 @@ export async function GET(req: NextRequest) {
         roomTotalMap.get(key)!.add(studentId);
 
         const rowClass = String(row.student?.maLop || row.maLopMH || '').trim().toUpperCase();
-        if (!roomStudentClassMap.has(key)) {
-          roomStudentClassMap.set(key, new Map());
+        const hoTen =
+          row.student?.hoTen?.trim() ||
+          `${row.student?.hoLot || ''} ${row.student?.ten || ''}`.trim() ||
+          studentId;
+        const ten = row.student?.ten?.trim() || '';
+
+        if (!roomStudentInfoMap.has(key)) {
+          roomStudentInfoMap.set(key, new Map());
         }
-        if (rowClass || !roomStudentClassMap.get(key)!.has(studentId)) {
-          roomStudentClassMap.get(key)!.set(studentId, rowClass);
+        if (rowClass || !roomStudentInfoMap.get(key)!.has(studentId)) {
+          roomStudentInfoMap.get(key)!.set(studentId, {
+            maSV: studentId,
+            hoTen,
+            ten,
+            maLop: rowClass,
+          });
         }
 
         if (rowClass) {
@@ -280,6 +297,17 @@ export async function GET(req: NextRequest) {
         )
       );
 
+      const sortMembersByName = (
+        a: { ten: string; hoTen: string; maSV: string },
+        b: { ten: string; hoTen: string; maSV: string }
+      ) => {
+        const tCmp = a.ten.localeCompare(b.ten, 'vi');
+        if (tCmp !== 0) return tCmp;
+        const hCmp = a.hoTen.localeCompare(b.hoTen, 'vi');
+        if (hCmp !== 0) return hCmp;
+        return a.maSV.localeCompare(b.maSV);
+      };
+
       return formattedRecords.map((rec) => {
         if (!rec.MaMH || !rec.NgayThi || !rec.MAPTHI) return rec;
         const bCode = String(rec.batchCode || '').trim().toUpperCase();
@@ -292,23 +320,33 @@ export async function GET(req: NextRequest) {
         const isUserInReviewBatch = Boolean(bCode && myMaSV && registeredReviewSet.has(`${bCode}|${myMaSV}`));
         let roomReviewSameClassCount: number | undefined;
         let roomReviewOtherClassCount: number | undefined;
+        let roomReviewSameClassMembers: Array<{ maSV: string; hoTen: string; maLop: string }> | undefined;
+        let roomReviewOtherClassMembers: Array<{ maSV: string; hoTen: string; maLop: string }> | undefined;
 
         if (isUserInReviewBatch) {
-          const studentsInRoom = roomStudentClassMap.get(key);
-          let sameCount = 0;
-          let otherCount = 0;
+          const studentsInRoom = roomStudentInfoMap.get(key);
+          const sameList: Array<{ maSV: string; hoTen: string; ten: string; maLop: string }> = [];
+          const otherList: Array<{ maSV: string; hoTen: string; ten: string; maLop: string }> = [];
           if (studentsInRoom) {
-            for (const [stId, stClass] of studentsInRoom.entries()) {
+            for (const [stId, stInfo] of studentsInRoom.entries()) {
               if (!registeredReviewSet.has(`${bCode}|${stId}`)) continue;
-              if (myClass && stClass === myClass) {
-                sameCount += 1;
+              if (myClass && stInfo.maLop === myClass) {
+                sameList.push(stInfo);
               } else {
-                otherCount += 1;
+                otherList.push(stInfo);
               }
             }
           }
-          roomReviewSameClassCount = sameCount;
-          roomReviewOtherClassCount = otherCount;
+          sameList.sort(sortMembersByName);
+          otherList.sort((a, b) => {
+            const clsCmp = a.maLop.localeCompare(b.maLop);
+            if (clsCmp !== 0) return clsCmp;
+            return sortMembersByName(a, b);
+          });
+          roomReviewSameClassCount = sameList.length;
+          roomReviewOtherClassCount = otherList.length;
+          roomReviewSameClassMembers = sameList.map(({ maSV, hoTen, maLop }) => ({ maSV, hoTen, maLop }));
+          roomReviewOtherClassMembers = otherList.map(({ maSV, hoTen, maLop }) => ({ maSV, hoTen, maLop }));
         }
 
         return {
@@ -318,6 +356,8 @@ export async function GET(req: NextRequest) {
           isUserInReviewBatch,
           roomReviewSameClassCount,
           roomReviewOtherClassCount,
+          roomReviewSameClassMembers,
+          roomReviewOtherClassMembers,
         };
       });
     };
