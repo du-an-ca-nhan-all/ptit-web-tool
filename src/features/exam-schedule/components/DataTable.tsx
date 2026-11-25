@@ -362,24 +362,37 @@ export default function DataTable({
                 {showRoomClassmatesColumn && (
                   <td className="px-6 py-4 text-center">
                     {record.roomClassmateCount !== undefined ? (
-                      <span
-                        title={`Có ${record.roomClassmateCount} sinh viên lớp ${record.MaLop || 'của bạn'}${
-                          record.roomTotalCount !== undefined ? ` / tổng ${record.roomTotalCount} SV` : ''
-                        } trong phòng ${record.MAPTHI || ''}. Bấm để xem danh sách phòng thi.`}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                          record.roomClassmateCount > 1
-                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                        }`}
-                      >
-                        <Users className="w-3.5 h-3.5 shrink-0" />
-                        <span>
-                          {record.roomClassmateCount} SV
-                          {record.roomTotalCount !== undefined && (
-                            <span className="font-medium opacity-75"> / {record.roomTotalCount}</span>
-                          )}
+                      <div className="flex flex-col items-center gap-1">
+                        <span
+                          title={`Có ${record.roomClassmateCount} sinh viên lớp ${record.MaLop || 'của bạn'}${
+                            record.roomTotalCount !== undefined ? ` / tổng ${record.roomTotalCount} SV` : ''
+                          } trong phòng ${record.MAPTHI || ''}. Bấm để xem danh sách phòng thi.`}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                            record.roomClassmateCount > 1
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          <Users className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            {record.roomClassmateCount} SV
+                            {record.roomTotalCount !== undefined && (
+                              <span className="font-medium opacity-75"> / {record.roomTotalCount}</span>
+                            )}
+                          </span>
                         </span>
-                      </span>
+                        {record.isUserInReviewBatch && record.roomReviewSameClassCount !== undefined && (
+                          <span
+                            title={`Đăng ký ôn tập trong phòng ${record.MAPTHI || ''}: ${
+                              record.roomReviewSameClassCount
+                            } SV lớp mình và ${record.roomReviewOtherClassCount ?? 0} SV lớp khác`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          >
+                            Ôn tập: {record.roomReviewSameClassCount} lớp mình •{' '}
+                            {record.roomReviewOtherClassCount ?? 0} lớp khác
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-xs text-slate-400">—</span>
                     )}

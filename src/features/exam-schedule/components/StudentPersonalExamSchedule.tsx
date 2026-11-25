@@ -1304,25 +1304,39 @@ export default function StudentPersonalExamSchedule({
                                 const roomStat = roomClassStatsLookup(exam.maMon, exam.ngayThi, exam.maPhong);
                                 if (!roomStat) return null;
                                 return (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenRoomMembersFromQldt(roomStat.record);
-                                    }}
-                                    title={`Theo File lịch thi: có ${roomStat.classmates} sinh viên lớp bạn${
-                                      roomStat.total !== undefined ? ` / tổng ${roomStat.total} SV` : ''
-                                    } trong phòng ${roomStat.record.MAPTHI || exam.maPhong}. Bấm để xem danh sách phòng thi.`}
-                                    className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer ${
-                                      roomStat.classmates > 1
-                                        ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
-                                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
-                                    }`}
-                                  >
-                                    <Users className="w-3 h-3 shrink-0" />
-                                    {roomStat.classmates} SV cùng lớp
-                                    {roomStat.total !== undefined ? ` / ${roomStat.total}` : ''}
-                                  </button>
+                                  <div className="mt-1 flex flex-col items-start gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenRoomMembersFromQldt(roomStat.record);
+                                      }}
+                                      title={`Theo File lịch thi: có ${roomStat.classmates} sinh viên lớp bạn${
+                                        roomStat.total !== undefined ? ` / tổng ${roomStat.total} SV` : ''
+                                      } trong phòng ${roomStat.record.MAPTHI || exam.maPhong}. Bấm để xem danh sách phòng thi.`}
+                                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer ${
+                                        roomStat.classmates > 1
+                                          ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                                          : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
+                                      }`}
+                                    >
+                                      <Users className="w-3 h-3 shrink-0" />
+                                      {roomStat.classmates} SV cùng lớp
+                                      {roomStat.total !== undefined ? ` / ${roomStat.total}` : ''}
+                                    </button>
+                                    {roomStat.record.isUserInReviewBatch &&
+                                      roomStat.record.roomReviewSameClassCount !== undefined && (
+                                        <span
+                                          title={`Đăng ký ôn tập trong phòng ${roomStat.record.MAPTHI || exam.maPhong}: ${
+                                            roomStat.record.roomReviewSameClassCount
+                                          } lớp mình và ${roomStat.record.roomReviewOtherClassCount ?? 0} lớp khác`}
+                                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                        >
+                                          Ôn tập: {roomStat.record.roomReviewSameClassCount} lớp mình •{' '}
+                                          {roomStat.record.roomReviewOtherClassCount ?? 0} lớp khác
+                                        </span>
+                                      )}
+                                  </div>
                                 );
                               })()}
                             </td>
@@ -1470,27 +1484,41 @@ export default function StudentPersonalExamSchedule({
                           const roomStat = roomClassStatsLookup(exam.maMon, exam.ngayThi, exam.maPhong);
                           if (!roomStat) return null;
                           return (
-                            <div className="flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-1.5 text-slate-600 text-[11px] sm:text-xs">
-                                <Users className="w-3.5 h-3.5 text-indigo-600" />
-                                <span>Cùng lớp trong phòng:</span>
+                            <>
+                              <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5 text-slate-600 text-[11px] sm:text-xs">
+                                  <Users className="w-3.5 h-3.5 text-indigo-600" />
+                                  <span>Cùng lớp trong phòng:</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenRoomMembersFromQldt(roomStat.record);
+                                  }}
+                                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer ${
+                                    roomStat.classmates > 1
+                                      ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
+                                  }`}
+                                >
+                                  {roomStat.classmates} SV
+                                  {roomStat.total !== undefined ? ` / ${roomStat.total}` : ''}
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenRoomMembersFromQldt(roomStat.record);
-                                }}
-                                className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer ${
-                                  roomStat.classmates > 1
-                                    ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
-                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
-                                }`}
-                              >
-                                {roomStat.classmates} SV
-                                {roomStat.total !== undefined ? ` / ${roomStat.total}` : ''}
-                              </button>
-                            </div>
+                              {roomStat.record.isUserInReviewBatch &&
+                                roomStat.record.roomReviewSameClassCount !== undefined && (
+                                  <div className="flex items-center justify-between gap-2 text-xs">
+                                    <span className="text-emerald-700 font-semibold text-[11px]">
+                                      Ôn tập trong phòng:
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      {roomStat.record.roomReviewSameClassCount} lớp mình •{' '}
+                                      {roomStat.record.roomReviewOtherClassCount ?? 0} lớp khác
+                                    </span>
+                                  </div>
+                                )}
+                            </>
                           );
                         })()}
 
@@ -1619,22 +1647,31 @@ export default function StudentPersonalExamSchedule({
                                   const roomStat = roomClassStatsLookup(exam.maMon, exam.ngayThi, exam.maPhong);
                                   if (!roomStat) return null;
                                   return (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleOpenRoomMembersFromQldt(roomStat.record);
-                                      }}
-                                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer ${
-                                        roomStat.classmates > 1
-                                          ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
-                                          : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
-                                      }`}
-                                    >
-                                      <Users className="w-3 h-3 shrink-0" />
-                                      {roomStat.classmates} SV cùng lớp
-                                      {roomStat.total !== undefined ? ` / ${roomStat.total}` : ''}
-                                    </button>
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenRoomMembersFromQldt(roomStat.record);
+                                        }}
+                                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer ${
+                                          roomStat.classmates > 1
+                                            ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
+                                        }`}
+                                      >
+                                        <Users className="w-3 h-3 shrink-0" />
+                                        {roomStat.classmates} SV cùng lớp
+                                        {roomStat.total !== undefined ? ` / ${roomStat.total}` : ''}
+                                      </button>
+                                      {roomStat.record.isUserInReviewBatch &&
+                                        roomStat.record.roomReviewSameClassCount !== undefined && (
+                                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            Ôn tập: {roomStat.record.roomReviewSameClassCount} lớp mình •{' '}
+                                            {roomStat.record.roomReviewOtherClassCount ?? 0} lớp khác
+                                          </span>
+                                        )}
+                                    </>
                                   );
                                 })()}
                                 <span>•</span>
@@ -1850,31 +1887,49 @@ export default function StudentPersonalExamSchedule({
                     );
                     if (!roomStat) return null;
                     return (
-                      <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-200/60 flex-wrap">
-                        <span className="text-slate-500 font-medium flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5 text-indigo-600" />
-                          <span>Cùng lớp trong phòng (từ file):</span>
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                              roomStat.classmates > 1
-                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            {roomStat.classmates} SV
-                            {roomStat.total !== undefined ? ` / ${roomStat.total} SV` : ''}
+                      <>
+                        <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-200/60 flex-wrap">
+                          <span className="text-slate-500 font-medium flex items-center gap-1">
+                            <Users className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>Cùng lớp trong phòng (từ file):</span>
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenRoomMembersFromQldt(roomStat.record)}
-                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
-                          >
-                            Xem danh sách &rarr;
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                                roomStat.classmates > 1
+                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}
+                            >
+                              {roomStat.classmates} SV
+                              {roomStat.total !== undefined ? ` / ${roomStat.total} SV` : ''}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenRoomMembersFromQldt(roomStat.record)}
+                              className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                            >
+                              Xem danh sách &rarr;
+                            </button>
+                          </div>
                         </div>
-                      </div>
+                        {roomStat.record.isUserInReviewBatch &&
+                          roomStat.record.roomReviewSameClassCount !== undefined && (
+                            <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-200/60 flex-wrap">
+                              <span className="text-emerald-700 font-semibold">
+                                ĐK Ôn tập trong phòng:
+                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {roomStat.record.roomReviewSameClassCount} lớp mình
+                                </span>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                                  {roomStat.record.roomReviewOtherClassCount ?? 0} lớp khác
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                      </>
                     );
                   })()}
 
@@ -2169,27 +2224,38 @@ export default function StudentPersonalExamSchedule({
                         </div>
 
                         {/* Footer Link: View classmates in this room */}
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] flex-wrap">
-                          <span
-                            className={`font-bold flex items-center gap-1 ${
-                              rec.roomClassmateCount !== undefined && rec.roomClassmateCount > 1
-                                ? 'text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full'
-                                : 'text-indigo-600'
-                            }`}
-                          >
-                            <Users className="w-3.5 h-3.5 shrink-0" />
-                            <span>
-                              {rec.roomClassmateCount !== undefined
-                                ? `Cùng lớp: ${rec.roomClassmateCount} SV${
-                                    rec.roomTotalCount !== undefined ? ` / ${rec.roomTotalCount} SV` : ''
-                                  }`
-                                : 'Xem Bạn Cùng Phòng Thi'}
+                        <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5 text-[11px]">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span
+                              className={`font-bold flex items-center gap-1 ${
+                                rec.roomClassmateCount !== undefined && rec.roomClassmateCount > 1
+                                  ? 'text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full'
+                                  : 'text-indigo-600'
+                              }`}
+                            >
+                              <Users className="w-3.5 h-3.5 shrink-0" />
+                              <span>
+                                {rec.roomClassmateCount !== undefined
+                                  ? `Cùng lớp: ${rec.roomClassmateCount} SV${
+                                      rec.roomTotalCount !== undefined ? ` / ${rec.roomTotalCount} SV` : ''
+                                    }`
+                                  : 'Xem Bạn Cùng Phòng Thi'}
+                              </span>
                             </span>
-                          </span>
 
-                          <span className="text-indigo-600 font-bold flex items-center gap-0.5">
-                            Xem phòng thi &rarr;
-                          </span>
+                            <span className="text-indigo-600 font-bold flex items-center gap-0.5">
+                              Xem phòng thi &rarr;
+                            </span>
+                          </div>
+
+                          {rec.isUserInReviewBatch && rec.roomReviewSameClassCount !== undefined && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Ôn tập: {rec.roomReviewSameClassCount} lớp mình •{' '}
+                                {rec.roomReviewOtherClassCount ?? 0} lớp khác
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

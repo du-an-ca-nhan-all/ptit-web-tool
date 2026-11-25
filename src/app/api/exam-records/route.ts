@@ -207,9 +207,17 @@ export async function GET(req: NextRequest) {
         },
       });
 
-      // Group unique students per room and per (room, class)
+      // Group unique students per room and per (room, class), and track student class per room
       const roomTotalMap = new Map<string, Set<string>>();
       const roomClassMap = new Map<string, Map<string, Set<string>>>();
+      const roomStudentClassMap = new Map<string, Map<string, string>>();
+      const allStudentIds = new Set<string>();
+      const batchCodeSet = new Set<string>();
+
+      for (const rec of formattedRecords) {
+        if (rec.batchCode) batchCodeSet.add(rec.batchCode);
+        if (rec.MaSV) allStudentIds.add(String(rec.MaSV).trim().toUpperCase());
+      }
 
       for (const row of roomRows) {
         const key = makeRoomKey(
@@ -221,6 +229,8 @@ export async function GET(req: NextRequest) {
         );
         const studentId = String(row.maSV || '').trim().toUpperCase();
         if (!studentId) continue;
+        allStudentIds.add(studentId);
+        if (row.batchCode) batchCodeSet.add(row.batchCode);
 
         if (!roomTotalMap.has(key)) {
           roomTotalMap.set(key, new Set());
@@ -228,6 +238,13 @@ export async function GET(req: NextRequest) {
         roomTotalMap.get(key)!.add(studentId);
 
         const rowClass = String(row.student?.maLop || row.maLopMH || '').trim().toUpperCase();
+        if (!roomStudentClassMap.has(key)) {
+          roomStudentClassMap.set(key, new Map());
+        }
+        if (rowClass || !roomStudentClassMap.get(key)!.has(studentId)) {
+          roomStudentClassMap.get(key)!.set(studentId, rowClass);
+        }
+
         if (rowClass) {
           if (!roomClassMap.has(key)) {
             roomClassMap.set(key, new Map());
@@ -240,17 +257,67 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Fetch review registrations for all relevant batches & students in a single query
+      const batchCodes = Array.from(batchCodeSet);
+      const reviewRegs =
+        batchCodes.length > 0 && allStudentIds.size > 0
+          ? await prisma.examReviewRegistration.findMany({
+              where: {
+                batchCode: { in: batchCodes },
+                isRegistered: true,
+                maSV: { in: Array.from(allStudentIds) },
+              },
+              select: {
+                batchCode: true,
+                maSV: true,
+              },
+            })
+          : [];
+
+      const registeredReviewSet = new Set<string>(
+        reviewRegs.map(
+          (r) => `${String(r.batchCode).trim().toUpperCase()}|${String(r.maSV).trim().toUpperCase()}`
+        )
+      );
+
       return formattedRecords.map((rec) => {
         if (!rec.MaMH || !rec.NgayThi || !rec.MAPTHI) return rec;
+        const bCode = String(rec.batchCode || '').trim().toUpperCase();
         const key = makeRoomKey(rec.batchCode || '', rec.MaMH, rec.NgayThi, rec.GioThi || '', rec.MAPTHI);
         const totalSet = roomTotalMap.get(key);
         const myClass = String(rec.MaLop || '').trim().toUpperCase();
+        const myMaSV = String(rec.MaSV || '').trim().toUpperCase();
         const classmateSet = myClass ? roomClassMap.get(key)?.get(myClass) : undefined;
+
+        const isUserInReviewBatch = Boolean(bCode && myMaSV && registeredReviewSet.has(`${bCode}|${myMaSV}`));
+        let roomReviewSameClassCount: number | undefined;
+        let roomReviewOtherClassCount: number | undefined;
+
+        if (isUserInReviewBatch) {
+          const studentsInRoom = roomStudentClassMap.get(key);
+          let sameCount = 0;
+          let otherCount = 0;
+          if (studentsInRoom) {
+            for (const [stId, stClass] of studentsInRoom.entries()) {
+              if (!registeredReviewSet.has(`${bCode}|${stId}`)) continue;
+              if (myClass && stClass === myClass) {
+                sameCount += 1;
+              } else {
+                otherCount += 1;
+              }
+            }
+          }
+          roomReviewSameClassCount = sameCount;
+          roomReviewOtherClassCount = otherCount;
+        }
 
         return {
           ...rec,
           roomTotalCount: totalSet ? totalSet.size : undefined,
           roomClassmateCount: classmateSet ? classmateSet.size : totalSet ? 0 : undefined,
+          isUserInReviewBatch,
+          roomReviewSameClassCount,
+          roomReviewOtherClassCount,
         };
       });
     };

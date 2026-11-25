@@ -23,6 +23,9 @@ export interface ExamRecord {
   isPostponed?: boolean; // true nếu không thi môn này hoặc hoãn thi (không chia tiền đầu người)
   roomClassmateCount?: number; // Số sinh viên cùng lớp trong phòng thi này (tính cả bản thân)
   roomTotalCount?: number; // Tổng số sinh viên trong phòng thi này
+  isUserInReviewBatch?: boolean; // Người dùng hiện tại có trong danh sách đăng ký ôn tập đợt này không
+  roomReviewSameClassCount?: number; // Số SV lớp mình đăng ký ôn tập trong phòng thi này
+  roomReviewOtherClassCount?: number; // Số SV lớp khác đăng ký ôn tập trong phòng thi này
   [key: string]: any;
 }
 
