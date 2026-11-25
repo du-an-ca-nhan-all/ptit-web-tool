@@ -18,6 +18,7 @@ import {
   MonitorsList,
   AllStudentsList,
   MonitorFlowManager,
+  ExamReviewRegistrationManager,
 } from '../../features/classes-monitor';
 import {
   AllMonitorsEnvelopes,
@@ -307,6 +308,14 @@ export default function HomeMainContent({
           onNavigateTab={(tab, subTab) =>
             handleTabChange(tab as NavigationTab, subTab as ProfileSubTab)
           }
+        />
+      ) : activeTab === 'exam_review' && (isAdmin || canAccessMonitorTools) ? (
+        <ExamReviewRegistrationManager
+          currentUser={effectiveUser!}
+          availableClasses={classes}
+          initialClassCode={monitorClass}
+          examBatches={examBatches}
+          activeBatch={activeBatch}
         />
       ) : activeTab === 'monitor' ? (
         <ClassMonitorTools

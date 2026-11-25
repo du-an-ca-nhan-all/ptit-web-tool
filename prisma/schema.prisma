@@ -801,3 +801,20 @@ model ReminderNotificationLog {
   @@index([reminderId])
   @@index([offsetMinutes])
 }
+
+// 33. Bảng ExamReviewRegistration: Cấu hình danh sách sinh viên đăng ký ôn tập theo từng lớp và đợt thi
+model ExamReviewRegistration {
+  id           Int       @id @default(autoincrement())
+  batchCode    String    // Mã đợt thi (ExamBatch.code)
+  classCode    String    // Mã lớp (Ví dụ: D25TXCN11-K)
+  maSV         String    // Mã sinh viên
+  isRegistered Boolean   @default(true) // Trạng thái đăng ký ôn tập
+  note         String?   // Ghi chú (ví dụ: môn ôn tập, đã đóng phí...)
+  updatedBy    String?   // Username lớp trưởng / admin cập nhật gần nhất
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([batchCode, classCode, maSV])
+  @@index([batchCode, classCode])
+  @@index([batchCode, maSV])
+}

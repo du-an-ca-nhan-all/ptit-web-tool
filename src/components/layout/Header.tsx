@@ -95,6 +95,8 @@ export default function Header({
         return 'Danh Sách sinh viên trong Lớp';
       case 'monitor_flow':
         return 'Cấu Hình Flow Lớp Trưởng';
+      case 'exam_review':
+        return 'Đăng Ký Ôn Tập Đợt Thi';
       case 'batches':
         return 'Quản Lý Đợt Thi';
       case 'telegram_admin':

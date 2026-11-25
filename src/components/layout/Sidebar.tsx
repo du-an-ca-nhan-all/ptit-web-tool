@@ -8,6 +8,7 @@ import {
   Mail,
   User,
   BookOpen,
+  BookOpenCheck,
   X,
   DollarSign,
   Database,
@@ -257,6 +258,18 @@ export default function Sidebar({
                 }`}
               >
                 <GitFork className="w-4 h-4 text-amber-400" /> Cấu Hình Flow Lớp Trưởng
+              </button>
+
+              {/* Đăng Ký Ôn Tập Đợt Thi */}
+              <button
+                onClick={() => onTabChange('exam_review')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'exam_review'
+                    ? 'bg-amber-600/20 text-amber-400 border border-amber-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <BookOpenCheck className="w-4 h-4 text-amber-400" /> Đăng Ký Ôn Tập
               </button>
 
               {/* Phân Công Nước Uống & Hỗ Trợ */}
