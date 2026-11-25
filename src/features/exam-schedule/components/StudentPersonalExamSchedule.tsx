@@ -231,6 +231,33 @@ export default function StudentPersonalExamSchedule({
   // Modal & Copy
   const [selectedExamModal, setSelectedExamModal] = useState<StudentQldtExamItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [allStudentFileRecords, setAllStudentFileRecords] = useState<ExamRecord[]>([]);
+
+  // Fetch all file-based exam records for current student (across batches) to match room classmate stats in QLDTTX mode
+  useEffect(() => {
+    if (!currentUser?.username) return;
+    let cancelled = false;
+    const params = new URLSearchParams({
+      maSV: currentUser.username,
+      all: 'true',
+      includeClassmatesCount: 'true',
+    });
+
+    fetch(`/api/exam-records?${params.toString()}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data?.records)) {
+          setAllStudentFileRecords(data.records);
+        }
+      })
+      .catch(() => {
+        // Ignore silent background enrichment errors
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.username, records]);
 
   const handleChangeLayoutMode = (mode: QldtViewLayout) => {
     setLayoutMode(mode);
@@ -239,7 +266,7 @@ export default function StudentPersonalExamSchedule({
     } catch {}
   };
 
-  // Map room classmate stats from batch DB records so QLDTTX views can also display them when matched
+  // Map room classmate stats from File DB records so all QLDTTX views can display them
   const roomClassStatsLookup = useMemo(() => {
     const normalizeDateKey = (dateStr?: string) => {
       if (!dateStr) return '';
@@ -248,32 +275,70 @@ export default function StudentPersonalExamSchedule({
       return `${Number(parts[0])}/${Number(parts[1])}/${Number(parts[2])}`;
     };
 
-    const byFullKey = new Map<string, { classmates: number; total?: number }>();
-    const bySubjectRoom = new Map<string, { classmates: number; total?: number }>();
+    const normalizeRoomCompact = (roomStr?: string) =>
+      String(roomStr || '')
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '');
 
-    for (const rec of records) {
+    type RoomMatch = { classmates: number; total?: number; record: ExamRecord };
+
+    const byFullKey = new Map<string, RoomMatch>();
+    const byCompactRoomKey = new Map<string, RoomMatch>();
+    const bySubjectDate = new Map<string, RoomMatch>();
+    const bySubjectRoom = new Map<string, RoomMatch>();
+
+    // Prefer current active batch records first, then all student file records across batches
+    const combinedRecords = [...records, ...allStudentFileRecords];
+
+    for (const rec of combinedRecords) {
       if (rec.roomClassmateCount === undefined) continue;
       const maMH = String(rec.MaMH || '').trim().toUpperCase();
       const mapThi = String(rec.MAPTHI || '').trim().toUpperCase();
+      const compactRoom = normalizeRoomCompact(rec.MAPTHI);
       const ngay = normalizeDateKey(rec.NgayThi);
-      const stat = { classmates: rec.roomClassmateCount, total: rec.roomTotalCount };
+      const stat: RoomMatch = {
+        classmates: rec.roomClassmateCount,
+        total: rec.roomTotalCount,
+        record: rec,
+      };
 
-      if (maMH && mapThi && ngay) {
+      if (maMH && mapThi && ngay && !byFullKey.has(`${maMH}|${ngay}|${mapThi}`)) {
         byFullKey.set(`${maMH}|${ngay}|${mapThi}`, stat);
       }
-      if (maMH && mapThi) {
+      if (maMH && compactRoom && ngay && !byCompactRoomKey.has(`${maMH}|${ngay}|${compactRoom}`)) {
+        byCompactRoomKey.set(`${maMH}|${ngay}|${compactRoom}`, stat);
+      }
+      if (maMH && ngay && !bySubjectDate.has(`${maMH}|${ngay}`)) {
+        bySubjectDate.set(`${maMH}|${ngay}`, stat);
+      }
+      if (maMH && mapThi && !bySubjectRoom.has(`${maMH}|${mapThi}`)) {
         bySubjectRoom.set(`${maMH}|${mapThi}`, stat);
       }
     }
 
-    return (maMon?: string, ngayThi?: string, maPhong?: string) => {
+    return (maMon?: string, ngayThi?: string, maPhong?: string): RoomMatch | null => {
       const mh = String(maMon || '').trim().toUpperCase();
       const rm = String(maPhong || '').trim().toUpperCase();
+      const compactRm = normalizeRoomCompact(maPhong);
       const dt = normalizeDateKey(ngayThi);
-      if (!mh || !rm) return null;
-      return byFullKey.get(`${mh}|${dt}|${rm}`) || bySubjectRoom.get(`${mh}|${rm}`) || null;
+      if (!mh) return null;
+
+      return (
+        (rm && dt ? byFullKey.get(`${mh}|${dt}|${rm}`) : undefined) ||
+        (compactRm && dt ? byCompactRoomKey.get(`${mh}|${dt}|${compactRm}`) : undefined) ||
+        (dt ? bySubjectDate.get(`${mh}|${dt}`) : undefined) ||
+        (rm ? bySubjectRoom.get(`${mh}|${rm}`) : undefined) ||
+        null
+      );
     };
-  }, [records]);
+  }, [records, allStudentFileRecords]);
+
+  const handleOpenRoomMembersFromQldt = (matchedRecord: ExamRecord) => {
+    setSelectedExamModal(null);
+    setSelectedExamRoom(matchedRecord);
+    setViewSourceMode('FILE_TONG');
+  };
 
   // Sync QLDTTX filters and view modes to URL query parameters
   useEffect(() => {
@@ -1239,20 +1304,25 @@ export default function StudentPersonalExamSchedule({
                                 const roomStat = roomClassStatsLookup(exam.maMon, exam.ngayThi, exam.maPhong);
                                 if (!roomStat) return null;
                                 return (
-                                  <span
-                                    title={`Có ${roomStat.classmates} sinh viên lớp bạn${
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenRoomMembersFromQldt(roomStat.record);
+                                    }}
+                                    title={`Theo File lịch thi: có ${roomStat.classmates} sinh viên lớp bạn${
                                       roomStat.total !== undefined ? ` / tổng ${roomStat.total} SV` : ''
-                                    } trong phòng ${exam.maPhong}`}
-                                    className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    } trong phòng ${roomStat.record.MAPTHI || exam.maPhong}. Bấm để xem danh sách phòng thi.`}
+                                    className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer ${
                                       roomStat.classmates > 1
-                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                                        ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
                                     }`}
                                   >
                                     <Users className="w-3 h-3 shrink-0" />
                                     {roomStat.classmates} SV cùng lớp
                                     {roomStat.total !== undefined ? ` / ${roomStat.total}` : ''}
-                                  </span>
+                                  </button>
                                 );
                               })()}
                             </td>
@@ -1396,6 +1466,34 @@ export default function StudentPersonalExamSchedule({
                           <strong className="text-indigo-700 font-mono text-xs">{exam.maPhong || 'Chưa xếp phòng'}</strong>
                         </div>
 
+                        {(() => {
+                          const roomStat = roomClassStatsLookup(exam.maMon, exam.ngayThi, exam.maPhong);
+                          if (!roomStat) return null;
+                          return (
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-1.5 text-slate-600 text-[11px] sm:text-xs">
+                                <Users className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Cùng lớp trong phòng:</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenRoomMembersFromQldt(roomStat.record);
+                                }}
+                                className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer ${
+                                  roomStat.classmates > 1
+                                    ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
+                                }`}
+                              >
+                                {roomStat.classmates} SV
+                                {roomStat.total !== undefined ? ` / ${roomStat.total}` : ''}
+                              </button>
+                            </div>
+                          );
+                        })()}
+
                         {exam.toThi && (
                           <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-1.5 text-slate-600 text-[11px] sm:text-xs">
@@ -1517,6 +1615,28 @@ export default function StudentPersonalExamSchedule({
                               </h5>
                               <div className="text-[11px] text-slate-500 flex items-center gap-1.5 sm:gap-2 mt-0.5 flex-wrap">
                                 <span className="font-mono font-bold text-slate-700">Phòng: {exam.maPhong || 'Chưa rõ'}</span>
+                                {(() => {
+                                  const roomStat = roomClassStatsLookup(exam.maMon, exam.ngayThi, exam.maPhong);
+                                  if (!roomStat) return null;
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenRoomMembersFromQldt(roomStat.record);
+                                      }}
+                                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border transition cursor-pointer ${
+                                        roomStat.classmates > 1
+                                          ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                                          : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
+                                      }`}
+                                    >
+                                      <Users className="w-3 h-3 shrink-0" />
+                                      {roomStat.classmates} SV cùng lớp
+                                      {roomStat.total !== undefined ? ` / ${roomStat.total}` : ''}
+                                    </button>
+                                  );
+                                })()}
                                 <span>•</span>
                                 <span>Tổ {exam.toThi || '-'}</span>
                                 {exam.diaDiemThi && (
@@ -1721,6 +1841,42 @@ export default function StudentPersonalExamSchedule({
                     <span className="text-slate-500 font-medium">Phòng thi:</span>
                     <strong className="text-indigo-700 font-mono text-sm">{selectedExamModal.maPhong || 'Chưa rõ'}</strong>
                   </div>
+
+                  {(() => {
+                    const roomStat = roomClassStatsLookup(
+                      selectedExamModal.maMon,
+                      selectedExamModal.ngayThi,
+                      selectedExamModal.maPhong
+                    );
+                    if (!roomStat) return null;
+                    return (
+                      <div className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-200/60 flex-wrap">
+                        <span className="text-slate-500 font-medium flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Cùng lớp trong phòng (từ file):</span>
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                              roomStat.classmates > 1
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            {roomStat.classmates} SV
+                            {roomStat.total !== undefined ? ` / ${roomStat.total} SV` : ''}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRoomMembersFromQldt(roomStat.record)}
+                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                          >
+                            Xem danh sách &rarr;
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
                     <span className="text-slate-500 font-medium">Tổ thi / Nhóm thi:</span>
