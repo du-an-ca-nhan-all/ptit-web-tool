@@ -1,11 +1,13 @@
 export * from './types/class.types';
 export * from './types/flow.types';
+export * from './types/roomAnalysis.types';
 export { default as ClassMembers } from './components/ClassMembers';
 export { default as ClassMonitorTools } from './components/ClassMonitorTools';
 export { default as MonitorsList } from './components/MonitorsList';
 export { default as AllStudentsList } from './components/AllStudentsList';
 export { default as MonitorFlowManager } from './components/MonitorFlowManager';
 export { default as ExamReviewRegistrationManager } from './components/ExamReviewRegistrationManager';
+export { default as MonitorRoomAnalysis } from './components/MonitorRoomAnalysis';
 export { default as FlowQueueMonitor } from './components/FlowQueueMonitor';
 export { default as ImportFlowStudentsModal } from './components/ImportFlowStudentsModal';
 export * from './hooks/useMonitorFlow';

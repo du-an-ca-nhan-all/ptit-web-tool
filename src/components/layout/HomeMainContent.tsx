@@ -19,6 +19,7 @@ import {
   AllStudentsList,
   MonitorFlowManager,
   ExamReviewRegistrationManager,
+  MonitorRoomAnalysis,
 } from '../../features/classes-monitor';
 import {
   AllMonitorsEnvelopes,
@@ -316,6 +317,17 @@ export default function HomeMainContent({
           initialClassCode={monitorClass}
           examBatches={examBatches}
           activeBatch={activeBatch}
+        />
+      ) : activeTab === 'room_analysis' && (isAdmin || canAccessMonitorTools) ? (
+        <MonitorRoomAnalysis
+          currentUser={effectiveUser!}
+          availableClasses={classes}
+          initialClassCode={monitorClass}
+          examBatches={examBatches}
+          activeBatch={activeBatch}
+          onSelectStudentSchedule={(studentId) => {
+            handleTabChange('schedule', undefined, { search: studentId });
+          }}
         />
       ) : activeTab === 'monitor' ? (
         <ClassMonitorTools

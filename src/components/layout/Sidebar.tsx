@@ -31,6 +31,7 @@ import {
   Clock,
   Coffee,
   Bell,
+  Split,
 } from 'lucide-react';
 import { LoginUser } from '../../types';
 import { NavigationTab } from '../../types/navigation';
@@ -270,6 +271,18 @@ export default function Sidebar({
                 }`}
               >
                 <BookOpenCheck className="w-4 h-4 text-amber-400" /> Đăng Ký Ôn Tập
+              </button>
+
+              {/* Lọc Tách Phòng & Sĩ Số Phòng Thi */}
+              <button
+                onClick={() => onTabChange('room_analysis')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === 'room_analysis'
+                    ? 'bg-rose-600/20 text-rose-400 border border-rose-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                }`}
+              >
+                <Split className="w-4 h-4 text-rose-400" /> Lọc Tách Phòng Thi
               </button>
 
               {/* Phân Công Nước Uống & Hỗ Trợ */}

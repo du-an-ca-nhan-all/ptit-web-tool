@@ -97,6 +97,8 @@ export default function Header({
         return 'Cấu Hình Flow Lớp Trưởng';
       case 'exam_review':
         return 'Đăng Ký Ôn Tập Đợt Thi';
+      case 'room_analysis':
+        return 'Lọc Tách Phòng & Sĩ Số Phòng Thi';
       case 'batches':
         return 'Quản Lý Đợt Thi';
       case 'telegram_admin':

@@ -25,6 +25,7 @@ export type NavigationTab =
   | 'course_registration'
   | 'monitor_flow'
   | 'exam_review'
+  | 'room_analysis'
   | 'global_jobs'
   | 'reminders';
 
@@ -86,6 +87,7 @@ export const VALID_NAVIGATION_TABS: NavigationTab[] = [
   'course_registration',
   'monitor_flow',
   'exam_review',
+  'room_analysis',
   'global_jobs',
   'reminders',
 ];
@@ -145,6 +147,10 @@ export const PATH_TO_TAB_MAP: Record<string, NavigationTab> = {
   exam_review: 'exam_review',
   ontap: 'exam_review',
   'on-tap': 'exam_review',
+  'room-analysis': 'room_analysis',
+  room_analysis: 'room_analysis',
+  tachphong: 'room_analysis',
+  'tach-phong': 'room_analysis',
   members: 'members',
   envelope: 'envelope_all',
   'envelope-all': 'envelope_all',
@@ -182,6 +188,10 @@ export const MONITOR_SUBPATH_MAP: Record<string, NavigationTab> = {
   exam_review: 'exam_review',
   ontap: 'exam_review',
   'on-tap': 'exam_review',
+  'room-analysis': 'room_analysis',
+  room_analysis: 'room_analysis',
+  tachphong: 'room_analysis',
+  'tach-phong': 'room_analysis',
   envelope: 'envelope_all',
   phongbi: 'envelope_all',
   'envelope-all': 'envelope_all',
@@ -292,6 +302,9 @@ export const getNavigationPath = (
       break;
     case 'exam_review':
       basePath = '/monitor/exam-review';
+      break;
+    case 'room_analysis':
+      basePath = '/monitor/room-analysis';
       break;
     case 'envelope':
     case 'envelope_all':
