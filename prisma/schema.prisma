@@ -175,9 +175,13 @@ model ExternalAccount {
   systemName  String    // Tên hệ thống (Ví dụ: "Cổng Quản Lý Đào Tạo Từ Xa PTTC1")
   systemUrl   String    // URL hệ thống (Ví dụ: "https://qldttx.pttc1.edu.vn/")
   
-  extUsername String    // Tên đăng nhập hệ thống ngoài (Mã SV)
-  extPassword String    // Mật khẩu hệ thống ngoài
-  token       String?   // Access token được cấp từ cổng QLDTTX (Bearer access_token)
+  extUsername          String    // Tên đăng nhập hệ thống ngoài (Mã SV hoặc Email)
+  extPassword          String    @default("") // Mật khẩu hệ thống ngoài (để trống với hệ thống dùng OAuth refresh_token như S-Link)
+  token                String?   // Access token được cấp từ cổng ngoài (Bearer access_token)
+  refreshToken         String?   // Refresh token OAuth/SSO (ví dụ PTIT S-Link Keycloak)
+  tokenExpiresAt       DateTime? // Thời điểm hết hạn dự kiến của Access Token
+  refreshTokenExpiresAt DateTime? // Thời điểm hết hạn dự kiến của Refresh Token
+  lastTokenRefreshedAt DateTime? // Thời điểm làm mới Access Token / Refresh Token gần nhất
   
   status      String    @default("CONNECTED") // 'CONNECTED' | 'DISCONNECTED' | 'ERROR'
   lastSyncAt  DateTime?

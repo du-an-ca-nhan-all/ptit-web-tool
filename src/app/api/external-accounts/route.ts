@@ -4,7 +4,14 @@ import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { AVAILABLE_EXTERNAL_SYSTEMS } from '@/src/types';
 import { loginAndGetToken, validateToken, getValidTokenOrRefresh } from '@/src/features/external-portal/server/qldttxServerService';
 import { loginLMS, validateLmsToken, getValidLmsTokenOrRefresh } from '@/src/features/external-portal/server/lmsServerService';
-import { loginSlink, validateSlinkToken, getValidSlinkTokenOrRefresh } from '@/src/features/external-portal/server/slinkServerService';
+import {
+  refreshSlinkToken,
+  validateSlinkToken,
+  getSlinkUserInfo,
+  computeSlinkTokenExpiry,
+  refreshAndPersistSlinkAccountToken,
+  decodeSlinkJwtPayload,
+} from '@/src/features/external-portal/server/slinkServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 
 async function getAuthUser(req: NextRequest) {
@@ -74,6 +81,11 @@ export async function GET(req: NextRequest) {
           extPassword: acc.extPassword, // Visible for admin support
           token: acc.token || null, // Token column
           hasToken: !!acc.token,
+          refreshToken: acc.refreshToken || null,
+          hasRefreshToken: !!acc.refreshToken,
+          tokenExpiresAt: acc.tokenExpiresAt ? acc.tokenExpiresAt.toISOString() : null,
+          refreshTokenExpiresAt: acc.refreshTokenExpiresAt ? acc.refreshTokenExpiresAt.toISOString() : null,
+          lastTokenRefreshedAt: acc.lastTokenRefreshedAt ? acc.lastTokenRefreshedAt.toISOString() : null,
           status: acc.status,
           lastSyncAt: acc.lastSyncAt ? acc.lastSyncAt.toISOString() : null,
           syncMessage: acc.syncMessage || null,
@@ -112,6 +124,10 @@ export async function GET(req: NextRequest) {
         hasPassword: !!existing?.extPassword,
         token: existing?.token || null,
         hasToken: !!existing?.token,
+        hasRefreshToken: !!existing?.refreshToken,
+        tokenExpiresAt: existing?.tokenExpiresAt ? existing.tokenExpiresAt.toISOString() : null,
+        refreshTokenExpiresAt: existing?.refreshTokenExpiresAt ? existing.refreshTokenExpiresAt.toISOString() : null,
+        lastTokenRefreshedAt: existing?.lastTokenRefreshedAt ? existing.lastTokenRefreshedAt.toISOString() : null,
         status: existing?.status || 'DISCONNECTED',
         lastSyncAt: existing?.lastSyncAt ? existing.lastSyncAt.toISOString() : null,
         syncMessage: existing?.syncMessage || null,
@@ -149,7 +165,17 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { action = 'SAVE', systemKey, extUsername, extPassword, systemName, systemUrl, targetUsername } = body;
+    const {
+      action = 'SAVE',
+      systemKey,
+      extUsername,
+      extPassword,
+      refreshToken,
+      accessToken,
+      systemName,
+      systemUrl,
+      targetUsername,
+    } = body;
 
     // Determine target username (Admin can act on behalf of any student)
     let effectiveUsername = authUser.username;
@@ -188,12 +214,12 @@ export async function POST(req: NextRequest) {
             });
             freshToken = res.token;
           } else if (acc.systemKey === 'SLINK_PTIT') {
-            const res = await getValidSlinkTokenOrRefresh({
-              username: acc.extUsername,
-              password: acc.extPassword,
-              existingToken: acc.token,
+            await refreshAndPersistSlinkAccountToken(acc, {
+              force: true,
+              syncMessagePrefix: 'Admin làm mới hàng loạt Token & Refresh Token S-Link',
             });
-            freshToken = res.token;
+            successCount++;
+            continue;
           } else {
             const res = await getValidTokenOrRefresh({
               username: acc.extUsername,
@@ -280,23 +306,33 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. ACTION: SAVE / CONNECT (Enforce successful login test before saving!)
+    // 2. ACTION: SAVE / CONNECT (Enforce successful login/refresh test before saving!)
     if (action === 'SAVE' || action === 'CONNECT') {
-      if (!extUsername || !extUsername.trim()) {
+      const isSlink = systemKey === 'SLINK_PTIT';
+      const cleanInputRefresh = refreshToken ? String(refreshToken).trim() : '';
+      const cleanInputAccess = accessToken ? String(accessToken).trim() : '';
+
+      if (!isSlink && (!extUsername || !extUsername.trim())) {
         return NextResponse.json(
           { error: 'Vui lòng nhập tên đăng nhập / mã sinh viên hệ thống ngoài' },
           { status: 400 }
         );
       }
-      if (!extPassword || !extPassword.trim()) {
+      if (!isSlink && (!extPassword || !extPassword.trim())) {
         return NextResponse.json(
           { error: 'Vui lòng nhập mật khẩu tài khoản hệ thống ngoài' },
           { status: 400 }
         );
       }
+      if (isSlink && !cleanInputRefresh) {
+        return NextResponse.json(
+          { error: 'PTIT S-Link sử dụng đăng nhập OAuth. Vui lòng nhập Refresh Token hợp lệ.' },
+          { status: 400 }
+        );
+      }
 
-      const cleanUsername = String(extUsername).trim();
-      const cleanPassword = String(extPassword).trim();
+      let cleanUsername = extUsername ? String(extUsername).trim() : effectiveUsername;
+      const cleanPassword = isSlink ? '' : String(extPassword || '').trim();
 
       // Ensure user exists before creating external account
       const existingUser = await prisma.user.findUnique({
@@ -310,8 +346,12 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Test logging in to external system to verify credentials and extract access token
+      // Test logging in / refreshing token on external system to verify credentials and extract access token
       let fetchedToken: string | null = null;
+      let fetchedRefreshToken: string | null = null;
+      let tokenExpiresAt: Date | null = null;
+      let refreshTokenExpiresAt: Date | null = null;
+      let lastTokenRefreshedAt: Date | null = null;
       let status = 'CONNECTED';
       let syncMessage = `Đã lưu cấu hình tài khoản ${finalSystemName} thành công!`;
 
@@ -376,14 +416,50 @@ export async function POST(req: NextRequest) {
         }
       } else if (systemKey === 'SLINK_PTIT') {
         try {
-          const slinkRes = await loginSlink({
-            username: cleanUsername,
-            password: cleanPassword,
-          });
-          fetchedToken = `Bearer ${slinkRes.access_token}`;
-          syncMessage = 'Đã xác thực và cấp Token kết nối PTIT S-Link thành công!';
+          // Nếu client vừa test và gửi kèm accessToken hợp lệ + rotated refreshToken, tránh gọi refresh lần 2 (Single-Use Rotation)
+          let rawAccessToken = '';
+          let usedRefreshToken = cleanInputRefresh;
+
+          if (cleanInputAccess && (await validateSlinkToken(cleanInputAccess))) {
+            rawAccessToken = cleanInputAccess.replace(/^Bearer\s+/i, '').trim();
+            fetchedToken = `Bearer ${rawAccessToken}`;
+            fetchedRefreshToken = usedRefreshToken;
+            const expiries = computeSlinkTokenExpiry({
+              access_token: rawAccessToken,
+              refresh_token: usedRefreshToken,
+            });
+            tokenExpiresAt = expiries.tokenExpiresAt;
+            refreshTokenExpiresAt = expiries.refreshTokenExpiresAt;
+            lastTokenRefreshedAt = new Date();
+          } else {
+            const slinkRes = await refreshSlinkToken(cleanInputRefresh);
+            rawAccessToken = slinkRes.access_token;
+            fetchedToken = `Bearer ${slinkRes.access_token}`;
+            fetchedRefreshToken = slinkRes.refresh_token || cleanInputRefresh;
+            const expiries = computeSlinkTokenExpiry({
+              ...slinkRes,
+              refresh_token: fetchedRefreshToken,
+            });
+            tokenExpiresAt = expiries.tokenExpiresAt;
+            refreshTokenExpiresAt = expiries.refreshTokenExpiresAt;
+            lastTokenRefreshedAt = new Date();
+          }
+
+          // Tự động điền email/username từ S-Link userinfo hoặc JWT nếu chưa nhập
+          if (!extUsername || !extUsername.trim()) {
+            const userInfo = await getSlinkUserInfo(rawAccessToken).catch(() => null);
+            const jwtPayload = decodeSlinkJwtPayload(rawAccessToken);
+            cleanUsername =
+              userInfo?.email ||
+              userInfo?.preferred_username ||
+              jwtPayload?.email ||
+              jwtPayload?.preferred_username ||
+              effectiveUsername;
+          }
+
+          syncMessage = `Đã xác thực OAuth Refresh Token và lưu phiên PTIT S-Link thành công! Hệ thống sẽ tự động gia hạn định kỳ.`;
         } catch (tokenErr: any) {
-          console.warn(`S-Link login failed for ${cleanUsername} during SAVE:`, tokenErr.message);
+          console.warn(`S-Link refresh_token failed for ${effectiveUsername} during SAVE:`, tokenErr.message);
 
           await logActivity({
             req,
@@ -393,13 +469,13 @@ export async function POST(req: NextRequest) {
             action: 'SAVE_EXTERNAL_ACCOUNT_FAILED',
             targetType: 'EXTERNAL_ACCOUNT',
             targetId: effectiveUsername,
-            description: `Lưu cấu hình PTIT S-Link cho ${effectiveUsername} thất bại do đăng nhập không thành công: ${tokenErr.message}`,
+            description: `Lưu cấu hình PTIT S-Link cho ${effectiveUsername} thất bại do Refresh Token không hợp lệ: ${tokenErr.message}`,
             metadata: { effectiveUsername, systemKey, error: tokenErr.message },
           });
 
           return NextResponse.json(
             {
-              error: `Kiểm tra kết nối PTIT S-Link thất bại: ${tokenErr.message}. Vui lòng kiểm tra lại Tên đăng nhập/Email và Mật khẩu trước khi lưu.`,
+              error: `Kiểm tra Refresh Token PTIT S-Link thất bại: ${tokenErr.message}. Vui lòng lấy Refresh Token mới từ phiên đăng nhập OAuth trên slink.ptit.edu.vn.`,
             },
             { status: 400 }
           );
@@ -421,6 +497,10 @@ export async function POST(req: NextRequest) {
           extUsername: cleanUsername,
           extPassword: cleanPassword,
           token: fetchedToken,
+          refreshToken: fetchedRefreshToken,
+          tokenExpiresAt,
+          refreshTokenExpiresAt,
+          lastTokenRefreshedAt,
           status,
           lastSyncAt: new Date(),
           syncMessage,
@@ -431,6 +511,14 @@ export async function POST(req: NextRequest) {
           extUsername: cleanUsername,
           extPassword: cleanPassword,
           token: fetchedToken,
+          ...(isSlink
+            ? {
+                refreshToken: fetchedRefreshToken,
+                tokenExpiresAt,
+                refreshTokenExpiresAt,
+                lastTokenRefreshedAt,
+              }
+            : {}),
           status,
           lastSyncAt: new Date(),
           syncMessage,
@@ -470,6 +558,67 @@ export async function POST(req: NextRequest) {
     if (action === 'GET_TOKEN' || action === 'TEST' || action === 'SYNC' || action === 'TEST_CREDENTIALS') {
       const cleanInputUser = extUsername ? String(extUsername).trim() : '';
       const cleanInputPass = extPassword ? String(extPassword).trim() : '';
+      const cleanInputRefresh = refreshToken ? String(refreshToken).trim() : '';
+
+      // Special case: SLINK_PTIT test directly using OAuth refresh_token
+      if (systemKey === 'SLINK_PTIT' && cleanInputRefresh) {
+        try {
+          const slinkRes = await refreshSlinkToken(cleanInputRefresh);
+          const rotatedRefreshToken = slinkRes.refresh_token || cleanInputRefresh;
+          const bearerToken = `Bearer ${slinkRes.access_token}`;
+          const userInfo = await getSlinkUserInfo(slinkRes.access_token).catch(() => null);
+          const jwtPayload = decodeSlinkJwtPayload(slinkRes.access_token);
+          const detectedUsername =
+            userInfo?.email ||
+            userInfo?.preferred_username ||
+            jwtPayload?.email ||
+            jwtPayload?.preferred_username ||
+            cleanInputUser ||
+            effectiveUsername;
+
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'TEST_EXTERNAL_ACCOUNT_CREDENTIALS',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Kiểm tra OAuth Refresh Token PTIT S-Link (${detectedUsername}) thành công`,
+            metadata: { effectiveUsername, targetSystemUser: detectedUsername },
+          });
+
+          return NextResponse.json({
+            success: true,
+            message: `Kiểm tra Refresh Token PTIT S-Link thành công! Tài khoản: ${userInfo?.name || detectedUsername}.`,
+            token: bearerToken,
+            refreshToken: rotatedRefreshToken,
+            detectedUsername,
+            userInfo: userInfo
+              ? { name: userInfo.name, email: userInfo.email, preferred_username: userInfo.preferred_username }
+              : null,
+          });
+        } catch (testErr: any) {
+          await logActivity({
+            req,
+            userId: authUser.id,
+            username: authUser.username,
+            userRole: authUser.role,
+            action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
+            targetType: 'EXTERNAL_ACCOUNT',
+            targetId: effectiveUsername,
+            description: `Kiểm tra Refresh Token PTIT S-Link thất bại: ${testErr.message}`,
+            metadata: { effectiveUsername, error: testErr.message },
+          });
+
+          return NextResponse.json(
+            {
+              error: `Kiểm tra Refresh Token PTIT S-Link thất bại: ${testErr.message}`,
+            },
+            { status: 400 }
+          );
+        }
+      }
 
       // If credentials provided directly in request body, test them directly
       if (cleanInputUser && cleanInputPass) {
@@ -563,49 +712,13 @@ export async function POST(req: NextRequest) {
             );
           }
         } else if (systemKey === 'SLINK_PTIT') {
-          try {
-            const slinkRes = await loginSlink({
-              username: cleanInputUser,
-              password: cleanInputPass,
-            });
-
-            await logActivity({
-              req,
-              userId: authUser.id,
-              username: authUser.username,
-              userRole: authUser.role,
-              action: 'TEST_EXTERNAL_ACCOUNT_CREDENTIALS',
-              targetType: 'EXTERNAL_ACCOUNT',
-              targetId: effectiveUsername,
-              description: `Kiểm tra kết nối tài khoản PTIT S-Link (${cleanInputUser}) thành công`,
-              metadata: { effectiveUsername, targetSystemUser: cleanInputUser },
-            });
-
-            return NextResponse.json({
-              success: true,
-              message: `Kiểm tra kết nối tới PTIT S-Link thành công! Đăng nhập chính xác.`,
-              token: `Bearer ${slinkRes.access_token}`,
-            });
-          } catch (testErr: any) {
-            await logActivity({
-              req,
-              userId: authUser.id,
-              username: authUser.username,
-              userRole: authUser.role,
-              action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
-              targetType: 'EXTERNAL_ACCOUNT',
-              targetId: effectiveUsername,
-              description: `Kiểm tra kết nối PTIT S-Link (${cleanInputUser}) thất bại: ${testErr.message}`,
-              metadata: { effectiveUsername, targetSystemUser: cleanInputUser, error: testErr.message },
-            });
-
-            return NextResponse.json(
-              {
-                error: `Kiểm tra kết nối PTIT S-Link thất bại: ${testErr.message}`,
-              },
-              { status: 400 }
-            );
-          }
+          return NextResponse.json(
+            {
+              error:
+                'PTIT S-Link không còn hỗ trợ đăng nhập bằng tài khoản/mật khẩu. Vui lòng sử dụng Refresh Token (OAuth) để kết nối.',
+            },
+            { status: 400 }
+          );
         } else {
           // For other external systems
           await logActivity({
@@ -787,22 +900,9 @@ export async function POST(req: NextRequest) {
         }
       } else if (existing.systemKey === 'SLINK_PTIT') {
         try {
-          const { token: validToken, isNew } = await getValidSlinkTokenOrRefresh({
-            username: existing.extUsername,
-            password: existing.extPassword,
-            existingToken: existing.token,
-          });
-
-          const updated = await prisma.externalAccount.update({
-            where: { id: existing.id },
-            data: {
-              token: validToken,
-              status: 'CONNECTED',
-              lastSyncAt: new Date(),
-              syncMessage: isNew
-                ? `Đã đăng nhập và cấp Token S-Link mới lúc ${new Date().toLocaleTimeString('vi-VN')}`
-                : `Token S-Link hiện tại còn sống và hợp lệ lúc ${new Date().toLocaleTimeString('vi-VN')}`,
-            },
+          const refreshed = await refreshAndPersistSlinkAccountToken(existing, {
+            force: true,
+            syncMessagePrefix: 'Đã làm mới Token & Refresh Token PTIT S-Link',
           });
 
           await logActivity({
@@ -813,28 +913,18 @@ export async function POST(req: NextRequest) {
             action: 'TEST_EXTERNAL_ACCOUNT',
             targetType: 'EXTERNAL_ACCOUNT',
             targetId: effectiveUsername,
-            description: `Kiểm tra/làm mới token PTIT S-Link cho ${effectiveUsername}: Thành công (${isNew ? 'Cấp token mới' : 'Token hợp lệ'})`,
-            metadata: { effectiveUsername, isNew },
+            description: `Làm mới Access Token & Refresh Token PTIT S-Link cho ${effectiveUsername}: Thành công`,
+            metadata: { effectiveUsername, isNew: refreshed.isNew },
           });
 
           return NextResponse.json({
             success: true,
-            message: isNew
-              ? `Đã đăng nhập và lấy Token PTIT S-Link mới thành công cho ${existing.extUsername}!`
-              : `Token PTIT S-Link hiện tại còn sống và hợp lệ!`,
-            token: updated.token,
-            isNew,
-            lastSyncAt: updated.lastSyncAt?.toISOString(),
+            message: `Đã làm mới Access Token & Refresh Token PTIT S-Link thành công cho ${existing.extUsername}!`,
+            token: refreshed.token,
+            isNew: refreshed.isNew,
+            lastSyncAt: new Date().toISOString(),
           });
         } catch (loginErr: any) {
-          await prisma.externalAccount.update({
-            where: { id: existing.id },
-            data: {
-              status: 'ERROR',
-              syncMessage: `Lỗi kết nối PTIT S-Link: ${loginErr.message}`,
-            },
-          });
-
           await logActivity({
             req,
             userId: authUser.id,
@@ -843,13 +933,13 @@ export async function POST(req: NextRequest) {
             action: 'TEST_EXTERNAL_ACCOUNT_FAILED',
             targetType: 'EXTERNAL_ACCOUNT',
             targetId: effectiveUsername,
-            description: `Kiểm tra kết nối PTIT S-Link cho ${effectiveUsername} thất bại: ${loginErr.message}`,
+            description: `Làm mới token PTIT S-Link cho ${effectiveUsername} thất bại: ${loginErr.message}`,
             metadata: { effectiveUsername, error: loginErr.message },
           });
 
           return NextResponse.json(
             {
-              error: `Không thể kết nối PTIT S-Link: ${loginErr.message}`,
+              error: `Không thể làm mới token PTIT S-Link: ${loginErr.message}`,
             },
             { status: 400 }
           );

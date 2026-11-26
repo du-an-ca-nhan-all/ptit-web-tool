@@ -15,7 +15,7 @@ import {
 } from '@/src/features/external-portal/server/qldttxServerService';
 import {
   getSlinkNotifications,
-  getValidSlinkTokenOrRefresh,
+  refreshAndPersistSlinkAccountToken,
   markSlinkNotificationAsRead,
   cleanHtml,
   formatSlinkDate,
@@ -736,30 +736,14 @@ export async function checkAndDispatchSlinkAnnouncements(options: {
         },
       });
 
-      if (!extAccount || (!extAccount.extPassword && !extAccount.token)) {
+      if (!extAccount || (!extAccount.refreshToken && !extAccount.token)) {
         continue;
       }
 
       totalChecked++;
 
       try {
-        const { token, isNew } = await getValidSlinkTokenOrRefresh({
-          username: extAccount.extUsername,
-          password: extAccount.extPassword,
-          existingToken: extAccount.token,
-        });
-
-        if (isNew && token !== extAccount.token) {
-          await prisma.externalAccount.update({
-            where: { id: extAccount.id },
-            data: {
-              token,
-              status: 'CONNECTED',
-              lastSyncAt: new Date(),
-              syncMessage: `Đã tự động làm mới Token S-Link lúc ${new Date().toLocaleTimeString('vi-VN')}`,
-            },
-          }).catch(() => {});
-        }
+        const { token } = await refreshAndPersistSlinkAccountToken(extAccount);
 
         // Chỉ lấy các thông báo đang CHƯA ĐỌC trên Cổng S-Link (unreadOnly = true)
         const notifRes = await getSlinkNotifications(token, 1, 30, true);

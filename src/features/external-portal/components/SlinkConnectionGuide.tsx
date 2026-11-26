@@ -91,91 +91,52 @@ export function SlinkConnectionGuide({
   const guideSteps = [
     {
       step: 1,
-      title: 'Nhấn nút "Tự Động Reset Mật Khẩu" ngay trên Tool',
+      title: 'Đăng nhập Cổng PTIT S-Link bằng OAuth trên trình duyệt',
       desc: (
         <>
-          Bấm nút{' '}
-          <button
-            type="button"
-            onClick={() => setIsForgotModalOpen(true)}
-            className="text-purple-700 font-bold bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-300 hover:bg-purple-200 inline-flex items-center gap-1 cursor-pointer active:scale-95"
+          Mở{' '}
+          <a
+            href="https://slink.ptit.edu.vn/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-purple-700 hover:text-purple-900 font-bold underline inline-flex items-center gap-0.5"
           >
-            <KeyRound className="w-3 h-3 text-purple-700" />
-            <span>Tự Động Reset Mật Khẩu (1-Click)</span>
-          </button>{' '}
-          trên Tool, nhập địa chỉ <strong>Email sinh viên PTIT</strong> (ví dụ:{' '}
-          <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-[11px] border border-slate-200">
-            ...@stu.ptit.edu.vn
-          </code>
-          ) và bấm gửi. Tool sẽ tự động kết nối máy chủ S-Link SSO để gửi yêu cầu đặt lại mật khẩu về email của bạn (không cần tự vào web slink.ptit.edu.vn).
+            slink.ptit.edu.vn <ExternalLink className="w-3 h-3" />
+          </a>{' '}
+          trên trình duyệt máy tính (Chrome/Edge) và đăng nhập qua cổng <strong>OAuth / Microsoft PTIT</strong> như bình thường. (S-Link đã ngừng hỗ trợ đăng nhập bằng tài khoản/mật khẩu trực tiếp.)
         </>
       ),
     },
     {
       step: 2,
-      title: 'Mở hòm thư sinh viên trên Microsoft Outlook',
+      title: 'Mở DevTools (F12) để lấy chuỗi refresh_token',
       desc: (
         <>
-          Đăng nhập hòm thư sinh viên tại{' '}
-          <a
-            href="https://outlook.office.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sky-600 hover:text-sky-800 font-bold underline inline-flex items-center gap-0.5"
-          >
-            PTIT Microsoft Outlook <ExternalLink className="w-3 h-3" />
-          </a>
-          . Kiểm tra thư từ người gửi{' '}
-          <strong className="text-slate-800">PTIT Slink SSO</strong> (
-          <span className="font-mono text-purple-700 text-[11px]">slink@ptit.edu.vn</span>) với tiêu đề{' '}
-          <em>"Reset password"</em>.{' '}
-          <button
-            type="button"
-            onClick={() => handleOpenLightbox(0)}
-            className="text-sky-600 hover:text-sky-800 font-bold underline inline-flex items-center gap-0.5 text-[11px] cursor-pointer"
-          >
-            [Xem ảnh minh họa]
-          </button>
+          Nhấn phím <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-[11px] border border-slate-200">F12</code> → chọn tab{' '}
+          <strong>Network</strong> (lọc từ khóa{' '}
+          <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-[11px] border border-slate-200">token</code>) hoặc tab{' '}
+          <strong>Application → Local Storage / Session Storage</strong> trên trang <code className="font-mono text-[11px]">slink.ptit.edu.vn</code> để sao chép giá trị{' '}
+          <strong className="text-purple-700 font-mono">refresh_token</strong> (chuỗi bắt đầu bằng <code className="font-mono text-[11px]">eyJ...</code>).
         </>
       ),
     },
     {
       step: 3,
-      title: 'Bấm vào link trong Email và tạo mật khẩu mới',
+      title: 'Dán Refresh Token vào ô bên dưới → Kiểm Tra & Lưu',
       desc: (
         <>
-          Nhấp vào liên kết{' '}
-          <strong className="text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
-            Link to reset credentials
-          </strong>{' '}
-          trong email để mở trang tạo mật khẩu mới.{' '}
-          <span className="text-amber-700 font-semibold inline-flex items-center gap-1">
-            <Clock className="w-3 h-3" /> (Link có hiệu lực 5 phút)
-          </span>
-          . Nhập mật khẩu mới tại ô <em>New password</em> & <em>Confirm password</em> rồi bấm{' '}
-          <button
-            type="button"
-            onClick={() => handleOpenLightbox(1)}
-            className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 inline-flex items-center gap-0.5 cursor-pointer"
-          >
-            <span>Submit</span>
-            <ImageIcon className="w-3 h-3" />
-          </button>
-          .
+          Dán chuỗi <strong className="text-purple-700 font-mono">refresh_token</strong> vào form, nhấn{' '}
+          <strong>"Kiểm Tra Kết Nối"</strong> để xác thực (hệ thống tự nhận diện Email sinh viên PTIT), sau đó bấm{' '}
+          <strong>"Lưu & Kết Nối"</strong>.
         </>
       ),
     },
     {
       step: 4,
-      title: 'Điền Email & Mật khẩu mới trên Tool để Lưu & Kết Nối',
+      title: 'Tự động gia hạn Token & Refresh Token định kỳ',
       desc: (
         <>
-          Quay lại form bên dưới, nhập <strong>Email sinh viên PTIT</strong> (ví dụ:{' '}
-          <code className="bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-[11px] border border-slate-200">
-            ...@stu.ptit.edu.vn
-          </code>
-          ) và <strong>Mật khẩu mới</strong> vừa tạo, sau đó ấn <strong>"Kiểm Tra Kết Nối"</strong> rồi{' '}
-          <strong>"Lưu & Kết Nối"</strong>.
+          Sau khi lưu, hệ thống sẽ <strong>tự động dùng refresh_token để tạo mới cả Access Token và Refresh Token mới định kỳ (mỗi 20 phút)</strong> giúp duy trì phiên kết nối liên tục không bị gián đoạn.
         </>
       ),
     },

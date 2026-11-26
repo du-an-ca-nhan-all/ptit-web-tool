@@ -69,6 +69,8 @@ export default function UserProfileScreen({
     [key: string]: {
       username: string;
       password: string;
+      refreshToken?: string;
+      validatedAccessToken?: string;
       showPass: boolean;
       isSaving: boolean;
       isTesting: boolean;
@@ -76,6 +78,7 @@ export default function UserProfileScreen({
       testMessage?: string;
       lastTestedUser?: string;
       lastTestedPass?: string;
+      lastTestedRefreshToken?: string;
     };
   }>({});
 
@@ -108,6 +111,8 @@ export default function UserProfileScreen({
             formState[acc.systemKey] = {
               username: prev[acc.systemKey]?.username || defaultUser,
               password: prev[acc.systemKey]?.password || '',
+              refreshToken: prev[acc.systemKey]?.refreshToken || '',
+              validatedAccessToken: prev[acc.systemKey]?.validatedAccessToken || '',
               showPass: prev[acc.systemKey]?.showPass || false,
               isSaving: false,
               isTesting: false,
@@ -115,6 +120,7 @@ export default function UserProfileScreen({
               testMessage: prev[acc.systemKey]?.testMessage || '',
               lastTestedUser: prev[acc.systemKey]?.lastTestedUser || '',
               lastTestedPass: prev[acc.systemKey]?.lastTestedPass || '',
+              lastTestedRefreshToken: prev[acc.systemKey]?.lastTestedRefreshToken || '',
             };
           });
           return formState;
@@ -178,9 +184,12 @@ export default function UserProfileScreen({
   const handleSaveExternalAccount = async (sys: any) => {
     setErrorMsg('');
     setSuccessMsg('');
+    const isSlink = sys.systemKey === 'SLINK_PTIT';
     const form = extForm[sys.systemKey] || {
       username: sys.extUsername || currentUser.username || '',
       password: '',
+      refreshToken: '',
+      validatedAccessToken: '',
       showPass: false,
       isSaving: false,
       isTesting: false,
@@ -188,25 +197,41 @@ export default function UserProfileScreen({
       testMessage: '',
       lastTestedUser: '',
       lastTestedPass: '',
+      lastTestedRefreshToken: '',
     };
 
-    if (!form.username || !form.username.trim()) {
-      setErrorMsg('Vui lòng nhập tên đăng nhập hệ thống');
-      return;
-    }
-    if (!form.password || !form.password.trim()) {
-      setErrorMsg('Vui lòng nhập mật khẩu tài khoản hệ thống ngoài');
-      return;
-    }
+    if (isSlink) {
+      if (!form.refreshToken || !form.refreshToken.trim()) {
+        setErrorMsg('Vui lòng nhập Refresh Token OAuth của PTIT S-Link');
+        return;
+      }
+      const isTestPassed =
+        form.testStatus === 'SUCCESS' &&
+        form.refreshToken.trim() === form.lastTestedRefreshToken;
 
-    const isTestPassed =
-      form.testStatus === 'SUCCESS' &&
-      form.username.trim() === form.lastTestedUser &&
-      form.password.trim() === form.lastTestedPass;
+      if (!isTestPassed) {
+        setErrorMsg('Yêu cầu bấm "Kiểm Tra Kết Nối" thành công trước khi có thể lưu cấu hình.');
+        return;
+      }
+    } else {
+      if (!form.username || !form.username.trim()) {
+        setErrorMsg('Vui lòng nhập tên đăng nhập hệ thống');
+        return;
+      }
+      if (!form.password || !form.password.trim()) {
+        setErrorMsg('Vui lòng nhập mật khẩu tài khoản hệ thống ngoài');
+        return;
+      }
 
-    if (!isTestPassed) {
-      setErrorMsg('Yêu cầu bấm "Kiểm Tra Kết Nối" thành công trước khi có thể lưu cấu hình.');
-      return;
+      const isTestPassed =
+        form.testStatus === 'SUCCESS' &&
+        form.username.trim() === form.lastTestedUser &&
+        form.password.trim() === form.lastTestedPass;
+
+      if (!isTestPassed) {
+        setErrorMsg('Yêu cầu bấm "Kiểm Tra Kết Nối" thành công trước khi có thể lưu cấu hình.');
+        return;
+      }
     }
 
     setExtForm((prev) => ({
@@ -218,14 +243,26 @@ export default function UserProfileScreen({
       const res = await fetch('/api/external-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'SAVE',
-          systemKey: sys.systemKey,
-          systemName: sys.systemName,
-          systemUrl: sys.systemUrl,
-          extUsername: form.username.trim(),
-          extPassword: form.password.trim(),
-        }),
+        body: JSON.stringify(
+          isSlink
+            ? {
+                action: 'SAVE',
+                systemKey: sys.systemKey,
+                systemName: sys.systemName,
+                systemUrl: sys.systemUrl,
+                extUsername: form.username?.trim() || '',
+                refreshToken: form.refreshToken?.trim() || '',
+                accessToken: form.validatedAccessToken || '',
+              }
+            : {
+                action: 'SAVE',
+                systemKey: sys.systemKey,
+                systemName: sys.systemName,
+                systemUrl: sys.systemUrl,
+                extUsername: form.username.trim(),
+                extPassword: form.password.trim(),
+              }
+        ),
       });
 
       const data = await res.json();
@@ -250,9 +287,12 @@ export default function UserProfileScreen({
   const handleTestConnection = async (sys: any) => {
     setErrorMsg('');
     setSuccessMsg('');
+    const isSlink = sys.systemKey === 'SLINK_PTIT';
     const form = extForm[sys.systemKey] || {
       username: sys.extUsername || currentUser.username || '',
       password: '',
+      refreshToken: '',
+      validatedAccessToken: '',
       showPass: false,
       isSaving: false,
       isTesting: false,
@@ -260,18 +300,27 @@ export default function UserProfileScreen({
       testMessage: '',
       lastTestedUser: '',
       lastTestedPass: '',
+      lastTestedRefreshToken: '',
     };
 
     const targetUser = form.username ? form.username.trim() : sys.extUsername || '';
     const targetPass = form.password ? form.password.trim() : '';
+    const targetRefreshToken = form.refreshToken ? form.refreshToken.trim() : '';
 
-    if (!targetUser) {
-      setErrorMsg('Vui lòng nhập tên đăng nhập / mã sinh viên trước khi kiểm tra');
-      return;
-    }
-    if (!targetPass && !sys.hasPassword) {
-      setErrorMsg('Vui lòng nhập mật khẩu tài khoản trước khi kiểm tra');
-      return;
+    if (isSlink) {
+      if (!targetRefreshToken && !sys.hasRefreshToken) {
+        setErrorMsg('Vui lòng nhập Refresh Token OAuth của PTIT S-Link trước khi kiểm tra');
+        return;
+      }
+    } else {
+      if (!targetUser) {
+        setErrorMsg('Vui lòng nhập tên đăng nhập / mã sinh viên trước khi kiểm tra');
+        return;
+      }
+      if (!targetPass && !sys.hasPassword) {
+        setErrorMsg('Vui lòng nhập mật khẩu tài khoản trước khi kiểm tra');
+        return;
+      }
     }
 
     setExtForm((prev) => ({
@@ -288,27 +337,44 @@ export default function UserProfileScreen({
       const res = await fetch('/api/external-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'TEST',
-          systemKey: sys.systemKey,
-          systemName: sys.systemName,
-          systemUrl: sys.systemUrl,
-          extUsername: targetUser,
-          extPassword: targetPass,
-        }),
+        body: JSON.stringify(
+          isSlink
+            ? {
+                action: 'TEST',
+                systemKey: sys.systemKey,
+                systemName: sys.systemName,
+                systemUrl: sys.systemUrl,
+                extUsername: targetUser,
+                refreshToken: targetRefreshToken || undefined,
+              }
+            : {
+                action: 'TEST',
+                systemKey: sys.systemKey,
+                systemName: sys.systemName,
+                systemUrl: sys.systemUrl,
+                extUsername: targetUser,
+                extPassword: targetPass,
+              }
+        ),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
+        const nextRefreshToken = isSlink ? (data.refreshToken || targetRefreshToken) : '';
+        const nextUsername = isSlink ? (data.detectedUsername || targetUser) : targetUser;
         setExtForm((prev) => ({
           ...prev,
           [sys.systemKey]: {
             ...prev[sys.systemKey],
+            username: nextUsername,
+            ...(isSlink && nextRefreshToken ? { refreshToken: nextRefreshToken } : {}),
+            ...(isSlink && data.token ? { validatedAccessToken: data.token } : {}),
             isTesting: false,
             testStatus: 'SUCCESS',
             testMessage: data.message || 'Kiểm tra kết nối và xác thực tài khoản thành công!',
-            lastTestedUser: targetUser,
+            lastTestedUser: nextUsername,
             lastTestedPass: targetPass,
+            lastTestedRefreshToken: nextRefreshToken,
           },
         }));
         setSuccessMsg(data.message || 'Kiểm tra kết nối thành công! Đã mở khóa nút Lưu.');
@@ -324,11 +390,13 @@ export default function UserProfileScreen({
             testMessage: errMsg,
             lastTestedUser: '',
             lastTestedPass: '',
+            lastTestedRefreshToken: '',
+            validatedAccessToken: '',
           },
         }));
         setErrorMsg(errMsg);
       }
-      if (sys.isConfigured) {
+      if (sys.isConfigured && !targetRefreshToken) {
         fetchExternalAccounts();
       }
     } catch (err) {

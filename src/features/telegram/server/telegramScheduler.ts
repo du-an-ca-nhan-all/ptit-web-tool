@@ -10,6 +10,7 @@ import {
   runGlobalNightlySyncScheduler,
   recoverStuckGlobalSyncQueueItems,
 } from '@/src/features/external-portal/server/globalSyncQueueServerService';
+import { refreshAllSlinkTokensPeriodic } from '@/src/features/external-portal/server/slinkServerService';
 import { recoverStuckFlowQueueItems } from '@/src/features/classes-monitor/server/monitorFlowQueueServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
@@ -73,6 +74,9 @@ export async function runTelegramSchedulerTasks() {
   });
   checkAndDispatchSlinkAnnouncements().catch((err) => {
     console.error('[Telegram Scheduler] Periodic S-Link announcements check error:', err);
+  });
+  refreshAllSlinkTokensPeriodic({ minIntervalMinutes: 20 }).catch((err) => {
+    console.error('[S-Link Token Scheduler] Periodic S-Link token refresh error:', err);
   });
   runClassScheduleReminders().catch((err) => {
     console.error('[Telegram Scheduler] Periodic class schedule check error:', err);

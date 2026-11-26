@@ -51,6 +51,8 @@ export async function fetchStudentGradesFromSlink(credentials: {
   statistics: any;
   newToken?: string;
   newRefreshToken?: string;
+  tokenExpiresAt?: Date | null;
+  refreshTokenExpiresAt?: Date | null;
   lastPulledAt: string;
 }> {
   // Lấy hoặc refresh token
@@ -197,6 +199,8 @@ export async function fetchStudentGradesFromSlink(credentials: {
     statistics,
     newToken: authRes.isNew ? authRes.token : undefined,
     newRefreshToken: authRes.isNew ? authRes.refreshToken : undefined,
+    tokenExpiresAt: authRes.isNew ? authRes.tokenExpiresAt : undefined,
+    refreshTokenExpiresAt: authRes.isNew ? authRes.refreshTokenExpiresAt : undefined,
     lastPulledAt: new Date().toISOString(),
   };
 }
@@ -795,7 +799,7 @@ export async function getStudentSlinkGrades(
     },
   });
 
-  const isConfigured = !!(extAccount && (extAccount.token || extAccount.extPassword));
+  const isConfigured = !!(extAccount && (extAccount.token || extAccount.refreshToken));
 
   if (!isConfigured) {
     return {
@@ -869,14 +873,19 @@ export async function getStudentSlinkGrades(
       username: extAccount!.extUsername || cleanUsername,
       password: extAccount!.extPassword || undefined,
       token: extAccount!.token,
+      refreshToken: extAccount!.refreshToken,
     });
 
-    // Cập nhật token và trạng thái CONNECTED vào ExternalAccount
+    // Cập nhật token, refreshToken và trạng thái CONNECTED vào ExternalAccount
     await prisma.externalAccount
       .update({
         where: { id: extAccount!.id },
         data: {
           ...(fetchedResult.newToken ? { token: fetchedResult.newToken } : {}),
+          ...(fetchedResult.newRefreshToken ? { refreshToken: fetchedResult.newRefreshToken } : {}),
+          ...(fetchedResult.tokenExpiresAt ? { tokenExpiresAt: fetchedResult.tokenExpiresAt } : {}),
+          ...(fetchedResult.refreshTokenExpiresAt ? { refreshTokenExpiresAt: fetchedResult.refreshTokenExpiresAt } : {}),
+          ...(fetchedResult.newToken || fetchedResult.newRefreshToken ? { lastTokenRefreshedAt: new Date() } : {}),
           lastSyncAt: new Date(),
           status: 'CONNECTED',
           syncMessage: 'Đồng bộ kết quả học tập thành công từ PTIT S-Link.',

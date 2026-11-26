@@ -109,11 +109,17 @@ async function enqueueSingleGlobalJobType(options: EnqueueGlobalSyncOptions) {
       extUsername: true,
       extPassword: true,
       token: true,
+      refreshToken: true,
     },
   });
 
-  // Lọc chỉ giữ các tài khoản có mật khẩu hoặc token (đã cấu hình hợp lệ)
-  extAccounts = extAccounts.filter((acc) => (acc.extPassword && acc.extPassword.trim()) || acc.token);
+  // Lọc chỉ giữ các tài khoản có mật khẩu, token hoặc refreshToken (đã cấu hình hợp lệ)
+  extAccounts = extAccounts.filter(
+    (acc) =>
+      (acc.extPassword && acc.extPassword.trim()) ||
+      (acc.refreshToken && acc.refreshToken.trim()) ||
+      acc.token
+  );
 
   if (options.targetUsernames && options.targetUsernames.length > 0) {
     const targetSet = new Set(options.targetUsernames.map((u) => u.trim().toUpperCase()));
@@ -412,7 +418,7 @@ async function processSingleGlobalSyncItem(item: any) {
         },
   });
 
-  if (!extAcc || (!extAcc.extPassword && !extAcc.token)) {
+  if (!extAcc || (!extAcc.extPassword && !extAcc.token && !extAcc.refreshToken)) {
     let msg = 'Bỏ qua: Sinh viên chưa liên kết tài khoản Cổng Quản Lý Đào Tạo (QLDTTX / QLHT)';
     if (isLmsJob) {
       msg = 'Bỏ qua: Sinh viên chưa liên kết tài khoản Hệ thống học tập trực tuyến (LMS PTTC1)';

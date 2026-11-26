@@ -40,6 +40,11 @@ interface ExternalAccountAdminItem {
   extPassword?: string;
   token?: string | null;
   hasToken?: boolean;
+  refreshToken?: string | null;
+  hasRefreshToken?: boolean;
+  tokenExpiresAt?: string | null;
+  refreshTokenExpiresAt?: string | null;
+  lastTokenRefreshedAt?: string | null;
   status: string;
   lastSyncAt: string | null;
   syncMessage: string | null;
@@ -77,6 +82,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
     username: '',
     extUsername: '',
     extPassword: '',
+    refreshToken: '',
     systemKey: AVAILABLE_EXTERNAL_SYSTEMS[0]?.key || 'QLDTTX_PTTC1',
     systemName: AVAILABLE_EXTERNAL_SYSTEMS[0]?.name || 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
     systemUrl: AVAILABLE_EXTERNAL_SYSTEMS[0]?.url || 'https://qldttx.pttc1.edu.vn/',
@@ -88,6 +94,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
   const [modalTestError, setModalTestError] = useState('');
   const [lastTestedModalUser, setLastTestedModalUser] = useState('');
   const [lastTestedModalPass, setLastTestedModalPass] = useState('');
+  const [lastTestedModalRefreshToken, setLastTestedModalRefreshToken] = useState('');
+  const [validatedModalAccessToken, setValidatedModalAccessToken] = useState('');
 
   // Delete confirm modal
   const [deletingAccount, setDeletingAccount] = useState<ExternalAccountAdminItem | null>(null);
@@ -228,21 +236,30 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
 
   // Test credentials before saving in modal
   const handleTestModalCredentials = async () => {
+    const isSlink = formData.systemKey === 'SLINK_PTIT';
     if (!formData.username.trim()) {
       setErrorMsg('Vui lòng nhập Mã sinh viên trước khi kiểm tra');
       return;
     }
-    if (!formData.extUsername.trim()) {
-      setErrorMsg(`Vui lòng nhập Tên đăng nhập ${formData.systemName} trước khi kiểm tra`);
-      return;
-    }
-    if (!formData.extPassword.trim()) {
-      setErrorMsg(`Vui lòng nhập Mật khẩu ${formData.systemName} trước khi kiểm tra`);
-      return;
+    if (isSlink) {
+      if (!formData.refreshToken.trim()) {
+        setErrorMsg('Vui lòng nhập Refresh Token OAuth của PTIT S-Link trước khi kiểm tra');
+        return;
+      }
+    } else {
+      if (!formData.extUsername.trim()) {
+        setErrorMsg(`Vui lòng nhập Tên đăng nhập ${formData.systemName} trước khi kiểm tra`);
+        return;
+      }
+      if (!formData.extPassword.trim()) {
+        setErrorMsg(`Vui lòng nhập Mật khẩu ${formData.systemName} trước khi kiểm tra`);
+        return;
+      }
     }
 
     const testUser = formData.extUsername.trim();
     const testPass = formData.extPassword.trim();
+    const testRefresh = formData.refreshToken.trim();
 
     setIsModalTesting(true);
     setModalTestStatus('TESTING');
@@ -254,21 +271,44 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       const res = await fetch('/api/external-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'TEST',
-          systemKey: formData.systemKey,
-          systemName: formData.systemName,
-          systemUrl: formData.systemUrl,
-          targetUsername: formData.username.trim(),
-          extUsername: testUser,
-          extPassword: testPass,
-        }),
+        body: JSON.stringify(
+          isSlink
+            ? {
+                action: 'TEST',
+                systemKey: formData.systemKey,
+                systemName: formData.systemName,
+                systemUrl: formData.systemUrl,
+                targetUsername: formData.username.trim(),
+                extUsername: testUser,
+                refreshToken: testRefresh,
+              }
+            : {
+                action: 'TEST',
+                systemKey: formData.systemKey,
+                systemName: formData.systemName,
+                systemUrl: formData.systemUrl,
+                targetUsername: formData.username.trim(),
+                extUsername: testUser,
+                extPassword: testPass,
+              }
+        ),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
+        const rotatedRefresh = isSlink ? (data.refreshToken || testRefresh) : '';
+        const detectedUser = isSlink ? (data.detectedUsername || testUser) : testUser;
+        if (isSlink) {
+          setFormData((prev) => ({
+            ...prev,
+            extUsername: detectedUser || prev.extUsername,
+            refreshToken: rotatedRefresh || prev.refreshToken,
+          }));
+          setLastTestedModalRefreshToken(rotatedRefresh);
+          setValidatedModalAccessToken(data.token || '');
+        }
         setModalTestStatus('SUCCESS');
-        setLastTestedModalUser(testUser);
+        setLastTestedModalUser(detectedUser);
         setLastTestedModalPass(testPass);
         setSuccessMsg(data.message || 'Kiểm tra kết nối thành công! Đã mở khóa nút Lưu.');
         setTimeout(() => setSuccessMsg(''), 4000);
@@ -278,6 +318,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
         setModalTestError(errMsg);
         setLastTestedModalUser('');
         setLastTestedModalPass('');
+        setLastTestedModalRefreshToken('');
+        setValidatedModalAccessToken('');
         setErrorMsg(errMsg);
       }
     } catch {
@@ -286,6 +328,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       setModalTestError(errMsg);
       setLastTestedModalUser('');
       setLastTestedModalPass('');
+      setLastTestedModalRefreshToken('');
+      setValidatedModalAccessToken('');
       setErrorMsg(errMsg);
     } finally {
       setIsModalTesting(false);
@@ -295,27 +339,42 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
   // Save Modal (Add or Edit) - Requires successful test first!
   const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isSlink = formData.systemKey === 'SLINK_PTIT';
     if (!formData.username.trim()) {
       setErrorMsg('Vui lòng nhập Mã sinh viên');
       return;
     }
-    if (!formData.extUsername.trim()) {
-      setErrorMsg('Vui lòng nhập Tên đăng nhập');
-      return;
-    }
-    if (!formData.extPassword.trim()) {
-      setErrorMsg('Vui lòng nhập Mật khẩu');
-      return;
-    }
+    if (isSlink) {
+      if (!formData.refreshToken.trim()) {
+        setErrorMsg('Vui lòng nhập Refresh Token OAuth');
+        return;
+      }
+      const isTestPassed =
+        modalTestStatus === 'SUCCESS' &&
+        formData.refreshToken.trim() === lastTestedModalRefreshToken;
+      if (!isTestPassed) {
+        setErrorMsg('Yêu cầu bấm "Kiểm Tra" thành công trước khi có thể lưu cấu hình.');
+        return;
+      }
+    } else {
+      if (!formData.extUsername.trim()) {
+        setErrorMsg('Vui lòng nhập Tên đăng nhập');
+        return;
+      }
+      if (!formData.extPassword.trim()) {
+        setErrorMsg('Vui lòng nhập Mật khẩu');
+        return;
+      }
 
-    const isTestPassed =
-      modalTestStatus === 'SUCCESS' &&
-      formData.extUsername.trim() === lastTestedModalUser &&
-      formData.extPassword.trim() === lastTestedModalPass;
+      const isTestPassed =
+        modalTestStatus === 'SUCCESS' &&
+        formData.extUsername.trim() === lastTestedModalUser &&
+        formData.extPassword.trim() === lastTestedModalPass;
 
-    if (!isTestPassed) {
-      setErrorMsg('Yêu cầu bấm "Kiểm Tra Kết Nối" thành công trước khi có thể lưu cấu hình.');
-      return;
+      if (!isTestPassed) {
+        setErrorMsg('Yêu cầu bấm "Kiểm Tra Kết Nối" thành công trước khi có thể lưu cấu hình.');
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -326,15 +385,28 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
       const res = await fetch('/api/external-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'SAVE',
-          systemKey: formData.systemKey,
-          systemName: formData.systemName,
-          systemUrl: formData.systemUrl,
-          targetUsername: formData.username.trim(),
-          extUsername: formData.extUsername.trim(),
-          extPassword: formData.extPassword.trim(),
-        }),
+        body: JSON.stringify(
+          isSlink
+            ? {
+                action: 'SAVE',
+                systemKey: formData.systemKey,
+                systemName: formData.systemName,
+                systemUrl: formData.systemUrl,
+                targetUsername: formData.username.trim(),
+                extUsername: formData.extUsername.trim(),
+                refreshToken: formData.refreshToken.trim(),
+                accessToken: validatedModalAccessToken,
+              }
+            : {
+                action: 'SAVE',
+                systemKey: formData.systemKey,
+                systemName: formData.systemName,
+                systemUrl: formData.systemUrl,
+                targetUsername: formData.username.trim(),
+                extUsername: formData.extUsername.trim(),
+                extPassword: formData.extPassword.trim(),
+              }
+        ),
       });
 
       const data = await res.json();
@@ -540,6 +612,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                 username: '',
                 extUsername: '',
                 extPassword: '',
+                refreshToken: '',
                 systemKey: AVAILABLE_EXTERNAL_SYSTEMS[0]?.key || 'QLDTTX_PTTC1',
                 systemName: AVAILABLE_EXTERNAL_SYSTEMS[0]?.name || 'Cổng Quản Lý Đào Tạo Từ Xa (PTTC1)',
                 systemUrl: AVAILABLE_EXTERNAL_SYSTEMS[0]?.url || 'https://qldttx.pttc1.edu.vn/',
@@ -548,6 +621,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
               setModalTestError('');
               setLastTestedModalUser('');
               setLastTestedModalPass('');
+              setLastTestedModalRefreshToken('');
+              setValidatedModalAccessToken('');
               setIsModalOpen(true);
             }}
             className="col-span-2 sm:col-span-1 px-3.5 py-2.5 sm:px-4 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
@@ -981,6 +1056,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                             username: acc.username,
                             extUsername: acc.extUsername,
                             extPassword: acc.extPassword || '',
+                            refreshToken: acc.refreshToken || '',
                             systemKey: acc.systemKey,
                             systemName: acc.systemName,
                             systemUrl: acc.systemUrl,
@@ -989,6 +1065,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                           setModalTestError('');
                           setLastTestedModalUser('');
                           setLastTestedModalPass('');
+                          setLastTestedModalRefreshToken('');
+                          setValidatedModalAccessToken('');
                           setIsModalOpen(true);
                         }}
                         className="flex-1 py-1.5 px-2 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-800 border border-indigo-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition cursor-pointer"
@@ -1168,6 +1246,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                                   username: acc.username,
                                   extUsername: acc.extUsername,
                                   extPassword: acc.extPassword || '',
+                                  refreshToken: acc.refreshToken || '',
                                   systemKey: acc.systemKey,
                                   systemName: acc.systemName,
                                   systemUrl: acc.systemUrl,
@@ -1176,6 +1255,8 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                                 setModalTestError('');
                                 setLastTestedModalUser('');
                                 setLastTestedModalPass('');
+                                setLastTestedModalRefreshToken('');
+                                setValidatedModalAccessToken('');
                                 setIsModalOpen(true);
                               }}
                               className="p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
@@ -1246,6 +1327,42 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-mono text-slate-800 break-all outline-none select-all"
                 />
               </div>
+
+              {viewingTokenAccount.systemKey === 'SLINK_PTIT' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-purple-700">
+                      OAuth Refresh Token (Tự động gia hạn định kỳ):
+                    </label>
+                    {viewingTokenAccount.refreshToken && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(viewingTokenAccount.refreshToken || '');
+                          alert('Đã sao chép Refresh Token vào clipboard!');
+                        }}
+                        className="text-[11px] font-bold text-purple-700 hover:underline cursor-pointer"
+                      >
+                        Sao chép Refresh Token
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    readOnly
+                    value={viewingTokenAccount.refreshToken || 'Chưa có refresh_token'}
+                    rows={3}
+                    className="w-full bg-purple-50/50 border border-purple-200 rounded-xl p-3 text-xs font-mono text-slate-800 break-all outline-none select-all"
+                  />
+                  {viewingTokenAccount.lastTokenRefreshedAt && (
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Gia hạn gần nhất: {new Date(viewingTokenAccount.lastTokenRefreshedAt).toLocaleString('vi-VN')}
+                      {viewingTokenAccount.refreshTokenExpiresAt
+                        ? ` • Hết hạn dự kiến: ${new Date(viewingTokenAccount.refreshTokenExpiresAt).toLocaleString('vi-VN')}`
+                        : ''}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {viewingTokenAccount.syncMessage && (
                 <div
@@ -1424,7 +1541,7 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   {formData.systemKey === 'SLINK_PTIT'
-                    ? 'Email sinh viên PTIT (Tên đăng nhập S-Link)'
+                    ? 'Email sinh viên PTIT (Tùy chọn - tự nhận diện từ Refresh Token)'
                     : `Tên đăng nhập trên ${formData.systemName} (Mã SV / Username)`}
                 </label>
                 <input
@@ -1432,58 +1549,81 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
                   value={formData.extUsername}
                   onChange={(e) => {
                     setFormData({ ...formData, extUsername: e.target.value });
-                    setModalTestStatus('IDLE');
-                    setModalTestError('');
+                    if (formData.systemKey !== 'SLINK_PTIT') {
+                      setModalTestStatus('IDLE');
+                      setModalTestError('');
+                    }
                   }}
                   placeholder={
                     formData.systemKey === 'SLINK_PTIT'
-                      ? 'Ví dụ: b21dcpt001@stu.ptit.edu.vn'
+                      ? 'Để trống để tự động lấy từ Refresh Token'
                       : 'Ví dụ: K25DTCN402'
                   }
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 sm:py-2 text-sm font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                  required
+                  required={formData.systemKey !== 'SLINK_PTIT'}
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Mật khẩu trên {formData.systemName}
-                </label>
-                <div className="relative">
-                  <input
-                    type={showModalPass ? 'text' : 'password'}
-                    value={formData.extPassword}
+              {formData.systemKey === 'SLINK_PTIT' ? (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    OAuth Refresh Token (PTIT S-Link) *
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formData.refreshToken}
                     onChange={(e) => {
-                      setFormData({ ...formData, extPassword: e.target.value });
+                      setFormData({ ...formData, refreshToken: e.target.value });
                       setModalTestStatus('IDLE');
                       setModalTestError('');
+                      setValidatedModalAccessToken('');
                     }}
-                    placeholder={`Nhập mật khẩu tài khoản ${
-                      formData.systemKey === 'LMS_PTTC1'
-                        ? 'LMS'
-                        : formData.systemKey === 'SLINK_PTIT'
-                        ? 'PTIT S-Link'
-                        : 'QLDTTX'
-                    }`}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 sm:py-2 pr-10 text-sm font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Dán chuỗi refresh_token (eyJhbGci...) lấy sau khi đăng nhập OAuth trên slink.ptit.edu.vn"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none break-all"
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowModalPass(!showModalPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                  >
-                    {showModalPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Mật khẩu trên {formData.systemName}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showModalPass ? 'text' : 'password'}
+                      value={formData.extPassword}
+                      onChange={(e) => {
+                        setFormData({ ...formData, extPassword: e.target.value });
+                        setModalTestStatus('IDLE');
+                        setModalTestError('');
+                      }}
+                      placeholder={`Nhập mật khẩu tài khoản ${
+                        formData.systemKey === 'LMS_PTTC1' ? 'LMS' : 'QLDTTX'
+                      }`}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 sm:py-2 pr-10 text-sm font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowModalPass(!showModalPass)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                    >
+                      {showModalPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Modal Test Connection Banner */}
               {(() => {
-                const isTestPassed =
-                  modalTestStatus === 'SUCCESS' &&
-                  formData.extUsername.trim() === lastTestedModalUser &&
-                  formData.extPassword.trim() === lastTestedModalPass;
+                const isSlink = formData.systemKey === 'SLINK_PTIT';
+                const isTestPassed = isSlink
+                  ? modalTestStatus === 'SUCCESS' &&
+                    Boolean(formData.refreshToken.trim()) &&
+                    formData.refreshToken.trim() === lastTestedModalRefreshToken
+                  : modalTestStatus === 'SUCCESS' &&
+                    formData.extUsername.trim() === lastTestedModalUser &&
+                    formData.extPassword.trim() === lastTestedModalPass;
 
                 if (isTestPassed) {
                   return (
@@ -1533,17 +1673,26 @@ export default function AdminExternalAccounts({ currentUser }: AdminExternalAcco
 
                 <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
                   {(() => {
-                    const isTestPassed =
-                      modalTestStatus === 'SUCCESS' &&
-                      formData.extUsername.trim() === lastTestedModalUser &&
-                      formData.extPassword.trim() === lastTestedModalPass;
+                    const isSlink = formData.systemKey === 'SLINK_PTIT';
+                    const isTestPassed = isSlink
+                      ? modalTestStatus === 'SUCCESS' &&
+                        Boolean(formData.refreshToken.trim()) &&
+                        formData.refreshToken.trim() === lastTestedModalRefreshToken
+                      : modalTestStatus === 'SUCCESS' &&
+                        formData.extUsername.trim() === lastTestedModalUser &&
+                        formData.extPassword.trim() === lastTestedModalPass;
 
                     return (
                       <>
                         <button
                           type="button"
                           onClick={handleTestModalCredentials}
-                          disabled={isModalTesting || !formData.extUsername.trim() || !formData.extPassword.trim()}
+                          disabled={
+                            isModalTesting ||
+                            (isSlink
+                              ? !formData.refreshToken.trim()
+                              : !formData.extUsername.trim() || !formData.extPassword.trim())
+                          }
                           className={`px-3 sm:px-4 py-2.5 sm:py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                             isTestPassed
                               ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300'

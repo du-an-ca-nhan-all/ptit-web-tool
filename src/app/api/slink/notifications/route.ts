@@ -3,10 +3,8 @@ import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import {
   getOrFetchStudentSlinkOverview,
-  getSlinkNotifications,
-  getSlinkUserInfo,
-  getValidSlinkTokenOrRefresh,
   markSlinkNotificationAsRead,
+  refreshAndPersistSlinkAccountToken,
 } from '@/src/features/external-portal/server/slinkServerService';
 import { checkAndDispatchSlinkAnnouncements } from '@/src/features/telegram/server/telegramDispatcher';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
@@ -113,22 +111,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const { token, isNew } = await getValidSlinkTokenOrRefresh({
-        username: extAccount.extUsername,
-        password: extAccount.extPassword,
-        existingToken: extAccount.token,
-      });
-
-      if (isNew && token !== extAccount.token) {
-        await prisma.externalAccount.update({
-          where: { id: extAccount.id },
-          data: {
-            token,
-            status: 'CONNECTED',
-            lastSyncAt: new Date(),
-          },
-        }).catch(() => {});
-      }
+      const { token } = await refreshAndPersistSlinkAccountToken(extAccount);
 
       const markType = action === 'MARK_ALL_READ' || type === 'ALL' ? 'ALL' : 'ONE';
       const markRes = await markSlinkNotificationAsRead(token, notificationId, markType);

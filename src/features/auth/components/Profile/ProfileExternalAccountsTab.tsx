@@ -36,6 +36,8 @@ interface ProfileExternalAccountsTabProps {
     [key: string]: {
       username: string;
       password: string;
+      refreshToken?: string;
+      validatedAccessToken?: string;
       showPass: boolean;
       isSaving: boolean;
       isTesting: boolean;
@@ -43,6 +45,7 @@ interface ProfileExternalAccountsTabProps {
       testMessage?: string;
       lastTestedUser?: string;
       lastTestedPass?: string;
+      lastTestedRefreshToken?: string;
     };
   };
   setExtForm: React.Dispatch<React.SetStateAction<any>>;
@@ -78,6 +81,8 @@ export function ProfileExternalAccountsTab({
       [sys.systemKey]: {
         username: defaultUser,
         password: '',
+        refreshToken: '',
+        validatedAccessToken: '',
         showPass: false,
         isSaving: false,
         isTesting: false,
@@ -85,6 +90,7 @@ export function ProfileExternalAccountsTab({
         testMessage: '',
         lastTestedUser: '',
         lastTestedPass: '',
+        lastTestedRefreshToken: '',
       },
     }));
   };
@@ -96,10 +102,13 @@ export function ProfileExternalAccountsTab({
       [sysKey]: {
         ...prev[sysKey],
         password: '',
+        refreshToken: '',
+        validatedAccessToken: '',
         testStatus: 'IDLE',
         testMessage: '',
         lastTestedUser: '',
         lastTestedPass: '',
+        lastTestedRefreshToken: '',
       },
     }));
   };
@@ -199,9 +208,12 @@ export function ProfileExternalAccountsTab({
                     sys.syncMessage.toLowerCase().includes('hết hạn'))
               );
 
+            const isSlink = sys.systemKey === 'SLINK_PTIT';
             const form = extForm[sys.systemKey] || {
               username: sys.extUsername || currentUser.username || '',
               password: '',
+              refreshToken: '',
+              validatedAccessToken: '',
               showPass: false,
               isSaving: false,
               isTesting: false,
@@ -209,13 +221,20 @@ export function ProfileExternalAccountsTab({
               testMessage: '',
               lastTestedUser: '',
               lastTestedPass: '',
+              lastTestedRefreshToken: '',
             };
 
-            const isTestSuccess = Boolean(
-              form.testStatus === 'SUCCESS' &&
-              form.username?.trim() === form.lastTestedUser &&
-              form.password?.trim() === form.lastTestedPass
-            );
+            const isTestSuccess = isSlink
+              ? Boolean(
+                  form.testStatus === 'SUCCESS' &&
+                  form.refreshToken?.trim() &&
+                  form.refreshToken?.trim() === form.lastTestedRefreshToken
+                )
+              : Boolean(
+                  form.testStatus === 'SUCCESS' &&
+                  form.username?.trim() === form.lastTestedUser &&
+                  form.password?.trim() === form.lastTestedPass
+                );
 
             // ==========================================
             // CASE 1: ĐÃ LIÊN KẾT (CONNECTED VIEW MODE)
@@ -275,19 +294,27 @@ export function ProfileExternalAccountsTab({
 
                     <div className="bg-slate-50/80 border border-slate-200/70 rounded-2xl p-3.5 flex flex-col gap-1">
                       <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <Key className="w-3 h-3" /> Mật khẩu
+                        <Key className="w-3 h-3" /> {isSlink ? 'Xác thực OAuth' : 'Mật khẩu'}
                       </span>
-                      <span className="font-mono font-bold text-slate-600 text-sm">
-                        ••••••••••••
+                      <span className="font-mono font-bold text-slate-600 text-xs sm:text-sm truncate">
+                        {isSlink
+                          ? sys.hasRefreshToken
+                            ? 'Refresh Token (Tự gia hạn)'
+                            : 'Chưa có Refresh Token'
+                          : '••••••••••••'}
                       </span>
                     </div>
 
                     <div className="bg-slate-50/80 border border-slate-200/70 rounded-2xl p-3.5 flex flex-col gap-1">
                       <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <RefreshCw className="w-3 h-3" /> Đồng bộ gần nhất
+                        <RefreshCw className="w-3 h-3" /> {isSlink ? 'Gia hạn token gần nhất' : 'Đồng bộ gần nhất'}
                       </span>
                       <span className="font-bold text-slate-700 text-xs truncate">
-                        {sys.lastSyncAt ? new Date(sys.lastSyncAt).toLocaleString('vi-VN') : 'Đã kết nối'}
+                        {isSlink && sys.lastTokenRefreshedAt
+                          ? new Date(sys.lastTokenRefreshedAt).toLocaleString('vi-VN')
+                          : sys.lastSyncAt
+                          ? new Date(sys.lastSyncAt).toLocaleString('vi-VN')
+                          : 'Đã kết nối'}
                       </span>
                     </div>
                   </div>
@@ -340,21 +367,8 @@ export function ProfileExternalAccountsTab({
                         className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
                       >
                         <Pencil className="w-3.5 h-3.5" />
-                        <span>Chỉnh Sửa Thông Tin</span>
+                        <span>{isSlink ? 'Cập Nhật Refresh Token' : 'Chỉnh Sửa Thông Tin'}</span>
                       </button>
-
-                      {/* S-Link specific: Quick Reset Password Button */}
-                      {sys.systemKey === 'SLINK_PTIT' && (
-                        <button
-                          type="button"
-                          onClick={() => setIsSlinkForgotModalOpen(true)}
-                          className="px-4 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
-                          title="Tự động gửi yêu cầu đặt lại mật khẩu S-Link qua Email"
-                        >
-                          <KeyRound className="w-3.5 h-3.5 text-purple-600" />
-                          <span>Quên / Đổi Mật Khẩu</span>
-                        </button>
-                      )}
                     </div>
 
                     {/* Button Delete / Disconnect */}
@@ -438,7 +452,7 @@ export function ProfileExternalAccountsTab({
                     variant="card"
                     defaultExpanded={true}
                     defaultUsername={form.username || ''}
-                    title={isEditing ? 'Hướng Dẫn Đổi / Lấy Lại Mật Khẩu PTIT S-Link' : 'Hướng Dẫn Lấy Mật Khẩu Cổng PTIT S-Link'}
+                    title={isEditing ? 'Hướng Dẫn Lấy Refresh Token OAuth PTIT S-Link Mới' : 'Hướng Dẫn Kết Nối PTIT S-Link Qua OAuth Refresh Token'}
                   />
                 )}
 
@@ -502,13 +516,62 @@ export function ProfileExternalAccountsTab({
                 </div>
 
                 {/* Input Fields */}
+                {isSlink ? (
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
+                        <Key className="w-3.5 h-3.5 text-purple-500" /> Refresh Token (OAuth PTIT S-Link) *
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={form.refreshToken || ''}
+                        onChange={(e) =>
+                          setExtForm((prev: any) => ({
+                            ...prev,
+                            [sys.systemKey]: {
+                              ...prev[sys.systemKey],
+                              refreshToken: e.target.value,
+                              validatedAccessToken: '',
+                              testStatus: 'IDLE',
+                              testMessage: '',
+                            },
+                          }))
+                        }
+                        placeholder="Dán chuỗi refresh_token (eyJhbGci...) lấy sau khi đăng nhập OAuth trên slink.ptit.edu.vn"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 text-xs font-mono text-slate-800 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none transition-all break-all"
+                      />
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Hệ thống sẽ dùng <code className="font-mono text-purple-700">refresh_token</code> này để định kỳ tạo mới cả Access Token và Refresh Token mới (mỗi 20 phút).
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
+                        <UserIcon className="w-3.5 h-3.5 text-slate-400" /> Email sinh viên PTIT (Tùy chọn - tự nhận diện khi Kiểm Tra)
+                      </label>
+                      <input
+                        type="text"
+                        value={form.username}
+                        onChange={(e) =>
+                          setExtForm((prev: any) => ({
+                            ...prev,
+                            [sys.systemKey]: {
+                              ...prev[sys.systemKey],
+                              username: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="Để trống để tự động lấy từ Refresh Token"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-2.5 text-xs font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
                       <UserIcon className="w-3.5 h-3.5 text-slate-400" />{' '}
-                      {sys.systemKey === 'SLINK_PTIT'
-                        ? 'Email sinh viên PTIT (Tên đăng nhập S-Link)'
-                        : `Tên đăng nhập (${sys.systemName})`}
+                      Tên đăng nhập ({sys.systemName})
                     </label>
                     <input
                       type="text"
@@ -569,23 +632,9 @@ export function ProfileExternalAccountsTab({
                         {form.showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-
-                    {/* S-Link Helper: Quick Reset Link under password field */}
-                    {sys.systemKey === 'SLINK_PTIT' && (
-                      <div className="mt-1.5 flex items-center justify-between text-[11px] bg-purple-50/80 border border-purple-200/80 rounded-xl px-3 py-1.5">
-                        <span className="text-purple-900 font-medium">Chưa có hoặc quên mật khẩu S-Link?</span>
-                        <button
-                          type="button"
-                          onClick={() => setIsSlinkForgotModalOpen(true)}
-                          className="text-purple-700 hover:text-purple-900 font-bold underline inline-flex items-center gap-1 cursor-pointer"
-                        >
-                          <Sparkles className="w-3 h-3 text-purple-600" />
-                          <span>Gửi yêu cầu reset tự động</span>
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
+                )}
 
                 {/* Interactive Status & Feedback Alert */}
                 {isTestSuccess ? (
@@ -627,7 +676,12 @@ export function ProfileExternalAccountsTab({
                     <button
                       type="button"
                       onClick={() => onTestConnection(sys)}
-                      disabled={form.isTesting || !form.username?.trim() || (!form.password?.trim() && !sys.hasPassword)}
+                      disabled={
+                        form.isTesting ||
+                        (isSlink
+                          ? !form.refreshToken?.trim()
+                          : !form.username?.trim() || (!form.password?.trim() && !sys.hasPassword))
+                      }
                       className={`px-4 py-2.5 text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-xs ${
                         isTestSuccess
                           ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300'

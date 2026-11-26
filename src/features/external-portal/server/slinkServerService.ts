@@ -78,6 +78,70 @@ export interface SlinkLoginResult {
   username: string;
 }
 
+export interface SlinkJwtPayload {
+  azp?: string;
+  exp?: number;
+  iat?: number;
+  iss?: string;
+  sub?: string;
+  preferred_username?: string;
+  email?: string;
+  name?: string;
+  [key: string]: any;
+}
+
+/**
+ * Giải mã payload JWT (không verify chữ ký) để đọc metadata như azp (client_id), exp, iss, email...
+ */
+export function decodeSlinkJwtPayload(token?: string | null): SlinkJwtPayload | null {
+  if (!token) return null;
+  try {
+    const clean = token.replace(/^Bearer\s+/i, '').trim().replace(/^["']|["']$/g, '');
+    const parts = clean.split('.');
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const jsonStr = Buffer.from(padded, 'base64').toString('utf8');
+    return JSON.parse(jsonStr) as SlinkJwtPayload;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tính thời điểm hết hạn của Access Token & Refresh Token từ phản hồi Keycloak hoặc JWT exp
+ */
+export function computeSlinkTokenExpiry(tokenRes: {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  refresh_expires_in?: number;
+}): { tokenExpiresAt: Date | null; refreshTokenExpiresAt: Date | null } {
+  const now = Date.now();
+
+  let tokenExpiresAt: Date | null = null;
+  if (typeof tokenRes.expires_in === 'number' && tokenRes.expires_in > 0) {
+    tokenExpiresAt = new Date(now + tokenRes.expires_in * 1000);
+  } else {
+    const accessPayload = decodeSlinkJwtPayload(tokenRes.access_token);
+    if (accessPayload?.exp) {
+      tokenExpiresAt = new Date(accessPayload.exp * 1000);
+    }
+  }
+
+  let refreshTokenExpiresAt: Date | null = null;
+  if (typeof tokenRes.refresh_expires_in === 'number' && tokenRes.refresh_expires_in > 0) {
+    refreshTokenExpiresAt = new Date(now + tokenRes.refresh_expires_in * 1000);
+  } else {
+    const refreshPayload = decodeSlinkJwtPayload(tokenRes.refresh_token);
+    if (refreshPayload?.exp) {
+      refreshTokenExpiresAt = new Date(refreshPayload.exp * 1000);
+    }
+  }
+
+  return { tokenExpiresAt, refreshTokenExpiresAt };
+}
+
 /**
  * Chuẩn hóa tên đăng nhập S-Link thành địa chỉ Email sinh viên PTIT (...@stu.ptit.edu.vn)
  * @param identifier Mã SV hoặc Email sinh viên
@@ -142,22 +206,34 @@ export async function loginSlink(account: {
 }
 
 /**
- * Làm mới Access Token bằng Refresh Token
+ * Làm mới Access Token và Refresh Token mới bằng Refresh Token (OAuth / Keycloak)
+ * Tự động nhận diện client_id (azp) và token endpoint (iss) từ JWT payload của refresh_token.
  * @param refreshToken - Chuỗi refresh token
  * @returns Promise<SlinkAuthTokenResponse>
  */
 export async function refreshSlinkToken(refreshToken: string): Promise<SlinkAuthTokenResponse> {
-  if (!refreshToken || !refreshToken.trim()) {
+  const cleanRefreshToken = (refreshToken || '')
+    .trim()
+    .replace(/^["']|["']$/g, '');
+
+  if (!cleanRefreshToken) {
     throw new Error('Refresh token không hợp lệ hoặc bị trống');
   }
 
+  const jwtPayload = decodeSlinkJwtPayload(cleanRefreshToken);
+  const clientId = jwtPayload?.azp || SLINK_CLIENT_ID;
+  const tokenUrl =
+    jwtPayload?.iss && typeof jwtPayload.iss === 'string' && jwtPayload.iss.startsWith('https://gwdu.ptit.edu.vn/sso/')
+      ? `${jwtPayload.iss.replace(/\/$/, '')}/protocol/openid-connect/token`
+      : SLINK_SSO_TOKEN_URL;
+
   const params = new URLSearchParams({
-    client_id: SLINK_CLIENT_ID,
+    client_id: clientId,
     grant_type: 'refresh_token',
-    refresh_token: refreshToken.trim(),
+    refresh_token: cleanRefreshToken,
   });
 
-  const res = await fetch(SLINK_SSO_TOKEN_URL, {
+  const res = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -167,7 +243,21 @@ export async function refreshSlinkToken(refreshToken: string): Promise<SlinkAuth
   });
 
   if (!res.ok) {
-    throw new Error(`Làm mới token S-Link thất bại (HTTP ${res.status})`);
+    const errBody = await res.text().catch(() => '');
+    let errMsg = `Làm mới token S-Link thất bại (HTTP ${res.status})`;
+    try {
+      const jsonErr = JSON.parse(errBody);
+      if (jsonErr.error_description) {
+        errMsg = `Làm mới token S-Link thất bại: ${jsonErr.error_description}`;
+      } else if (jsonErr.error) {
+        errMsg = `Làm mới token S-Link thất bại: ${jsonErr.error}`;
+      }
+    } catch {
+      if (errBody) {
+        errMsg = `Làm mới token S-Link thất bại (HTTP ${res.status}): ${errBody.slice(0, 200)}`;
+      }
+    }
+    throw new Error(errMsg);
   }
 
   return (await res.json()) as SlinkAuthTokenResponse;
@@ -196,60 +286,272 @@ export async function validateSlinkToken(token: string): Promise<boolean> {
 }
 
 /**
- * Lấy Token S-Link hợp lệ:
- * - Nếu token cũ còn sống (check qua SSO UserInfo) -> giữ nguyên (isNew: false)
- * - Nếu token hết hạn hoặc chưa có:
- *   + Thử làm mới bằng refreshToken nếu có
- *   + Hoặc tự động đăng nhập lại bằng mật khẩu (isNew: true)
+ * Lấy Token S-Link hợp lệ thông qua OAuth Refresh Token:
+ * - Nếu không forceRefresh và token cũ còn sống (check qua SSO UserInfo) -> giữ nguyên (isNew: false)
+ * - Nếu token hết hạn, chưa có, hoặc forceRefresh -> gọi refreshSlinkToken để lấy cả access_token & refresh_token mới
+ * (S-Link đã ngừng hỗ trợ đăng nhập trực tiếp bằng username/password, chỉ dùng OAuth refresh_token)
  */
 export async function getValidSlinkTokenOrRefresh(account: {
-  username: string;
+  username?: string;
   password?: string;
   existingToken?: string | null;
   refreshToken?: string | null;
-}): Promise<{ token: string; isNew: boolean; refreshToken?: string }> {
+  forceRefresh?: boolean;
+}): Promise<{
+  token: string;
+  isNew: boolean;
+  refreshToken?: string;
+  tokenExpiresAt?: Date | null;
+  refreshTokenExpiresAt?: Date | null;
+}> {
   const existingRaw = account.existingToken ? account.existingToken.replace(/^Bearer\s+/i, '').trim() : '';
 
-  if (existingRaw && !existingRaw.startsWith('ERROR')) {
+  if (!account.forceRefresh && existingRaw && !existingRaw.startsWith('ERROR')) {
     const isAlive = await validateSlinkToken(existingRaw);
     if (isAlive) {
       const fullBearer = account.existingToken?.startsWith('Bearer ')
         ? account.existingToken
         : `Bearer ${existingRaw}`;
-      return { token: fullBearer, isNew: false };
-    }
-  }
-
-  // Thử refresh token nếu có
-  if (account.refreshToken && account.refreshToken.trim()) {
-    try {
-      const refreshed = await refreshSlinkToken(account.refreshToken);
       return {
-        token: `Bearer ${refreshed.access_token}`,
-        refreshToken: refreshed.refresh_token,
-        isNew: true,
+        token: fullBearer,
+        refreshToken: account.refreshToken || undefined,
+        isNew: false,
       };
-    } catch (refreshErr) {
-      console.warn('[S-Link] Refresh token expired/failed, falling back to password login if available.');
     }
   }
 
-  // Token hết hạn và chưa refresh được -> Đăng nhập lấy token mới nếu có mật khẩu
-  if (!account.password || !account.password.trim()) {
+  // Làm mới bằng refresh_token (OAuth)
+  if (!account.refreshToken || !account.refreshToken.trim()) {
     throw new Error(
-      'Phiên đăng nhập PTIT S-Link đã hết hạn và chưa có mật khẩu để tự động đăng nhập lại. Vui lòng cập nhật mật khẩu S-Link trong phần Tài khoản liên kết.'
+      'PTIT S-Link đã chuyển sang đăng nhập OAuth và chưa có Refresh Token để làm mới phiên. Vui lòng cập nhật Refresh Token S-Link trong phần Tài khoản liên kết.'
     );
   }
 
-  const fresh = await loginSlink({
-    username: account.username,
-    password: account.password,
+  const refreshed = await refreshSlinkToken(account.refreshToken);
+  const nextRefreshToken = refreshed.refresh_token || account.refreshToken.trim();
+  const { tokenExpiresAt, refreshTokenExpiresAt } = computeSlinkTokenExpiry({
+    ...refreshed,
+    refresh_token: nextRefreshToken,
   });
 
   return {
-    token: `Bearer ${fresh.access_token}`,
-    refreshToken: fresh.refresh_token,
+    token: `Bearer ${refreshed.access_token}`,
+    refreshToken: nextRefreshToken,
+    tokenExpiresAt,
+    refreshTokenExpiresAt,
     isNew: true,
+  };
+}
+
+// Khóa tránh race condition khi nhiều tiến trình cùng refresh một refresh_token xoay vòng (rotation)
+const inFlightSlinkRefreshes = new Map<
+  number,
+  Promise<{
+    token: string;
+    refreshToken: string | null;
+    isNew: boolean;
+    tokenExpiresAt?: Date | null;
+    refreshTokenExpiresAt?: Date | null;
+  }>
+>();
+
+/**
+ * Lấy hoặc làm mới token cho một bản ghi ExternalAccount (S-Link) và LƯU LẠI cả access_token + refresh_token mới vào DB.
+ * Có cơ chế lock theo account.id để tránh xung đột Refresh Token Rotation.
+ */
+export async function refreshAndPersistSlinkAccountToken(
+  extAccount: {
+    id: number;
+    extUsername: string;
+    extPassword?: string | null;
+    token?: string | null;
+    refreshToken?: string | null;
+  },
+  options?: { force?: boolean; syncMessagePrefix?: string }
+): Promise<{
+  token: string;
+  refreshToken: string | null;
+  isNew: boolean;
+  tokenExpiresAt?: Date | null;
+  refreshTokenExpiresAt?: Date | null;
+}> {
+  const existingPromise = inFlightSlinkRefreshes.get(extAccount.id);
+  if (existingPromise) {
+    return existingPromise;
+  }
+
+  const runPromise = (async () => {
+    try {
+      // Đọc bản mới nhất từ DB để đảm bảo luôn dùng refresh_token mới nhất (tránh dùng lại token cũ đã rotate)
+      const latestAccount = await prisma.externalAccount.findUnique({
+        where: { id: extAccount.id },
+        select: {
+          id: true,
+          extUsername: true,
+          extPassword: true,
+          token: true,
+          refreshToken: true,
+        },
+      });
+
+      const target = latestAccount || extAccount;
+
+      const result = await getValidSlinkTokenOrRefresh({
+        username: target.extUsername,
+        password: target.extPassword || undefined,
+        existingToken: target.token,
+        refreshToken: target.refreshToken,
+        forceRefresh: options?.force,
+      });
+
+      if (result.isNew) {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        const prefix = options?.syncMessagePrefix || 'Đã tự động làm mới Token & Refresh Token S-Link';
+        await prisma.externalAccount.update({
+          where: { id: extAccount.id },
+          data: {
+            token: result.token,
+            refreshToken: result.refreshToken || target.refreshToken,
+            tokenExpiresAt: result.tokenExpiresAt ?? undefined,
+            refreshTokenExpiresAt: result.refreshTokenExpiresAt ?? undefined,
+            lastTokenRefreshedAt: now,
+            status: 'CONNECTED',
+            lastSyncAt: now,
+            syncMessage: `${prefix} lúc ${timeStr}`,
+          },
+        });
+      }
+
+      return {
+        token: result.token,
+        refreshToken: result.refreshToken || target.refreshToken || null,
+        isNew: result.isNew,
+        tokenExpiresAt: result.tokenExpiresAt,
+        refreshTokenExpiresAt: result.refreshTokenExpiresAt,
+      };
+    } catch (err: any) {
+      await prisma.externalAccount
+        .update({
+          where: { id: extAccount.id },
+          data: {
+            status: 'ERROR',
+            syncMessage: `Lỗi làm mới Token S-Link: ${err?.message || 'Refresh token đã hết hạn hoặc không hợp lệ'}`,
+          },
+        })
+        .catch(() => {});
+      throw err;
+    } finally {
+      inFlightSlinkRefreshes.delete(extAccount.id);
+    }
+  })();
+
+  inFlightSlinkRefreshes.set(extAccount.id, runPromise);
+  return runPromise;
+}
+
+/**
+ * Tác vụ chạy định kỳ để giữ sống và xoay vòng (rotate) cả Access Token lẫn Refresh Token
+ * cho toàn bộ tài khoản PTIT S-Link có lưu refreshToken.
+ */
+export async function refreshAllSlinkTokensPeriodic(options?: {
+  force?: boolean;
+  minIntervalMinutes?: number;
+}): Promise<{
+  total: number;
+  refreshed: number;
+  skipped: number;
+  failed: number;
+  errors: Array<{ username: string; error: string }>;
+}> {
+  const force = options?.force ?? false;
+  const minIntervalMinutes = options?.minIntervalMinutes ?? 20;
+  const minIntervalMs = minIntervalMinutes * 60 * 1000;
+  const ACCESS_EXPIRY_BUFFER_MS = 10 * 60 * 1000; // Refresh sớm trước khi access_token hết hạn 10 phút
+  const REFRESH_EXPIRY_BUFFER_MS = 60 * 60 * 1000; // Refresh sớm trước khi refresh_token hết hạn 60 phút
+
+  const slinkAccounts = await prisma.externalAccount.findMany({
+    where: {
+      OR: [
+        { systemKey: 'SLINK_PTIT' },
+        { systemUrl: { contains: 'slink.ptit.edu.vn' } },
+      ],
+      refreshToken: {
+        not: null,
+      },
+    },
+    orderBy: { lastTokenRefreshedAt: 'asc' },
+  });
+
+  const validAccounts = slinkAccounts.filter((acc) => acc.refreshToken && acc.refreshToken.trim().length > 0);
+  let refreshed = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors: Array<{ username: string; error: string }> = [];
+
+  for (const acc of validAccounts) {
+    // Bỏ qua các tài khoản đã báo lỗi token hết hạn vĩnh viễn trừ khi force=true
+    if (
+      !force &&
+      acc.status === 'ERROR' &&
+      acc.syncMessage &&
+      (acc.syncMessage.toLowerCase().includes('invalid_grant') ||
+        acc.syncMessage.toLowerCase().includes('not active') ||
+        acc.syncMessage.toLowerCase().includes('expired'))
+    ) {
+      skipped++;
+      continue;
+    }
+
+    const now = Date.now();
+    let shouldRefresh = force;
+
+    if (!shouldRefresh) {
+      const lastRefreshedMs = acc.lastTokenRefreshedAt
+        ? new Date(acc.lastTokenRefreshedAt).getTime()
+        : acc.lastSyncAt
+        ? new Date(acc.lastSyncAt).getTime()
+        : 0;
+
+      const accessExpiringSoon =
+        !acc.token ||
+        (acc.tokenExpiresAt && new Date(acc.tokenExpiresAt).getTime() - now <= ACCESS_EXPIRY_BUFFER_MS);
+      const refreshExpiringSoon =
+        acc.refreshTokenExpiresAt && new Date(acc.refreshTokenExpiresAt).getTime() - now <= REFRESH_EXPIRY_BUFFER_MS;
+      const intervalElapsed = now - lastRefreshedMs >= minIntervalMs;
+
+      shouldRefresh = Boolean(accessExpiringSoon || refreshExpiringSoon || intervalElapsed);
+    }
+
+    if (!shouldRefresh) {
+      skipped++;
+      continue;
+    }
+
+    try {
+      await refreshAndPersistSlinkAccountToken(acc, {
+        force: true,
+        syncMessagePrefix: 'Gia hạn định kỳ Token & Refresh Token S-Link thành công',
+      });
+      refreshed++;
+    } catch (err: any) {
+      failed++;
+      errors.push({
+        username: acc.username,
+        error: err?.message || 'Lỗi không xác định',
+      });
+    }
+
+    // Nghỉ ngắn giữa các tài khoản để tránh spam máy chủ SSO
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+
+  return {
+    total: validAccounts.length,
+    refreshed,
+    skipped,
+    failed,
+    errors,
   };
 }
 
@@ -410,23 +712,9 @@ export async function getOrFetchStudentSlinkOverview(
     };
   }
 
-  const { token, isNew } = await getValidSlinkTokenOrRefresh({
-    username: extAccount.extUsername,
-    password: extAccount.extPassword,
-    existingToken: options?.forceRefresh ? null : extAccount.token,
+  const { token } = await refreshAndPersistSlinkAccountToken(extAccount, {
+    force: options?.forceRefresh,
   });
-
-  if (isNew && token !== extAccount.token) {
-    await prisma.externalAccount.update({
-      where: { id: extAccount.id },
-      data: {
-        token,
-        status: 'CONNECTED',
-        lastSyncAt: new Date(),
-        syncMessage: `Đã tự động làm mới Token S-Link lúc ${new Date().toLocaleTimeString('vi-VN')}`,
-      },
-    });
-  }
 
   const [userInfoRes, notifRes] = await Promise.all([
     getSlinkUserInfo(token).catch((e) => {
