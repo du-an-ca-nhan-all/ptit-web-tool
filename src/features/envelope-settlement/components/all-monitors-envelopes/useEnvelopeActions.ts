@@ -35,7 +35,7 @@ export function useEnvelopeActions() {
     fetchEnvelopeAssignments().then((res) => {
       if (res) setEnvelopeAssignments(res);
     });
-    fetchPricingFromBackend().catch(() => {});
+    fetchPricingFromBackend().catch((err) => console.warn("[useEnvelopeActions] Non-fatal async error:", err));
 
     const handler = (e: any) => {
       if (e.detail) {

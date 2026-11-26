@@ -89,7 +89,7 @@ export async function handleDownloadSqlDump(
     fileSize: buffer.length,
     adminUsername: authUser.username,
     description: `Quản trị viên ${authUser.username} xuất toàn bộ cơ sở dữ liệu PostgreSQL sang file SQL Dump (.sql)`,
-  }).catch(() => {});
+  }).catch((err) => console.warn("[downloadHandlers] Non-fatal async error:", err));
 
   return new Response(buffer, {
     status: 200,

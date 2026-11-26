@@ -7,6 +7,59 @@ import {
   splitVietnameseFullName,
 } from './normalize';
 
+function parseHeaderlessRow(row: string[]) {
+  const offset = row.length >= 2 && /^\d+$/.test(row[0]) && MA_SV_REGEX.test(row[1]) ? 1 : 0;
+  const maSV = (row[offset] || '').trim().toUpperCase();
+  const remaining = row.slice(offset + 1);
+
+  if (remaining.length === 1) {
+    return { maSV, hoLot: '', ten: '', hoTen: remaining[0], gioiTinh: undefined as string | undefined, ngaySinh: '', soDienThoai: '', ghiChu: '' };
+  }
+  if (remaining.length < 2) {
+    return { maSV, hoLot: '', ten: '', hoTen: '', gioiTinh: undefined as string | undefined, ngaySinh: '', soDienThoai: '', ghiChu: '' };
+  }
+
+  const secondNorm = normalizeHeader(remaining[1]);
+  const isGender = secondNorm === 'nam' || secondNorm === 'nu';
+  const isDate = /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(remaining[1]);
+
+  if (isGender) {
+    return {
+      maSV,
+      hoLot: '',
+      ten: '',
+      hoTen: remaining[0],
+      gioiTinh: normalizeGender(remaining[1]),
+      ngaySinh: remaining[2] || '',
+      soDienThoai: remaining[3] || '',
+      ghiChu: remaining[4] || '',
+    };
+  }
+  if (isDate) {
+    return {
+      maSV,
+      hoLot: '',
+      ten: '',
+      hoTen: remaining[0],
+      gioiTinh: undefined as string | undefined,
+      ngaySinh: remaining[1],
+      soDienThoai: remaining[2] || '',
+      ghiChu: remaining[3] || '',
+    };
+  }
+
+  return {
+    maSV,
+    hoLot: remaining[0],
+    ten: remaining[1],
+    hoTen: '',
+    gioiTinh: normalizeGender(remaining[2]),
+    ngaySinh: remaining[3] || '',
+    soDienThoai: remaining[4] || '',
+    ghiChu: remaining[5] || '',
+  };
+}
+
 export function parseRows(rawRows: unknown[][]): ParseClassMembersResult {
   const rows = rawRows
     .map((r) => (Array.isArray(r) ? r.map((c) => String(c ?? '').trim()) : []))
@@ -47,47 +100,15 @@ export function parseRows(rawRows: unknown[][]): ParseClassMembersResult {
       soDienThoai = headerMap.soDienThoai >= 0 ? (row[headerMap.soDienThoai] || '').trim() : '';
       ghiChu = headerMap.ghiChu >= 0 ? (row[headerMap.ghiChu] || '').trim() : '';
     } else {
-      // Headerless heuristic: check if col 0 is numeric STT and col 1 is MaSV
-      let offset = 0;
-      if (row.length >= 2 && /^\d+$/.test(row[0]) && MA_SV_REGEX.test(row[1])) {
-        offset = 1;
-      }
-
-      maSV = (row[offset] || '').trim().toUpperCase();
-      const remaining = row.slice(offset + 1);
-
-      if (remaining.length === 1) {
-        hoTen = remaining[0];
-      } else if (remaining.length >= 2) {
-        // Check if remaining[0] & remaining[1] look like HoLot + Ten (common PTIT format)
-        // vs HoTen + Gender/DOB
-        const secondNorm = normalizeHeader(remaining[1]);
-        const isSecondGenderOrDate =
-          secondNorm === 'nam' ||
-          secondNorm === 'nu' ||
-          /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(remaining[1]);
-
-        if (isSecondGenderOrDate) {
-          hoTen = remaining[0];
-          if (secondNorm === 'nam' || secondNorm === 'nu') {
-            gioiTinh = normalizeGender(remaining[1]);
-            ngaySinh = remaining[2] || '';
-            soDienThoai = remaining[3] || '';
-            ghiChu = remaining[4] || '';
-          } else {
-            ngaySinh = remaining[1];
-            soDienThoai = remaining[2] || '';
-            ghiChu = remaining[3] || '';
-          }
-        } else {
-          hoLot = remaining[0];
-          ten = remaining[1];
-          gioiTinh = normalizeGender(remaining[2]);
-          ngaySinh = remaining[3] || '';
-          soDienThoai = remaining[4] || '';
-          ghiChu = remaining[5] || '';
-        }
-      }
+      const parsed = parseHeaderlessRow(row);
+      maSV = parsed.maSV;
+      hoLot = parsed.hoLot;
+      ten = parsed.ten;
+      hoTen = parsed.hoTen;
+      gioiTinh = parsed.gioiTinh;
+      ngaySinh = parsed.ngaySinh;
+      soDienThoai = parsed.soDienThoai;
+      ghiChu = parsed.ghiChu;
     }
 
     if (!maSV || !MA_SV_REGEX.test(maSV)) {

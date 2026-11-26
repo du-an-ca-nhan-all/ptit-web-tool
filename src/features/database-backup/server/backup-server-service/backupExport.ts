@@ -132,14 +132,11 @@ export async function exportDatabaseAsSqlDump(): Promise<string> {
         AND pg_get_serial_sequence('"' || c.table_name || '"', c.column_name) IS NOT NULL;
     `);
 
-    if (Array.isArray(seqCols)) {
-      for (const { table_name, column_name, seq_name } of seqCols) {
-        if (seq_name) {
-          const safeTable = assertSafeSqlIdentifier(table_name, 'table name');
-          const safeCol = assertSafeSqlIdentifier(column_name, 'column name');
-          lines.push(`SELECT setval('${seq_name}', coalesce(max("${safeCol}"), 1), max("${safeCol}") IS NOT NULL) FROM "public"."${safeTable}";`);
-        }
-      }
+    const validSeqCols = Array.isArray(seqCols) ? seqCols.filter((c: any) => Boolean(c.seq_name)) : [];
+    for (const { table_name, column_name, seq_name } of validSeqCols) {
+      const safeTable = assertSafeSqlIdentifier(table_name, 'table name');
+      const safeCol = assertSafeSqlIdentifier(column_name, 'column name');
+      lines.push(`SELECT setval('${seq_name}', coalesce(max("${safeCol}"), 1), max("${safeCol}") IS NOT NULL) FROM "public"."${safeTable}";`);
     }
   } catch (caughtError) {
     console.warn(`[backupExport] Non-fatal error:`, caughtError);

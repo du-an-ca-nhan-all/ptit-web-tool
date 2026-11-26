@@ -62,6 +62,48 @@ export function pushSchemaToDev(devUrl: string) {
   });
 }
 
+async function recreateCustomTableFromProd(
+  prodPrisma: PrismaClient,
+  devPrisma: PrismaClient,
+  table: string
+): Promise<void> {
+  try {
+    const columns: any = await prodPrisma.$queryRawUnsafe(`
+      SELECT 
+        column_name, 
+        data_type, 
+        udt_name,
+        is_nullable, 
+        column_default
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' AND table_name = $1
+      ORDER BY ordinal_position;
+    `, table);
+
+    if (!Array.isArray(columns) || columns.length === 0) return;
+    const safeTable = assertSafeSqlIdentifier(table, 'table name');
+    const colDefs = columns.map((c: any) => {
+      const safeColumn = assertSafeSqlIdentifier(c.column_name, 'column name');
+      let typeStr = c.udt_name || c.data_type;
+      if (typeStr === 'varchar') typeStr = 'text';
+      if (typeStr === 'int4') typeStr = 'integer';
+      if (typeStr === 'int8') typeStr = 'bigint';
+      if (typeStr === 'bool') typeStr = 'boolean';
+      const nullStr = c.is_nullable === 'NO' ? ' NOT NULL' : '';
+      return `"${safeColumn}" ${typeStr}${nullStr}`;
+    });
+
+    await devPrisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "public"."${safeTable}" (
+        ${colDefs.join(',\n')}
+      );
+    `);
+    console.log(`  ➕ Đã tự động tái tạo cấu trúc bảng tuỳ chỉnh "${table}" trên DEV.`);
+  } catch (err: any) {
+    console.warn(`  ⚠️ Không thể tự động tạo DDL cho bảng "${table}":`, err.message);
+  }
+}
+
 /**
  * 6. Tự động kiểm tra và tạo bù bất kỳ bảng nào có trên PROD nhưng chưa có trên DEV
  *    (Đặc biệt là _prisma_migrations hoặc các bảng ngoài schema.prisma)
@@ -87,43 +129,7 @@ export async function ensureMissingTablesCreated(prodPrisma: PrismaClient, devPr
       `);
       console.log(`  ➕ Đã tự động tạo bảng hệ thống "_prisma_migrations" trên DEV.`);
     } else {
-      // Dynamic DDL generation cho bất kỳ bảng tuỳ chỉnh nào khác
-      try {
-        const columns: any = await prodPrisma.$queryRawUnsafe(`
-          SELECT 
-            column_name, 
-            data_type, 
-            udt_name,
-            is_nullable, 
-            column_default
-          FROM information_schema.columns 
-          WHERE table_schema = 'public' AND table_name = $1
-          ORDER BY ordinal_position;
-        `, table);
-
-        if (Array.isArray(columns) && columns.length > 0) {
-          const safeTable = assertSafeSqlIdentifier(table, 'table name');
-          const colDefs = columns.map((c: any) => {
-            const safeColumn = assertSafeSqlIdentifier(c.column_name, 'column name');
-            let typeStr = c.udt_name || c.data_type;
-            if (typeStr === 'varchar') typeStr = 'text';
-            if (typeStr === 'int4') typeStr = 'integer';
-            if (typeStr === 'int8') typeStr = 'bigint';
-            if (typeStr === 'bool') typeStr = 'boolean';
-            const nullStr = c.is_nullable === 'NO' ? ' NOT NULL' : '';
-            return `"${safeColumn}" ${typeStr}${nullStr}`;
-          });
-
-          await devPrisma.$executeRawUnsafe(`
-            CREATE TABLE IF NOT EXISTS "public"."${safeTable}" (
-              ${colDefs.join(',\n')}
-            );
-          `);
-          console.log(`  ➕ Đã tự động tái tạo cấu trúc bảng tuỳ chỉnh "${table}" trên DEV.`);
-        }
-      } catch (err: any) {
-        console.warn(`  ⚠️ Không thể tự động tạo DDL cho bảng "${table}":`, err.message);
-      }
+      await recreateCustomTableFromProd(prodPrisma, devPrisma, table);
     }
   }
 }

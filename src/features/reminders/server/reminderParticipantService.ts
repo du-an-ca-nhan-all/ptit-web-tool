@@ -52,17 +52,16 @@ export async function getStudentCurrentCourses(username: string): Promise<Enroll
         distinct: ['maMH'],
       });
 
-      for (const ex of exams) {
-        if (ex.maMH && ex.tenMH) {
-          const key = `${ex.maMH}_${ex.nhomHoc || '01'}`;
-          courseMap.set(key, {
-            idToHoc: `${ex.maMH}-${ex.nhomHoc || '01'}`,
-            maMon: ex.maMH,
-            tenMon: ex.tenMH,
-            nhomTo: ex.nhomHoc || '01',
-            lop: ex.maLopMH || '',
-          });
-        }
+      const validExams = exams.filter((ex) => Boolean(ex.maMH && ex.tenMH));
+      for (const ex of validExams) {
+        const key = `${ex.maMH}_${ex.nhomHoc || '01'}`;
+        courseMap.set(key, {
+          idToHoc: `${ex.maMH}-${ex.nhomHoc || '01'}`,
+          maMon: ex.maMH!,
+          tenMon: ex.tenMH!,
+          nhomTo: ex.nhomHoc || '01',
+          lop: ex.maLopMH || '',
+        });
       }
     } catch (err) {
       console.error(`[getStudentCurrentCourses] Lỗi đọc ExamRecord cho ${cleanUsername}:`, err);

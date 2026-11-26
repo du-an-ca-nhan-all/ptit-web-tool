@@ -5,6 +5,20 @@ import {
   sendBackupToTelegram,
 } from '../src/features/database-backup/server/backupServerService';
 
+async function sendBackupNotificationToTelegram(): Promise<void> {
+  console.log('\n[+] Sending backup files to Telegram...');
+  try {
+    const telRes = await sendBackupToTelegram();
+    if (telRes.success) {
+      console.log(`  -> [Telegram SUCCESS] Sent ${telRes.filesSent.length} files: ${telRes.filesSent.join(', ')}`);
+    } else {
+      console.warn(`  -> [Telegram FAILED] ${telRes.error || telRes.message}`);
+    }
+  } catch (telErr: any) {
+    console.error(`  -> [Telegram ERROR] ${telErr.message}`);
+  }
+}
+
 async function main() {
   console.log('====================================================');
   console.log('    PTIT WEB TOOL - POSTGRESQL DATABASE BACKUP      ');
@@ -39,17 +53,7 @@ async function main() {
     });
 
     if (shouldSendTelegram) {
-      console.log('\n[+] Sending backup files to Telegram...');
-      try {
-        const telRes = await sendBackupToTelegram();
-        if (telRes.success) {
-          console.log(`  -> [Telegram SUCCESS] Sent ${telRes.filesSent.length} files: ${telRes.filesSent.join(', ')}`);
-        } else {
-          console.warn(`  -> [Telegram FAILED] ${telRes.error || telRes.message}`);
-        }
-      } catch (telErr: any) {
-        console.error(`  -> [Telegram ERROR] ${telErr.message}`);
-      }
+      await sendBackupNotificationToTelegram();
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);

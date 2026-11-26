@@ -50,11 +50,9 @@ export const activityLogService = {
       if (!username && req) {
         try {
           const auth = await getAuthUser(req);
-          if (auth) {
-            userId = auth.id;
-            username = auth.username;
-            userRole = auth.role;
-          }
+          userId = auth?.id ?? userId;
+          username = auth?.username ?? username;
+          userRole = auth?.role ?? userRole;
         } catch (caughtError) {
           console.warn(`[activityLogServerService] Non-fatal error:`, caughtError);
         }

@@ -42,7 +42,7 @@ export function usePricingConfigModal({ isOpen, onClose, isAdmin }: PricingConfi
       setSavedMsg('');
       fetchPricingFromBackend().then(() => {
         loadCurrentSettings();
-      }).catch(() => {});
+      }).catch((err) => console.warn("[usePricingConfigModal] Non-fatal async error:", err));
     }
   }, [isOpen, effectiveIsAdmin]);
 

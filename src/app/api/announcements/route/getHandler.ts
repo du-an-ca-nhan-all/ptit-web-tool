@@ -57,7 +57,7 @@ export async function handleGetAnnouncements(req: NextRequest) {
     // Increment views in background
     if (announcements.length > 0) {
       const ids = announcements.map((a) => a.id);
-      incrementAnnouncementViews(ids).catch(() => {});
+      incrementAnnouncementViews(ids).catch((err) => console.warn("[getHandler] Non-fatal async error:", err));
     }
 
     return NextResponse.json({

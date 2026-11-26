@@ -65,7 +65,7 @@ export async function PUT(
       isAdmin: user.isAdmin,
     });
 
-    runPendingReminderAlerts().catch(() => {});
+    runPendingReminderAlerts().catch((err) => console.warn("[route] Non-fatal async error:", err));
 
     return NextResponse.json({
       success: true,

@@ -17,6 +17,38 @@ export interface CopyTablesDataParams {
   tableCounts: Map<string, number>;
 }
 
+function serializeTransferValue(rawValue: any): any {
+  if (rawValue !== null && typeof rawValue === 'object' && !(rawValue instanceof Date) && !Buffer.isBuffer(rawValue)) {
+    return JSON.stringify(rawValue);
+  }
+  return rawValue;
+}
+
+async function insertDevChunk(params: {
+  devPrisma: PrismaClient;
+  safeTableName: string;
+  columns: string[];
+  quotedCols: string;
+  chunk: any[];
+}): Promise<void> {
+  const { devPrisma, safeTableName, columns, quotedCols, chunk } = params;
+  const placeholders: string[] = [];
+  const flatValues: any[] = [];
+  let pIndex = 1;
+
+  for (const row of chunk) {
+    const rowPlaceholders: string[] = [];
+    for (const col of columns) {
+      rowPlaceholders.push(`$${pIndex++}`);
+      flatValues.push(serializeTransferValue(row[col]));
+    }
+    placeholders.push(`(${rowPlaceholders.join(', ')})`);
+  }
+
+  const insertSql = `INSERT INTO "public"."${safeTableName}" (${quotedCols}) VALUES ${placeholders.join(', ')};`;
+  await devPrisma.$executeRawUnsafe(insertSql, ...flatValues);
+}
+
 /**
  * Nạp dữ liệu động từ PROD sang DEV theo thứ tự ràng buộc khoá ngoại
  */
@@ -60,26 +92,7 @@ export async function copyTablesData({
     const chunks = chunkArray(rows, batchSize);
 
     for (const chunk of chunks) {
-      const placeholders: string[] = [];
-      const flatValues: any[] = [];
-      let pIndex = 1;
-
-      for (const row of chunk) {
-        const rowPlaceholders: string[] = [];
-        for (const col of columns) {
-          rowPlaceholders.push(`$${pIndex++}`);
-          let val = row[col];
-          // Format object/array sang JSON string nếu cần
-          if (val !== null && typeof val === 'object' && !(val instanceof Date) && !Buffer.isBuffer(val)) {
-            val = JSON.stringify(val);
-          }
-          flatValues.push(val);
-        }
-        placeholders.push(`(${rowPlaceholders.join(', ')})`);
-      }
-
-      const insertSql = `INSERT INTO "public"."${safeTableName}" (${quotedCols}) VALUES ${placeholders.join(', ')};`;
-      await devPrisma.$executeRawUnsafe(insertSql, ...flatValues);
+      await insertDevChunk({ devPrisma, safeTableName, columns, quotedCols, chunk });
     }
 
     copiedRecords += rows.length;

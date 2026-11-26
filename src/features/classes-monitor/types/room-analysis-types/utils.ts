@@ -36,25 +36,24 @@ export function getExamTimestamp(ngayThi: string, gioThi: string): number {
   }
 
   const timeStr = String(gioThi || '').trim();
-  if (timeStr) {
-    const hhmmMatch = timeStr.match(/(\d{1,2})\s*[gGhH:]\s*(\d{1,2})(?::(\d{1,2}))?/);
-    if (hhmmMatch) {
-      const hours = Number(hhmmMatch[1]);
-      const minutes = Number(hhmmMatch[2]);
-      const seconds = hhmmMatch[3] !== undefined ? Number(hhmmMatch[3]) : 0;
-      if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) {
-        baseDate.setHours(hours, minutes, seconds, 0);
-        return baseDate.getTime();
-      }
-    } else {
-      const hourOnlyMatch = timeStr.match(/(\d{1,2})\s*[gGhH]\b/);
-      if (hourOnlyMatch) {
-        const hours = Number(hourOnlyMatch[1]);
-        if (!isNaN(hours)) {
-          baseDate.setHours(hours, 0, 0, 0);
-          return baseDate.getTime();
-        }
-      }
+  if (!timeStr) return baseDate.getTime();
+
+  const hhmmMatch = timeStr.match(/(\d{1,2})\s*[gGhH:]\s*(\d{1,2})(?::(\d{1,2}))?/);
+  if (hhmmMatch) {
+    const hours = Number(hhmmMatch[1]);
+    const minutes = Number(hhmmMatch[2]);
+    const seconds = hhmmMatch[3] !== undefined ? Number(hhmmMatch[3]) : 0;
+    if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) {
+      baseDate.setHours(hours, minutes, seconds, 0);
+    }
+    return baseDate.getTime();
+  }
+
+  const hourOnlyMatch = timeStr.match(/(\d{1,2})\s*[gGhH]\b/);
+  if (hourOnlyMatch) {
+    const hours = Number(hourOnlyMatch[1]);
+    if (!isNaN(hours)) {
+      baseDate.setHours(hours, 0, 0, 0);
     }
   }
 

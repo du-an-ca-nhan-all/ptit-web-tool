@@ -40,7 +40,7 @@ export async function handleCreateSnapshot(
     adminUsername: authUser.username,
     description: `Quản trị viên ${authUser.username} tạo ${createdFiles.length} bản snapshot sao lưu máy chủ (.SQL)`,
     tableStats: stats.tables,
-  }).catch(() => {});
+  }).catch((err) => console.warn("[snapshotHandlers] Non-fatal async error:", err));
 
   return NextResponse.json({
     success: true,

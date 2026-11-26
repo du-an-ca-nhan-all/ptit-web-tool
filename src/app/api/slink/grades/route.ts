@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
         targetType: 'EXTERNAL_ACCOUNT',
         targetId: usernameToQuery,
         description: `Làm mới và kéo kết quả học tập từ PTIT S-Link cho ${usernameToQuery}`,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[route] Non-fatal async error:", err));
     }
 
     return NextResponse.json(gradesData);
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
         targetType: 'EXTERNAL_ACCOUNT',
         targetId: usernameToQuery,
         description: `Đồng bộ kết quả học tập từ PTIT S-Link cho ${usernameToQuery}`,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[route] Non-fatal async error:", err));
     }
 
     return NextResponse.json(gradesData);

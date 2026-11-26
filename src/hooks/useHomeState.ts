@@ -74,8 +74,8 @@ export function useHomeState() {
   // Initial mount load
   useEffect(() => {
     setIsMounted(true);
-    fetchPricingFromBackend().catch(() => {});
-    fetchMonitorsData().catch(() => {});
+    fetchPricingFromBackend().catch((err) => console.warn("[useHomeState] Non-fatal async error:", err));
+    fetchMonitorsData().catch((err) => console.warn("[useHomeState] Non-fatal async error:", err));
 
     // Fetch batches
     fetch('/api/exam-batches')
@@ -87,7 +87,7 @@ export function useHomeState() {
           if (active) setActiveBatch(active);
         }
       })
-      .catch(() => {})
+      .catch((err) => console.warn("[useHomeState] Non-fatal async error:", err))
       .finally(() => setIsLoading(false));
   }, [fetchMonitorsData, setExamBatches, setActiveBatch, setIsMounted, setIsLoading]);
 

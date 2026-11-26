@@ -9,6 +9,149 @@ import {
   buildPreClass60Message,
 } from './classScheduleFormatters';
 
+async function dispatchMorningSummaryIfNeeded(params: {
+  sub: any;
+  effectiveToken: string;
+  studentName: string;
+  todayDowName: string;
+  todayStr: string;
+  sessionsToday: any[];
+  nowVN: Date;
+  force: boolean;
+}): Promise<{ sent: boolean; error?: string }> {
+  const { sub, effectiveToken, studentName, todayDowName, todayStr, sessionsToday, nowVN, force } = params;
+  const key = {
+    username: sub.username,
+    courseCode: 'DAILY_SUMMARY',
+    reminderType: 'MORNING_DAILY_SUMMARY',
+    targetDate: todayStr,
+  };
+
+  const morningLog = await prisma.classScheduleReminderLog.findUnique({
+    where: { username_courseCode_reminderType_targetDate: key },
+  });
+  if (morningLog && !force) return { sent: false };
+
+  const { morningMessage, sessionInfo } = buildMorningSummaryMessage({
+    studentName,
+    username: sub.username,
+    todayDowName,
+    todayStr,
+    sessionsToday,
+    classReminderBefore: sub.classReminderBefore,
+    nowVN,
+  });
+
+  const sendRes = await sendTelegramMessage({
+    botToken: effectiveToken,
+    chatId: sub.chatId,
+    text: morningMessage,
+    options: { threadId: sub.threadId ? Number(sub.threadId) : undefined },
+  });
+
+  if (!sendRes.success) {
+    return { sent: false, error: sendRes.error ? `${sub.username}: ${sendRes.error}` : undefined };
+  }
+
+  await prisma.classScheduleReminderLog.upsert({
+    where: { username_courseCode_reminderType_targetDate: key },
+    create: { ...key, sessionInfo },
+    update: { sentAt: new Date(), sessionInfo },
+  });
+  return { sent: true };
+}
+
+async function dispatchPreClassAlertIfNeeded(params: {
+  sub: any;
+  effectiveToken: string;
+  studentName: string;
+  ses: any;
+  todayStr: string;
+  reminderType: 'BEFORE_CLASS_60M' | 'BEFORE_CLASS_30M';
+  forcePreClassAlert?: boolean;
+}): Promise<boolean> {
+  const { sub, effectiveToken, studentName, ses, todayStr, reminderType, forcePreClassAlert } = params;
+  const sessionKey = `${ses.subjectCode}_${ses.startPeriod}`;
+  const key = { username: sub.username, courseCode: sessionKey, reminderType, targetDate: todayStr };
+
+  const existingLog = await prisma.classScheduleReminderLog.findUnique({
+    where: { username_courseCode_reminderType_targetDate: key },
+  });
+  if (existingLog && !forcePreClassAlert) return false;
+
+  const text =
+    reminderType === 'BEFORE_CLASS_60M'
+      ? buildPreClass60Message({ studentName, username: sub.username, ses })
+      : buildPreClass30Message({ studentName, username: sub.username, ses });
+
+  const sendRes = await sendTelegramMessage({
+    botToken: effectiveToken,
+    chatId: sub.chatId,
+    text,
+    options: { threadId: sub.threadId ? Number(sub.threadId) : undefined },
+  });
+  if (!sendRes.success) return false;
+
+  await prisma.classScheduleReminderLog.upsert({
+    where: { username_courseCode_reminderType_targetDate: key },
+    create: { ...key, sessionInfo: `${ses.startTime} - ${ses.room}` },
+    update: { sentAt: new Date() },
+  });
+  return true;
+}
+
+async function processPreClassSessions(params: {
+  sub: any;
+  effectiveToken: string;
+  studentName: string;
+  sessionsToday: any[];
+  nowMinutesToday: number;
+  todayStr: string;
+  forcePreClassAlert?: boolean;
+}): Promise<number> {
+  const { sub, effectiveToken, studentName, sessionsToday, nowMinutesToday, todayStr, forcePreClassAlert } = params;
+  const reminderConfig = sub.classReminderBefore ?? 30;
+  let sentCount = 0;
+
+  for (const ses of sessionsToday) {
+    const minutesUntilStart = ses.startMinutes - nowMinutesToday;
+
+    const shouldCheck60M =
+      (reminderConfig === 60 || reminderConfig === 0) &&
+      ((minutesUntilStart > 30 && minutesUntilStart <= 65) || !!forcePreClassAlert);
+    if (shouldCheck60M) {
+      const sent = await dispatchPreClassAlertIfNeeded({
+        sub,
+        effectiveToken,
+        studentName,
+        ses,
+        todayStr,
+        reminderType: 'BEFORE_CLASS_60M',
+        forcePreClassAlert,
+      });
+      if (sent) sentCount++;
+    }
+
+    const shouldCheck30M =
+      (reminderConfig === 30 || reminderConfig === 0) &&
+      ((minutesUntilStart > 0 && minutesUntilStart <= 35) || !!forcePreClassAlert);
+    if (shouldCheck30M) {
+      const sent = await dispatchPreClassAlertIfNeeded({
+        sub,
+        effectiveToken,
+        studentName,
+        ses,
+        todayStr,
+        reminderType: 'BEFORE_CLASS_30M',
+        forcePreClassAlert,
+      });
+      if (sent) sentCount++;
+    }
+  }
+
+  return sentCount;
+}
+
 /**
  * Quét và gửi thông báo lịch học (Sáng 7h-10h gửi tổng hợp & trước giờ học 30p/1h gửi nhắc nhở)
  * Hỗ trợ forceCheck để kiểm tra và gửi trực tiếp kết quả (dù có hay không có ca học) đến Telegram.
@@ -26,237 +169,57 @@ export async function runClassScheduleReminders(options: {
     );
     const nowHourVN = nowVN.getHours();
     const nowMinutesToday = nowHourVN * 60 + nowVN.getMinutes();
-
     const todayDowName = DOW_NAMES[nowVN.getDay()];
 
-    const whereCond: any = {
-      isEnabled: true,
-      notifyClassSchedule: true,
-    };
-    if (options.username) {
-      whereCond.username = options.username;
-    }
+    const whereCond: any = { isEnabled: true, notifyClassSchedule: true };
+    if (options.username) whereCond.username = options.username;
 
     const subscribers = await prisma.telegramConfig.findMany({
       where: whereCond,
-      include: {
-        user: {
-          include: {
-            student: true,
-          },
-        },
-      },
+      include: { user: { include: { student: true } } },
     });
 
     let morningSummariesSent = 0;
     let preClassAlertsSent = 0;
     const errors: string[] = [];
-
-    // Is current time within the morning review window (7h00 -> 10h00 VN Time)?
     const isMorningWindow = (nowHourVN >= 7 && nowHourVN < 10) || options.forceMorningSummary || options.forceCheck;
 
     for (const sub of subscribers) {
       const studentName = sub.user?.student?.hoTen || sub.username;
-
-      // 1. Gọi API QLDTTX để lấy TKB học kỳ
       const rawSemesterList = await getStudentAllSemesterSessions(sub.username);
       const sessionsToday = await getStudentClassSessionsForDate(sub.username, nowVN, rawSemesterList);
 
-      let effectiveToken: string;
-      try {
-        const resolved = await resolveEffectiveBotToken(sub.botToken);
-        effectiveToken = resolved.token;
-      } catch {
-        continue;
-      }
+      const effectiveToken = await resolveEffectiveBotToken(sub.botToken)
+        .then((res) => res.token)
+        .catch(() => null);
+      if (!effectiveToken) continue;
 
-      // ─────────────────────────────────────────────────────────────
-      // 1. GỬI TỔNG HỢP LỊCH HỌC ĐẦU NGÀY (7h00 - 10h00 SÁNG HOẶC KIỂM TRA THỦ CÔNG)
-      // Kể cả khi hôm nay không có ca học nào vẫn gửi thông báo báo không có ca học
-      // ─────────────────────────────────────────────────────────────
-      if (isMorningWindow) {
-        const morningLog = await prisma.classScheduleReminderLog.findUnique({
-          where: {
-            username_courseCode_reminderType_targetDate: {
-              username: sub.username,
-              courseCode: 'DAILY_SUMMARY',
-              reminderType: 'MORNING_DAILY_SUMMARY',
-              targetDate: todayStr,
-            },
-          },
-        });
-
-        if (!morningLog || options.forceMorningSummary || options.forceCheck) {
-          const { morningMessage, sessionInfo } = buildMorningSummaryMessage({
+      const morningRes = isMorningWindow
+        ? await dispatchMorningSummaryIfNeeded({
+            sub,
+            effectiveToken,
             studentName,
-            username: sub.username,
             todayDowName,
             todayStr,
             sessionsToday,
-            classReminderBefore: sub.classReminderBefore,
             nowVN,
-          });
+            force: !!(options.forceMorningSummary || options.forceCheck),
+          })
+        : { sent: false };
+      morningSummariesSent += morningRes.sent ? 1 : 0;
+      if (morningRes.error) errors.push(morningRes.error);
 
-          const sendRes = await sendTelegramMessage({
-            botToken: effectiveToken,
-            chatId: sub.chatId,
-            text: morningMessage,
-            options: {
-              threadId: sub.threadId ? Number(sub.threadId) : undefined,
-            },
-          });
+      if (sessionsToday.length === 0) continue;
 
-          if (sendRes.success) {
-            morningSummariesSent++;
-            await prisma.classScheduleReminderLog.upsert({
-              where: {
-                username_courseCode_reminderType_targetDate: {
-                  username: sub.username,
-                  courseCode: 'DAILY_SUMMARY',
-                  reminderType: 'MORNING_DAILY_SUMMARY',
-                  targetDate: todayStr,
-                },
-              },
-              create: {
-                username: sub.username,
-                courseCode: 'DAILY_SUMMARY',
-                reminderType: 'MORNING_DAILY_SUMMARY',
-                targetDate: todayStr,
-                sessionInfo,
-              },
-              update: {
-                sentAt: new Date(),
-                sessionInfo,
-              },
-            });
-          } else if (sendRes.error) {
-            errors.push(`${sub.username}: ${sendRes.error}`);
-          }
-        }
-      }
-
-      // Nếu không có ca học nào trong hôm nay -> Bỏ qua bước nhắc trước giờ học
-      if (sessionsToday.length === 0) {
-        continue;
-      }
-
-      // ─────────────────────────────────────────────────────────────
-      // 2. NHẮC NHỞ TRƯỚC GIỜ VÀO HỌC (30 PHÚT HOẶC 1 TIẾNG)
-      // ─────────────────────────────────────────────────────────────
-      const reminderConfig = sub.classReminderBefore ?? 30; // 30, 60 hoặc 0 (cả hai)
-
-      for (const ses of sessionsToday) {
-        const minutesUntilStart = ses.startMinutes - nowMinutesToday;
-        const sessionKey = `${ses.subjectCode}_${ses.startPeriod}`;
-
-        // Kiểm tra điều kiện nhắc 60 phút
-        const shouldCheck60M =
-          (reminderConfig === 60 || reminderConfig === 0) &&
-          ((minutesUntilStart > 30 && minutesUntilStart <= 65) || options.forcePreClassAlert);
-
-        if (shouldCheck60M) {
-          const log60 = await prisma.classScheduleReminderLog.findUnique({
-            where: {
-              username_courseCode_reminderType_targetDate: {
-                username: sub.username,
-                courseCode: sessionKey,
-                reminderType: 'BEFORE_CLASS_60M',
-                targetDate: todayStr,
-              },
-            },
-          });
-
-          if (!log60 || options.forcePreClassAlert) {
-            const preMessage60 = buildPreClass60Message({ studentName, username: sub.username, ses });
-            const sendRes = await sendTelegramMessage({
-              botToken: effectiveToken,
-              chatId: sub.chatId,
-              text: preMessage60,
-              options: {
-                threadId: sub.threadId ? Number(sub.threadId) : undefined,
-              },
-            });
-
-            if (sendRes.success) {
-              preClassAlertsSent++;
-              await prisma.classScheduleReminderLog.upsert({
-                where: {
-                  username_courseCode_reminderType_targetDate: {
-                    username: sub.username,
-                    courseCode: sessionKey,
-                    reminderType: 'BEFORE_CLASS_60M',
-                    targetDate: todayStr,
-                  },
-                },
-                create: {
-                  username: sub.username,
-                  courseCode: sessionKey,
-                  reminderType: 'BEFORE_CLASS_60M',
-                  targetDate: todayStr,
-                  sessionInfo: `${ses.startTime} - ${ses.room}`,
-                },
-                update: {
-                  sentAt: new Date(),
-                },
-              });
-            }
-          }
-        }
-
-        // Kiểm tra điều kiện nhắc 30 phút
-        const shouldCheck30M =
-          (reminderConfig === 30 || reminderConfig === 0) &&
-          ((minutesUntilStart > 0 && minutesUntilStart <= 35) || options.forcePreClassAlert);
-
-        if (shouldCheck30M) {
-          const log30 = await prisma.classScheduleReminderLog.findUnique({
-            where: {
-              username_courseCode_reminderType_targetDate: {
-                username: sub.username,
-                courseCode: sessionKey,
-                reminderType: 'BEFORE_CLASS_30M',
-                targetDate: todayStr,
-              },
-            },
-          });
-
-          if (!log30 || options.forcePreClassAlert) {
-            const preMessage30 = buildPreClass30Message({ studentName, username: sub.username, ses });
-            const sendRes = await sendTelegramMessage({
-              botToken: effectiveToken,
-              chatId: sub.chatId,
-              text: preMessage30,
-              options: {
-                threadId: sub.threadId ? Number(sub.threadId) : undefined,
-              },
-            });
-
-            if (sendRes.success) {
-              preClassAlertsSent++;
-              await prisma.classScheduleReminderLog.upsert({
-                where: {
-                  username_courseCode_reminderType_targetDate: {
-                    username: sub.username,
-                    courseCode: sessionKey,
-                    reminderType: 'BEFORE_CLASS_30M',
-                    targetDate: todayStr,
-                  },
-                },
-                create: {
-                  username: sub.username,
-                  courseCode: sessionKey,
-                  reminderType: 'BEFORE_CLASS_30M',
-                  targetDate: todayStr,
-                  sessionInfo: `${ses.startTime} - ${ses.room}`,
-                },
-                update: {
-                  sentAt: new Date(),
-                },
-              });
-            }
-          }
-        }
-      }
+      preClassAlertsSent += await processPreClassSessions({
+        sub,
+        effectiveToken,
+        studentName,
+        sessionsToday,
+        nowMinutesToday,
+        todayStr,
+        forcePreClassAlert: options.forcePreClassAlert,
+      });
     }
 
     return {

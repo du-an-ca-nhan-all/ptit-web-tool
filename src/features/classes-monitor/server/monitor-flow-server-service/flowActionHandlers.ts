@@ -124,6 +124,32 @@ export async function executeCancelCourseAction(params: {
   return { succeeded: Boolean(res.success), result };
 }
 
+async function syncCourseGroupList(params: {
+  idsToProcess: string[];
+  creds: QldttxCredentials;
+  svNganh: number;
+  mode: 'cancel' | 'register';
+}): Promise<{ successCount: number; failCount: number }> {
+  const { idsToProcess, creds, svNganh, mode } = params;
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const idToHoc of idsToProcess) {
+    try {
+      const actionRes =
+        mode === 'cancel'
+          ? await cancelCourseGroupQLDTTX(creds, { id_to_hoc: idToHoc, sv_nganh: svNganh })
+          : await registerCourseGroupQLDTTX(creds, { id_to_hoc: idToHoc, sv_nganh: svNganh });
+      if (actionRes.success) successCount++;
+      else failCount++;
+    } catch {
+      failCount++;
+    }
+  }
+
+  return { successCount, failCount };
+}
+
 export async function executeSyncAllCoursesAction(params: {
   normMonitor: string;
   normFollower: string;
@@ -169,38 +195,18 @@ export async function executeSyncAllCoursesAction(params: {
 
   // 2. HỦY các môn mà Sinh viên đang có nhưng Lớp trưởng KHÔNG có (hoặc Lớp trưởng đã hủy)
   if (allowCancelCourse) {
-    for (const [idToHoc] of followerToHocMap.entries()) {
-      if (!monitorToHocMap.has(idToHoc)) {
-        try {
-          const cancelRes = await cancelCourseGroupQLDTTX(creds, {
-            id_to_hoc: idToHoc,
-            sv_nganh: svNganh,
-          });
-          if (cancelRes.success) cancelSuccess++;
-          else cancelFail++;
-        } catch {
-          cancelFail++;
-        }
-      }
-    }
+    const idsToCancel = Array.from(followerToHocMap.keys()).filter((id) => !monitorToHocMap.has(id));
+    const cancelStats = await syncCourseGroupList({ idsToProcess: idsToCancel, creds, svNganh, mode: 'cancel' });
+    cancelSuccess = cancelStats.successCount;
+    cancelFail = cancelStats.failCount;
   }
 
   // 3. ĐĂNG KÝ các môn mà Lớp trưởng CÓ nhưng Sinh viên CHƯA có
   if (allowRegisterCourse) {
-    for (const [idToHoc] of monitorToHocMap.entries()) {
-      if (!followerToHocMap.has(idToHoc)) {
-        try {
-          const regRes = await registerCourseGroupQLDTTX(creds, {
-            id_to_hoc: idToHoc,
-            sv_nganh: svNganh,
-          });
-          if (regRes.success) regSuccess++;
-          else regFail++;
-        } catch {
-          regFail++;
-        }
-      }
-    }
+    const idsToRegister = Array.from(monitorToHocMap.keys()).filter((id) => !followerToHocMap.has(id));
+    const regStats = await syncCourseGroupList({ idsToProcess: idsToRegister, creds, svNganh, mode: 'register' });
+    regSuccess = regStats.successCount;
+    regFail = regStats.failCount;
   }
 
   const hasErrors = cancelFail > 0 || regFail > 0;

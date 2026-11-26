@@ -66,7 +66,7 @@ export async function handleRestoreUploadedFile(
     adminUsername: authUser.username,
     format: filename.split('.').pop()?.toUpperCase() || 'DB',
     success: true,
-  }).catch(() => {});
+  }).catch((err) => console.warn("[restoreHandlers] Non-fatal async error:", err));
 
   const localBackups = listLocalBackups();
   return NextResponse.json({
@@ -109,7 +109,7 @@ export async function handleRestoreSavedBackup(
     adminUsername: authUser.username,
     format: filename.split('.').pop()?.toUpperCase() || 'DB',
     success: true,
-  }).catch(() => {});
+  }).catch((err) => console.warn("[restoreHandlers] Non-fatal async error:", err));
 
   const localBackups = listLocalBackups();
   return NextResponse.json({

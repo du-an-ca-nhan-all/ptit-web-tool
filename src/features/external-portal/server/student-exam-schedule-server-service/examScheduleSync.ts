@@ -68,7 +68,7 @@ function notifyExamScheduleChangesIfDetected(
           targetId: cleanUsername,
           description: `Phát hiện ${detectedDiffs.length} biến động trong lịch thi cá nhân từ Cổng QLDTTX`,
           metadata: { cleanUsername, changesCount: detectedDiffs.length, changes: detectedDiffs },
-        }).catch(() => {});
+        }).catch((err) => console.warn("[examScheduleSync] Non-fatal async error:", err));
       }
     }
   } catch (diffErr) {
@@ -150,7 +150,7 @@ export async function syncAndPersistStudentExamSchedule(params: {
           syncMessage: 'Đồng bộ lịch thi thành công từ QLDTTX.',
         },
       })
-      .catch(() => {});
+      .catch((err) => console.warn("[examScheduleSync] Non-fatal async error:", err));
   }
 
   const currentSemesterExams = allExamsBySemester[targetHocKy] || [];

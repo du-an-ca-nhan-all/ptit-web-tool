@@ -7,6 +7,24 @@ interface UseTimetableFetchOptions {
   onAutoJumpDate: (date: Date, isoDate: string) => void;
 }
 
+function tryAutoJumpToFirstEvent(
+  events: any[] | undefined,
+  onAutoJump: (date: Date, isoDate: string) => void
+): void {
+  if (!events || events.length === 0) return;
+  const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  if (params?.get('date') || params?.get('day')) return;
+
+  const todayIso = formatIso(new Date());
+  const hasTodayOrFuture = events.some((e: any) => e.date >= todayIso);
+  if (hasTodayOrFuture || !events[0]?.date) return;
+
+  const firstDate = new Date(events[0].date);
+  if (!isNaN(firstDate.getTime())) {
+    onAutoJump(firstDate, events[0].date);
+  }
+}
+
 export function useTimetableFetch({ onAutoJumpDate }: UseTimetableFetchOptions) {
   const [data, setData] = useState<StudentTimetableCalendarResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,20 +64,7 @@ export function useTimetableFetch({ onAutoJumpDate }: UseTimetableFetchOptions) 
         }
 
         // Auto jump calendar date to nearest active session if current month has no events and no URL date
-        if (json.events && json.events.length > 0) {
-          const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-          const hasUrlDate = Boolean(params?.get('date') || params?.get('day'));
-          if (!hasUrlDate) {
-            const todayIso = formatIso(new Date());
-            const hasTodayOrFuture = json.events.some((e: any) => e.date >= todayIso);
-            if (!hasTodayOrFuture && json.events[0]?.date) {
-              const firstDate = new Date(json.events[0].date);
-              if (!isNaN(firstDate.getTime())) {
-                onAutoJumpDateRef.current(firstDate, json.events[0].date);
-              }
-            }
-          }
-        }
+        tryAutoJumpToFirstEvent(json.events, onAutoJumpDateRef.current);
       } else {
         const type = json.errorType || (res.status === 401 ? 'INVALID_CREDENTIALS' : 'SERVER_ERROR');
         setErrorType(type);

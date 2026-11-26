@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
         targetType: 'EXTERNAL_ACCOUNT',
         targetId: targetUsername,
         description: `Làm mới danh sách thông báo từ PTIT S-Link`,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[route] Non-fatal async error:", err));
     }
 
     return NextResponse.json({
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
         description: markType === 'ALL'
           ? `Đánh dấu tất cả thông báo S-Link là đã đọc`
           : `Đánh dấu thông báo S-Link (${notificationId}) là đã đọc`,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[route] Non-fatal async error:", err));
 
       return NextResponse.json({
         success: true,

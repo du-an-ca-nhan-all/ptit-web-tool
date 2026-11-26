@@ -44,6 +44,68 @@ export async function getTableRecordCounts(
   return counts;
 }
 
+function sortTablesTopologically(tables: string[], fkRows: any[]): string[] {
+  const inDegree = new Map<string, number>();
+  const dependents = new Map<string, Set<string>>();
+  const dependencies = new Map<string, Set<string>>();
+
+  for (const t of tables) {
+    inDegree.set(t, 0);
+    dependents.set(t, new Set());
+    dependencies.set(t, new Set());
+  }
+
+  for (const { child_table, parent_table } of fkRows) {
+    if (!tables.includes(child_table) || !tables.includes(parent_table)) continue;
+    if (dependencies.get(child_table)!.has(parent_table)) continue;
+    dependencies.get(child_table)!.add(parent_table);
+    dependents.get(parent_table)!.add(child_table);
+    inDegree.set(child_table, (inDegree.get(child_table) || 0) + 1);
+  }
+
+  const queue = tables.filter((t) => inDegree.get(t) === 0);
+  const sorted: string[] = [];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    sorted.push(current);
+
+    for (const child of dependents.get(current) || []) {
+      const newDeg = (inDegree.get(child) || 1) - 1;
+      inDegree.set(child, newDeg);
+      if (newDeg === 0) queue.push(child);
+    }
+  }
+
+  for (const t of tables) {
+    if (!sorted.includes(t)) sorted.push(t);
+  }
+
+  return sorted;
+}
+
+async function syncSingleSequence(
+  prismaClient: typeof prisma,
+  row: { table_name: string; column_name: string; seq_name?: string }
+): Promise<boolean> {
+  if (!row.seq_name) return false;
+  const safeTable = assertSafeSqlIdentifier(row.table_name, 'table name');
+  const safeColumn = assertSafeSqlIdentifier(row.column_name, 'column name');
+  try {
+    await prismaClient.$executeRawUnsafe(`
+      SELECT setval(
+        $1, 
+        COALESCE((SELECT MAX("${safeColumn}") FROM "public"."${safeTable}"), 1), 
+        (SELECT MAX("${safeColumn}") IS NOT NULL FROM "public"."${safeTable}")
+      );
+    `, row.seq_name);
+    return true;
+  } catch (caughtError) {
+    console.warn(`[postgresMetadata] Non-fatal error:`, caughtError);
+    return false;
+  }
+}
+
 /**
  * 3. Phân tích quan hệ Foreign Key & Sắp xếp thứ tự nạp bảng theo Topological Sort
  *    (Bảng cha được nạp trước, bảng con chứa khoá ngoại được nạp sau)
@@ -65,59 +127,7 @@ export async function getTableDependencyOrder(
         AND tc.table_schema = 'public'
         AND tc.table_name != ccu.table_name;
     `);
-
-    const inDegree = new Map<string, number>();
-    const dependents = new Map<string, Set<string>>(); // parent -> children
-    const dependencies = new Map<string, Set<string>>(); // child -> parents
-
-    for (const t of tables) {
-      inDegree.set(t, 0);
-      dependents.set(t, new Set());
-      dependencies.set(t, new Set());
-    }
-
-    if (Array.isArray(fkRows)) {
-      for (const { child_table, parent_table } of fkRows) {
-        if (tables.includes(child_table) && tables.includes(parent_table)) {
-          if (!dependencies.get(child_table)!.has(parent_table)) {
-            dependencies.get(child_table)!.add(parent_table);
-            dependents.get(parent_table)!.add(child_table);
-            inDegree.set(child_table, (inDegree.get(child_table) || 0) + 1);
-          }
-        }
-      }
-    }
-
-    // Hàng đợi các bảng không phụ thuộc bảng nào
-    const queue: string[] = [];
-    for (const t of tables) {
-      if (inDegree.get(t) === 0) {
-        queue.push(t);
-      }
-    }
-
-    const sorted: string[] = [];
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      sorted.push(current);
-
-      for (const child of dependents.get(current) || []) {
-        const newDeg = (inDegree.get(child) || 1) - 1;
-        inDegree.set(child, newDeg);
-        if (newDeg === 0) {
-          queue.push(child);
-        }
-      }
-    }
-
-    // Bổ sung các bảng còn lại nếu có quan hệ vòng tròn
-    for (const t of tables) {
-      if (!sorted.includes(t)) {
-        sorted.push(t);
-      }
-    }
-
-    return sorted;
+    return sortTablesTopologically(tables, Array.isArray(fkRows) ? fkRows : []);
   } catch {
     return tables;
   }
@@ -139,25 +149,10 @@ export async function syncPostgresSequences(prismaClient = prisma): Promise<numb
         AND pg_get_serial_sequence('"' || c.table_name || '"', c.column_name) IS NOT NULL;
     `);
 
+    if (!Array.isArray(seqCols)) return 0;
     let count = 0;
-    if (Array.isArray(seqCols)) {
-      for (const { table_name, column_name, seq_name } of seqCols) {
-        if (!seq_name) continue;
-        const safeTable = assertSafeSqlIdentifier(table_name, 'table name');
-        const safeColumn = assertSafeSqlIdentifier(column_name, 'column name');
-        try {
-          await prismaClient.$executeRawUnsafe(`
-            SELECT setval(
-              $1, 
-              COALESCE((SELECT MAX("${safeColumn}") FROM "public"."${safeTable}"), 1), 
-              (SELECT MAX("${safeColumn}") IS NOT NULL FROM "public"."${safeTable}")
-            );
-          `, seq_name);
-          count++;
-        } catch (caughtError) {
-          console.warn(`[postgresMetadata] Non-fatal error:`, caughtError);
-        }
-      }
+    for (const row of seqCols) {
+      if (await syncSingleSequence(prismaClient, row)) count++;
     }
     return count;
   } catch {

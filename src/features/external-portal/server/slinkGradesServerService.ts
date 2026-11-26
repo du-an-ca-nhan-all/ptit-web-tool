@@ -95,7 +95,7 @@ export async function getStudentSlinkGrades(
           syncMessage: 'Đồng bộ kết quả học tập thành công từ PTIT S-Link.',
         },
       })
-      .catch(() => {});
+      .catch((err) => console.warn("[slinkGradesServerService] Non-fatal async error:", err));
 
     // Xây dựng dữ liệu hoàn chỉnh
     const resultObj = buildSlinkGradeResultFromRawData(cleanUsername, fetchedResult, {
@@ -128,7 +128,7 @@ export async function getStudentSlinkGrades(
             syncMessage: 'Phiên PTIT S-Link đã hết hạn hoặc Refresh Token không hợp lệ. Vui lòng cập nhật lại Refresh Token.',
           },
         })
-        .catch(() => {});
+        .catch((err) => console.warn("[slinkGradesServerService] Non-fatal async error:", err));
     }
 
     // Nếu lỗi mạng / timeout, thử fallback sang StudentSlinkGradeRecord trong DB

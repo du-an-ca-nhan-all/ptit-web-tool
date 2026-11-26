@@ -89,7 +89,7 @@ export async function getStudentGrades(
           syncMessage: 'Đồng bộ điểm thành công từ QLDTTX.',
         },
       })
-      .catch(() => {});
+      .catch((err) => console.warn("[studentGradesServerService] Non-fatal async error:", err));
 
     // Xây dựng dữ liệu hoàn chỉnh
     const resultObj = buildGradeResultFromRawData(cleanUsername, fetchedResult, {
@@ -123,17 +123,16 @@ export async function getStudentGrades(
             syncMessage: 'Đăng nhập thất bại: Tài khoản hoặc mật khẩu không chính xác.',
           },
         })
-        .catch(() => {});
+        .catch((err) => console.warn("[studentGradesServerService] Non-fatal async error:", err));
     } else {
       // Nếu lỗi mạng / timeout trường, thử fallback sang StudentGradeRecord trong DB
-      try {
-        const fallbackResult = await readCachedStudentGrades(cleanUsername, extAccount?.lastSyncAt, false);
-        if (fallbackResult) {
-          return fallbackResult;
+      const fallbackResult = await readCachedStudentGrades(cleanUsername, extAccount?.lastSyncAt, false).catch(
+        (fbErr) => {
+          console.warn(`[studentGradesServerService] Non-fatal error:`, fbErr);
+          return null;
         }
-      } catch (fbErr) {
-        console.warn(`[studentGradesServerService] Non-fatal error:`, fbErr);
-      }
+      );
+      if (fallbackResult) return fallbackResult;
 
       return createEmptyGradesResult({
         username: cleanUsername,

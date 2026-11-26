@@ -1,6 +1,50 @@
 import { prisma } from '@/src/lib/prisma';
 import { enqueueSingleGlobalJobType } from './enqueue';
 
+function computeUsernameIntervalMs(username: string): number {
+  let hash = 0;
+  for (let i = 0; i < username.length; i++) {
+    hash = (hash << 5) - hash + username.charCodeAt(i);
+    hash |= 0;
+  }
+  const randomIntervalMinutes = 20 + (Math.abs(hash) % 11);
+  return randomIntervalMinutes * 60 * 1000;
+}
+
+async function isStudentDueForTodayExamSync(params: {
+  rec: { username: string; rawData: string | null; lastPulledAt: Date | null };
+  todayVnStr: string;
+  todayIsoStr: string;
+}): Promise<boolean> {
+  const { rec, todayVnStr, todayIsoStr } = params;
+  if (!rec.rawData) return false;
+  try {
+    const parsed = JSON.parse(rec.rawData);
+    const rawExams = parsed?.exams || parsed?.data?.ds_lich_thi || (Array.isArray(parsed) ? parsed : []) || [];
+    const hasExamToday = rawExams.some((ex: any) => {
+      const examDateStr = (ex.ngay_thi || ex.ngayThi || ex.NgayThi || '').trim();
+      const examDateIso = (ex.dateIso || '').trim();
+      return examDateStr === todayVnStr || examDateIso === todayIsoStr;
+    });
+    if (!hasExamToday) return false;
+
+    const lastPulledMs = rec.lastPulledAt ? new Date(rec.lastPulledAt).getTime() : 0;
+    if (Date.now() - lastPulledMs < computeUsernameIntervalMs(rec.username)) return false;
+
+    const activeTask = await prisma.globalSyncQueueItem.findFirst({
+      where: {
+        username: rec.username,
+        jobType: { in: ['SYNC_EXAMS', 'SYNC_TODAY_EXAMS'] },
+        status: { in: ['QUEUED', 'RUNNING'] },
+      },
+    });
+    return !activeTask;
+  } catch (caughtError) {
+    console.warn(`[todayExamsSync] Non-fatal error:`, caughtError);
+    return false;
+  }
+}
+
 /**
  * Quét và kiểm tra các sinh viên có ca thi HÔM NAY.
  * Định kỳ 20 đến 30 phút (ngẫu nhiên hóa theo từng sinh viên) sẽ cho vào hàng đợi Global
@@ -29,48 +73,8 @@ export async function checkAndQueueTodayExamsSync(
     const dueUsernames: string[] = [];
 
     for (const rec of allRecords) {
-      if (!rec.rawData) continue;
-      try {
-        const parsed = JSON.parse(rec.rawData);
-        const rawExams = parsed?.exams || parsed?.data?.ds_lich_thi || (Array.isArray(parsed) ? parsed : []) || [];
-
-        // Kiểm tra xem sinh viên có môn thi hôm nay không
-        const hasExamToday = rawExams.some((ex: any) => {
-          const examDateStr = (ex.ngay_thi || ex.ngayThi || ex.NgayThi || '').trim();
-          const examDateIso = (ex.dateIso || '').trim();
-          return examDateStr === todayVnStr || examDateIso === todayIsoStr;
-        });
-
-        if (!hasExamToday) continue;
-
-        // Tính chu kỳ quét ngẫu nhiên 20 đến 30 phút (phân bổ ngẫu nhiên theo hash username)
-        let hash = 0;
-        for (let i = 0; i < rec.username.length; i++) {
-          hash = (hash << 5) - hash + rec.username.charCodeAt(i);
-          hash |= 0;
-        }
-        const randomIntervalMinutes = 20 + (Math.abs(hash) % 11); // 20, 21, 22, ..., 30 phút
-        const randomIntervalMs = randomIntervalMinutes * 60 * 1000;
-
-        const lastPulledMs = rec.lastPulledAt ? new Date(rec.lastPulledAt).getTime() : 0;
-        const timeSinceLastPull = Date.now() - lastPulledMs;
-
-        if (timeSinceLastPull >= randomIntervalMs) {
-          // Kiểm tra xem đã có task QUEUED hoặc RUNNING cho user này trong queue chưa
-          const activeTask = await prisma.globalSyncQueueItem.findFirst({
-            where: {
-              username: rec.username,
-              jobType: { in: ['SYNC_EXAMS', 'SYNC_TODAY_EXAMS'] },
-              status: { in: ['QUEUED', 'RUNNING'] },
-            },
-          });
-
-          if (!activeTask) {
-            dueUsernames.push(rec.username);
-          }
-        }
-      } catch (caughtError) {
-        console.warn(`[todayExamsSync] Non-fatal error:`, caughtError);
+      if (await isStudentDueForTodayExamSync({ rec, todayVnStr, todayIsoStr })) {
+        dueUsernames.push(rec.username);
       }
     }
 

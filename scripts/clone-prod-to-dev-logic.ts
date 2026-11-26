@@ -101,7 +101,7 @@ async function main() {
     console.log('  ✅ Đã xoá sạch toàn bộ bảng và dữ liệu cũ trên DEV!');
 
     // Ngắt kết nối devPrisma tạm thời để prisma db push tạo mới schema
-    await devPrisma.$disconnect().catch(() => {});
+    await devPrisma.$disconnect().catch((err) => console.warn("[clone-prod-to-dev-logic] Non-fatal async error:", err));
 
     // 8. Tái tạo lại cấu trúc bảng trên DEV từ schema.prisma
     console.log('\n[4/6] Đang tái tạo cấu trúc bảng trên DEV (theo Prisma Schema & Tự động bù bảng thiếu)...');
@@ -148,8 +148,8 @@ async function main() {
     console.error('\n❌ [LỖI TRONG QUÁ TRÌNH CLONE DỮ LIỆU]:', error);
     process.exit(1);
   } finally {
-    await prodPrisma.$disconnect().catch(() => {});
-    await devPrisma.$disconnect().catch(() => {});
+    await prodPrisma.$disconnect().catch((err) => console.warn("[clone-prod-to-dev-logic] Non-fatal async error:", err));
+    await devPrisma.$disconnect().catch((err) => console.warn("[clone-prod-to-dev-logic] Non-fatal async error:", err));
   }
 }
 

@@ -91,7 +91,7 @@ export async function persistTimetableSyncSuccess(
         syncMessage: 'Đồng bộ TKB thành công từ QLDTTX.',
       },
     })
-    .catch(() => {});
+    .catch((err) => console.warn("[timetableCacheRepo] Non-fatal async error:", err));
 
   // 4. Lưu / Persist vào DB bảng StudentTimetableRecord
   try {
@@ -129,7 +129,7 @@ export async function markExternalAccountAuthError(extAccountId: number): Promis
         syncMessage: 'Đăng nhập thất bại: Tài khoản hoặc mật khẩu không chính xác.',
       },
     })
-    .catch(() => {});
+    .catch((err) => console.warn("[timetableCacheRepo] Non-fatal async error:", err));
 }
 
 export async function tryBuildFromCourseRegistrationFallback(

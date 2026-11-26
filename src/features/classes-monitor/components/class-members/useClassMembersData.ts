@@ -45,7 +45,7 @@ export function useClassMembersData({
           setAllSystemClasses(data.classes);
         }
       })
-      .catch(() => {});
+      .catch((err) => console.warn("[useClassMembersData] Non-fatal async error:", err));
   }, []);
 
   // Available classes in dataset

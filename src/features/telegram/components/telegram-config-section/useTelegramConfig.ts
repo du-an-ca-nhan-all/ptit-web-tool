@@ -97,14 +97,16 @@ export function useTelegramConfig({
           setSlinkCheckInterval(data.config.slinkCheckInterval ?? 2);
           setNotifyClassSchedule(data.config.notifyClassSchedule ?? true);
           setClassReminderBefore(data.config.classReminderBefore ?? 30);
-          if (data.config.lastTestStatus) {
-            setTestResult({
-              success: data.config.lastTestStatus === 'SUCCESS',
-              message: data.config.lastTestStatus === 'SUCCESS' ? 'Lần kiểm tra gần nhất thành công' : undefined,
-              error: data.config.lastTestError || undefined,
-              botInfo: data.config.botUsername ? { username: data.config.botUsername, firstName: data.config.botFirstName } : null,
-            });
-          }
+          setTestResult(
+            data.config.lastTestStatus
+              ? {
+                  success: data.config.lastTestStatus === 'SUCCESS',
+                  message: data.config.lastTestStatus === 'SUCCESS' ? 'Lần kiểm tra gần nhất thành công' : undefined,
+                  error: data.config.lastTestError || undefined,
+                  botInfo: data.config.botUsername ? { username: data.config.botUsername, firstName: data.config.botFirstName } : null,
+                }
+              : null
+          );
         } else {
           setConfig(null);
           setIsCustomBot(false);

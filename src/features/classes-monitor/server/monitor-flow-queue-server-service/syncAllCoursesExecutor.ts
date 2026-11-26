@@ -58,34 +58,26 @@ export async function executeSyncAllCoursesItem({
   let cancelFail = 0;
 
   // 3. Hủy môn thừa
-  for (const [idToHoc, _] of followerToHocMap.entries()) {
-    if (!monitorToHocMap.has(idToHoc)) {
-      try {
-        const cancelRes = await cancelCourseGroupQLDTTX(creds, {
-          id_to_hoc: idToHoc,
-          sv_nganh: svNganh,
-        });
-        if (cancelRes.success) cancelSuccess++;
-        else cancelFail++;
-      } catch {
-        cancelFail++;
-      }
+  for (const [idToHoc] of followerToHocMap.entries()) {
+    if (monitorToHocMap.has(idToHoc)) continue;
+    try {
+      const cancelRes = await cancelCourseGroupQLDTTX(creds, { id_to_hoc: idToHoc, sv_nganh: svNganh });
+      if (cancelRes.success) cancelSuccess++;
+      else cancelFail++;
+    } catch {
+      cancelFail++;
     }
   }
 
   // 4. Đăng ký môn thiếu
-  for (const [idToHoc, _] of monitorToHocMap.entries()) {
-    if (!followerToHocMap.has(idToHoc)) {
-      try {
-        const regRes = await registerCourseGroupQLDTTX(creds, {
-          id_to_hoc: idToHoc,
-          sv_nganh: svNganh,
-        });
-        if (regRes.success) regSuccess++;
-        else regFail++;
-      } catch {
-        regFail++;
-      }
+  for (const [idToHoc] of monitorToHocMap.entries()) {
+    if (followerToHocMap.has(idToHoc)) continue;
+    try {
+      const regRes = await registerCourseGroupQLDTTX(creds, { id_to_hoc: idToHoc, sv_nganh: svNganh });
+      if (regRes.success) regSuccess++;
+      else regFail++;
+    } catch {
+      regFail++;
     }
   }
 

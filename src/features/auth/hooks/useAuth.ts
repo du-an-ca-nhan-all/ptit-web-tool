@@ -99,16 +99,13 @@ export function useAuth() {
     if (typeof window === 'undefined') return 'sinh_vien';
     try {
       const savedUserStr = localStorage.getItem('currentUser');
-      if (savedUserStr) {
-        const u = JSON.parse(savedUserStr);
-        if (u?.username) {
-          const savedRole = localStorage.getItem('active_role_' + u.username);
-          if (savedRole) return savedRole;
-          const rawRole = u.role || '';
-          if (rawRole.includes('admin') || u.isAdmin) return 'admin';
-          if (rawRole.includes('lop_truong') || u.isMonitor) return 'lop_truong';
-        }
-      }
+      const u = savedUserStr ? JSON.parse(savedUserStr) : null;
+      if (!u?.username) return 'sinh_vien';
+      const savedRole = localStorage.getItem('active_role_' + u.username);
+      if (savedRole) return savedRole;
+      const rawRole = u.role || '';
+      if (rawRole.includes('admin') || u.isAdmin) return 'admin';
+      if (rawRole.includes('lop_truong') || u.isMonitor) return 'lop_truong';
     } catch (caughtError) {
       console.warn(`[useAuth] Non-fatal error:`, caughtError);
     }

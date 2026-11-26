@@ -181,18 +181,13 @@ export async function enrichWithRoomClassStats(
 
     if (isUserInReviewBatch) {
       const studentsInRoom = roomStudentInfoMap.get(key);
-      const sameList: RoomStudentInfo[] = [];
-      const otherList: RoomStudentInfo[] = [];
-      if (studentsInRoom) {
-        for (const [stId, stInfo] of studentsInRoom.entries()) {
-          if (!registeredReviewSet.has(`${bCode}|${stId}`)) continue;
-          if (myClass && stInfo.maLop === myClass) {
-            sameList.push(stInfo);
-          } else {
-            otherList.push(stInfo);
-          }
-        }
-      }
+      const allRoomReviewStudents = studentsInRoom
+        ? Array.from(studentsInRoom.entries())
+            .filter(([stId]) => registeredReviewSet.has(`${bCode}|${stId}`))
+            .map(([, stInfo]) => stInfo)
+        : [];
+      const sameList = allRoomReviewStudents.filter((stInfo) => Boolean(myClass && stInfo.maLop === myClass));
+      const otherList = allRoomReviewStudents.filter((stInfo) => !(myClass && stInfo.maLop === myClass));
       sameList.sort(sortMembersByName);
       otherList.sort((a, b) => {
         const clsCmp = a.maLop.localeCompare(b.maLop);

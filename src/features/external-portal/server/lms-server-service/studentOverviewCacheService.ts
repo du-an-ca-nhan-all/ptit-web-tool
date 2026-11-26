@@ -103,7 +103,7 @@ export async function getOrFetchStudentLmsOverview(
         where: { id: extAccount.id },
         data: updateAccountData,
       })
-      .catch(() => {});
+      .catch((err) => console.warn("[studentOverviewCacheService] Non-fatal async error:", err));
 
     // Lưu / Cập nhật vào DB Cache bằng Prisma upsert
     try {
@@ -161,34 +161,45 @@ export async function getOrFetchStudentLmsOverview(
             syncMessage: `Lỗi kết nối LMS: ${fetchErr.message}`,
           },
         })
-        .catch(() => {});
+        .catch((err) => console.warn("[studentOverviewCacheService] Non-fatal async error:", err));
     }
 
+function buildCachedOverviewFallback(params: {
+  cachedDb: any;
+  extAccountLastSyncAt: Date | null;
+  errorMessage?: string;
+}) {
+  const { cachedDb, extAccountLastSyncAt, errorMessage } = params;
+  if (!cachedDb?.rawData) return null;
+  try {
+    const parsed = JSON.parse(cachedDb.rawData);
+    if (!Array.isArray(parsed?.courses) || parsed.courses.length === 0) return null;
+    const fallbackSyncTime =
+      cachedDb.lastPulledAt || cachedDb.updatedAt || cachedDb.createdAt || extAccountLastSyncAt;
+    const exactSyncTime = parsed?.lastSyncAt || fallbackSyncTime;
+    const formattedDate = exactSyncTime ? new Date(exactSyncTime).toLocaleString('vi-VN') : 'gần nhất';
+    return {
+      ...parsed,
+      isConfigured: true,
+      hasLinkedAccount: true,
+      isCachedDb: true,
+      isLiveSync: false,
+      syncWarning: `Không thể kết nối đến LMS (${errorMessage || 'Lỗi mạng'}). Đang hiển thị dữ liệu đã lưu lúc ${formattedDate}.`,
+      lastSyncAt: exactSyncTime ? new Date(exactSyncTime).toISOString() : new Date().toISOString(),
+    };
+  } catch (parseErr) {
+    console.warn(`[studentOverviewCacheService] Non-fatal error:`, parseErr);
+    return null;
+  }
+}
+
     // NGUYÊN TẮC QUAN TRỌNG: Nếu tải về bị lỗi -> KHÔNG GHI ĐÈ! Trả về dữ liệu Cache cũ nếu có
-    if (cachedDb && cachedDb.rawData) {
-      try {
-        const parsed = JSON.parse(cachedDb.rawData);
-        if (Array.isArray(parsed?.courses) && parsed.courses.length > 0) {
-          const fallbackSyncTime =
-            cachedDb.lastPulledAt || cachedDb.updatedAt || cachedDb.createdAt || extAccount.lastSyncAt;
-          const exactSyncTime = parsed?.lastSyncAt || fallbackSyncTime;
-          const formattedDate = exactSyncTime ? new Date(exactSyncTime).toLocaleString('vi-VN') : 'gần nhất';
-          return {
-            ...parsed,
-            isConfigured: true,
-            hasLinkedAccount: true,
-            isCachedDb: true,
-            isLiveSync: false,
-            syncWarning: `Không thể kết nối đến LMS (${fetchErr.message || 'Lỗi mạng'}). Đang hiển thị dữ liệu đã lưu lúc ${formattedDate}.`,
-            lastSyncAt: exactSyncTime
-              ? new Date(exactSyncTime).toISOString()
-              : new Date().toISOString(),
-          };
-        }
-      } catch (parseErr) {
-        console.warn(`[studentOverviewCacheService] Non-fatal error:`, parseErr);
-      }
-    }
+    const fallbackOverview = buildCachedOverviewFallback({
+      cachedDb,
+      extAccountLastSyncAt: extAccount.lastSyncAt,
+      errorMessage: fetchErr.message,
+    });
+    if (fallbackOverview) return fallbackOverview;
 
     // Nếu chưa từng có cache và tải lỗi -> throw Error để UI xử lý
     throw fetchErr;

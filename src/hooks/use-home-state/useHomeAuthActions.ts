@@ -52,7 +52,7 @@ export function useHomeAuthActions({
             description: `Chuyển vai trò làm việc sang ${getRoleDisplayLabel(newRole)}`,
             metadata: { previousRole: activeRole, newRole },
           }),
-        }).catch(() => {});
+        }).catch((err) => console.warn("[useHomeAuthActions] Non-fatal async error:", err));
       } catch (caughtError) {
         console.warn(`[useHomeAuthActions] Non-fatal error:`, caughtError);
       }
@@ -88,21 +88,19 @@ export function useHomeAuthActions({
         });
 
         const data = await res.json();
-        if (res.ok && data.success) {
-          if (data.token) {
-            localStorage.setItem('auth_token', data.token);
-          }
-          if (data.user) {
-            setCurrentUser(data.user);
-            localStorage.setItem('currentUser', JSON.stringify(data.user));
-            if (data.user.lop) setMonitorClass(data.user.lop);
-          }
-          setShowImpersonateModal(false);
-          setImpersonateTargetInput('');
-          handleTabChange('schedule');
-        } else {
+        if (!res.ok || !data.success) {
           setImpersonateError(data.error || 'Giả lập tài khoản thất bại');
+          return;
         }
+        if (data.token) localStorage.setItem('auth_token', data.token);
+        if (data.user) {
+          setCurrentUser(data.user);
+          localStorage.setItem('currentUser', JSON.stringify(data.user));
+          if (data.user.lop) setMonitorClass(data.user.lop);
+        }
+        setShowImpersonateModal(false);
+        setImpersonateTargetInput('');
+        handleTabChange('schedule');
       } catch (err: any) {
         setImpersonateError(err.message || 'Lỗi mạng khi giả lập tài khoản');
       } finally {
@@ -126,17 +124,14 @@ export function useHomeAuthActions({
       });
 
       const data = await res.json();
-      if (res.ok && data.success) {
-        if (data.token) {
-          localStorage.setItem('auth_token', data.token);
-        }
-        if (data.user) {
-          setCurrentUser(data.user);
-          localStorage.setItem('currentUser', JSON.stringify(data.user));
-          if (data.user.lop) setMonitorClass(data.user.lop);
-        }
-        handleTabChange('schedule');
+      if (!res.ok || !data.success) return;
+      if (data.token) localStorage.setItem('auth_token', data.token);
+      if (data.user) {
+        setCurrentUser(data.user);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        if (data.user.lop) setMonitorClass(data.user.lop);
       }
+      handleTabChange('schedule');
     } catch (err) {
       console.error('Error reverting impersonation:', err);
     } finally {

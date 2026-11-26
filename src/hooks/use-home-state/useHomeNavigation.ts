@@ -85,32 +85,28 @@ export function useHomeNavigation({
         return;
       }
 
-      if (tab !== activeTab || options) {
-        if (!options?.preserveFilters) {
-          const newSearch = options?.search ?? '';
-          const newClassCode = options?.classCode ?? '';
-          const newSubjectCode = options?.subjectCode ?? '';
-          const newDate = options?.date ?? '';
-          const newPage = options?.page ?? 1;
+      if ((tab !== activeTab || options) && !options?.preserveFilters) {
+        const newSearch = options?.search ?? '';
+        const newClassCode = options?.classCode ?? '';
+        const newSubjectCode = options?.subjectCode ?? '';
+        const newDate = options?.date ?? '';
+        const newPage = options?.page ?? 1;
 
-          setSearchInput(newSearch);
-          setFilters({
-            search: newSearch,
-            classCode: newClassCode,
-            subjectCode: newSubjectCode,
-            date: newDate,
-          });
-          setPage(newPage);
-          setSelectedExamRoom(null);
-          setSortConfig({ key: 'DateTime', direction: 'asc' });
+        setSearchInput(newSearch);
+        setFilters({
+          search: newSearch,
+          classCode: newClassCode,
+          subjectCode: newSubjectCode,
+          date: newDate,
+        });
+        setPage(newPage);
+        setSelectedExamRoom(null);
+        setSortConfig({ key: 'DateTime', direction: 'asc' });
 
-          if (options?.monitorClass !== undefined) {
-            setMonitorClass(options.monitorClass);
-          } else if (tab === 'members' || tab === 'monitor') {
-            if (!monitorClass && currentUser?.lop) {
-              setMonitorClass(currentUser.lop);
-            }
-          }
+        if (options?.monitorClass !== undefined) {
+          setMonitorClass(options.monitorClass);
+        } else if ((tab === 'members' || tab === 'monitor') && !monitorClass && currentUser?.lop) {
+          setMonitorClass(currentUser.lop);
         }
       }
 

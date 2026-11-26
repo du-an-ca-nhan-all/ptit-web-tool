@@ -46,18 +46,18 @@ export async function fetchEnvelopeAssignments(): Promise<EnvelopeAssignmentsMap
     const res = await fetch('/api/envelope-assignments', {
       cache: 'no-store',
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.assignments && typeof data.assignments === 'object') {
-        memoryCache = data.assignments;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data.assignments));
-          window.dispatchEvent(new CustomEvent(ENVELOPE_ASSIGNMENTS_CHANGED_EVENT, { detail: data.assignments }));
-          window.dispatchEvent(new CustomEvent('pricing_config_changed'));
-        }
-        return data.assignments;
-      }
+    if (!res.ok) return getStoredEnvelopeAssignments();
+    const data = await res.json();
+    if (!data.assignments || typeof data.assignments !== 'object') {
+      return getStoredEnvelopeAssignments();
     }
+    memoryCache = data.assignments;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data.assignments));
+      window.dispatchEvent(new CustomEvent(ENVELOPE_ASSIGNMENTS_CHANGED_EVENT, { detail: data.assignments }));
+      window.dispatchEvent(new CustomEvent('pricing_config_changed'));
+    }
+    return data.assignments;
   } catch (e) {
     console.error('Failed to fetch envelope assignments from API:', e);
   }

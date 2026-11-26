@@ -154,8 +154,8 @@ export async function executeMonitorFlowAction(
       }
 
       if (outcome) {
-        if (outcome.succeeded) successCount++;
-        else failCount++;
+        successCount += outcome.succeeded ? 1 : 0;
+        failCount += outcome.succeeded ? 0 : 1;
         executionResults.push(outcome.result);
       }
     } catch (err: any) {

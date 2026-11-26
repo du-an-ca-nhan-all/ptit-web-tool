@@ -37,13 +37,11 @@ export function useLmsCourses() {
       if (res.ok && json.isConfigured !== false) {
         setIsConfigured(true);
         setData(json);
-        if (forceRefresh) {
-          if (json.syncWarning) {
-            setErrorMsg(json.syncWarning);
-          } else {
-            setSuccessMsg('Đã cập nhật dữ liệu mới nhất từ LMS thành công!');
-            setTimeout(() => setSuccessMsg(''), 4000);
-          }
+        if (forceRefresh && json.syncWarning) {
+          setErrorMsg(json.syncWarning);
+        } else if (forceRefresh) {
+          setSuccessMsg('Đã cập nhật dữ liệu mới nhất từ LMS thành công!');
+          setTimeout(() => setSuccessMsg(''), 4000);
         }
       } else if (json.isConfigured === false) {
         setIsConfigured(false);

@@ -121,7 +121,7 @@ export function usePWA(): PWAState {
 
           // Periodic check for updates every 1 hour
           const intervalId = window.setInterval(() => {
-            registration.update().catch(() => {});
+            registration.update().catch((err) => console.warn("[usePWA] Non-fatal async error:", err));
           }, 60 * 60 * 1000);
 
           return () => window.clearInterval(intervalId);

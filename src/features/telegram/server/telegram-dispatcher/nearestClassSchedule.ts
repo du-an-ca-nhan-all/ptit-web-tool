@@ -30,39 +30,54 @@ export async function findNearestStudentClassSchedule(
   for (let offset = 0; offset <= maxDays; offset++) {
     const checkDate = new Date(nowVN.getFullYear(), nowVN.getMonth(), nowVN.getDate() + offset);
     const sessions = await getStudentClassSessionsForDate(username, checkDate, rawList);
+    if (!sessions || sessions.length === 0) continue;
 
-    if (sessions && sessions.length > 0) {
-      if (offset === 0 && !options.includeTodayIfEnded) {
-        // Kiểm tra xem hôm nay còn ca học nào chưa kết thúc không
-        const hasUpcomingSession = sessions.some((s) => {
-          const sessionEndMinutes = s.startMinutes + ((s.endPeriod - s.startPeriod + 1) * 45 || 135);
-          return sessionEndMinutes >= nowMinutesToday;
-        });
-
-        // Nếu hôm nay tất cả các ca học đều đã qua thì tiếp tục tìm các ngày kế tiếp trong 10 ngày tới
-        if (!hasUpcomingSession) {
-          continue;
-        }
-      }
-
-      const dateStr = formatDateVN(checkDate);
-      const dowName = DOW_NAMES[checkDate.getDay()];
-      return {
-        found: true,
-        maxDays,
-        date: checkDate,
-        dateStr,
-        dowName,
-        dayOffset: offset,
-        sessions,
-      };
+    if (offset === 0 && !options.includeTodayIfEnded) {
+      const hasUpcomingSession = sessions.some((s) => {
+        const sessionEndMinutes = s.startMinutes + ((s.endPeriod - s.startPeriod + 1) * 45 || 135);
+        return sessionEndMinutes >= nowMinutesToday;
+      });
+      if (!hasUpcomingSession) continue;
     }
+
+    const dateStr = formatDateVN(checkDate);
+    const dowName = DOW_NAMES[checkDate.getDay()];
+    return {
+      found: true,
+      maxDays,
+      date: checkDate,
+      dateStr,
+      dowName,
+      dayOffset: offset,
+      sessions,
+    };
   }
 
   return {
     found: false,
     maxDays,
   };
+}
+
+async function sendEmptyNearestScheduleIfForced(params: {
+  sub: any;
+  effectiveToken: string;
+  studentName: string;
+  classCode: string;
+  maxDays: number;
+  nowVN: Date;
+}): Promise<{ sent: boolean; error?: string }> {
+  const { sub, effectiveToken, studentName, classCode, maxDays, nowVN } = params;
+  const empty10DaysMsg = `📚 <b>[LỊCH HỌC 10 NGÀY TỚI] THỜI KHÓA BIỂU PTIT</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n🏫 Lớp: <b>${classCode}</b>\n\n📌 <i>Đã quét thời khóa biểu cổng trường: Trong ${maxDays} ngày tới bạn không có ca học nào trên hệ thống.</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Quét lúc: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>`;
+
+  const sendRes = await sendTelegramMessage({
+    botToken: effectiveToken,
+    chatId: sub.chatId,
+    text: empty10DaysMsg,
+    options: { threadId: sub.threadId ? Number(sub.threadId) : undefined },
+  });
+  if (sendRes.success) return { sent: true };
+  return { sent: false, error: sendRes.error ? `${sub.username}: ${sendRes.error}` : undefined };
 }
 
 /**
@@ -135,24 +150,19 @@ export async function dispatchNearestClassScheduleNotification(options: {
       // 3. Nếu không có lịch học trong 10 ngày tới
       if (!nearest.found || !nearest.sessions || nearest.sessions.length === 0) {
         notFoundCount++;
-        if (options.forceSend) {
-          const empty10DaysMsg = `📚 <b>[LỊCH HỌC 10 NGÀY TỚI] THỜI KHÓA BIỂU PTIT</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n🏫 Lớp: <b>${classCode}</b>\n\n📌 <i>Đã quét thời khóa biểu cổng trường: Trong ${maxDays} ngày tới bạn không có ca học nào trên hệ thống.</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Quét lúc: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>`;
-
-          const sendRes = await sendTelegramMessage({
-            botToken: effectiveToken,
-            chatId: sub.chatId,
-            text: empty10DaysMsg,
-            options: {
-              threadId: sub.threadId ? Number(sub.threadId) : undefined,
-            },
-          });
-
-          if (sendRes.success) {
-            sentCount++;
-          } else if (sendRes.error) {
-            errors.push(`${sub.username}: ${sendRes.error}`);
-          }
-        }
+        const emptyRes = options.forceSend
+          ? await sendEmptyNearestScheduleIfForced({
+              sub,
+              effectiveToken,
+              studentName,
+              classCode,
+              maxDays,
+              nowVN,
+            })
+          : { sent: false };
+        sentCount += emptyRes.sent ? 1 : 0;
+        const emptyErrors = emptyRes.error ? [emptyRes.error] : [];
+        errors.push(...emptyErrors);
 
         results.push({
           username: sub.username,

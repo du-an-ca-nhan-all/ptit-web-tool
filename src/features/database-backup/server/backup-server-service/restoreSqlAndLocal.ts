@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { prisma } from '@/src/lib/prisma';
 import type { DatabaseStats } from './types';
 import { generateTimestampString } from './utils';
@@ -41,7 +41,7 @@ export async function restoreFromSqlDump(
     }
   }
 
-  await syncPostgresSequences().catch(() => {});
+  await syncPostgresSequences().catch((err) => console.warn("[restoreSqlAndLocal] Non-fatal async error:", err));
   const stats = await getDatabaseStats();
 
   return {
@@ -106,7 +106,7 @@ for tbl in tables:
 print(json.dumps({"data": data}))
 conn.close()
 `;
-    const output = execSync(`python3 -c '${pythonScript}' "${tempSqlitePath}"`, {
+    const output = execFileSync('python3', ['-c', pythonScript, tempSqlitePath], {
       maxBuffer: 100 * 1024 * 1024,
       encoding: 'utf8',
     });

@@ -19,16 +19,64 @@ import {
   parsePeriodAndTime,
 } from './utils';
 
+function expandTkbSegmentDates(params: {
+  item: any;
+  seg: any;
+  fields: NormalizedSubjectFields;
+  ctx: BuilderContext;
+}): void {
+  const { item, seg, fields, ctx } = params;
+  const { subjectName, subjectCode, group, classCode, room, onlineLink, lecturer, colorIndex } = fields;
+  const curDate = new Date(seg.startDate.getTime());
+  const endDateObj = new Date(seg.endDate.getTime());
+
+  while (curDate <= endDateObj) {
+    const jsDay = curDate.getDay();
+    const curDow = jsDay === 0 ? 8 : jsDay + 1;
+    const dateStr = formatIsoDate(curDate);
+    curDate.setDate(curDate.getDate() + 1);
+
+    if (curDow !== seg.dayOfWeekNum) continue;
+    const eventKey = `${subjectCode}_${dateStr}_${seg.startPeriod}_${seg.room}`;
+    if (ctx.seenEventKeys.has(eventKey)) continue;
+
+    ctx.seenEventKeys.add(eventKey);
+    ctx.events.push({
+      id: `ev_${dateStr}_${subjectCode}_${seg.startPeriod}_${Math.random().toString(36).slice(2, 6)}`,
+      date: dateStr,
+      dayOfWeekStr: seg.dayOfWeekStr,
+      dayOfWeekNum: seg.dayOfWeekNum,
+      subjectName,
+      subjectCode,
+      group,
+      classCode,
+      periodStr: seg.periodStr,
+      startPeriod: seg.startPeriod,
+      endPeriod: seg.endPeriod,
+      startTime: seg.startTime,
+      endTime: seg.endTime,
+      startMinutes: seg.startMinutes,
+      room: seg.room || room,
+      onlineLink: onlineLink || undefined,
+      lecturer: lecturer || undefined,
+      shift: getShift(seg.startPeriod, seg.startMinutes),
+      colorIndex,
+      rawSession: item,
+    });
+
+    const subRec = ctx.subjectMap.get(subjectCode);
+    if (subRec) subRec.totalSessions++;
+  }
+}
+
 function processTkbStringItem(params: ProcessTkbStringItemParams): void {
   const { item, tkbStr, fields, ctx } = params;
-  const { subjectName, subjectCode, group, classCode, room, onlineLink, lecturer, colorIndex } =
-    fields;
+  const { subjectName, subjectCode, group, classCode, room, colorIndex } = fields;
   const parsedSegments = parseTkbString(tkbStr);
 
   for (const seg of parsedSegments) {
     if (!seg.startDate || !seg.endDate) continue;
 
-    // Cập nhật subject summary
     if (!ctx.subjectMap.has(subjectCode)) {
       ctx.subjectMap.set(subjectCode, {
         subjectCode,
@@ -45,51 +93,7 @@ function processTkbStringItem(params: ProcessTkbStringItemParams): void {
       });
     }
 
-    // Tạo sự kiện cho từng ngày trong khoảng [startDate, endDate]
-    const curDate = new Date(seg.startDate.getTime());
-    const endDateObj = new Date(seg.endDate.getTime());
-
-    while (curDate <= endDateObj) {
-      const jsDay = curDate.getDay();
-      const curDow = jsDay === 0 ? 8 : jsDay + 1;
-
-      if (curDow === seg.dayOfWeekNum) {
-        const dateStr = formatIsoDate(curDate);
-        const eventKey = `${subjectCode}_${dateStr}_${seg.startPeriod}_${seg.room}`;
-
-        if (!ctx.seenEventKeys.has(eventKey)) {
-          ctx.seenEventKeys.add(eventKey);
-          const ev: TimetableCalendarEvent = {
-            id: `ev_${dateStr}_${subjectCode}_${seg.startPeriod}_${Math.random().toString(36).slice(2, 6)}`,
-            date: dateStr,
-            dayOfWeekStr: seg.dayOfWeekStr,
-            dayOfWeekNum: seg.dayOfWeekNum,
-            subjectName,
-            subjectCode,
-            group,
-            classCode,
-            periodStr: seg.periodStr,
-            startPeriod: seg.startPeriod,
-            endPeriod: seg.endPeriod,
-            startTime: seg.startTime,
-            endTime: seg.endTime,
-            startMinutes: seg.startMinutes,
-            room: seg.room || room,
-            onlineLink: onlineLink || undefined,
-            lecturer: lecturer || undefined,
-            shift: getShift(seg.startPeriod, seg.startMinutes),
-            colorIndex,
-            rawSession: item,
-          };
-          ctx.events.push(ev);
-
-          const subRec = ctx.subjectMap.get(subjectCode);
-          if (subRec) subRec.totalSessions++;
-        }
-      }
-
-      curDate.setDate(curDate.getDate() + 1);
-    }
+    expandTkbSegmentDates({ item, seg, fields, ctx });
   }
 }
 
@@ -191,19 +195,16 @@ function processDirectJsonItem(
     while (curDate <= endDateObj) {
       const jsDay = curDate.getDay();
       const curDow = jsDay === 0 ? 8 : jsDay + 1;
-
-      if (curDow === dayOfWeekNum) {
-        const dateStr = formatIsoDate(curDate);
-        const eventKey = `${subjectCode}_${dateStr}_${startPeriod}_${room}`;
-
-        if (!ctx.seenEventKeys.has(eventKey)) {
-          ctx.seenEventKeys.add(eventKey);
-          ctx.events.push(createEvent(dateStr));
-          ctx.subjectMap.get(subjectCode)!.totalSessions++;
-        }
-      }
-
+      const dateStr = formatIsoDate(curDate);
       curDate.setDate(curDate.getDate() + 1);
+
+      if (curDow !== dayOfWeekNum) continue;
+      const eventKey = `${subjectCode}_${dateStr}_${startPeriod}_${room}`;
+      if (ctx.seenEventKeys.has(eventKey)) continue;
+
+      ctx.seenEventKeys.add(eventKey);
+      ctx.events.push(createEvent(dateStr));
+      ctx.subjectMap.get(subjectCode)!.totalSessions++;
     }
   }
 }

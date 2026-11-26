@@ -25,7 +25,9 @@ export function buildGradeResultFromRawData(
   const gradeCounts = createEmptyGradeCounts();
 
   for (const sem of rawSemesters) {
-    processedSemesters.push(parseRawSemester(sem, gradeCounts, allCourses));
+    const semesterSummary = parseRawSemester(sem, gradeCounts);
+    processedSemesters.push(semesterSummary);
+    allCourses.push(...semesterSummary.courses);
   }
 
   // Sắp xếp các học kỳ theo thứ tự gần nhất đến cũ nhất (descending) để đồng nhất với UI

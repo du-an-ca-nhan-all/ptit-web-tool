@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
         targetId: 'SLINK_PTIT',
         description: `Gia hạn định kỳ Token & Refresh Token PTIT S-Link: ${result.refreshed}/${result.total} thành công, ${result.skipped} bỏ qua, ${result.failed} lỗi`,
         metadata: result,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[route] Non-fatal async error:", err));
     }
 
     return NextResponse.json({

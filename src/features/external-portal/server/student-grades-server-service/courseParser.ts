@@ -135,8 +135,7 @@ function accumulateGradeCount(
 
 export function parseRawSemester(
   sem: any,
-  gradeCounts: GradeCountsMap,
-  allCourses: StudentCourseGrade[]
+  gradeCounts: GradeCountsMap
 ): SemesterGradeSummary {
   const semesterId = String(sem.hoc_ky || '');
   const semesterName = sem.ten_hoc_ky || `Học kỳ ${semesterId}`;
@@ -154,7 +153,6 @@ export function parseRawSemester(
     }
 
     semesterCourses.push(courseObj);
-    allCourses.push(courseObj);
     accumulateGradeCount(gradeCounts, courseObj);
   }
 

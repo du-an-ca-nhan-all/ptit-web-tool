@@ -82,9 +82,7 @@ export async function handlePostEnvelopeAssignment(req: NextRequest) {
           where: { maSV: finalAssistantId },
           select: { hoTen: true },
         });
-        if (asstStudent?.hoTen) {
-          finalAssistantName = asstStudent.hoTen;
-        }
+        finalAssistantName = asstStudent?.hoTen || finalAssistantName;
       } catch (caughtError) {
         console.warn(`[postHandler] Non-fatal error:`, caughtError);
       }

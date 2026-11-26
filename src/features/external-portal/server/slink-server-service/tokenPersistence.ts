@@ -97,7 +97,7 @@ export async function refreshAndPersistSlinkAccountToken(
             syncMessage: `Lỗi làm mới Token S-Link: ${err?.message || 'Refresh token đã hết hạn hoặc không hợp lệ'}`,
           },
         })
-        .catch(() => {});
+        .catch((err) => console.warn("[tokenPersistence] Non-fatal async error:", err));
       throw err;
     } finally {
       inFlightSlinkRefreshes.delete(extAccount.id);

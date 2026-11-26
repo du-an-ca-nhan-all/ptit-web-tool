@@ -25,7 +25,10 @@ export function buildTextPreview(text?: string): string | undefined {
 /**
  * Insert item into queue sorted by priority (high to low) and scheduled time (early to late)
  */
-export function insertItemByPriority(queue: TelegramQueueItem[], item: TelegramQueueItem) {
+export function insertItemByPriority(
+  queue: readonly TelegramQueueItem[],
+  item: TelegramQueueItem
+): TelegramQueueItem[] {
   const itemWeight = PRIORITY_WEIGHTS[item.priority] || 20;
 
   let insertIdx = queue.length;
@@ -43,7 +46,7 @@ export function insertItemByPriority(queue: TelegramQueueItem[], item: TelegramQ
       }
     }
   }
-  queue.splice(insertIdx, 0, item);
+  return [...queue.slice(0, insertIdx), item, ...queue.slice(insertIdx)];
 }
 
 /**

@@ -32,6 +32,46 @@ export async function getTableRecordCounts(prismaClient: PrismaClient, tables: s
   return counts;
 }
 
+function sortTablesTopologically(tables: string[], fkRows: any[]): string[] {
+  const inDegree = new Map<string, number>();
+  const dependents = new Map<string, Set<string>>();
+  const dependencies = new Map<string, Set<string>>();
+
+  for (const t of tables) {
+    inDegree.set(t, 0);
+    dependents.set(t, new Set());
+    dependencies.set(t, new Set());
+  }
+
+  for (const { child_table, parent_table } of fkRows) {
+    if (!tables.includes(child_table) || !tables.includes(parent_table)) continue;
+    if (dependencies.get(child_table)!.has(parent_table)) continue;
+    dependencies.get(child_table)!.add(parent_table);
+    dependents.get(parent_table)!.add(child_table);
+    inDegree.set(child_table, (inDegree.get(child_table) || 0) + 1);
+  }
+
+  const queue = tables.filter((t) => inDegree.get(t) === 0);
+  const sorted: string[] = [];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    sorted.push(current);
+
+    for (const child of dependents.get(current) || []) {
+      const newDeg = (inDegree.get(child) || 1) - 1;
+      inDegree.set(child, newDeg);
+      if (newDeg === 0) queue.push(child);
+    }
+  }
+
+  for (const t of tables) {
+    if (!sorted.includes(t)) sorted.push(t);
+  }
+
+  return sorted;
+}
+
 /**
  * 3. Phân tích quan hệ Foreign Key & Sắp xếp thứ tự nạp bảng theo Topological Sort
  *    (Bảng cha được nạp trước, bảng con chứa khoá ngoại được nạp sau)
@@ -50,59 +90,7 @@ export async function getTableDependencyOrder(prismaClient: PrismaClient, tables
         AND tc.table_schema = 'public'
         AND tc.table_name != ccu.table_name;
     `);
-
-    const inDegree = new Map<string, number>();
-    const dependents = new Map<string, Set<string>>(); // parent -> children
-    const dependencies = new Map<string, Set<string>>(); // child -> parents
-
-    for (const t of tables) {
-      inDegree.set(t, 0);
-      dependents.set(t, new Set());
-      dependencies.set(t, new Set());
-    }
-
-    if (Array.isArray(fkRows)) {
-      for (const { child_table, parent_table } of fkRows) {
-        if (tables.includes(child_table) && tables.includes(parent_table)) {
-          if (!dependencies.get(child_table)!.has(parent_table)) {
-            dependencies.get(child_table)!.add(parent_table);
-            dependents.get(parent_table)!.add(child_table);
-            inDegree.set(child_table, (inDegree.get(child_table) || 0) + 1);
-          }
-        }
-      }
-    }
-
-    // Hàng đợi các bảng không phụ thuộc bảng nào
-    const queue: string[] = [];
-    for (const t of tables) {
-      if (inDegree.get(t) === 0) {
-        queue.push(t);
-      }
-    }
-
-    const sorted: string[] = [];
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      sorted.push(current);
-
-      for (const child of dependents.get(current) || []) {
-        const newDeg = (inDegree.get(child) || 1) - 1;
-        inDegree.set(child, newDeg);
-        if (newDeg === 0) {
-          queue.push(child);
-        }
-      }
-    }
-
-    // Nếu có chu trình phụ thuộc vòng quanh, bổ sung các bảng còn lại vào cuối
-    for (const t of tables) {
-      if (!sorted.includes(t)) {
-        sorted.push(t);
-      }
-    }
-
-    return sorted;
+    return sortTablesTopologically(tables, Array.isArray(fkRows) ? fkRows : []);
   } catch {
     // Nếu lỗi phân tích FK, giữ nguyên thứ tự ban đầu
     return tables;

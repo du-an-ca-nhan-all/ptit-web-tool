@@ -49,18 +49,17 @@ export async function GET(req: NextRequest) {
     if (mainReg) {
       try {
         const parsed = JSON.parse(mainReg.data);
-        if (Array.isArray(parsed.semesters)) {
-          parsed.semesters.forEach((s: any) => {
-            if (!allAvailableSemestersMap.has(String(s.hoc_ky))) {
-              allAvailableSemestersMap.set(String(s.hoc_ky), {
-                hoc_ky: s.hoc_ky,
-                ten_hoc_ky: s.ten_hoc_ky,
-                totalCourses: s.totalCourses,
-                totalCredits: s.totalCredits,
-              });
-            }
-          });
-        }
+        const semestersList = Array.isArray(parsed.semesters) ? parsed.semesters : [];
+        semestersList.forEach((s: any) => {
+          if (!allAvailableSemestersMap.has(String(s.hoc_ky))) {
+            allAvailableSemestersMap.set(String(s.hoc_ky), {
+              hoc_ky: s.hoc_ky,
+              ten_hoc_ky: s.ten_hoc_ky,
+              totalCourses: s.totalCourses,
+              totalCredits: s.totalCredits,
+            });
+          }
+        });
         mainData = {
           username: mainReg.username,
           data: parsed.data ? parsed : { data: parsed },

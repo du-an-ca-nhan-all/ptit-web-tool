@@ -68,18 +68,10 @@ export function usePortalCourseData({
       if (res.ok && data.success) {
         setExternalAccount(data.externalAccount || { isConfigured: false, status: 'DISCONNECTED' });
         setMonitorFlowConfig(data.monitorFlowConfig || null);
-        if (data.openCourses) {
-          setOpenCourses(data.openCourses);
-          if (data.openCourses.id_rs) {
-            setCurrentIdRs(data.openCourses.id_rs);
-          }
-        }
-        if (data.registeredCourses) {
-          setRegisteredCourses(data.registeredCourses);
-          if (data.registeredCourses.id_rs && !data.openCourses?.id_rs) {
-            setCurrentIdRs(data.registeredCourses.id_rs);
-          }
-        }
+        if (data.openCourses) setOpenCourses(data.openCourses);
+        if (data.registeredCourses) setRegisteredCourses(data.registeredCourses);
+        const nextIdRs = data.openCourses?.id_rs || data.registeredCourses?.id_rs;
+        if (nextIdRs) setCurrentIdRs(nextIdRs);
       } else {
         if (data.monitorFlowConfig) {
           setMonitorFlowConfig(data.monitorFlowConfig);

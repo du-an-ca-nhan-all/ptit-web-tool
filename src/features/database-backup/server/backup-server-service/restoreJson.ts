@@ -5,6 +5,46 @@ import { chunkArray, getTableAliases } from './utils';
 import { getDatabaseStats, getPublicTables, getTableDependencyOrder, syncPostgresSequences } from './postgresMetadata';
 import { createLocalBackup } from './localBackupStorage';
 
+function resolveRowsForTable(data: Record<string, any>, tableName: string): any[] | undefined {
+  if (Array.isArray(data[tableName])) return data[tableName];
+  for (const alias of getTableAliases(tableName)) {
+    if (Array.isArray(data[alias])) return data[alias];
+  }
+  return undefined;
+}
+
+function serializeSqlParamValue(rawValue: any): any {
+  if (rawValue === undefined) return null;
+  if (rawValue !== null && typeof rawValue === 'object' && !(rawValue instanceof Date) && !Buffer.isBuffer(rawValue)) {
+    return JSON.stringify(rawValue);
+  }
+  return rawValue;
+}
+
+async function insertTableChunk(params: {
+  safeTableName: string;
+  columns: string[];
+  quotedCols: string;
+  chunk: any[];
+}): Promise<void> {
+  const { safeTableName, columns, quotedCols, chunk } = params;
+  const placeholders: string[] = [];
+  const flatValues: any[] = [];
+  let pIndex = 1;
+
+  for (const row of chunk) {
+    const rowPlaceholders: string[] = [];
+    for (const col of columns) {
+      rowPlaceholders.push(`$${pIndex++}`);
+      flatValues.push(serializeSqlParamValue(row[col]));
+    }
+    placeholders.push(`(${rowPlaceholders.join(', ')})`);
+  }
+
+  const insertSql = `INSERT INTO "public"."${safeTableName}" (${quotedCols}) VALUES ${placeholders.join(', ')};`;
+  await prisma.$executeRawUnsafe(insertSql, ...flatValues);
+}
+
 /**
  * Phục hồi cơ sở dữ liệu từ file JSON dump (Tự động nạp động 100% bảng & cột)
  */
@@ -45,20 +85,7 @@ export async function restoreFromJsonDump(
   const tableRowsMap = new Map<string, any[]>();
 
   for (const tableName of sortedTables) {
-    let rows: any[] | undefined;
-
-    if (Array.isArray(data[tableName])) {
-      rows = data[tableName];
-    } else {
-      const aliases = getTableAliases(tableName);
-      for (const alias of aliases) {
-        if (Array.isArray(data[alias])) {
-          rows = data[alias];
-          break;
-        }
-      }
-    }
-
+    const rows = resolveRowsForTable(data, tableName);
     if (rows && rows.length > 0) {
       tableRowsMap.set(tableName, rows);
     }
@@ -112,25 +139,7 @@ export async function restoreFromJsonDump(
     const chunks = chunkArray(rows, batchSize);
 
     for (const chunk of chunks) {
-      const placeholders: string[] = [];
-      const flatValues: any[] = [];
-      let pIndex = 1;
-
-      for (const row of chunk) {
-        const rowPlaceholders: string[] = [];
-        for (const col of columns) {
-          rowPlaceholders.push(`$${pIndex++}`);
-          let val = row[col];
-          if (val !== null && val !== undefined && typeof val === 'object' && !(val instanceof Date) && !Buffer.isBuffer(val)) {
-            val = JSON.stringify(val);
-          }
-          flatValues.push(val === undefined ? null : val);
-        }
-        placeholders.push(`(${rowPlaceholders.join(', ')})`);
-      }
-
-      const insertSql = `INSERT INTO "public"."${safeTableName}" (${quotedCols}) VALUES ${placeholders.join(', ')};`;
-      await prisma.$executeRawUnsafe(insertSql, ...flatValues);
+      await insertTableChunk({ safeTableName, columns, quotedCols, chunk });
     }
 
     totalRestored += rows.length;
@@ -144,7 +153,7 @@ export async function restoreFromJsonDump(
   }
 
   // 6. Tự động đồng bộ toàn bộ sequences ID trên PostgreSQL
-  await syncPostgresSequences().catch(() => {});
+  await syncPostgresSequences().catch((err) => console.warn("[restoreJson] Non-fatal async error:", err));
 
   const stats = await getDatabaseStats();
 

@@ -67,7 +67,7 @@ export function useSettlementState({
   }, [isAdmin]);
 
   useEffect(() => {
-    fetchPricingFromBackend().catch(() => {});
+    fetchPricingFromBackend().catch((err) => console.warn("[useSettlementState] Non-fatal async error:", err));
     const handler = () => setPricingVersion((v) => v + 1);
     window.addEventListener('pricing_config_changed', handler);
     return () => window.removeEventListener('pricing_config_changed', handler);
@@ -152,28 +152,24 @@ export function useSettlementState({
   };
 
   useEffect(() => {
-    if (!selectedClass) {
-      try {
-        const saved = localStorage.getItem('currentUser');
-        if (saved) {
-          const user = JSON.parse(saved);
-          if (user?.lop) {
-            const userLop = user.lop.trim();
-            if (availableClasses.allClasses.includes(userLop)) {
-              setSelectedClass(userLop);
-              return;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn(`[useSettlementState] Non-fatal error:`, e);
-      }
+    if (selectedClass) return;
 
-      if (availableClasses.monClasses.length > 0) {
-        setSelectedClass(availableClasses.monClasses[0]);
-      } else if (availableClasses.otherClasses.length > 0) {
-        setSelectedClass(availableClasses.otherClasses[0]);
+    try {
+      const saved = localStorage.getItem('currentUser');
+      const user = saved ? JSON.parse(saved) : null;
+      const userLop = user?.lop?.trim();
+      if (userLop && availableClasses.allClasses.includes(userLop)) {
+        setSelectedClass(userLop);
+        return;
       }
+    } catch (e) {
+      console.warn(`[useSettlementState] Non-fatal error:`, e);
+    }
+
+    if (availableClasses.monClasses.length > 0) {
+      setSelectedClass(availableClasses.monClasses[0]);
+    } else if (availableClasses.otherClasses.length > 0) {
+      setSelectedClass(availableClasses.otherClasses[0]);
     }
   }, [availableClasses, selectedClass]);
 

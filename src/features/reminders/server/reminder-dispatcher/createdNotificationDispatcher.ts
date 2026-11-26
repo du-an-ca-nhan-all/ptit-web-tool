@@ -165,7 +165,7 @@ export async function sendReminderCreatedNotification(
                   status: 'SUCCESS',
                 },
               })
-              .catch(() => {});
+              .catch((err) => console.warn("[createdNotificationDispatcher] Non-fatal async error:", err));
           } else {
             const errMsg = sendRes.error || 'Lỗi gửi Telegram';
             errors.push(`${sub.username}: ${errMsg}`);
@@ -183,7 +183,7 @@ export async function sendReminderCreatedNotification(
                   errorMessage: errMsg,
                 },
               })
-              .catch(() => {});
+              .catch((err) => console.warn("[createdNotificationDispatcher] Non-fatal async error:", err));
           }
         })
       );

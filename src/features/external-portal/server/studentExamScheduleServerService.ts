@@ -142,7 +142,7 @@ export async function getStudentQldtExamSchedule(
             syncMessage: 'Đăng nhập thất bại: Tài khoản hoặc mật khẩu không chính xác.',
           },
         })
-        .catch(() => {});
+        .catch((err) => console.warn("[studentExamScheduleServerService] Non-fatal async error:", err));
     }
   }
 

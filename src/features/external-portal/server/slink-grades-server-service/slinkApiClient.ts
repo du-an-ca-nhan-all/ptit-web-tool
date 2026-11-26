@@ -85,10 +85,8 @@ export async function fetchStudentGradesFromSlink(
           )}`,
           { headers }
         );
-        if (resChuanDauRa.ok) {
-          const dataCdr = await resChuanDauRa.json();
-          chuongTrinhDaoTao = dataCdr?.data?.ctdtKeHoach || null;
-        }
+        const dataCdr = resChuanDauRa.ok ? await resChuanDauRa.json() : null;
+        chuongTrinhDaoTao = dataCdr?.data?.ctdtKeHoach || null;
       } catch (err) {
         console.warn('[fetchStudentGradesFromSlink] Lỗi lấy CTĐT từ chuẩn đầu ra:', err);
       }

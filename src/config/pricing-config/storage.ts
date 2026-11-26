@@ -97,7 +97,7 @@ export function savePricingConfig(config: Partial<PricingConfig>): PricingConfig
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(next),
-    }).catch(() => {});
+    }).catch((err) => console.warn("[storage] Non-fatal async error:", err));
   } catch (caughtError) {
     console.warn(`[storage] Non-fatal error:`, caughtError);
   }
@@ -117,7 +117,7 @@ export function resetPricingConfig(): PricingConfig {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(DEFAULT_PRICING_CONFIG),
-    }).catch(() => {});
+    }).catch((err) => console.warn("[storage] Non-fatal async error:", err));
   } catch (caughtError) {
     console.warn(`[storage] Non-fatal error:`, caughtError);
   }
@@ -167,7 +167,7 @@ export function saveSessionPriceOverride(
         customPrice: priceNum,
         note: meta?.note,
       }),
-    }).catch(() => {});
+    }).catch((err) => console.warn("[storage] Non-fatal async error:", err));
   } catch (caughtError) {
     console.warn(`[storage] Non-fatal error:`, caughtError);
   }
@@ -185,7 +185,7 @@ export function removeSessionPriceOverride(sessionKey: string): void {
     fetch(`/api/exam-rooms?roomKey=${encodeURIComponent(sessionKey)}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
-    }).catch(() => {});
+    }).catch((err) => console.warn("[storage] Non-fatal async error:", err));
   } catch (caughtError) {
     console.warn(`[storage] Non-fatal error:`, caughtError);
   }
@@ -201,7 +201,7 @@ export function clearAllSessionPriceOverrides(): void {
     fetch('/api/exam-rooms?clearAll=true', {
       method: 'DELETE',
       headers: getAuthHeaders(),
-    }).catch(() => {});
+    }).catch((err) => console.warn("[storage] Non-fatal async error:", err));
   } catch (caughtError) {
     console.warn(`[storage] Non-fatal error:`, caughtError);
   }

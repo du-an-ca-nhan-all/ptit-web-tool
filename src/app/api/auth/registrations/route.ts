@@ -108,6 +108,42 @@ export async function GET(req: NextRequest) {
   }
 }
 
+async function upsertApprovedStudentAndUser(item: any): Promise<void> {
+  const existingStudent = await prisma.student.findUnique({ where: { maSV: item.username } });
+  if (existingStudent) {
+    const updateData: any = {};
+    if (item.fullName && !existingStudent.hoTen) updateData.hoTen = item.fullName;
+    if (item.phoneNumber && !existingStudent.soDienThoai) updateData.soDienThoai = item.phoneNumber;
+    if (item.lop && !existingStudent.maLop) updateData.maLop = item.lop;
+    if (Object.keys(updateData).length > 0) {
+      await prisma.student.update({ where: { id: existingStudent.id }, data: updateData });
+    }
+  } else {
+    await prisma.student.create({
+      data: {
+        maSV: item.username,
+        hoTen: item.fullName || item.username,
+        ten: item.fullName ? item.fullName.split(' ').pop() : item.username,
+        soDienThoai: item.phoneNumber || null,
+        maLop: item.lop || null,
+        trangThai: 'DANG_HOC',
+      },
+    });
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { username: item.username } });
+  if (existingUser) {
+    await prisma.user.update({
+      where: { id: existingUser.id },
+      data: { passwordHash: item.passwordHash, isActive: true },
+    });
+  } else {
+    await prisma.user.create({
+      data: { username: item.username, passwordHash: item.passwordHash, role: 'sinh_vien', isActive: true },
+    });
+  }
+}
+
 // POST /api/auth/registrations
 // Actions: 'APPROVE' | 'REJECT' | 'DELETE' | 'BULK_APPROVE' | 'BULK_REJECT' (Admin only)
 export async function POST(req: NextRequest) {
@@ -160,59 +196,8 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // 2. Upsert Student info first (Foreign key prerequisite for User)
-        const existingStudent = await prisma.student.findUnique({
-          where: { maSV: item.username },
-        });
-
-        if (existingStudent) {
-          const updateData: any = {};
-          if (item.fullName && !existingStudent.hoTen) updateData.hoTen = item.fullName;
-          if (item.phoneNumber && !existingStudent.soDienThoai) updateData.soDienThoai = item.phoneNumber;
-          if (item.lop && !existingStudent.maLop) updateData.maLop = item.lop;
-
-          if (Object.keys(updateData).length > 0) {
-            await prisma.student.update({
-              where: { id: existingStudent.id },
-              data: updateData,
-            });
-          }
-        } else {
-          await prisma.student.create({
-            data: {
-              maSV: item.username,
-              hoTen: item.fullName || item.username,
-              ten: item.fullName ? item.fullName.split(' ').pop() : item.username,
-              soDienThoai: item.phoneNumber || null,
-              maLop: item.lop || null,
-              trangThai: 'DANG_HOC',
-            },
-          });
-        }
-
-        // 3. Upsert/Update User with new password
-        const existingUser = await prisma.user.findUnique({
-          where: { username: item.username },
-        });
-
-        if (existingUser) {
-          await prisma.user.update({
-            where: { id: existingUser.id },
-            data: {
-              passwordHash: item.passwordHash,
-              isActive: true,
-            },
-          });
-        } else {
-          await prisma.user.create({
-            data: {
-              username: item.username,
-              passwordHash: item.passwordHash,
-              role: 'sinh_vien',
-              isActive: true,
-            },
-          });
-        }
+        // 2 & 3. Upsert Student & User with new password
+        await upsertApprovedStudentAndUser(item);
 
         // 4. Log activity
         await logActivity({

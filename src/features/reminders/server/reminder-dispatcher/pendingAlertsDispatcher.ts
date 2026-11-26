@@ -7,6 +7,74 @@ import { formatOffsetMinutes } from '../../types/reminder.types';
 import { buildPendingAlertMessageHtml, formatDateTimeVN } from './formatters';
 import type { RunPendingAlertsResult } from './types';
 
+async function dispatchAlertToSubscriber(params: {
+  reminder: any;
+  alert: any;
+  sub: any;
+  creatorName: string;
+  formattedEventTime: string;
+  reminderOffsetLabel: string;
+}): Promise<{ sent: boolean; error?: string }> {
+  const { reminder, alert, sub, creatorName, formattedEventTime, reminderOffsetLabel } = params;
+  const logKey = {
+    reminderId: reminder.id,
+    offsetMinutes: alert.offsetMinutes,
+    username: sub.username,
+  };
+
+  try {
+    await prisma.reminderNotificationLog.create({
+      data: { ...logKey, alertId: alert.id, status: 'SENDING' },
+    });
+  } catch {
+    return { sent: false };
+  }
+
+  let effectiveToken: string;
+  try {
+    const resolved = await resolveEffectiveBotToken(sub.botToken);
+    effectiveToken = resolved.token;
+  } catch (tokenErr: any) {
+    return { sent: false, error: `${sub.username}: ${tokenErr.message}` };
+  }
+
+  const studentName = sub.user?.student?.hoTen || sub.username;
+  const messageHtml = buildPendingAlertMessageHtml({
+    reminder,
+    studentName,
+    username: sub.username,
+    creatorName,
+    formattedEventTime,
+    reminderOffsetLabel,
+  });
+
+  const sendRes = await sendTelegramMessage({
+    botToken: effectiveToken,
+    chatId: sub.chatId,
+    text: messageHtml,
+    options: { threadId: sub.threadId ? Number(sub.threadId) : undefined },
+  });
+
+  if (sendRes.success) {
+    await prisma.reminderNotificationLog
+      .update({
+        where: { reminderId_offsetMinutes_username: logKey },
+        data: { sentAt: new Date(), status: 'SUCCESS' },
+      })
+      .catch((err) => console.warn('[pendingAlertsDispatcher] Non-fatal async error:', err));
+    return { sent: true };
+  }
+
+  const errMsg = sendRes.error || 'Lỗi gửi tin Telegram';
+  await prisma.reminderNotificationLog
+    .update({
+      where: { reminderId_offsetMinutes_username: logKey },
+      data: { status: 'FAILED', errorMessage: errMsg },
+    })
+    .catch((err) => console.warn('[pendingAlertsDispatcher] Non-fatal async error:', err));
+  return { sent: false, error: `${sub.username}: ${errMsg}` };
+}
+
 /**
  * Quét và phát thông báo Telegram cho tất cả các mốc nhắc hẹn đã đến giờ
  */
@@ -17,42 +85,28 @@ export async function runPendingReminderAlerts(): Promise<RunPendingAlertsResult
   let totalMessagesSent = 0;
 
   try {
-    // 1. Tìm các mốc cảnh báo đã đến giờ kích hoạt nhưng chưa phát (triggerTime <= now)
     const pendingAlerts = await prisma.reminderAlert.findMany({
       where: {
         triggerTime: { lte: now },
         isSent: false,
-        reminder: {
-          status: 'ACTIVE',
-        },
+        reminder: { status: 'ACTIVE' },
       },
       include: {
         reminder: {
           include: {
-            creator: {
-              include: { student: true },
-            },
+            creator: { include: { student: true } },
             participants: {
               where: { isDismissed: false },
-              include: {
-                user: {
-                  include: { student: true },
-                },
-              },
+              include: { user: { include: { student: true } } },
             },
           },
         },
       },
-      take: 50, // Giới hạn mỗi lần quét để tránh nghẽn
+      take: 50,
     });
 
     if (pendingAlerts.length === 0) {
-      return {
-        success: true,
-        totalAlertsProcessed: 0,
-        totalMessagesSent: 0,
-        errors: [],
-      };
+      return { success: true, totalAlertsProcessed: 0, totalMessagesSent: 0, errors: [] };
     }
 
     for (const alert of pendingAlerts) {
@@ -60,10 +114,7 @@ export async function runPendingReminderAlerts(): Promise<RunPendingAlertsResult
       const reminder = alert.reminder;
       if (!reminder) continue;
 
-      // Danh sách người nhận (chỉ lấy sinh viên chưa ẩn nhắc hẹn)
-      const participants = reminder.participants || [];
-      const participantUsernames = participants.map((p) => p.username);
-
+      const participantUsernames = (reminder.participants || []).map((p) => p.username);
       if (participantUsernames.length === 0) {
         await prisma.reminderAlert.update({
           where: { id: alert.id },
@@ -72,22 +123,16 @@ export async function runPendingReminderAlerts(): Promise<RunPendingAlertsResult
         continue;
       }
 
-      // CHỈ LẤY CÁC USER ĐÃ CẤU HÌNH THÔNG BÁO TELEGRAM
       const telegramSubscribers = await prisma.telegramConfig.findMany({
         where: {
           username: { in: participantUsernames },
           isEnabled: true,
           chatId: { not: '' },
         },
-        include: {
-          user: {
-            include: { student: true },
-          },
-        },
+        include: { user: { include: { student: true } } },
       });
 
       if (telegramSubscribers.length === 0) {
-        // Không có user nào bật telegram, đánh dấu đã quét để tránh quét lặp
         await prisma.reminderAlert.update({
           where: { id: alert.id },
           data: { isSent: true, sentAt: now },
@@ -99,98 +144,24 @@ export async function runPendingReminderAlerts(): Promise<RunPendingAlertsResult
       const formattedEventTime = formatDateTimeVN(reminder.eventTime);
       const reminderOffsetLabel = alert.label || formatOffsetMinutes(alert.offsetMinutes);
 
-      // Gửi tin nhắn đến từng sinh viên đủ điều kiện
-      for (const sub of telegramSubscribers) {
-        // ATOMIC LOCK: Tạo trước bản ghi với trạng thái 'SENDING'
-        // Do có UNIQUE index (reminderId, offsetMinutes, username), nếu luồng khác đã bắt đầu hoặc đã gửi,
-        // lệnh create() sẽ ném ngoại lệ -> bỏ qua ngay lập tức để chống gửi trùng lặp tuyệt đối.
-        try {
-          await prisma.reminderNotificationLog.create({
-            data: {
-              reminderId: reminder.id,
-              alertId: alert.id,
-              username: sub.username,
-              offsetMinutes: alert.offsetMinutes,
-              status: 'SENDING',
-            },
-          });
-        } catch (dupErr) {
-          continue;
-        }
+      const alertDispatchResults = await Promise.all(
+        telegramSubscribers.map((sub) =>
+          dispatchAlertToSubscriber({
+            reminder,
+            alert,
+            sub,
+            creatorName,
+            formattedEventTime,
+            reminderOffsetLabel,
+          })
+        )
+      );
+      totalMessagesSent += alertDispatchResults.filter((r) => r.sent).length;
+      errors.push(...alertDispatchResults.map((r) => r.error).filter((e): e is string => Boolean(e)));
 
-        let effectiveToken: string;
-        try {
-          const resolved = await resolveEffectiveBotToken(sub.botToken);
-          effectiveToken = resolved.token;
-        } catch (tokenErr: any) {
-          errors.push(`${sub.username}: ${tokenErr.message}`);
-          continue;
-        }
-
-        const studentName = sub.user?.student?.hoTen || sub.username;
-        const messageHtml = buildPendingAlertMessageHtml({
-          reminder,
-          studentName,
-          username: sub.username,
-          creatorName,
-          formattedEventTime,
-          reminderOffsetLabel,
-        });
-
-        const sendRes = await sendTelegramMessage({
-          botToken: effectiveToken,
-          chatId: sub.chatId,
-          text: messageHtml,
-          options: {
-            threadId: sub.threadId ? Number(sub.threadId) : undefined,
-          },
-        });
-
-        if (sendRes.success) {
-          totalMessagesSent++;
-          await prisma.reminderNotificationLog
-            .update({
-              where: {
-                reminderId_offsetMinutes_username: {
-                  reminderId: reminder.id,
-                  offsetMinutes: alert.offsetMinutes,
-                  username: sub.username,
-                },
-              },
-              data: {
-                sentAt: new Date(),
-                status: 'SUCCESS',
-              },
-            })
-            .catch(() => {});
-        } else {
-          const errMsg = sendRes.error || 'Lỗi gửi tin Telegram';
-          errors.push(`${sub.username}: ${errMsg}`);
-          await prisma.reminderNotificationLog
-            .update({
-              where: {
-                reminderId_offsetMinutes_username: {
-                  reminderId: reminder.id,
-                  offsetMinutes: alert.offsetMinutes,
-                  username: sub.username,
-                },
-              },
-              data: {
-                status: 'FAILED',
-                errorMessage: errMsg,
-              },
-            })
-            .catch(() => {});
-        }
-      }
-
-      // Đánh dấu mốc Alert này đã được phát xong
       await prisma.reminderAlert.update({
         where: { id: alert.id },
-        data: {
-          isSent: true,
-          sentAt: new Date(),
-        },
+        data: { isSent: true, sentAt: new Date() },
       });
     }
 

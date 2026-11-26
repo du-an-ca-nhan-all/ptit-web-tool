@@ -40,24 +40,24 @@ export default function UploadSection({ onDataLoaded, onRefreshFromDb }: UploadS
         });
 
         const data = await res.json();
-        if (res.ok && data.success) {
-          setSuccessMsg(data.message || 'Đã lưu dữ liệu vào cơ sở dữ liệu PostgreSQL thành công!');
-          if (onRefreshFromDb) {
-            onRefreshFromDb();
-          } else {
-            const text = await file.text();
-            Papa.parse<ExamRecord>(text, {
-              header: true,
-              skipEmptyLines: true,
-              complete: (results) => {
-                const cleanedData = results.data.filter((row) => row.MaSV);
-                onDataLoaded(cleanedData);
-              },
-            });
-          }
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Lỗi khi lưu vào cơ sở dữ liệu');
+        }
+        setSuccessMsg(data.message || 'Đã lưu dữ liệu vào cơ sở dữ liệu PostgreSQL thành công!');
+        if (onRefreshFromDb) {
+          onRefreshFromDb();
           return;
         }
-        throw new Error(data.error || 'Lỗi khi lưu vào cơ sở dữ liệu');
+        const text = await file.text();
+        Papa.parse<ExamRecord>(text, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const cleanedData = results.data.filter((row) => row.MaSV);
+            onDataLoaded(cleanedData);
+          },
+        });
+        return;
       } catch (err: any) {
         setError(`Lỗi: ${err.message}`);
       } finally {

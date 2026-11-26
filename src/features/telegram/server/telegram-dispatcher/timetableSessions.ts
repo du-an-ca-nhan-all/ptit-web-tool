@@ -38,7 +38,7 @@ export async function getStudentAllSemesterSessions(username: string): Promise<a
               syncMessage: 'Đã cập nhật Token QLDTTX từ API TKB.',
             },
           })
-          .catch(() => {});
+          .catch((err) => console.warn("[timetableSessions] Non-fatal async error:", err));
       }
 
       if (Array.isArray(fetched.rawList) && fetched.rawList.length > 0) {
@@ -60,7 +60,7 @@ export async function getStudentAllSemesterSessions(username: string): Promise<a
               lastPulledAt: new Date(),
             },
           })
-          .catch(() => {});
+          .catch((err) => console.warn("[timetableSessions] Non-fatal async error:", err));
 
         return fetched.rawList;
       }
@@ -132,27 +132,25 @@ export async function getStudentClassSessionsForDate(
   for (const item of rawList) {
     const toHoc = item.to_hoc;
     if (toHoc && toHoc.tkb) {
-      const parsedTkb = parseTkbString(toHoc.tkb);
-      for (const seg of parsedTkb) {
-        if (isSessionOnDate(seg, targetDateVN)) {
-          sessionsToday.push({
-            subjectName: toHoc.ten_mon || toHoc.ten_mon_hoc || 'Môn học',
-            subjectCode: toHoc.ma_mon || toHoc.ma_mon_hoc || '',
-            group: toHoc.nhom_to || toHoc.nhom || '',
-            classCode: toHoc.lop || toHoc.ma_lop || '',
-            dayOfWeekStr: seg.dayOfWeekStr,
-            dayOfWeekNum: seg.dayOfWeekNum,
-            periodStr: seg.periodStr,
-            startPeriod: seg.startPeriod,
-            endPeriod: seg.endPeriod,
-            startTime: seg.startTime,
-            endTime: seg.endTime,
-            startMinutes: seg.startMinutes,
-            room: seg.room,
-            startDate: seg.startDate,
-            endDate: seg.endDate,
-          });
-        }
+      const matchingSegments = parseTkbString(toHoc.tkb).filter((seg) => isSessionOnDate(seg, targetDateVN));
+      for (const seg of matchingSegments) {
+        sessionsToday.push({
+          subjectName: toHoc.ten_mon || toHoc.ten_mon_hoc || 'Môn học',
+          subjectCode: toHoc.ma_mon || toHoc.ma_mon_hoc || '',
+          group: toHoc.nhom_to || toHoc.nhom || '',
+          classCode: toHoc.lop || toHoc.ma_lop || '',
+          dayOfWeekStr: seg.dayOfWeekStr,
+          dayOfWeekNum: seg.dayOfWeekNum,
+          periodStr: seg.periodStr,
+          startPeriod: seg.startPeriod,
+          endPeriod: seg.endPeriod,
+          startTime: seg.startTime,
+          endTime: seg.endTime,
+          startMinutes: seg.startMinutes,
+          room: seg.room,
+          startDate: seg.startDate,
+          endDate: seg.endDate,
+        });
       }
     } else {
       const parsedDirect = parseSessionFromApiItem(item, targetDateVN);

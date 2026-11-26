@@ -104,7 +104,7 @@ export function handleSendFailureResult({
       item.attempts++;
       item.status = 'PENDING';
       item.scheduledFor = Date.now() + pauseMs;
-      insertItemByPriority(state.queue, item);
+      state.queue = insertItemByPriority(state.queue, item);
 
       recordHistory({
         id: item.id,
@@ -166,7 +166,7 @@ export function handleSendFailureResult({
     item.status = 'PENDING';
     const backoffDelay = Math.min(30000, 1000 * Math.pow(1.5, Math.min(currentGeneralRetries, 8)));
     item.scheduledFor = Date.now() + backoffDelay;
-    insertItemByPriority(state.queue, item);
+    state.queue = insertItemByPriority(state.queue, item);
 
     recordHistory({
       id: item.id,

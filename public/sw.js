@@ -145,7 +145,7 @@ self.addEventListener('fetch', (event) => {
                 });
               }
             })
-            .catch(() => {});
+            .catch((err) => console.warn("[sw] Non-fatal async error:", err));
           return cachedResponse;
         }
 

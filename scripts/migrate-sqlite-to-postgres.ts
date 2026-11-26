@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { prisma } from '../src/lib/prisma';
 import { restoreFromJsonDump, syncPostgresSequences, getDatabaseStats } from '../src/features/database-backup/server/backupServerService';
 
@@ -95,7 +95,7 @@ for key, tbl in tables:
 print(json.dumps({"data": data}))
 conn.close()
 `;
-      const output = execSync(`python3 -c '${pythonScript}' "${sqliteDbPath}"`, {
+      const output = execFileSync('python3', ['-c', pythonScript, sqliteDbPath], {
         maxBuffer: 100 * 1024 * 1024,
         encoding: 'utf8',
       });

@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
         targetType: 'LMS_COURSES',
         targetId: targetUsername,
         description: `Làm mới dữ liệu khóa học từ LMS PTTC1 (${result.courses?.length || 0} môn học)`,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[route] Non-fatal async error:", err));
     }
 
     return NextResponse.json({
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
             status: 'CONNECTED',
           },
         })
-        .catch(() => {});
+        .catch((err) => console.warn("[route] Non-fatal async error:", err));
     }
 
     // ACTION: Lấy chi tiết hoạt động trong khóa học

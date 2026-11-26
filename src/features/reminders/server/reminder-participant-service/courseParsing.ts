@@ -97,31 +97,22 @@ export function matchesCourseList(
     const itemMaMon = String(toHoc.ma_mon || item.ma_mon || '').trim().toUpperCase();
     const itemNhomTo = String(toHoc.nhom_to || item.nhom_to || '').trim();
 
-    let matches = false;
-
     // Khớp chính xác theo id_to_hoc (độ chính xác cao nhất)
     if (targetIdToHoc && itemToHocId && targetIdToHoc === itemToHocId) {
-      matches = true;
-    }
-    // Khớp theo mã môn & nhóm tổ
-    else if (targetMaMon && itemMaMon === targetMaMon) {
-      if (targetNhomTo && itemNhomTo && targetNhomTo !== itemNhomTo) {
-        // Khác nhóm tổ -> không match
-        continue;
-      }
-      if (checkLop) {
-        const itemLop = String(toHoc.lop || item.lop || fallbackClassCode || '').trim();
-        if (targetLop && itemLop && !itemLop.includes(targetLop) && !fallbackClassCode?.includes(targetLop)) {
-          // Khác lớp -> không match
-          continue;
-        }
-      }
-      matches = true;
-    }
-
-    if (matches) {
       return true;
     }
+
+    if (!targetMaMon || itemMaMon !== targetMaMon) continue;
+    if (targetNhomTo && itemNhomTo && targetNhomTo !== itemNhomTo) continue;
+
+    if (checkLop && targetLop) {
+      const itemLop = String(toHoc.lop || item.lop || fallbackClassCode || '').trim();
+      if (itemLop && !itemLop.includes(targetLop) && !fallbackClassCode?.includes(targetLop)) {
+        continue;
+      }
+    }
+
+    return true;
   }
 
   return false;

@@ -76,7 +76,7 @@ export function enqueueTelegramMessage({
       reject,
     };
 
-    insertItemByPriority(state.queue, item);
+    state.queue = insertItemByPriority(state.queue, item);
     triggerWorker(0);
   });
 }
@@ -128,7 +128,7 @@ export function enqueueTelegramDocument({
       reject,
     };
 
-    insertItemByPriority(state.queue, item);
+    state.queue = insertItemByPriority(state.queue, item);
     triggerWorker(0);
   });
 }
@@ -171,7 +171,7 @@ export function enqueueBatchTelegramMessages(
       scheduledFor: Date.now(),
     };
 
-    insertItemByPriority(state.queue, queueItem);
+    state.queue = insertItemByPriority(state.queue, queueItem);
   }
 
   triggerWorker(0);

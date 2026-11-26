@@ -47,6 +47,22 @@ export interface CalculateRoomPriceParams {
   overrides?: Record<string, number>;
 }
 
+function getLocalStorageCustomPrice(sessionKey: string): number | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const rawAssign =
+      localStorage.getItem('ptit_envelope_assignments') ||
+      localStorage.getItem('custom_envelope_assignments');
+    if (!rawAssign) return null;
+    const map = JSON.parse(rawAssign);
+    const customPrice = map[sessionKey]?.customPrice;
+    return typeof customPrice === 'number' ? Number(customPrice) : null;
+  } catch (caughtError) {
+    console.warn(`[calculator] Non-fatal error:`, caughtError);
+    return null;
+  }
+}
+
 export const calculateRoomPrice = ({
   subject,
   subjectCode,
@@ -56,48 +72,29 @@ export const calculateRoomPrice = ({
   customConfig,
   overrides,
 }: CalculateRoomPriceParams): number => {
-  // 1. Kiểm tra nếu phòng/buổi thi này có mức giá tùy chỉnh riêng
-  if (sessionKey) {
-    const sessionOverrides = overrides || getSessionPriceOverrides();
-    if (sessionOverrides[sessionKey] !== undefined && typeof sessionOverrides[sessionKey] === 'number') {
-      return sessionOverrides[sessionKey];
-    }
-
-    // 2. Kiểm tra từ envelope assignments confirmation (bảng/cache phân công phong bì)
-    try {
-      const assignments = getStoredEnvelopeAssignments();
-      if (
-        assignments &&
-        assignments[sessionKey]?.customPrice !== undefined &&
-        assignments[sessionKey]?.customPrice !== null &&
-        typeof assignments[sessionKey]?.customPrice === 'number'
-      ) {
-        return Number(assignments[sessionKey].customPrice);
-      }
-    } catch (caughtError) {
-      console.warn(`[calculator] Non-fatal error:`, caughtError);
-    }
-
-    try {
-      if (typeof window !== 'undefined') {
-        const rawAssign =
-          localStorage.getItem('ptit_envelope_assignments') ||
-          localStorage.getItem('custom_envelope_assignments');
-        if (rawAssign) {
-          const map = JSON.parse(rawAssign);
-          if (
-            map[sessionKey]?.customPrice !== undefined &&
-            map[sessionKey]?.customPrice !== null &&
-            typeof map[sessionKey]?.customPrice === 'number'
-          ) {
-            return Number(map[sessionKey].customPrice);
-          }
-        }
-      }
-    } catch (caughtError) {
-      console.warn(`[calculator] Non-fatal error:`, caughtError);
-    }
+  if (!sessionKey) {
+    return getDefaultRoomPrice({ subject, subjectCode, room, examFormat, customConfig });
   }
+
+  // 1. Kiểm tra nếu phòng/buổi thi này có mức giá tùy chỉnh riêng
+  const sessionOverrides = overrides || getSessionPriceOverrides();
+  if (typeof sessionOverrides[sessionKey] === 'number') {
+    return sessionOverrides[sessionKey];
+  }
+
+  // 2. Kiểm tra từ envelope assignments confirmation (bảng/cache phân công phong bì)
+  try {
+    const assignments = getStoredEnvelopeAssignments();
+    const customPrice = assignments?.[sessionKey]?.customPrice;
+    if (typeof customPrice === 'number') {
+      return Number(customPrice);
+    }
+  } catch (caughtError) {
+    console.warn(`[calculator] Non-fatal error:`, caughtError);
+  }
+
+  const localPrice = getLocalStorageCustomPrice(sessionKey);
+  if (localPrice !== null) return localPrice;
 
   return getDefaultRoomPrice({ subject, subjectCode, room, examFormat, customConfig });
 };
