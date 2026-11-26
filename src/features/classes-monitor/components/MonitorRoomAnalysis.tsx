@@ -4,6 +4,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   BookOpenCheck,
   Check,
   Copy,
@@ -21,6 +23,7 @@ import {
 } from 'lucide-react';
 import { ExamBatchItem, LoginUser, isUserAdmin } from '../../../types';
 import {
+  ExamDateTimeSortOrder,
   ReferenceCandidate,
   ReferenceStudentInfo,
   RoomAnalysisRecord,
@@ -30,6 +33,8 @@ import {
   analyzeClassRooms,
   formatGroupLabel,
   matchesRoomCount,
+  sortAnalyzedRecords,
+  sortAnalyzedRooms,
 } from '../types/roomAnalysis.types';
 import RoomAnalysisSplitTable from './RoomAnalysisSplitTable';
 import RoomAnalysisRoomsList from './RoomAnalysisRoomsList';
@@ -102,6 +107,11 @@ export default function MonitorRoomAnalysis({
   const [onlyNonMonitorRooms, setOnlyNonMonitorRooms] = useState<boolean>(false);
   const [hidePostponed, setHidePostponed] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [examTimeSort, setExamTimeSort] = useState<ExamDateTimeSortOrder>('DATE_ASC');
+
+  const toggleExamTimeSort = useCallback(() => {
+    setExamTimeSort((prev) => (prev === 'DATE_ASC' ? 'DATE_DESC' : 'DATE_ASC'));
+  }, []);
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToast({ text, type });
@@ -227,7 +237,7 @@ export default function MonitorRoomAnalysis({
   // Filtered student records for Tab 1
   const filteredRecords = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return subjectRecords.filter((r) => {
+    const matched = subjectRecords.filter((r) => {
       if (splitFilter === 'ALL_SPLIT') {
         if (r.splitStatus !== 'SPLIT_SAME_GROUP' && r.splitStatus !== 'SPLIT_DIFF_GROUP') {
           return false;
@@ -254,12 +264,14 @@ export default function MonitorRoomAnalysis({
       }
       return true;
     });
-  }, [subjectRecords, splitFilter, roomCountOp, roomCountN, searchQuery]);
+
+    return sortAnalyzedRecords(matched, examTimeSort);
+  }, [subjectRecords, splitFilter, roomCountOp, roomCountN, searchQuery, examTimeSort]);
 
   // Filtered rooms for Tab 2
   const filteredRooms = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return analyzedRooms.filter((room) => {
+    const matched = analyzedRooms.filter((room) => {
       if (selectedSubject !== 'ALL' && room.maMH !== selectedSubject) return false;
       if (onlyNonMonitorRooms && room.isMonitorRoom) return false;
       if (!matchesRoomCount(room.scopeCount, roomCountOp, roomCountN)) return false;
@@ -280,7 +292,17 @@ export default function MonitorRoomAnalysis({
       }
       return true;
     });
-  }, [analyzedRooms, selectedSubject, onlyNonMonitorRooms, roomCountOp, roomCountN, searchQuery]);
+
+    return sortAnalyzedRooms(matched, examTimeSort);
+  }, [
+    analyzedRooms,
+    selectedSubject,
+    onlyNonMonitorRooms,
+    roomCountOp,
+    roomCountN,
+    searchQuery,
+    examTimeSort,
+  ]);
 
   const handleCopyResult = async () => {
     const scopeLabel = scope === 'REVIEW' ? 'AE Ôn Tập' : 'Cả Lớp';
@@ -748,8 +770,24 @@ export default function MonitorRoomAnalysis({
             </button>
           </div>
 
-          {/* Subject Filter */}
-          <div className="pb-2 sm:pb-3 flex items-center gap-2">
+          {/* Subject Filter + Exam Date/Time Sort */}
+          <div className="pb-2 sm:pb-3 flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={toggleExamTimeSort}
+              title="Đảo chiều sắp xếp theo ngày giờ thi"
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 text-xs font-bold rounded-xl px-3 py-1.5 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              {examTimeSort === 'DATE_ASC' ? (
+                <ArrowUp className="w-3.5 h-3.5 text-indigo-600" />
+              ) : (
+                <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+              )}
+              <span>
+                Ngày giờ thi: {examTimeSort === 'DATE_ASC' ? 'Sớm → Muộn' : 'Muộn → Sớm'}
+              </span>
+            </button>
+
             <span className="text-[11px] font-bold text-slate-400 uppercase">Môn thi:</span>
             <select
               value={selectedSubject}
@@ -928,6 +966,8 @@ export default function MonitorRoomAnalysis({
           <RoomAnalysisSplitTable
             records={filteredRecords}
             scope={scope}
+            examTimeSort={examTimeSort}
+            onToggleExamTimeSort={toggleExamTimeSort}
             onStudentClick={onSelectStudentSchedule}
           />
         ) : (

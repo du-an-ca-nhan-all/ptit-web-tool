@@ -3,6 +3,8 @@
 import React from 'react';
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   BookOpenCheck,
   CheckCircle2,
   Crown,
@@ -14,6 +16,7 @@ import {
 } from 'lucide-react';
 import {
   AnalyzedStudentRecord,
+  ExamDateTimeSortOrder,
   SplitRoomStatus,
   StudentScope,
   formatGroupLabel,
@@ -22,6 +25,8 @@ import {
 interface RoomAnalysisSplitTableProps {
   records: AnalyzedStudentRecord[];
   scope: StudentScope;
+  examTimeSort: ExamDateTimeSortOrder;
+  onToggleExamTimeSort: () => void;
   onStudentClick?: (maSV: string) => void;
 }
 
@@ -54,6 +59,8 @@ const STATUS_BADGE_MAP: Record<
 export default function RoomAnalysisSplitTable({
   records,
   scope,
+  examTimeSort,
+  onToggleExamTimeSort,
   onStudentClick,
 }: RoomAnalysisSplitTableProps) {
   if (records.length === 0) {
@@ -76,7 +83,25 @@ export default function RoomAnalysisSplitTable({
             <th className="py-3.5 px-4 text-center w-12">STT</th>
             <th className="py-3.5 px-4 min-w-[200px]">Sinh viên</th>
             <th className="py-3.5 px-4 min-w-[180px]">Môn thi</th>
-            <th className="py-3.5 px-4 min-w-[170px]">Phòng của SV</th>
+            <th className="py-3.5 px-4 min-w-[175px]">
+              <button
+                type="button"
+                onClick={onToggleExamTimeSort}
+                title={
+                  examTimeSort === 'DATE_ASC'
+                    ? 'Đang sắp xếp ngày giờ thi: Sớm → Muộn (nhấn để đảo chiều)'
+                    : 'Đang sắp xếp ngày giờ thi: Muộn → Sớm (nhấn để đảo chiều)'
+                }
+                className="inline-flex items-center gap-1 uppercase tracking-wider font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+              >
+                <span>Phòng &amp; Ngày giờ thi</span>
+                {examTimeSort === 'DATE_ASC' ? (
+                  <ArrowUp className="w-3.5 h-3.5" />
+                ) : (
+                  <ArrowDown className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </th>
             <th className="py-3.5 px-4 min-w-[165px]">Phòng Lớp Trưởng</th>
             <th className="py-3.5 px-4 min-w-[160px]">Tổ / Nhóm</th>
             <th className="py-3.5 px-4 min-w-[185px]">Trạng thái</th>
