@@ -109,8 +109,20 @@ export function startTelegramScheduler() {
   // Chạy ngay lần đầu phục hồi các job bị kẹt
   recoverAllStuckQueueJobs().catch(console.error);
 
-  // Chạy định kỳ mỗi 5 phút
-  setInterval(() => {
+  // Chạy định kỳ mỗi 5 phút (lưu handle + unref để giải phóng tài nguyên an toàn)
+  const timer = setInterval(() => {
     runTelegramSchedulerTasks().catch(console.error);
   }, 5 * 60 * 1000);
+  timer.unref?.();
+  (globalThis as any).__telegramSchedulerTimer = timer;
+}
+
+export function stopTelegramScheduler() {
+  const g = globalThis as any;
+  if (g.__telegramSchedulerTimer) {
+    clearInterval(g.__telegramSchedulerTimer);
+    g.__telegramSchedulerTimer = undefined;
+  }
+  g.__telegramSchedulerStarted = false;
+  isSchedulerRunning = false;
 }

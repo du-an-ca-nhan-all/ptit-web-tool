@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { assertSafeSqlIdentifier } from '../../src/lib/sqlSafety';
 
 // Chia mảng thành các chunk nhỏ hơn
 export function chunkArray<T>(array: T[], size: number): T[][] {
@@ -42,14 +43,16 @@ export async function copyTablesData({
       continue;
     }
 
+    const safeTableName = assertSafeSqlIdentifier(tableName, 'table name');
+
     // Đọc toàn bộ dữ liệu của bảng từ PROD
-    const rows: any[] = await prodPrisma.$queryRawUnsafe(`SELECT * FROM "public"."${tableName}";`);
+    const rows: any[] = await prodPrisma.$queryRawUnsafe(`SELECT * FROM "public"."${safeTableName}";`);
     if (!Array.isArray(rows) || rows.length === 0) {
       continue;
     }
 
     const columns = Object.keys(rows[0]);
-    const quotedCols = columns.map((c) => `"${c}"`).join(', ');
+    const quotedCols = columns.map((c) => `"${assertSafeSqlIdentifier(c, 'column name')}"`).join(', ');
 
     // Giới hạn số tham số dưới 30,000 (PostgreSQL tối đa 65,535 params)
     const maxParams = 30000;
@@ -75,7 +78,7 @@ export async function copyTablesData({
         placeholders.push(`(${rowPlaceholders.join(', ')})`);
       }
 
-      const insertSql = `INSERT INTO "public"."${tableName}" (${quotedCols}) VALUES ${placeholders.join(', ')};`;
+      const insertSql = `INSERT INTO "public"."${safeTableName}" (${quotedCols}) VALUES ${placeholders.join(', ')};`;
       await devPrisma.$executeRawUnsafe(insertSql, ...flatValues);
     }
 
@@ -85,7 +88,9 @@ export async function copyTablesData({
 
   // Bật lại triggers/foreign keys
   if (replicaRoleSet) {
-    await devPrisma.$executeRawUnsafe(`SET session_replication_role = 'origin';`).catch(() => {});
+    await devPrisma.$executeRawUnsafe(`SET session_replication_role = 'origin';`).catch((err) => {
+      console.warn('[data-transfer] Failed to restore session_replication_role to origin:', err);
+    });
   }
 
   return copiedRecords;

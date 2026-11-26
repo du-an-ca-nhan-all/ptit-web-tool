@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getCurrentUserFromCookie } from '@/src/lib/auth';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import {
   updateReminder,
   deleteReminder,
@@ -9,6 +11,33 @@ import {
 } from '@/src/features/reminders';
 
 export const dynamic = 'force-dynamic';
+
+const optionalString = z.string().nullish().transform((v) => v ?? undefined);
+
+const updateReminderBodySchema = z
+  .object({
+    title: optionalString,
+    description: optionalString,
+    location: optionalString,
+    type: z.enum(['PERSONAL', 'COURSE', 'CLASS']).nullish().transform((v) => v ?? undefined),
+    idToHoc: optionalString,
+    idMon: optionalString,
+    maMon: optionalString,
+    tenMon: optionalString,
+    nhomTo: optionalString,
+    lop: optionalString,
+    tkbRaw: optionalString,
+    giangVien: optionalString,
+    eventTime: optionalString,
+    offsetMinutesList: z.array(z.number()).nullish().transform((v) => v ?? undefined),
+  })
+  .passthrough();
+
+const patchReminderBodySchema = z
+  .object({
+    action: z.string().nullish(),
+  })
+  .passthrough();
 
 export async function PUT(
   req: NextRequest,
@@ -26,7 +55,9 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'ID không hợp lệ' }, { status: 400 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, updateReminderBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const updated = await updateReminder({
       id: reminderId,
       username: user.username,
@@ -97,7 +128,9 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'ID không hợp lệ' }, { status: 400 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, patchReminderBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const action = body.action || 'TOGGLE_COMPLETE';
 
     if (action === 'DISMISS') {

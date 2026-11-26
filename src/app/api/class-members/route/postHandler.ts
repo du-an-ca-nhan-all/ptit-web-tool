@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { prisma } from '@/src/lib/prisma';
 import { checkIsAdmin } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { getAuthUser } from './auth';
+
+const classMemberPostSchema = z.object({
+  MaSV: z.string().optional(),
+  MaLop: z.string().optional(),
+  HoLotSV: z.string().nullish(),
+  TenSV: z.string().nullish(),
+  PHAI: z.string().nullish(),
+  NgaySinhC: z.string().nullish(),
+  phone: z.string().nullish(),
+  note: z.string().nullish(),
+  trangThai: z.string().optional(),
+}).passthrough();
 
 export async function handlePostClassMember(req: NextRequest) {
   try {
@@ -11,7 +25,9 @@ export async function handlePostClassMember(req: NextRequest) {
       return NextResponse.json({ error: 'Vui lòng đăng nhập' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, classMemberPostSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const {
       MaSV,
       MaLop,

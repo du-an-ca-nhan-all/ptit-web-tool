@@ -6,9 +6,13 @@ interface RateLimitRecord {
 
 const rateLimitStore = new Map<string, RateLimitRecord>();
 
-// Cleanup stale records every 5 minutes
-if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
+const globalForRateLimit = globalThis as typeof globalThis & {
+  __rateLimitCleanupTimer?: ReturnType<typeof setInterval>;
+};
+
+// Cleanup stale records every 5 minutes (singleton + unref to prevent timer leaks)
+if (typeof setInterval !== 'undefined' && !globalForRateLimit.__rateLimitCleanupTimer) {
+  globalForRateLimit.__rateLimitCleanupTimer = setInterval(() => {
     const now = Date.now();
     for (const [key, record] of rateLimitStore.entries()) {
       record.timestamps = record.timestamps.filter((ts) => now - ts < 3600 * 1000);
@@ -17,6 +21,14 @@ if (typeof setInterval !== 'undefined') {
       }
     }
   }, 5 * 60 * 1000);
+  globalForRateLimit.__rateLimitCleanupTimer.unref?.();
+}
+
+export function stopRateLimitCleanup(): void {
+  if (globalForRateLimit.__rateLimitCleanupTimer) {
+    clearInterval(globalForRateLimit.__rateLimitCleanupTimer);
+    globalForRateLimit.__rateLimitCleanupTimer = undefined;
+  }
 }
 
 export function getClientIp(req: NextRequest | Request): string {

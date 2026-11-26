@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor, getUserRoles } from '@/src/lib/auth';
 import { prisma } from '@/src/lib/prisma';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 import { syncStudentProfileFromQLDTTX } from '@/src/features/external-portal/server/studentProfileSyncService';
+
+const updateMeSchema = z.object({
+  soDienThoai: z.union([z.string(), z.number()]).nullish(),
+  ghiChu: z.string().nullish(),
+}).passthrough();
 
 export async function GET(req: NextRequest) {
   try {
@@ -107,7 +114,9 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, updateMeSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const { soDienThoai, ghiChu } = body;
 
     // Update student info

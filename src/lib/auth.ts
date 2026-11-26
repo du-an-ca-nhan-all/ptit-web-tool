@@ -3,10 +3,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { prisma } from './prisma';
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'ptit-secret-key-exam-portal-secure-token-2026'
-);
+import { getJwtSecret } from './jwtSecret';
 
 // Token & cookie lifetime: 10 years
 export const AUTH_TOKEN_EXPIRY = '10y';
@@ -93,12 +90,12 @@ export async function createAuthToken(user: AuthUser): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(AUTH_TOKEN_EXPIRY)
-    .sign(JWT_SECRET);
+    .sign(getJwtSecret());
 }
 
 export async function verifyAuthToken(token: string): Promise<AuthUser | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, getJwtSecret());
     const p = payload as any;
     return {
       id: p.id,

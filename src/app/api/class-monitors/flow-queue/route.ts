@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import {
   enqueueFlowAction,
@@ -70,7 +72,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Chỉ Lớp trưởng hoặc Quản trị viên mới có quyền thao tác Queue' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const flowQueuePostSchema = z.object({
+      action: z.string().optional(),
+      classCode: z.string().optional(),
+      monitorUsername: z.string().optional(),
+      flowAction: z.enum(['REGISTER', 'CANCEL', 'SYNC_ALL_COURSES']).optional(),
+      title: z.string().optional(),
+      id_to_hoc: z.string().optional(),
+      ma_mon: z.string().optional(),
+      ten_mon: z.string().optional(),
+      nhom_to: z.string().optional(),
+      sv_nganh: z.union([z.number(), z.string()]).optional(),
+      targetFollowerUsernames: z.array(z.string()).optional(),
+      batchId: z.string().optional(),
+    }).passthrough();
+
+    const parsed = await parseJsonBody(req, flowQueuePostSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const {
       action = 'ENQUEUE',
       classCode = authUser.lop || '',

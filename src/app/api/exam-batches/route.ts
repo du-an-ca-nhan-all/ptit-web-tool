@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { checkIsAdmin } from '@/src/lib/auth';
 import { examBatchService } from '@/src/features/exam-schedule/server/examBatchServerService';
 import type { ExamBatchActionBody, ExamBatchActionContext } from './route/types';
 import { getAuthUser } from './route/utils';
 import { handleCreateBatch, handleDeleteBatch, handleUpdateBatch } from './route/manageActions';
 import { handleSetActiveBatch, handleToggleBatch } from './route/statusActions';
+
+const examBatchPostSchema = z.object({
+  action: z.string().optional(),
+  code: z.unknown().optional(),
+  name: z.unknown().optional(),
+  semester: z.unknown().optional(),
+  academicYear: z.unknown().optional(),
+  startDate: z.unknown().optional(),
+  endDate: z.unknown().optional(),
+  description: z.unknown().optional(),
+  isActive: z.unknown().optional(),
+  deleteRecords: z.unknown().optional(),
+}).passthrough();
 
 // GET /api/exam-batches
 // Returns all exam batches with summary statistics (Cached)
@@ -35,7 +50,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = (await req.json()) as ExamBatchActionBody;
+    const parsed = await parseJsonBody(req, examBatchPostSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as ExamBatchActionBody;
     const ctx: ExamBatchActionContext = { req, authUser, body };
 
     if (body.action === 'CREATE') {

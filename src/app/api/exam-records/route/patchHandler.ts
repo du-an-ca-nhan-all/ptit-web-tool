@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { dispatchExamPostponed } from '@/src/features/telegram/server/telegramDispatcher';
 import type { PatchPostponedPayload, PatchUpdateResult } from './types';
 import { parsePatchPayload, parsePostponedBoolean } from './utils';
+
+const stringOrNumberSchema = z.union([z.string(), z.number()]);
+
+const patchExamRecordsBodySchema = z
+  .object({
+    id: stringOrNumberSchema.nullish(),
+    ids: z.array(stringOrNumberSchema).nullish(),
+    isPostponed: z.union([z.boolean(), z.string(), z.number()]).nullish(),
+    maSV: z.string().nullish(),
+    maMH: z.string().nullish(),
+    mapThi: z.string().nullish(),
+    ngayThi: z.string().nullish(),
+    gioThi: z.string().nullish(),
+  })
+  .passthrough();
 
 async function extractPatchAuthUser(req: NextRequest) {
   let authUser = null;
@@ -110,7 +127,9 @@ async function updatePostponedRecords(
 export async function handlePatchExamRecords(req: NextRequest): Promise<NextResponse> {
   try {
     const authUser = await extractPatchAuthUser(req);
-    const body = await req.json().catch(() => ({}));
+    const parsed = await parseJsonBody(req, patchExamRecordsBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const payload = parsePatchPayload(body);
 
     const cleanIsPostponed = parsePostponedBoolean(payload.rawIsPostponed);

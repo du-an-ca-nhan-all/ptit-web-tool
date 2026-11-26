@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import {
   getOrFetchStudentSlinkOverview,
   markSlinkNotificationAsRead,
@@ -8,6 +10,15 @@ import {
 } from '@/src/features/external-portal/server/slinkServerService';
 import { checkAndDispatchSlinkAnnouncements } from '@/src/features/telegram/server/telegramDispatcher';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+
+const slinkNotificationsPostBodySchema = z
+  .object({
+    action: z.string().nullish(),
+    notificationId: z.string().nullish().transform((v) => v ?? undefined),
+    targetUsername: z.string().nullish(),
+    type: z.string().nullish(),
+  })
+  .passthrough();
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -88,7 +99,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vui lòng đăng nhập để thực hiện' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, slinkNotificationsPostBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const { action, notificationId, targetUsername: requestedUsername, type } = body;
     const targetUsername = (authUser.isAdmin && requestedUsername) || authUser.username;
 

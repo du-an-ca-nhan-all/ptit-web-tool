@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { prisma } from '@/src/lib/prisma';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 import { getAuthUser, verifyIsMonitorOrAdmin } from './auth';
 import { fetchEnvelopeConfirmationRecords, mapRecordsToAssignments } from './mappers';
+
+const envelopeAssignmentPostSchema = z.object({
+  roomKey: z.string().nullish(),
+  sessionId: z.string().nullish(),
+  assignedClass: z.string().nullish(),
+  assistantStudentId: z.string().nullish(),
+  assistantStudentName: z.string().nullish(),
+  customPrice: z.union([z.number(), z.string()]).nullish(),
+  batchCode: z.string().nullish(),
+  room: z.string().nullish(),
+  date: z.string().nullish(),
+  time: z.string().nullish(),
+  subjectCode: z.string().nullish(),
+  subject: z.string().nullish(),
+  note: z.string().nullish(),
+}).passthrough();
 
 // POST /api/envelope-assignments
 // Xác nhận nhận đi phong bì cho phòng thi, cho phép gán sinh viên hỗ trợ
@@ -14,7 +32,9 @@ export async function handlePostEnvelopeAssignment(req: NextRequest) {
       return NextResponse.json({ error: 'Chỉ Lớp Trưởng hoặc Quản trị viên mới có quyền xác nhận phụ trách nước uống & hỗ trợ' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, envelopeAssignmentPostSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const {
       roomKey,
       sessionId,

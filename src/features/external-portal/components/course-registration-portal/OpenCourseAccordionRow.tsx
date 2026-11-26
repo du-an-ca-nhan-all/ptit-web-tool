@@ -4,6 +4,7 @@ import React from 'react';
 import { Check, Plus, Flame, Lock } from 'lucide-react';
 import { MonitorFlowConfigInfo } from '../../hooks/useCourseRegistration';
 import { CourseRegistrationHookResult, CourseRegistrationSubTab } from './types';
+import { sanitizeHtml } from '@/src/lib/htmlSanitizer';
 
 interface OpenCourseAccordionRowProps {
   group: any;
@@ -82,7 +83,7 @@ export function OpenCourseAccordionRow({
         {group.tkb ? (
           <div
             className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: group.tkb }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(group.tkb) }}
           />
         ) : (
           <span className="text-slate-400 italic text-[11px]">Chưa xếp lịch</span>

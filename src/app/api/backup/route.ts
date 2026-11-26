@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { requireAdminUser } from './route/auth';
 import {
   handleDownloadSavedFile,
@@ -76,7 +78,17 @@ export async function POST(req: NextRequest) {
       return await handleRestoreUploadedFile(req, auth.user);
     }
 
-    const body = await req.json().catch(() => ({}));
+    const backupPostSchema = z.object({
+      action: z.string().optional(),
+      filename: z.string().nullish(),
+      format: z.string().nullish(),
+      chatId: z.union([z.string(), z.number()]).nullish(),
+      threadId: z.union([z.string(), z.number()]).nullish(),
+    }).passthrough();
+
+    const parsed = await parseJsonBody(req, backupPostSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const action = (body.action || 'CREATE_SNAPSHOT').toUpperCase();
 
     if (action === 'RESTORE_SAVED_BACKUP') {

@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { prisma } from '@/src/lib/prisma';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { getAuthUser, normalizeCode } from './utils';
+
+const reviewRegistrationItemSchema = z.object({
+  maSV: z.string(),
+  isRegistered: z.boolean().optional().default(false),
+  note: z.string().nullish(),
+}).passthrough();
+
+const reviewRegistrationsPostSchema = z.object({
+  action: z.string().optional(),
+  batchCode: z.string().nullish(),
+  classCode: z.string().nullish(),
+  maSV: z.string().nullish(),
+  isRegistered: z.boolean().optional(),
+  note: z.string().nullish(),
+  items: z.array(reviewRegistrationItemSchema).optional(),
+}).passthrough();
 
 // POST /api/class-monitors/review-registrations
 // Actions: TOGGLE_ONE | SAVE_BULK | IMPORT_MASV
@@ -19,7 +37,9 @@ export async function handlePostReviewRegistrations(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, reviewRegistrationsPostSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const action = String(body.action || 'TOGGLE_ONE').toUpperCase();
     const batchCode = normalizeCode(body.batchCode);
     const requestedClass = normalizeCode(body.classCode);

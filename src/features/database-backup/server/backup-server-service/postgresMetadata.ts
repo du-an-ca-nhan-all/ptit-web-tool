@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { prisma } from '@/src/lib/prisma';
+import { assertSafeSqlIdentifier } from '@/src/lib/sqlSafety';
 import type { DatabaseStats, TableStat } from './types';
 import { formatBytes, getDatabaseFilePath } from './utils';
 
@@ -31,8 +32,9 @@ export async function getTableRecordCounts(
 ): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   for (const table of tables) {
+    const safeTable = assertSafeSqlIdentifier(table, 'table name');
     try {
-      const res: any = await prismaClient.$queryRawUnsafe(`SELECT COUNT(*)::bigint AS count FROM "public"."${table}";`);
+      const res: any = await prismaClient.$queryRawUnsafe(`SELECT COUNT(*)::bigint AS count FROM "public"."${safeTable}";`);
       counts.set(table, Number(res[0]?.count || 0));
     } catch (err: any) {
       console.warn(`[BackupService] Lỗi khi đếm số bản ghi bảng "${table}":`, err.message);
@@ -141,12 +143,14 @@ export async function syncPostgresSequences(prismaClient = prisma): Promise<numb
     if (Array.isArray(seqCols)) {
       for (const { table_name, column_name, seq_name } of seqCols) {
         if (!seq_name) continue;
+        const safeTable = assertSafeSqlIdentifier(table_name, 'table name');
+        const safeColumn = assertSafeSqlIdentifier(column_name, 'column name');
         try {
           await prismaClient.$executeRawUnsafe(`
             SELECT setval(
               $1, 
-              COALESCE((SELECT MAX("${column_name}") FROM "public"."${table_name}"), 1), 
-              (SELECT MAX("${column_name}") IS NOT NULL FROM "public"."${table_name}")
+              COALESCE((SELECT MAX("${safeColumn}") FROM "public"."${safeTable}"), 1), 
+              (SELECT MAX("${safeColumn}") IS NOT NULL FROM "public"."${safeTable}")
             );
           `, seq_name);
           count++;

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { AVAILABLE_EXTERNAL_SYSTEMS } from '@/src/types';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { getAuthUser } from './route/auth';
 import { handleGetExternalAccounts } from './route/getHandler';
 import { handleBatchTokensAction } from './route/batchAction';
@@ -7,6 +9,22 @@ import { handleDeleteAccountAction } from './route/deleteAction';
 import { handleSaveAccountAction } from './route/saveAction';
 import { handleTestOrSyncAction } from './route/testExistingAction';
 import { ExternalAccountActionBody, ExternalAccountActionContext } from './route/types';
+
+const optionalString = z.string().nullish().transform((v) => v ?? undefined);
+
+const externalAccountActionBodySchema = z
+  .object({
+    action: optionalString,
+    systemKey: optionalString,
+    extUsername: optionalString,
+    extPassword: optionalString,
+    refreshToken: optionalString,
+    accessToken: optionalString,
+    systemName: optionalString,
+    systemUrl: optionalString,
+    targetUsername: optionalString,
+  })
+  .passthrough();
 
 // GET /api/external-accounts
 // Supports:
@@ -25,7 +43,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vui lòng đăng nhập để thực hiện thao tác' }, { status: 401 });
     }
 
-    const body: ExternalAccountActionBody = await req.json();
+    const parsed = await parseJsonBody(req, externalAccountActionBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body: ExternalAccountActionBody = parsed.data;
     const {
       action = 'SAVE',
       systemKey,

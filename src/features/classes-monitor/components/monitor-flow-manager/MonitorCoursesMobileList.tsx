@@ -4,6 +4,7 @@ import React from 'react';
 import { BookOpen, Zap } from 'lucide-react';
 import { CourseItem } from '../../server/monitorFlowServerService';
 import { ExecuteFlowFn } from './types';
+import { sanitizeHtml } from '@/src/lib/htmlSanitizer';
 
 interface MonitorCoursesMobileListProps {
   monitorCourses: CourseItem[];
@@ -76,7 +77,7 @@ export function MonitorCoursesMobileList({
                 {course.tkb ? (
                   <div
                     className="text-[11px] text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-2 border border-slate-100"
-                    dangerouslySetInnerHTML={{ __html: course.tkb }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(course.tkb) }}
                   />
                 ) : (
                   <span className="text-[11px] text-slate-400 italic">Chưa xếp TKB</span>

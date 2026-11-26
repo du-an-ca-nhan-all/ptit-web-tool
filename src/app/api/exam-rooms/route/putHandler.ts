@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/src/lib/prisma';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { DEFAULT_PRICING_CONFIG } from '@/src/config/pricingConfig';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 import { getAuthUser, verifyIsAdmin } from './auth';
+
+const putPricingConfigBodySchema = z
+  .object({
+    commonRoom: z.union([z.number(), z.string()]).nullish(),
+    englishOralRoom: z.union([z.number(), z.string()]).nullish(),
+  })
+  .passthrough();
 
 // PUT /api/exam-rooms
 // Lưu cấu hình định mức giá chung toàn hệ thống
@@ -13,7 +22,9 @@ export async function handlePutPricingConfig(req: NextRequest) {
     if (!verifyIsAdmin(authUser)) {
       return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền cấu hình định mức tiền phòng' }, { status: 403 });
     }
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, putPricingConfigBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
 
     const commonRoom = Math.max(0, parseInt(String(body.commonRoom), 10) || DEFAULT_PRICING_CONFIG.commonRoom);
     const englishOralRoom = Math.max(0, parseInt(String(body.englishOralRoom), 10) || DEFAULT_PRICING_CONFIG.englishOralRoom);

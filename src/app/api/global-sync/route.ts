@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import {
+  GlobalJobType,
   enqueueGlobalSyncJob,
   processGlobalSyncQueue,
   getGlobalSyncQueueStatus,
@@ -13,6 +16,18 @@ import {
 import { setGlobalConfig, GLOBAL_CONFIG_KEYS, GlobalNightlySyncConfigValue } from '@/src/lib/globalConfig';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
+
+const optStr = z.string().nullish().transform((v) => v ?? undefined);
+const globalSyncPostBodySchema = z
+  .object({
+    action: optStr,
+    jobType: optStr,
+    title: optStr,
+    batchId: optStr,
+    targetUsernames: z.array(z.string()).nullish().transform((v) => v ?? undefined),
+    config: z.record(z.string(), z.any()).nullish().transform((v) => v ?? undefined),
+  })
+  .passthrough();
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -70,7 +85,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Chỉ Quản trị viên (Admin) mới có quyền thao tác Hàng đợi Global' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, globalSyncPostBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const {
       action = 'ENQUEUE',
       jobType = 'SYNC_ALL', // 'SYNC_TIMETABLE' | 'SYNC_GRADES' | 'SYNC_LMS' | 'SYNC_ALL'
@@ -83,7 +100,7 @@ export async function POST(req: NextRequest) {
     // 1. ACTION: ENQUEUE
     if (action === 'ENQUEUE') {
       const enqueueRes = await enqueueGlobalSyncJob({
-        jobType,
+        jobType: jobType as GlobalJobType,
         title,
         triggeredBy: authUser.username,
         targetUsernames,

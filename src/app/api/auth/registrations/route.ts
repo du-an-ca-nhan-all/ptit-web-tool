@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { prisma } from '@/src/lib/prisma';
 import { checkIsAdmin, getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+
+const registrationActionSchema = z.object({
+  action: z.string().optional(),
+  id: z.union([z.number(), z.string()]).nullish(),
+  ids: z.array(z.union([z.number(), z.string()])).optional(),
+  reason: z.string().nullish(),
+}).passthrough();
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -113,7 +122,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Chỉ Quản trị viên mới có quyền duyệt yêu cầu đăng ký' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, registrationActionSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const { action = 'APPROVE', id, ids, reason } = body;
 
     let targetIds: number[] = [];

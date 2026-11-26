@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { getAuthUser } from './auth';
 import {
   handleCreateAnnouncement,
@@ -10,6 +12,18 @@ import {
   handleBulkDeleteAnnouncements,
 } from './manageActions';
 
+const announcementPostSchema = z.object({
+  action: z.string().optional(),
+  id: z.union([z.number(), z.string()]).nullish(),
+  ids: z.array(z.union([z.number(), z.string()])).optional(),
+  title: z.string().nullish(),
+  content: z.string().nullish(),
+  type: z.string().nullish(),
+  priority: z.union([z.number(), z.string()]).nullish(),
+  isActive: z.boolean().nullish(),
+  isPinned: z.boolean().nullish(),
+}).passthrough();
+
 export async function handlePostAnnouncements(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -20,7 +34,9 @@ export async function handlePostAnnouncements(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, announcementPostSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const { action } = body;
 
     // 1. CREATE

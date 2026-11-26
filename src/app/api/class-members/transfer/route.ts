@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { prisma } from '@/src/lib/prisma';
 import { checkIsAdmin, checkIsMonitor } from '@/src/lib/auth';
 import { getAuthUser } from './route/utils';
@@ -7,6 +9,16 @@ import {
   handleReceiveAction,
   handleRestoreAction,
 } from './route/handlers';
+
+const classMemberTransferSchema = z.object({
+  action: z.string().optional(),
+  maSV: z.string().optional(),
+  currentClass: z.string().nullish(),
+  targetClass: z.string().nullish(),
+  type: z.string().nullish(),
+  reason: z.string().nullish(),
+  studentInfo: z.record(z.string(), z.any()).nullish(),
+}).passthrough();
 
 // GET /api/class-members/transfer?classCode=...
 // Fetch excluded/transferred students of a class directly from Student table
@@ -64,7 +76,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, classMemberTransferSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const { action, maSV, currentClass, targetClass, type, reason, studentInfo } = body;
 
     if (!maSV) {

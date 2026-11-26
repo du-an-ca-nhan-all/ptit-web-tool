@@ -6,8 +6,10 @@ interface GoogleAnalyticsProps {
   gaId?: string;
 }
 
+const SAFE_GA_ID_RE = /^(?:G|AW|DC|UA)-[A-Z0-9-]+$/i;
+
 export default function GoogleAnalytics({ gaId = GA_TRACKING_ID }: GoogleAnalyticsProps) {
-  if (!gaId) {
+  if (!gaId || !SAFE_GA_ID_RE.test(gaId)) {
     return null;
   }
 

@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import {
   getOrFetchStudentLmsOverview,
   fetchLmsCourseSections,
   getValidLmsTokenOrRefresh,
 } from '@/src/features/external-portal/server/lmsServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+
+const lmsCoursesPostBodySchema = z
+  .object({
+    action: z.string().nullish(),
+    courseId: z.union([z.string(), z.number()]).nullish(),
+    targetUsername: z.string().nullish(),
+  })
+  .passthrough();
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -82,7 +92,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vui lòng đăng nhập để thực hiện thao tác' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, lmsCoursesPostBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const { action, courseId, targetUsername } = body;
     const effectiveUsername = (authUser.isAdmin && targetUsername) || authUser.username;
 

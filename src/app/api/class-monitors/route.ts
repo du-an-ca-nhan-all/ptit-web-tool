@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { checkIsAdmin, getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { monitorsServerService } from '@/src/features/classes-monitor/server/monitorsServerService';
+
+const classMonitorPostSchema = z.object({
+  action: z.string().optional(),
+  classCode: z.string().optional(),
+  newMonitorMaSV: z.string().nullish(),
+  fromMaSV: z.string().nullish(),
+  reason: z.string().nullish(),
+  monitorMaSV: z.string().nullish(),
+}).passthrough();
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -67,7 +78,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Chỉ Quản trị viên (Admin) mới có quyền chỉ định hoặc chuyển lớp trưởng' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, classMonitorPostSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const { action = 'ASSIGN', classCode, newMonitorMaSV, fromMaSV, reason, monitorMaSV } = body;
 
     if (!classCode || typeof classCode !== 'string' || !classCode.trim()) {

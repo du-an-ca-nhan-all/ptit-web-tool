@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { getStudentSlinkGrades } from '@/src/features/external-portal/server/slinkGradesServerService';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+
+const slinkGradesPostBodySchema = z
+  .object({
+    targetUsername: z.string().nullish(),
+  })
+  .passthrough();
 
 async function getAuthUser(req: NextRequest) {
   let authUser = await getCurrentUserFromCookie();
@@ -77,7 +85,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
+    const parsed = await parseJsonBody(req, slinkGradesPostBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const targetUsername = body.targetUsername?.trim().toUpperCase();
 
     let usernameToQuery = authUser.username.toUpperCase();

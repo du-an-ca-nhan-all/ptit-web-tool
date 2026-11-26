@@ -1,4 +1,5 @@
 import { prisma } from '@/src/lib/prisma';
+import { assertSafeSqlIdentifier } from '@/src/lib/sqlSafety';
 import type { DatabaseStats } from './types';
 import { chunkArray, getTableAliases, sqlVal, toCamelCase } from './utils';
 import { getDatabaseStats, getPublicTables, getTableDependencyOrder } from './postgresMetadata';
@@ -24,8 +25,9 @@ export async function exportDatabaseAsJson(): Promise<{
   const data: Record<string, any[]> = {};
 
   for (const tableName of sortedTables) {
+    const safeTableName = assertSafeSqlIdentifier(tableName, 'table name');
     try {
-      const rows: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "public"."${tableName}";`);
+      const rows: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "public"."${safeTableName}";`);
       const rowData = Array.isArray(rows) ? rows : [];
       data[tableName] = rowData;
 
@@ -77,7 +79,9 @@ export async function exportDatabaseAsSqlDump(): Promise<string> {
 
   // 1. Truncate theo thứ tự đảo ngược ràng buộc (con trước, cha sau)
   const cleanTables = [...sortedTables].reverse();
-  const truncateList = cleanTables.map((t) => `"public"."${t}"`).join(', ');
+  const truncateList = cleanTables
+    .map((t) => `"public"."${assertSafeSqlIdentifier(t, 'table name')}"`)
+    .join(', ');
   if (truncateList) {
     lines.push('-- 1. Clean existing records in cascade');
     lines.push(`TRUNCATE TABLE ${truncateList} CASCADE;`);
@@ -86,15 +90,16 @@ export async function exportDatabaseAsSqlDump(): Promise<string> {
 
   // 2. Nạp dữ liệu từng bảng động theo thứ tự cha trước con sau
   for (const tableName of sortedTables) {
+    const safeTableName = assertSafeSqlIdentifier(tableName, 'table name');
     try {
-      const rows: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "public"."${tableName}";`);
+      const rows: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "public"."${safeTableName}";`);
       if (!Array.isArray(rows) || rows.length === 0) {
         continue;
       }
 
-      lines.push(`-- Table: "${tableName}" (${rows.length} rows)`);
+      lines.push(`-- Table: "${safeTableName}" (${rows.length} rows)`);
       const columns = Object.keys(rows[0]);
-      const quotedCols = columns.map((c) => `"${c}"`).join(', ');
+      const quotedCols = columns.map((c) => `"${assertSafeSqlIdentifier(c, 'column name')}"`).join(', ');
 
       // Nhóm theo chunk 100 dòng cho mỗi câu lệnh INSERT để file gọn và tốc độ nạp nhanh
       const rowChunks = chunkArray(rows, 100);
@@ -103,7 +108,7 @@ export async function exportDatabaseAsSqlDump(): Promise<string> {
           const vals = columns.map((col) => sqlVal(r[col]));
           return `(${vals.join(', ')})`;
         });
-        lines.push(`INSERT INTO "public"."${tableName}" (${quotedCols}) VALUES`);
+        lines.push(`INSERT INTO "public"."${safeTableName}" (${quotedCols}) VALUES`);
         lines.push(`  ${valuesList.join(',\n  ')};`);
       }
       lines.push('');
@@ -130,7 +135,9 @@ export async function exportDatabaseAsSqlDump(): Promise<string> {
     if (Array.isArray(seqCols)) {
       for (const { table_name, column_name, seq_name } of seqCols) {
         if (seq_name) {
-          lines.push(`SELECT setval('${seq_name}', coalesce(max("${column_name}"), 1), max("${column_name}") IS NOT NULL) FROM "public"."${table_name}";`);
+          const safeTable = assertSafeSqlIdentifier(table_name, 'table name');
+          const safeCol = assertSafeSqlIdentifier(column_name, 'column name');
+          lines.push(`SELECT setval('${seq_name}', coalesce(max("${safeCol}"), 1), max("${safeCol}") IS NOT NULL) FROM "public"."${safeTable}";`);
         }
       }
     }

@@ -3,6 +3,7 @@
 import React from 'react';
 import { BookOpen, CheckCircle2, Clock } from 'lucide-react';
 import { CourseRegistrationHookResult, CourseRegistrationSubTab } from './types';
+import { sanitizeHtml } from '@/src/lib/htmlSanitizer';
 
 interface RegisteredCoursesTabProps {
   registeredCourses: CourseRegistrationHookResult['registeredCourses'];
@@ -107,7 +108,7 @@ export function RegisteredCoursesTab({
                         {toHoc.tkb ? (
                           <div
                             className="text-[11px] text-slate-600 leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: toHoc.tkb }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(toHoc.tkb) }}
                           />
                         ) : (
                           <span className="text-slate-400 italic">Chưa xếp lịch</span>

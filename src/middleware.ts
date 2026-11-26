@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify } from 'jose/jwt/verify';
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'ptit-secret-key-exam-portal-secure-token-2026'
-);
+import { getJwtSecret } from './lib/jwtSecret';
 
 // Public API endpoints that do not require authentication
 const PUBLIC_API_PREFIXES = [
@@ -58,7 +55,7 @@ export async function middleware(request: NextRequest) {
       }
 
       try {
-        await jwtVerify(token, JWT_SECRET);
+        await jwtVerify(token, getJwtSecret());
       } catch (err) {
         return NextResponse.json(
           {

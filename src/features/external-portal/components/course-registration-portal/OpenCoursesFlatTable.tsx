@@ -4,6 +4,7 @@ import React from 'react';
 import { Flame, Lock } from 'lucide-react';
 import { MonitorFlowConfigInfo } from '../../hooks/useCourseRegistration';
 import { CourseRegistrationHookResult, CourseRegistrationSubTab } from './types';
+import { sanitizeHtml } from '@/src/lib/htmlSanitizer';
 
 interface OpenCoursesFlatTableProps {
   flatFilteredGroups: any[];
@@ -80,7 +81,7 @@ export function OpenCoursesFlatTable({
                     {group.tkb ? (
                       <div
                         className="text-[11px] text-slate-600 line-clamp-2"
-                        dangerouslySetInnerHTML={{ __html: group.tkb }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(group.tkb) }}
                       />
                     ) : (
                       <span className="text-slate-400 italic">Chưa có TKB</span>

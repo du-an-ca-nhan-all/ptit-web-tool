@@ -1,4 +1,5 @@
 import { prisma } from '@/src/lib/prisma';
+import { assertSafeSqlIdentifier } from '@/src/lib/sqlSafety';
 import type { DatabaseStats } from './types';
 import { chunkArray, getTableAliases } from './utils';
 import { getDatabaseStats, getPublicTables, getTableDependencyOrder, syncPostgresSequences } from './postgresMetadata';
@@ -75,8 +76,9 @@ export async function restoreFromJsonDump(
   // 4. Xóa sạch dữ liệu cũ theo thứ tự con trước, cha sau
   const reverseSorted = [...sortedTables].reverse();
   for (const tableName of reverseSorted) {
+    const safeTableName = assertSafeSqlIdentifier(tableName, 'table name');
     try {
-      await prisma.$executeRawUnsafe(`DELETE FROM "public"."${tableName}";`);
+      await prisma.$executeRawUnsafe(`DELETE FROM "public"."${safeTableName}";`);
     } catch (delErr: any) {
       console.warn(`[Restore Warning] Không thể xoá bảng "${tableName}":`, delErr.message);
     }
@@ -89,6 +91,8 @@ export async function restoreFromJsonDump(
     const rows = tableRowsMap.get(tableName);
     if (!rows || rows.length === 0) continue;
 
+    const safeTableName = assertSafeSqlIdentifier(tableName, 'table name');
+
     // Tìm tất cả các cột xuất hiện trong tập dữ liệu của bảng
     const columnSet = new Set<string>();
     for (const r of rows) {
@@ -100,7 +104,7 @@ export async function restoreFromJsonDump(
     const columns = Array.from(columnSet);
     if (columns.length === 0) continue;
 
-    const quotedCols = columns.map((c) => `"${c}"`).join(', ');
+    const quotedCols = columns.map((c) => `"${assertSafeSqlIdentifier(c, 'column name')}"`).join(', ');
 
     // Giới hạn số tham số dưới 30,000 để tránh tràn giới hạn 65,535 của PostgreSQL
     const maxParams = 30000;
@@ -125,7 +129,7 @@ export async function restoreFromJsonDump(
         placeholders.push(`(${rowPlaceholders.join(', ')})`);
       }
 
-      const insertSql = `INSERT INTO "public"."${tableName}" (${quotedCols}) VALUES ${placeholders.join(', ')};`;
+      const insertSql = `INSERT INTO "public"."${safeTableName}" (${quotedCols}) VALUES ${placeholders.join(', ')};`;
       await prisma.$executeRawUnsafe(insertSql, ...flatValues);
     }
 
@@ -134,7 +138,9 @@ export async function restoreFromJsonDump(
 
   // Bật lại ràng buộc triggers / foreign keys
   if (replicaRoleSet) {
-    await prisma.$executeRawUnsafe(`SET session_replication_role = 'origin';`).catch(() => {});
+    await prisma.$executeRawUnsafe(`SET session_replication_role = 'origin';`).catch((err) => {
+      console.warn('[restoreJson] Failed to restore session_replication_role to origin:', err);
+    });
   }
 
   // 6. Tự động đồng bộ toàn bộ sequences ID trên PostgreSQL

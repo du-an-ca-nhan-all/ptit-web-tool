@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import {
   checkFlowLockForAction,
   findQldttxExternalAccount,
@@ -10,6 +12,19 @@ import {
   handleRegisterCourseAction,
 } from './postActions';
 
+const stringOrNumberSchema = z.union([z.string(), z.number()]);
+
+const courseRegisterPostBodySchema = z
+  .object({
+    action: z.string().nullish().transform((v) => v ?? undefined),
+    id_to_hoc: stringOrNumberSchema.nullish(),
+    id_rs: stringOrNumberSchema.nullish(),
+    sv_nganh: stringOrNumberSchema.nullish().transform((v) => v ?? undefined),
+    targetUsername: z.string().nullish(),
+    targetKeys: z.array(stringOrNumberSchema).nullish(),
+  })
+  .passthrough();
+
 export async function handlePostCourseRegister(req: NextRequest) {
   try {
     const authUser = await getAuthUser(req);
@@ -17,7 +32,9 @@ export async function handlePostCourseRegister(req: NextRequest) {
       return NextResponse.json({ error: 'Vui lòng đăng nhập để thực hiện thao tác' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, courseRegisterPostBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const {
       action = 'REGISTER', // 'REGISTER' | 'CANCEL' | 'CHECK_SLOTS'
       id_to_hoc,

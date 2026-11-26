@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { assertSafeSqlIdentifier } from '../../src/lib/sqlSafety';
 
 /**
  * 1. Lấy danh sách toàn bộ các bảng trong public schema
@@ -20,8 +21,9 @@ export async function getPublicTables(prismaClient: PrismaClient): Promise<strin
 export async function getTableRecordCounts(prismaClient: PrismaClient, tables: string[]): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   for (const table of tables) {
+    const safeTable = assertSafeSqlIdentifier(table, 'table name');
     try {
-      const res: any = await prismaClient.$queryRawUnsafe(`SELECT COUNT(*)::bigint AS count FROM "public"."${table}";`);
+      const res: any = await prismaClient.$queryRawUnsafe(`SELECT COUNT(*)::bigint AS count FROM "public"."${safeTable}";`);
       counts.set(table, Number(res[0]?.count || 0));
     } catch {
       counts.set(table, 0);

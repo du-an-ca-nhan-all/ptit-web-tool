@@ -1,5 +1,6 @@
 import React from 'react';
 import { BookOpen, Clock, Calendar, X, Video, Phone } from 'lucide-react';
+import { sanitizeHtml } from '@/src/lib/htmlSanitizer';
 
 interface CourseDetailModalProps {
   course: any | null;
@@ -118,7 +119,7 @@ export default function CourseDetailModal({ course, onClose }: CourseDetailModal
               <div
                 className="text-slate-700 leading-relaxed font-sans text-xs"
                 dangerouslySetInnerHTML={{
-                  __html: course.to_hoc?.tkb || course.tkb,
+                  __html: sanitizeHtml(course.to_hoc?.tkb || course.tkb),
                 }}
               />
             </div>

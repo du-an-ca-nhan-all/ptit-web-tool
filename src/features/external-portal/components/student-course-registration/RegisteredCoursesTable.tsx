@@ -8,6 +8,7 @@ import {
   X,
   Video,
 } from 'lucide-react';
+import { sanitizeHtml } from '@/src/lib/htmlSanitizer';
 
 interface RegisteredCoursesTableProps {
   courses: any[];
@@ -166,7 +167,7 @@ export default function RegisteredCoursesTable({
                       {tkb ? (
                         <div
                           className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed"
-                          dangerouslySetInnerHTML={{ __html: tkb }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(tkb) }}
                         />
                       ) : (
                         <span className="text-slate-400 italic text-[11px]">Chưa xếp TKB</span>

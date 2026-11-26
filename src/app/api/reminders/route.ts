@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getCurrentUserFromCookie } from '@/src/lib/auth';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import {
   createReminder,
   getRemindersForUser,
@@ -7,6 +9,27 @@ import {
 } from '@/src/features/reminders';
 
 export const dynamic = 'force-dynamic';
+
+const optionalString = z.string().nullish().transform((v) => v ?? undefined);
+
+const createReminderBodySchema = z
+  .object({
+    title: optionalString,
+    description: optionalString,
+    location: optionalString,
+    type: z.enum(['PERSONAL', 'COURSE', 'CLASS']).nullish().transform((v) => v ?? undefined),
+    idToHoc: optionalString,
+    idMon: optionalString,
+    maMon: optionalString,
+    tenMon: optionalString,
+    nhomTo: optionalString,
+    lop: optionalString,
+    tkbRaw: optionalString,
+    giangVien: optionalString,
+    eventTime: optionalString,
+    offsetMinutesList: z.array(z.number()).nullish(),
+  })
+  .passthrough();
 
 export async function GET(req: NextRequest) {
   try {
@@ -47,7 +70,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Chưa đăng nhập' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, createReminderBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     if (!body.title || !body.title.trim()) {
       return NextResponse.json(
         { success: false, error: 'Vui lòng nhập tiêu đề nhắc hẹn' },

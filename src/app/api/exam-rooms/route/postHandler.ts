@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/src/lib/prisma';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
 import { getAuthUser, verifyIsMonitorOrAdmin } from './auth';
+
+const postExamRoomBodySchema = z
+  .object({
+    roomKey: z.string().nullish(),
+    mapThi: z.string().nullish(),
+    maMH: z.string().nullish(),
+    tenMH: z.string().nullish(),
+    ngayThi: z.string().nullish(),
+    gioThi: z.string().nullish(),
+    maHTThi: z.string().nullish(),
+    batchCode: z.string().nullish(),
+    customPrice: z.union([z.number(), z.string()]).nullish(),
+    note: z.string().nullish(),
+  })
+  .passthrough();
 
 // POST /api/exam-rooms
 // Thêm mới hoặc cập nhật mức giá phòng thi tùy chỉnh (Upsert theo roomKey)
@@ -12,7 +29,9 @@ export async function handlePostExamRoom(req: NextRequest) {
     if (!verifyIsMonitorOrAdmin(authUser)) {
       return NextResponse.json({ error: 'Chỉ Lớp Trưởng hoặc Quản trị viên mới có quyền cấu hình tiền phòng' }, { status: 403 });
     }
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, postExamRoomBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
 
     const {
       roomKey,

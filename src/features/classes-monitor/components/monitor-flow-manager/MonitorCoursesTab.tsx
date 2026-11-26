@@ -5,6 +5,7 @@ import { BookOpen, Calendar, Clock, DollarSign, RefreshCw, Sparkles, Zap } from 
 import { CourseItem, MonitorProfileData } from '../../server/monitorFlowServerService';
 import { ExecuteFlowFn } from './types';
 import { MonitorCoursesMobileList } from './MonitorCoursesMobileList';
+import { sanitizeHtml } from '@/src/lib/htmlSanitizer';
 
 interface MonitorCoursesTabProps {
   monitorData: MonitorProfileData | null;
@@ -173,7 +174,7 @@ export function MonitorCoursesTab({
                       {course.tkb ? (
                         <div
                           className="text-[11px] text-slate-600 leading-relaxed"
-                          dangerouslySetInnerHTML={{ __html: course.tkb }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(course.tkb) }}
                         />
                       ) : (
                         <span className="text-slate-400 italic">Chưa xếp lịch</span>

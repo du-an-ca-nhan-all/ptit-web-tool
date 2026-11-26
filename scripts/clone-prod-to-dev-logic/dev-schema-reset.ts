@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { PrismaClient } from '@prisma/client';
+import { assertSafeSqlIdentifier } from '../../src/lib/sqlSafety';
 import { getPublicTables } from './schema-introspection';
 
 /**
@@ -24,7 +25,8 @@ export async function dropAllDevTables(devPrisma: PrismaClient) {
     `);
     if (Array.isArray(tables) && tables.length > 0) {
       for (const { tablename } of tables) {
-        await devPrisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "public"."${tablename}" CASCADE;`);
+        const safeTable = assertSafeSqlIdentifier(tablename, 'table name');
+        await devPrisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "public"."${safeTable}" CASCADE;`);
       }
     }
 
@@ -36,7 +38,8 @@ export async function dropAllDevTables(devPrisma: PrismaClient) {
     `);
     if (Array.isArray(types) && types.length > 0) {
       for (const { typname } of types) {
-        await devPrisma.$executeRawUnsafe(`DROP TYPE IF EXISTS "public"."${typname}" CASCADE;`);
+        const safeType = assertSafeSqlIdentifier(typname, 'type name');
+        await devPrisma.$executeRawUnsafe(`DROP TYPE IF EXISTS "public"."${safeType}" CASCADE;`);
       }
     }
   }
@@ -99,18 +102,20 @@ export async function ensureMissingTablesCreated(prodPrisma: PrismaClient, devPr
         `, table);
 
         if (Array.isArray(columns) && columns.length > 0) {
+          const safeTable = assertSafeSqlIdentifier(table, 'table name');
           const colDefs = columns.map((c: any) => {
+            const safeColumn = assertSafeSqlIdentifier(c.column_name, 'column name');
             let typeStr = c.udt_name || c.data_type;
             if (typeStr === 'varchar') typeStr = 'text';
             if (typeStr === 'int4') typeStr = 'integer';
             if (typeStr === 'int8') typeStr = 'bigint';
             if (typeStr === 'bool') typeStr = 'boolean';
             const nullStr = c.is_nullable === 'NO' ? ' NOT NULL' : '';
-            return `"${c.column_name}" ${typeStr}${nullStr}`;
+            return `"${safeColumn}" ${typeStr}${nullStr}`;
           });
 
           await devPrisma.$executeRawUnsafe(`
-            CREATE TABLE IF NOT EXISTS "public"."${table}" (
+            CREATE TABLE IF NOT EXISTS "public"."${safeTable}" (
               ${colDefs.join(',\n')}
             );
           `);
@@ -142,12 +147,14 @@ export async function syncAllDevSequences(devPrisma: PrismaClient): Promise<numb
   if (Array.isArray(seqCols)) {
     for (const { table_name, column_name, seq_name } of seqCols) {
       if (!seq_name) continue;
+      const safeTable = assertSafeSqlIdentifier(table_name, 'table name');
+      const safeColumn = assertSafeSqlIdentifier(column_name, 'column name');
       try {
         await devPrisma.$executeRawUnsafe(`
           SELECT setval(
             $1, 
-            COALESCE((SELECT MAX("${column_name}") FROM "public"."${table_name}"), 1), 
-            (SELECT MAX("${column_name}") IS NOT NULL FROM "public"."${table_name}")
+            COALESCE((SELECT MAX("${safeColumn}") FROM "public"."${safeTable}"), 1), 
+            (SELECT MAX("${safeColumn}") IS NOT NULL FROM "public"."${safeTable}")
           );
         `, seq_name);
         count++;

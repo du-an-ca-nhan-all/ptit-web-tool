@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { dispatchDatabaseExportOrBackup } from '@/src/features/telegram/server/telegramDispatcher';
 import {
@@ -50,12 +52,22 @@ export async function handleCreateSnapshot(
   });
 }
 
+const deleteBackupSchema = z.object({
+  filename: z.string().nullish(),
+}).passthrough();
+
 export async function handleDeleteBackup(
   req: NextRequest,
   authUser: BackupAuthUser
 ): Promise<NextResponse> {
-  const body = await req.json().catch(() => ({}));
-  const filename = body.filename || new URL(req.url).searchParams.get('filename');
+  const queryFilename = new URL(req.url).searchParams.get('filename');
+  let body: z.infer<typeof deleteBackupSchema> = {};
+  if (req.headers.get('content-type')?.includes('application/json') || !queryFilename) {
+    const parsed = await parseJsonBody(req, deleteBackupSchema);
+    if (!parsed.ok) return parsed.response;
+    body = parsed.data;
+  }
+  const filename = body.filename || queryFilename;
 
   if (!filename) {
     return NextResponse.json({ error: 'Vui lòng cung cấp tên file cần xoá' }, { status: 400 });

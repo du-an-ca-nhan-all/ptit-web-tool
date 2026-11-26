@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { parseJsonBody } from '@/src/lib/requestValidation';
 import { getAuthUser } from './route/helpers';
 import { handleGetTelegramConfig } from './route/getHandler';
 import { handleAdminBotAction } from './route/adminBotActions';
@@ -6,6 +8,13 @@ import { handleAdminQueueAction } from './route/adminQueueActions';
 import { handleUserConfigAction } from './route/userConfigActions';
 import { handleUserCheckAction } from './route/userCheckActions';
 import { handleUserChatAction } from './route/userChatActions';
+
+const telegramConfigPostBodySchema = z
+  .object({
+    action: z.string().nullish(),
+    targetUsername: z.string().nullish(),
+  })
+  .passthrough();
 
 // GET /api/telegram-config?view=all OR /api/telegram-config?targetUsername=K25...
 export async function GET(req: NextRequest) {
@@ -20,7 +29,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vui lòng đăng nhập để thực hiện' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const parsed = await parseJsonBody(req, telegramConfigPostBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const { action, targetUsername } = body;
 
     // Target username check: Normal users can only configure their own account, admin can configure anyone
