@@ -53,7 +53,9 @@ export function useHomeAuthActions({
             metadata: { previousRole: activeRole, newRole },
           }),
         }).catch(() => {});
-      } catch {}
+      } catch (caughtError) {
+        console.warn(`[useHomeAuthActions] Non-fatal error:`, caughtError);
+      }
 
       if (newRole === 'sinh_vien') {
         if (MONITOR_AND_ADMIN_TABS.includes(activeTab)) {
@@ -146,7 +148,9 @@ export function useHomeAuthActions({
   const handleLogout = useCallback(async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[useHomeAuthActions] Non-fatal error:`, caughtError);
+    }
     localStorage.removeItem('currentUser');
     localStorage.removeItem('auth_token');
     setCurrentUser(null);

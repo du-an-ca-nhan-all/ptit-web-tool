@@ -137,8 +137,13 @@ export async function runPendingReminderAlerts(): Promise<RunPendingAlertsResult
           reminderOffsetLabel,
         });
 
-        const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
-          threadId: sub.threadId ? Number(sub.threadId) : undefined,
+        const sendRes = await sendTelegramMessage({
+          botToken: effectiveToken,
+          chatId: sub.chatId,
+          text: messageHtml,
+          options: {
+            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          },
         });
 
         if (sendRes.success) {

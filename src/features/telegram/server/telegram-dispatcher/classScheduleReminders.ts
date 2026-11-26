@@ -97,8 +97,13 @@ export async function runClassScheduleReminders(options: {
             nowVN,
           });
 
-          const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, morningMessage, {
-            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          const sendRes = await sendTelegramMessage({
+            botToken: effectiveToken,
+            chatId: sub.chatId,
+            text: morningMessage,
+            options: {
+              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            },
           });
 
           if (sendRes.success) {
@@ -163,8 +168,13 @@ export async function runClassScheduleReminders(options: {
 
           if (!log60 || options.forcePreClassAlert) {
             const preMessage60 = buildPreClass60Message({ studentName, username: sub.username, ses });
-            const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, preMessage60, {
-              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            const sendRes = await sendTelegramMessage({
+              botToken: effectiveToken,
+              chatId: sub.chatId,
+              text: preMessage60,
+              options: {
+                threadId: sub.threadId ? Number(sub.threadId) : undefined,
+              },
             });
 
             if (sendRes.success) {
@@ -212,8 +222,13 @@ export async function runClassScheduleReminders(options: {
 
           if (!log30 || options.forcePreClassAlert) {
             const preMessage30 = buildPreClass30Message({ studentName, username: sub.username, ses });
-            const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, preMessage30, {
-              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            const sendRes = await sendTelegramMessage({
+              botToken: effectiveToken,
+              chatId: sub.chatId,
+              text: preMessage30,
+              options: {
+                threadId: sub.threadId ? Number(sub.threadId) : undefined,
+              },
             });
 
             if (sendRes.success) {

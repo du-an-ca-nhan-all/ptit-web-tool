@@ -101,6 +101,6 @@ export async function incrementAnnouncementViews(ids: number[]): Promise<void> {
       },
     });
   } catch (err) {
-    // Ignore view count increment errors
+    console.warn(`[announcementsMutationService] Non-fatal error:`, err);
   }
 }

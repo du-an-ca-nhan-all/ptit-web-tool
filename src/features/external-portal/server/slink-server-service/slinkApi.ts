@@ -27,19 +27,20 @@ export async function getSlinkUserInfo(accessToken: string): Promise<SlinkUserIn
   return (await res.json()) as SlinkUserInfo;
 }
 
+export interface GetSlinkNotificationsParams {
+  accessToken: string;
+  page?: number;
+  limit?: number;
+  unreadOnly?: boolean;
+}
+
 /**
  * Lấy danh sách thông báo của người dùng từ PTIT S-Link
- * @param accessToken - Bearer token hoặc raw access token
- * @param page - Trang cần lấy (mặc định 1)
- * @param limit - Số lượng mỗi trang (mặc định 20)
- * @param unreadOnly - Chỉ lấy thông báo chưa đọc
  */
 export async function getSlinkNotifications(
-  accessToken: string,
-  page: number = 1,
-  limit: number = 20,
-  unreadOnly: boolean = false
+  params: GetSlinkNotificationsParams
 ): Promise<SlinkNotificationResponse> {
+  const { accessToken, page = 1, limit = 20, unreadOnly = false } = params;
   const rawToken = accessToken.replace(/^Bearer\s+/i, '').trim();
   const url = `${SLINK_NOTIFICATION_API_URL}?page=${page}&limit=${limit}`;
 

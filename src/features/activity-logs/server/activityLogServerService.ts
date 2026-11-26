@@ -55,8 +55,8 @@ export const activityLogService = {
             username = auth.username;
             userRole = auth.role;
           }
-        } catch {
-          // Ignore auth extraction error in logger
+        } catch (caughtError) {
+          console.warn(`[activityLogServerService] Non-fatal error:`, caughtError);
         }
       }
 

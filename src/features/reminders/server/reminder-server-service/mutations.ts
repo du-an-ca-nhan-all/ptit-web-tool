@@ -11,15 +11,22 @@ import {
   normalizeUsername,
 } from './utils';
 
+export interface UpdateReminderParams {
+  id: number;
+  username: string;
+  input: Partial<CreateReminderInput>;
+  isAdmin?: boolean;
+}
+
 /**
  * Chỉnh sửa một lịch nhắc hẹn
  */
-export async function updateReminder(
-  id: number,
-  username: string,
-  input: Partial<CreateReminderInput>,
-  isAdmin = false
-): Promise<ReminderItemDto> {
+export async function updateReminder({
+  id,
+  username,
+  input,
+  isAdmin = false,
+}: UpdateReminderParams): Promise<ReminderItemDto> {
   const cleanUsername = normalizeUsername(username);
 
   const existing = await prisma.reminderItem.findUnique({

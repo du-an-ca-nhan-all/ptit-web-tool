@@ -3,13 +3,21 @@ import { recordHistory } from './state';
 import { TelegramQueueInternalState, TelegramQueueItem } from './types';
 import { buildTextPreview, insertItemByPriority } from './utils';
 
-export function handleSendException(
-  state: TelegramQueueInternalState,
-  item: TelegramQueueItem,
-  err: any,
-  durationMs: number,
-  completedAt: string
-) {
+export interface HandleSendExceptionParams {
+  state: TelegramQueueInternalState;
+  item: TelegramQueueItem;
+  err: any;
+  durationMs: number;
+  completedAt: string;
+}
+
+export function handleSendException({
+  state,
+  item,
+  err,
+  durationMs,
+  completedAt,
+}: HandleSendExceptionParams) {
   const isErr429 =
     err?.status === 429 ||
     (typeof err?.message === 'string' &&

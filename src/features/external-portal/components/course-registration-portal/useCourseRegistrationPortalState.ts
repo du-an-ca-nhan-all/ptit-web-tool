@@ -42,24 +42,24 @@ export function useCourseRegistrationPortalState(currentUser: LoginUser) {
   // Group open course groups by Subject
   const groupedOpenCourses = useMemo(
     () =>
-      groupAndFilterOpenCourses(
-        registration.openCourses.ds_nhom_to,
+      groupAndFilterOpenCourses({
+        dsNhomTo: registration.openCourses.ds_nhom_to,
         searchQuery,
         statusFilter,
-        registeredSubjectCodeMap
-      ),
+        registeredSubjectCodeMap,
+      }),
     [registration.openCourses.ds_nhom_to, searchQuery, statusFilter, registeredSubjectCodeMap]
   );
 
   // Flat list for Flat View
   const flatFilteredGroups = useMemo(
     () =>
-      filterFlatOpenCourses(
-        registration.openCourses.ds_nhom_to,
+      filterFlatOpenCourses({
+        dsNhomTo: registration.openCourses.ds_nhom_to,
         searchQuery,
         statusFilter,
-        registeredSubjectCodeMap
-      ),
+        registeredSubjectCodeMap,
+      }),
     [registration.openCourses.ds_nhom_to, searchQuery, statusFilter, registeredSubjectCodeMap]
   );
 

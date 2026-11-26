@@ -101,13 +101,13 @@ export function useExternalAccounts({
     const targetPass = form.password ? form.password.trim() : '';
     const targetRefreshToken = form.refreshToken ? form.refreshToken.trim() : '';
 
-    const validationError = validateTestExternalAccount(
+    const validationError = validateTestExternalAccount({
       sys,
       targetUser,
       targetPass,
       targetRefreshToken,
-      isSlink
-    );
+      isSlink,
+    });
     if (validationError) {
       setErrorMsg(validationError);
       return;
@@ -128,7 +128,13 @@ export function useExternalAccounts({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
-          buildTestExternalAccountPayload(sys, targetUser, targetPass, targetRefreshToken, isSlink)
+          buildTestExternalAccountPayload({
+            sys,
+            targetUser,
+            targetPass,
+            targetRefreshToken,
+            isSlink,
+          })
         ),
       });
 

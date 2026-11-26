@@ -48,7 +48,9 @@ export async function handlePostEnvelopeAssignment(req: NextRequest) {
       if (student?.hoTen) {
         claimedByName = student.hoTen;
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[postHandler] Non-fatal error:`, caughtError);
+    }
 
     // Resolve assistant student name if assistantStudentId provided
     let finalAssistantName = assistantStudentName ? String(assistantStudentName).trim() : null;
@@ -63,7 +65,9 @@ export async function handlePostEnvelopeAssignment(req: NextRequest) {
         if (asstStudent?.hoTen) {
           finalAssistantName = asstStudent.hoTen;
         }
-      } catch {}
+      } catch (caughtError) {
+        console.warn(`[postHandler] Non-fatal error:`, caughtError);
+      }
     }
 
     // Process customPrice

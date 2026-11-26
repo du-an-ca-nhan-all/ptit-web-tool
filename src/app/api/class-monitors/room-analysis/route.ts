@@ -88,7 +88,13 @@ export async function GET(req: NextRequest) {
     const reviewNoteMap = new Map(reviewRegs.map((r) => [normalizeCode(r.maSV), r.note || '']));
 
     const formatRecord = (r: (typeof classExamRecords)[number]) =>
-      formatExamRecord(r, classCode, reviewSet, reviewNoteMap, roomTotalMap);
+      formatExamRecord({
+        record: r,
+        classCode,
+        reviewSet,
+        reviewNoteMap,
+        roomTotalMap,
+      });
 
     const records = classExamRecords.map(formatRecord);
     const referenceRecords = refExamRecordsRaw.map(formatRecord);

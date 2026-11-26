@@ -11,6 +11,8 @@ export type {
   StudentScope,
 } from './room-analysis-types/types';
 
+export type { BuildRoomKeyParams } from './room-analysis-types/utils';
+
 export {
   buildRoomKey,
   compareExamDateTime,

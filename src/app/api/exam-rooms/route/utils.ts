@@ -15,7 +15,9 @@ export function parseGlobalPricing(rawValue?: string | null): PricingConfig {
             ? parsed.englishOralRoom
             : DEFAULT_PRICING_CONFIG.englishOralRoom,
       };
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[utils] Non-fatal error:`, caughtError);
+    }
   }
   return globalPricing;
 }

@@ -51,7 +51,7 @@ export async function registerCourseGroupQLDTTX(
     },
   };
 
-  const { parsed, accumulatedToken } = await postQldttxEndpoint(endpoint, body, account, tokenState);
+  const { parsed, accumulatedToken } = await postQldttxEndpoint({ endpoint, body, account, tokenState });
 
   const resData = parsed?.data || {};
   const isThanhCong = Boolean(
@@ -90,7 +90,7 @@ export async function cancelCourseGroupQLDTTX(
     },
   };
 
-  const { parsed, accumulatedToken } = await postQldttxEndpoint(endpoint, body, account, tokenState);
+  const { parsed, accumulatedToken } = await postQldttxEndpoint({ endpoint, body, account, tokenState });
 
   const resData = parsed?.data || {};
   const thongBaoLoi = resData?.thong_bao_loi || parsed?.message || '';

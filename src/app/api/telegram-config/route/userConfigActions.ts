@@ -14,12 +14,19 @@ import {
   resolveEffectiveTokenOrResponse,
 } from './helpers';
 
-export async function handleUserConfigAction(
-  req: NextRequest,
-  username: string,
-  action: string,
-  body: any
-): Promise<NextResponse | null> {
+export interface UserConfigActionParams {
+  req: NextRequest;
+  username: string;
+  action: string;
+  body: any;
+}
+
+export async function handleUserConfigAction({
+  req,
+  username,
+  action,
+  body,
+}: UserConfigActionParams): Promise<NextResponse | null> {
   // 1. ACTION: SEND TEST NOTIFICATION
   if (action === 'TEST') {
     const customToken = body.botToken?.trim() || null;
@@ -37,10 +44,15 @@ export async function handleUserConfigAction(
       where: { maSV: username },
     });
 
-    const testResult = await sendTestNotification(tokenRes.token, chatId, threadId, {
-      username,
-      fullName: student?.hoTen || username,
-      maLop: student?.maLop,
+    const testResult = await sendTestNotification({
+      botToken: tokenRes.token,
+      chatId,
+      threadId,
+      userInfo: {
+        username,
+        fullName: student?.hoTen || username,
+        maLop: student?.maLop,
+      },
     });
 
     // Update test status in user's TelegramConfig

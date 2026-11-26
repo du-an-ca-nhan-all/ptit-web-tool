@@ -33,13 +33,21 @@ export function mergeStudentsWithEdits(
   });
 }
 
-export function buildUpdatedFollowerConfig(
-  prev: Record<string, EditedFollowerConfig>,
-  students: FollowerStudentItem[],
-  username: string,
-  field: FollowerConfigField,
-  value: any
-): Record<string, EditedFollowerConfig> {
+export interface BuildUpdatedFollowerConfigParams {
+  prev: Record<string, EditedFollowerConfig>;
+  students: FollowerStudentItem[];
+  username: string;
+  field: FollowerConfigField;
+  value: any;
+}
+
+export function buildUpdatedFollowerConfig({
+  prev,
+  students,
+  username,
+  field,
+  value,
+}: BuildUpdatedFollowerConfigParams): Record<string, EditedFollowerConfig> {
   const existingStudent = students.find((s) => s.maSV === username);
   const current = prev[username] || {
     isEnabled: existingStudent?.isEnabled ?? false,
@@ -74,12 +82,19 @@ export function buildAllFollowersStatusEdits(
   return newEdits;
 }
 
-export function buildAllPermissionsEdits(
-  prev: Record<string, EditedFollowerConfig>,
-  students: FollowerStudentItem[],
-  field: FollowerPermissionField,
-  value: boolean
-): Record<string, EditedFollowerConfig> {
+export interface BuildAllPermissionsEditsParams {
+  prev: Record<string, EditedFollowerConfig>;
+  students: FollowerStudentItem[];
+  field: FollowerPermissionField;
+  value: boolean;
+}
+
+export function buildAllPermissionsEdits({
+  prev,
+  students,
+  field,
+  value,
+}: BuildAllPermissionsEditsParams): Record<string, EditedFollowerConfig> {
   const updated = { ...prev };
   students.forEach((st) => {
     const curr = updated[st.maSV] || {

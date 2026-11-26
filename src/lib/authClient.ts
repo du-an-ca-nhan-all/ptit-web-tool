@@ -35,7 +35,9 @@ export function clearStoredAuth(): void {
   try {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('currentUser');
-  } catch {}
+  } catch (caughtError) {
+    console.warn(`[authClient] Non-fatal error:`, caughtError);
+  }
 }
 
 /**

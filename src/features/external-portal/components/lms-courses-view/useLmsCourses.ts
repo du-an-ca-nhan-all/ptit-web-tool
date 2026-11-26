@@ -96,7 +96,14 @@ export function useLmsCourses() {
 
   // Filtered & Sorted courses
   const filteredCourses = useMemo(
-    () => filterAndSortCourses(data?.courses, searchQuery, statusFilter, selectedSemester, sortBy),
+    () =>
+      filterAndSortCourses({
+        courses: data?.courses,
+        searchQuery,
+        statusFilter,
+        selectedSemester,
+        sortBy,
+      }),
     [data?.courses, searchQuery, statusFilter, selectedSemester, sortBy]
   );
 

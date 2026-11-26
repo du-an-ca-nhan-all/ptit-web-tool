@@ -27,25 +27,35 @@ export async function findCachedTimetableRecord(cleanUsername: string): Promise<
   }
 }
 
+export interface TryBuildFromCachedRecordParams {
+  cleanUsername: string;
+  cachedRecord: any;
+  currentSemester: number;
+  lastPulled: any;
+  mode: 'cache' | 'fallback';
+}
+
 export function tryBuildFromCachedRecord(
-  cleanUsername: string,
-  cachedRecord: any,
-  currentSemester: number,
-  lastPulled: any,
-  mode: 'cache' | 'fallback'
+  params: TryBuildFromCachedRecordParams
 ): StudentTimetableCalendarResult | null {
+  const { cleanUsername, cachedRecord, currentSemester, lastPulled, mode } = params;
   try {
     const parsed = JSON.parse(cachedRecord.rawData);
     const rawList = extractRawListFromCachedRecord(parsed);
 
     if (Array.isArray(rawList) && rawList.length > 0) {
       const semId = cachedRecord.semesterId || parsed.currentSemester || currentSemester;
-      return buildTimetableResultFromRawData(cleanUsername, rawList, semId, {
-        isConfigured: true,
-        isLiveSync: false,
-        isCachedDb: true,
-        lastSyncAt: lastPulled ? new Date(lastPulled).toISOString() : null,
-        semesterName: cachedRecord.semesterName || undefined,
+      return buildTimetableResultFromRawData({
+        cleanUsername,
+        rawList,
+        currentSemester: semId,
+        options: {
+          isConfigured: true,
+          isLiveSync: false,
+          isCachedDb: true,
+          lastSyncAt: lastPulled ? new Date(lastPulled).toISOString() : null,
+          semesterName: cachedRecord.semesterName || undefined,
+        },
       });
     }
   } catch (err) {
@@ -58,13 +68,18 @@ export function tryBuildFromCachedRecord(
   return null;
 }
 
+export interface PersistTimetableSyncSuccessParams {
+  extAccountId: number;
+  cleanUsername: string;
+  fetched: any;
+  currentSemester: number;
+  resultObj: StudentTimetableCalendarResult;
+}
+
 export async function persistTimetableSyncSuccess(
-  extAccountId: number,
-  cleanUsername: string,
-  fetched: any,
-  currentSemester: number,
-  resultObj: StudentTimetableCalendarResult
+  params: PersistTimetableSyncSuccessParams
 ): Promise<void> {
+  const { extAccountId, cleanUsername, fetched, currentSemester, resultObj } = params;
   // Cập nhật trạng thái CONNECTED và token mới nếu có
   await prisma.externalAccount
     .update({
@@ -132,11 +147,16 @@ export async function tryBuildFromCourseRegistrationFallback(
       const list = extractRawListFromCourseRegistration(parsed);
 
       if (Array.isArray(list) && list.length > 0) {
-        return buildTimetableResultFromRawData(cleanUsername, list, currentSemester, {
-          isConfigured: true,
-          isLiveSync: false,
-          isCachedDb: true,
-          lastSyncAt: dbCourseReg.updatedAt ? dbCourseReg.updatedAt.toISOString() : null,
+        return buildTimetableResultFromRawData({
+          cleanUsername,
+          rawList: list,
+          currentSemester,
+          options: {
+            isConfigured: true,
+            isLiveSync: false,
+            isCachedDb: true,
+            lastSyncAt: dbCourseReg.updatedAt ? dbCourseReg.updatedAt.toISOString() : null,
+          },
         });
       }
     }
@@ -171,12 +191,17 @@ export function buildNotConfiguredResult(
   };
 }
 
+export interface BuildInvalidCredentialsResultParams {
+  cleanUsername: string;
+  currentSemester: number;
+  lastSyncAt: Date | null | undefined;
+  authErrorMessage: string;
+}
+
 export function buildInvalidCredentialsResult(
-  cleanUsername: string,
-  currentSemester: number,
-  lastSyncAt: Date | null | undefined,
-  authErrorMessage: string
+  params: BuildInvalidCredentialsResultParams
 ): StudentTimetableCalendarResult {
+  const { cleanUsername, currentSemester, lastSyncAt, authErrorMessage } = params;
   return {
     success: false,
     username: cleanUsername,

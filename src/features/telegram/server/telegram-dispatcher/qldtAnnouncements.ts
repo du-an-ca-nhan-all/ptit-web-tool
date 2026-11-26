@@ -186,8 +186,13 @@ export async function checkAndDispatchQldtAnnouncements(options: {
 
           const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ CỔNG QLDTTX (PTTC1)</b>${unreadBadge}${mustReadBadge}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${escapeTelegramHtml(studentName)}</b> (<code>${escapeTelegramHtml(sub.username)}</code>)\n📌 <b>${escapeTelegramHtml(cleanTitle)}</b>\n\n${cleanSummary ? `📝 <i>${escapeTelegramHtml(cleanSummary)}</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${escapeTelegramHtml(senderDisplay)}</b>\n🗓️ Thời gian: <b>${escapeTelegramHtml(dateDisplay)}</b>\n🔗 <a href="https://qldttx.pttc1.edu.vn/#/xemthongbao">Xem chi tiết trên Cổng QLDTTX (/#/xemthongbao)</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
 
-          const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
-            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          const sendRes = await sendTelegramMessage({
+            botToken: effectiveToken,
+            chatId: sub.chatId,
+            text: messageHtml,
+            options: {
+              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            },
           });
 
           if (sendRes.success) {

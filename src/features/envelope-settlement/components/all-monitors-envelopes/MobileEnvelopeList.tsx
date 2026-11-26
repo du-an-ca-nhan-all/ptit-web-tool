@@ -36,7 +36,13 @@ export default function MobileEnvelopeList({
     <div className="block md:hidden p-3 space-y-3.5">
       {paginatedSessions.map((session, index) => {
         const itemIndex = (page - 1) * pageSize + index + 1;
-        const roomPrice = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id);
+        const roomPrice = calculateRoomPrice({
+          subject: session.subject,
+          subjectCode: session.subjectCode,
+          room: session.room,
+          examFormat: session.examFormat,
+          sessionKey: session.id,
+        });
 
         return (
           <div key={session.id} className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-2xs flex flex-col gap-3">

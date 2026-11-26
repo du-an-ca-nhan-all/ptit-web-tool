@@ -165,7 +165,9 @@ export function useSettlementState({
             }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn(`[useSettlementState] Non-fatal error:`, e);
+      }
 
       if (availableClasses.monClasses.length > 0) {
         setSelectedClass(availableClasses.monClasses[0]);

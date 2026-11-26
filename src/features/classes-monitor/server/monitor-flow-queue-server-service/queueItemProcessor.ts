@@ -120,7 +120,7 @@ export async function processSingleQueueItem(item: any) {
         },
       });
     } else if (canonicalAction === 'COURSE_SYNC_ALL') {
-      await executeSyncAllCoursesItem(item, normMonitor, normFollower, svNganh, creds);
+      await executeSyncAllCoursesItem({ item, normMonitor, normFollower, svNganh, creds });
     }
   } catch (err: any) {
     const errMsg = err.message || 'Lỗi ngoại lệ khi thực thi';

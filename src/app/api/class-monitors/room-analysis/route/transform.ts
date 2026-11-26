@@ -42,19 +42,32 @@ export interface ReferenceStudentInfo {
   examCount: number;
 }
 
-export function formatExamRecord(
-  r: ClassExamRecord,
-  classCode: string,
-  reviewSet: Set<string>,
-  reviewNoteMap: Map<string, string>,
-  roomTotalMap: Map<string, Set<string>>
-): FormattedExamRecord {
+export interface FormatExamRecordParams {
+  record: ClassExamRecord;
+  classCode: string;
+  reviewSet: Set<string>;
+  reviewNoteMap: Map<string, string>;
+  roomTotalMap: Map<string, Set<string>>;
+}
+
+export function formatExamRecord({
+  record: r,
+  classCode,
+  reviewSet,
+  reviewNoteMap,
+  roomTotalMap,
+}: FormatExamRecordParams): FormattedExamRecord {
   const maSV = normalizeCode(r.maSV);
   const hoTen =
     r.student?.hoTen?.trim() ||
     `${r.student?.hoLot || ''} ${r.student?.ten || ''}`.trim() ||
     maSV;
-  const rKey = makeRoomKey(r.maMH || '', r.mapThi || '', r.ngayThi || '', r.gioThi || '');
+  const rKey = makeRoomKey({
+    maMH: r.maMH || '',
+    mapThi: r.mapThi || '',
+    ngayThi: r.ngayThi || '',
+    gioThi: r.gioThi || '',
+  });
   return {
     id: r.id,
     maSV,

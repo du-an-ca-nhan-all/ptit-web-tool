@@ -22,18 +22,23 @@ async function fetchGradesMap(jar: CookieJar): Promise<Map<string, string>> {
       const gradeHtml = await gradeRes.text();
       return parseGradesOverviewHtml(gradeHtml);
     }
-  } catch {
-    // Ignore grade overview error
+  } catch (caughtError) {
+    console.warn(`[dashboardFetcher] Non-fatal error:`, caughtError);
   }
   return new Map<string, string>();
 }
 
+export interface FetchLmsCoursesParams {
+  sesskey: string;
+  jar: CookieJar;
+  seenIds: Set<string>;
+  gradeMap: Map<string, string>;
+}
+
 async function fetchRemuiCourses(
-  sesskey: string,
-  jar: CookieJar,
-  seenIds: Set<string>,
-  gradeMap: Map<string, string>
+  params: FetchLmsCoursesParams
 ): Promise<LmsCourseOverviewItem[]> {
+  const { sesskey, jar, seenIds, gradeMap } = params;
   try {
     const ajaxRes = await fetch(
       `${LMS_BASE_URL}/lib/ajax/service.php?sesskey=${sesskey}&info=theme_remui_get_myoverviewcourses`,
@@ -74,11 +79,9 @@ async function fetchRemuiCourses(
 }
 
 async function fetchCoreCourses(
-  sesskey: string,
-  jar: CookieJar,
-  seenIds: Set<string>,
-  gradeMap: Map<string, string>
+  params: FetchLmsCoursesParams
 ): Promise<LmsCourseOverviewItem[]> {
+  const { sesskey, jar, seenIds, gradeMap } = params;
   try {
     const coreRes = await fetch(
       `${LMS_BASE_URL}/lib/ajax/service.php?sesskey=${sesskey}&info=core_course_get_enrolled_courses_by_timeline_classification`,
@@ -211,11 +214,11 @@ export async function fetchLmsDashboardOverview(account: {
 
   if (sesskey) {
     // Primary source: Edwiser RemUI `theme_remui_get_myoverviewcourses`
-    courses.push(...(await fetchRemuiCourses(sesskey, jar, seenIds, gradeMap)));
+    courses.push(...(await fetchRemuiCourses({ sesskey, jar, seenIds, gradeMap })));
 
     // Secondary fallback: Moodle core `core_course_get_enrolled_courses_by_timeline_classification`
     if (courses.length === 0) {
-      courses.push(...(await fetchCoreCourses(sesskey, jar, seenIds, gradeMap)));
+      courses.push(...(await fetchCoreCourses({ sesskey, jar, seenIds, gradeMap })));
     }
   }
 

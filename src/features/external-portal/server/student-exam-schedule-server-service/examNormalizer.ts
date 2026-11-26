@@ -28,14 +28,11 @@ function calculateDaysUntil(dateIso: string): number {
   return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
-/**
- * Chuẩn hóa danh sách ca thi từ dữ liệu raw QLDTTX
- */
-export function buildQldtExamResultFromRawData(
-  cleanUsername: string,
-  rawExams: any[],
-  currentSemester: number,
-  semesters: StudentQldtSemester[],
+export interface BuildQldtExamResultParams {
+  cleanUsername: string;
+  rawExams: any[];
+  currentSemester: number;
+  semesters: StudentQldtSemester[];
   options: {
     isConfigured: boolean;
     isLiveSync: boolean;
@@ -43,8 +40,16 @@ export function buildQldtExamResultFromRawData(
     lastSyncAt: string | null;
     semesterName?: string;
     noticeNoTuitionFee?: string;
-  }
+  };
+}
+
+/**
+ * Chuẩn hóa danh sách ca thi từ dữ liệu raw QLDTTX
+ */
+export function buildQldtExamResultFromRawData(
+  params: BuildQldtExamResultParams
 ): StudentQldtExamScheduleResult {
+  const { cleanUsername, rawExams, currentSemester, semesters, options } = params;
   const currentSemObj = semesters.find((s) => s.hocKy === currentSemester);
   const semesterName =
     options.semesterName ||
@@ -114,13 +119,18 @@ export function buildQldtExamResultFromRawData(
   };
 }
 
+export interface BuildResultFromCachedRawDataParams {
+  cleanUsername: string;
+  cachedRecord: any;
+  currentSemester: number;
+  lastPulled: Date | string | null | undefined;
+  requestedSemesterId?: number;
+}
+
 export function buildResultFromCachedRawData(
-  cleanUsername: string,
-  cachedRecord: any,
-  currentSemester: number,
-  lastPulled: Date | string | null | undefined,
-  requestedSemesterId?: number
+  params: BuildResultFromCachedRawDataParams
 ): StudentQldtExamScheduleResult {
+  const { cleanUsername, cachedRecord, currentSemester, lastPulled, requestedSemesterId } = params;
   const parsed = JSON.parse(cachedRecord.rawData);
   const semesters: StudentQldtSemester[] = parsed?.semesters || [];
   const semId =
@@ -142,13 +152,19 @@ export function buildResultFromCachedRawData(
     rawExams = parsed?.exams || parsed?.data?.ds_lich_thi || (Array.isArray(parsed) ? parsed : []) || [];
   }
 
-  return buildQldtExamResultFromRawData(cleanUsername, rawExams, semId, semesters, {
-    isConfigured: true,
-    isLiveSync: false,
-    isCachedDb: true,
-    lastSyncAt: lastPulled ? new Date(lastPulled).toISOString() : null,
-    semesterName: cachedRecord.semesterName || undefined,
-    noticeNoTuitionFee: parsed?.noticeNoTuitionFee,
+  return buildQldtExamResultFromRawData({
+    cleanUsername,
+    rawExams,
+    currentSemester: semId,
+    semesters,
+    options: {
+      isConfigured: true,
+      isLiveSync: false,
+      isCachedDb: true,
+      lastSyncAt: lastPulled ? new Date(lastPulled).toISOString() : null,
+      semesterName: cachedRecord.semesterName || undefined,
+      noticeNoTuitionFee: parsed?.noticeNoTuitionFee,
+    },
   });
 }
 

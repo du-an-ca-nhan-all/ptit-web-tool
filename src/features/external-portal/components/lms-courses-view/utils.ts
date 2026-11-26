@@ -41,13 +41,21 @@ export function computeFilterCounts(courses?: LmsCourseOverviewItem[]): LmsFilte
   };
 }
 
-export function filterAndSortCourses(
-  courses: LmsCourseOverviewItem[] | undefined,
-  searchQuery: string,
-  statusFilter: LmsStatusFilter,
-  selectedSemester: string,
-  sortBy: LmsSortBy
-): LmsCourseOverviewItem[] {
+export interface FilterAndSortCoursesParams {
+  courses: LmsCourseOverviewItem[] | undefined;
+  searchQuery: string;
+  statusFilter: LmsStatusFilter;
+  selectedSemester: string;
+  sortBy: LmsSortBy;
+}
+
+export function filterAndSortCourses({
+  courses,
+  searchQuery,
+  statusFilter,
+  selectedSemester,
+  sortBy,
+}: FilterAndSortCoursesParams): LmsCourseOverviewItem[] {
   if (!courses) return [];
 
   const list = courses.filter((c) => {

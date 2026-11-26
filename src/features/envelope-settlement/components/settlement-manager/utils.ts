@@ -97,7 +97,13 @@ export function computeActiveDetailCalc(
   const sess = selectedDetail.session;
   const responsibleClass = selectedDetail.toClass;
   const totalStudents = Array.from(effectiveClassCountsForModal.values()).reduce((sum, cnt) => sum + cnt, 0);
-  const roomPrice = calculateRoomPrice(sess.subject, sess.subjectCode, sess.room, sess.examFormat, sess.id);
+  const roomPrice = calculateRoomPrice({
+    subject: sess.subject,
+    subjectCode: sess.subjectCode,
+    room: sess.room,
+    examFormat: sess.examFormat,
+    sessionKey: sess.id,
+  });
   const pricePerStudent = totalStudents > 0 ? roomPrice / totalStudents : 0;
   const fromClassCount = effectiveClassCountsForModal.get(selectedDetail.fromClass) || 0;
   const amount = fromClassCount * pricePerStudent;

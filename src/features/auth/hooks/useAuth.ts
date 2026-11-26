@@ -109,7 +109,9 @@ export function useAuth() {
           if (rawRole.includes('lop_truong') || u.isMonitor) return 'lop_truong';
         }
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[useAuth] Non-fatal error:`, caughtError);
+    }
     return 'sinh_vien';
   });
 
@@ -138,7 +140,9 @@ export function useAuth() {
           headers: { Authorization: `Bearer ${token}` },
         });
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[useAuth] Non-fatal error:`, caughtError);
+    }
     clearStoredAuth();
     setCurrentUser(null);
     setAuthError(null);

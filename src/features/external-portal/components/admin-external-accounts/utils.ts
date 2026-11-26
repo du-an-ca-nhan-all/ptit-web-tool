@@ -39,13 +39,21 @@ export function extractClassList(accounts: ExternalAccountAdminItem[]): string[]
   return Array.from(set).sort();
 }
 
-export function filterAccounts(
-  accounts: ExternalAccountAdminItem[],
-  searchQuery: string,
-  selectedClass: string,
-  selectedSystem: string,
-  statusFilter: StatusFilter
-): ExternalAccountAdminItem[] {
+export interface FilterAccountsParams {
+  accounts: ExternalAccountAdminItem[];
+  searchQuery: string;
+  selectedClass: string;
+  selectedSystem: string;
+  statusFilter: StatusFilter;
+}
+
+export function filterAccounts({
+  accounts,
+  searchQuery,
+  selectedClass,
+  selectedSystem,
+  statusFilter,
+}: FilterAccountsParams): ExternalAccountAdminItem[] {
   return accounts.filter((a) => {
     // Search
     const matchSearch =
@@ -102,13 +110,21 @@ export function computeAccountMetrics(
   };
 }
 
-export function isModalTestPassed(
-  formData: AccountFormData,
-  modalTestStatus: ModalTestStatus,
-  lastTestedModalUser: string,
-  lastTestedModalPass: string,
-  lastTestedModalRefreshToken: string
-): boolean {
+export interface IsModalTestPassedParams {
+  formData: AccountFormData;
+  modalTestStatus: ModalTestStatus;
+  lastTestedModalUser: string;
+  lastTestedModalPass: string;
+  lastTestedModalRefreshToken: string;
+}
+
+export function isModalTestPassed({
+  formData,
+  modalTestStatus,
+  lastTestedModalUser,
+  lastTestedModalPass,
+  lastTestedModalRefreshToken,
+}: IsModalTestPassedParams): boolean {
   const isSlink = formData.systemKey === 'SLINK_PTIT';
   return isSlink
     ? modalTestStatus === 'SUCCESS' &&

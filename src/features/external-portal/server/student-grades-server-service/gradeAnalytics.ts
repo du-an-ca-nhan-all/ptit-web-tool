@@ -89,12 +89,15 @@ export function buildGradeDistribution(
   return { buckets, highestGradeCount, averageLetter };
 }
 
-export function buildTargetGoals(
-  gpa4: number | null,
-  gpa10: number | null,
-  totalCreditsAccumulated: number,
-  curriculumTargetCredits: number
-): AcademicTargetGoal[] {
+export interface BuildTargetGoalsParams {
+  gpa4: number | null;
+  gpa10: number | null;
+  totalCreditsAccumulated: number;
+  curriculumTargetCredits: number;
+}
+
+export function buildTargetGoals(params: BuildTargetGoalsParams): AcademicTargetGoal[] {
+  const { gpa4, gpa10, totalCreditsAccumulated, curriculumTargetCredits } = params;
   const remainingCredits = Math.max(0, curriculumTargetCredits - totalCreditsAccumulated);
   const targetGoals: AcademicTargetGoal[] = [
     { label: 'Bằng Khá (GPA ≥ 2.50 / Hệ 10 ≥ 7.0)', targetGpa4: 2.5, targetGpa10: 7.0, isAchievable: true, requiredGpaOnRemaining: null, requiredGpa10OnRemaining: null, status: 'ACHIEVED', note: '' },

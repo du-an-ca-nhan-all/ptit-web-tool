@@ -120,7 +120,9 @@ conn.close()
     throw new Error(`Không thể trích xuất dữ liệu từ file SQLite để nạp vào PostgreSQL: ${err.message}`);
   } finally {
     if (typeof sourcePathOrBuffer !== 'string' && fs.existsSync(tempSqlitePath)) {
-      try { fs.unlinkSync(tempSqlitePath); } catch {}
+      try { fs.unlinkSync(tempSqlitePath); } catch (caughtError) {
+        console.warn(`[restoreSqlAndLocal] Non-fatal error:`, caughtError);
+      }
     }
   }
 }

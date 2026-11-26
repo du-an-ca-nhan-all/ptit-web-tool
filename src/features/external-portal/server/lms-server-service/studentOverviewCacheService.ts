@@ -185,7 +185,9 @@ export async function getOrFetchStudentLmsOverview(
               : new Date().toISOString(),
           };
         }
-      } catch (parseErr) {}
+      } catch (parseErr) {
+        console.warn(`[studentOverviewCacheService] Non-fatal error:`, parseErr);
+      }
     }
 
     // Nếu chưa từng có cache và tải lỗi -> throw Error để UI xử lý

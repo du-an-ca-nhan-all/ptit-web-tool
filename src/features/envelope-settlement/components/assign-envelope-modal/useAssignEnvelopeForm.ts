@@ -31,12 +31,12 @@ export function useAssignEnvelopeForm({
 
   const defaultPrice = useMemo(() => {
     if (!session) return 600000;
-    return getDefaultRoomPrice(
-      session.subject || '',
-      session.subjectCode || '',
-      session.room || '',
-      session.examFormat || ''
-    );
+    return getDefaultRoomPrice({
+      subject: session.subject || '',
+      subjectCode: session.subjectCode || '',
+      room: session.room || '',
+      examFormat: session.examFormat || '',
+    });
   }, [session]);
 
   // Find candidate classes in this room

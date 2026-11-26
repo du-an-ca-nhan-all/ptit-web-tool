@@ -95,7 +95,7 @@ export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string
   const updateFollowerConfig = useCallback(
     (username: string, field: FollowerConfigField, value: any) => {
       setEditedConfigs((prev) =>
-        buildUpdatedFollowerConfig(prev, students, username, field, value)
+        buildUpdatedFollowerConfig({ prev, students, username, field, value })
       );
     },
     [students]
@@ -112,7 +112,7 @@ export function useMonitorFlow(currentUser: LoginUser, initialClassCode?: string
   const setAllPermissions = useCallback(
     (field: FollowerPermissionField, value: boolean) => {
       setEditedConfigs((prev) =>
-        buildAllPermissionsEdits(prev, students, field, value)
+        buildAllPermissionsEdits({ prev, students, field, value })
       );
     },
     [students]

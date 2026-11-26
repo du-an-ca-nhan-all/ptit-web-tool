@@ -27,7 +27,9 @@ export function decodeHtmlEntities(text?: string): string {
         if (code >= 0 && code <= 0x10ffff) {
           return String.fromCodePoint(code);
         }
-      } catch {}
+      } catch (caughtError) {
+        console.warn(`[htmlUtils] Non-fatal error:`, caughtError);
+      }
       return _;
     });
 
@@ -38,7 +40,9 @@ export function decodeHtmlEntities(text?: string): string {
         if (code >= 0 && code <= 0x10ffff) {
           return String.fromCodePoint(code);
         }
-      } catch {}
+      } catch (caughtError) {
+        console.warn(`[htmlUtils] Non-fatal error:`, caughtError);
+      }
       return _;
     });
 

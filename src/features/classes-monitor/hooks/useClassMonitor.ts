@@ -13,7 +13,9 @@ export function useClassMonitor(initialClass?: string) {
         const u = JSON.parse(saved);
         return u.lop || '';
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[useClassMonitor] Non-fatal error:`, caughtError);
+    }
     return '';
   });
 

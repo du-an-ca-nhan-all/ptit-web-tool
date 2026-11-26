@@ -45,7 +45,9 @@ export async function findEnrolledStudentsForCourse(
         if (matches && reg.username) {
           matchedUsernames.add(reg.username.trim().toUpperCase());
         }
-      } catch {}
+      } catch (caughtError) {
+        console.warn(`[enrolledStudentsLookup] Non-fatal error:`, caughtError);
+      }
     }
   } catch (err) {
     console.error('[findEnrolledStudentsForCourse] Lỗi quét CourseRegistration:', err);
@@ -68,7 +70,9 @@ export async function findEnrolledStudentsForCourse(
         if (matches && tt.username) {
           matchedUsernames.add(tt.username.trim().toUpperCase());
         }
-      } catch {}
+      } catch (caughtError) {
+        console.warn(`[enrolledStudentsLookup] Non-fatal error:`, caughtError);
+      }
     }
   } catch (err) {
     console.error('[findEnrolledStudentsForCourse] Lỗi quét StudentTimetableRecord:', err);

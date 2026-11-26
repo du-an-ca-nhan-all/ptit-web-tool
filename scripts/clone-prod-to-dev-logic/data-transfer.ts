@@ -9,22 +9,29 @@ export function chunkArray<T>(array: T[], size: number): T[][] {
   return chunks;
 }
 
+export interface CopyTablesDataParams {
+  prodPrisma: PrismaClient;
+  devPrisma: PrismaClient;
+  sortedTables: string[];
+  tableCounts: Map<string, number>;
+}
+
 /**
  * Nạp dữ liệu động từ PROD sang DEV theo thứ tự ràng buộc khoá ngoại
  */
-export async function copyTablesData(
-  prodPrisma: PrismaClient,
-  devPrisma: PrismaClient,
-  sortedTables: string[],
-  tableCounts: Map<string, number>,
-): Promise<number> {
+export async function copyTablesData({
+  prodPrisma,
+  devPrisma,
+  sortedTables,
+  tableCounts,
+}: CopyTablesDataParams): Promise<number> {
   // Tạm thời tắt ràng buộc triggers/foreign keys nếu quyền cho phép
   let replicaRoleSet = false;
   try {
     await devPrisma.$executeRawUnsafe(`SET session_replication_role = 'replica';`);
     replicaRoleSet = true;
-  } catch {
-    // Nếu không có superuser, thứ tự topological sort đã đảm bảo an toàn
+  } catch (caughtError) {
+    console.warn(`[data-transfer] Non-fatal error:`, caughtError);
   }
 
   let copiedRecords = 0;

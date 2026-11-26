@@ -1,13 +1,10 @@
 import type { TelegramSendResult } from './types';
 import { sendRawTelegramDocument, sendRawTelegramMessage, verifyTelegramBot } from './rawApi';
 
-/**
- * Send a message via Global Telegram Queue (rate-limited, throttled, 429 backoff)
- */
-export async function sendTelegramMessage(
-  botToken: string,
-  chatId: string,
-  text: string,
+export interface SendTelegramMessageParams {
+  botToken: string;
+  chatId: string;
+  text: string;
   options?: {
     threadId?: string | number | null;
     parseMode?: 'HTML' | 'MarkdownV2' | 'Markdown';
@@ -15,23 +12,35 @@ export async function sendTelegramMessage(
     priority?: import('../telegramQueueServerService').TelegramMessagePriority;
     sendImmediately?: boolean;
     maxAttempts?: number;
-  }
-): Promise<TelegramSendResult> {
-  if (options?.sendImmediately) {
-    return await sendRawTelegramMessage(botToken, chatId, text, options);
-  }
-  const { enqueueTelegramMessage } = await import('../telegramQueueServerService');
-  return await enqueueTelegramMessage(botToken, chatId, text, options, options?.priority || 'NORMAL', options?.maxAttempts);
+  };
 }
 
 /**
- * Send a document/file via Global Telegram Queue (sendDocument)
+ * Send a message via Global Telegram Queue (rate-limited, throttled, 429 backoff)
  */
-export async function sendTelegramDocument(
-  botToken: string,
-  chatId: string,
-  fileBuffer: Buffer | Uint8Array,
-  filename: string,
+export async function sendTelegramMessage(
+  params: SendTelegramMessageParams
+): Promise<TelegramSendResult> {
+  const { botToken, chatId, text, options } = params;
+  if (options?.sendImmediately) {
+    return await sendRawTelegramMessage({ botToken, chatId, text, options });
+  }
+  const { enqueueTelegramMessage } = await import('../telegramQueueServerService');
+  return await enqueueTelegramMessage({
+    botToken,
+    chatId,
+    text,
+    options,
+    priority: options?.priority || 'NORMAL',
+    maxAttempts: options?.maxAttempts,
+  });
+}
+
+export interface SendTelegramDocumentParams {
+  botToken: string;
+  chatId: string;
+  fileBuffer: Buffer | Uint8Array;
+  filename: string;
   options?: {
     threadId?: string | number | null;
     caption?: string;
@@ -39,28 +48,49 @@ export async function sendTelegramDocument(
     priority?: import('../telegramQueueServerService').TelegramMessagePriority;
     sendImmediately?: boolean;
     maxAttempts?: number;
-  }
+  };
+}
+
+/**
+ * Send a document/file via Global Telegram Queue (sendDocument)
+ */
+export async function sendTelegramDocument(
+  params: SendTelegramDocumentParams
 ): Promise<TelegramSendResult> {
+  const { botToken, chatId, fileBuffer, filename, options } = params;
   if (options?.sendImmediately) {
-    return await sendRawTelegramDocument(botToken, chatId, fileBuffer, filename, options);
+    return await sendRawTelegramDocument({ botToken, chatId, fileBuffer, filename, options });
   }
   const { enqueueTelegramDocument } = await import('../telegramQueueServerService');
-  return await enqueueTelegramDocument(botToken, chatId, fileBuffer, filename, options, options?.priority || 'NORMAL', options?.maxAttempts);
+  return await enqueueTelegramDocument({
+    botToken,
+    chatId,
+    fileBuffer,
+    filename,
+    options,
+    priority: options?.priority || 'NORMAL',
+    maxAttempts: options?.maxAttempts,
+  });
+}
+
+export interface SendTestNotificationParams {
+  botToken: string;
+  chatId: string;
+  threadId?: string | null;
+  userInfo?: {
+    username?: string;
+    fullName?: string;
+    maLop?: string;
+  };
 }
 
 /**
  * Send a formatted test notification to Telegram
  */
 export async function sendTestNotification(
-  botToken: string,
-  chatId: string,
-  threadId?: string | null,
-  userInfo?: {
-    username?: string;
-    fullName?: string;
-    maLop?: string;
-  }
+  params: SendTestNotificationParams
 ): Promise<TelegramSendResult> {
+  const { botToken, chatId, threadId, userInfo } = params;
   // First verify the bot info
   const botVerify = await verifyTelegramBot(botToken);
   if (!botVerify.success) {
@@ -109,9 +139,14 @@ export async function sendTestNotification(
     `🔔 <i>Từ bây giờ, hệ thống sẽ tự động gửi thông báo lịch thi, cập nhật phòng thi, kết quả ĐKMH và các thông tin học vụ quan trọng trực tiếp đến Telegram này.</i>`,
   ].filter(Boolean).join('\n');
 
-  const sendResult = await sendTelegramMessage(botToken, chatId, messageHtml, {
-    threadId,
-    parseMode: 'HTML',
+  const sendResult = await sendTelegramMessage({
+    botToken,
+    chatId,
+    text: messageHtml,
+    options: {
+      threadId,
+      parseMode: 'HTML',
+    },
   });
 
   if (sendResult.success) {

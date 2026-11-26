@@ -128,12 +128,12 @@ export async function handleExcludeAction(
 
   const actionType = type || 'LOAI_BO'; // 'BAO_LUU' | 'NGHI_HOC' | 'CHUYEN_LOP' | 'LOAI_BO'
   const actionReason = reason ? String(reason).trim() : '';
-  const { targetTrangThai, statusNote } = resolveExcludeStatus(
+  const { targetTrangThai, statusNote } = resolveExcludeStatus({
     actionType,
     actionReason,
     cleanCurrentClass,
-    targetClass
-  );
+    targetClass,
+  });
 
   const existingStudent = await prisma.student.findUnique({ where: { maSV: cleanMaSV } });
   const updatedNote = appendStudentNote(existingStudent?.ghiChu, statusNote);

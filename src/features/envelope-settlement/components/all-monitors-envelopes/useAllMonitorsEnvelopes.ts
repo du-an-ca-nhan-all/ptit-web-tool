@@ -141,7 +141,15 @@ export function useAllMonitorsEnvelopes({
 
   const totalExpectedMoney = useMemo(() => {
     return displayedSessions.reduce(
-      (sum, s) => sum + calculateRoomPrice(s.subject, s.subjectCode, s.room, s.examFormat, s.id),
+      (sum, s) =>
+        sum +
+        calculateRoomPrice({
+          subject: s.subject,
+          subjectCode: s.subjectCode,
+          room: s.room,
+          examFormat: s.examFormat,
+          sessionKey: s.id,
+        }),
       0
     );
   }, [displayedSessions, pricingVersion]);

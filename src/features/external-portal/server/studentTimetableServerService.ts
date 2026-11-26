@@ -16,6 +16,7 @@ import type { StudentTimetableCalendarResult } from './student-timetable-server-
 import { isQldttxAuthError } from './student-timetable-server-service/utils';
 
 export type {
+  BuildTimetableResultParams,
   StudentTimetableCalendarResult,
   TimetableCalendarEvent,
   TimetableSubjectSummary,
@@ -54,13 +55,13 @@ export async function getStudentTimetableCalendar(
 
   // Nếu KHÔNG yêu cầu forceRefresh và cache còn hạn (< 10 phút) -> Trả về dữ liệu từ CSDL ngay
   if (!options?.forceRefresh && isCacheFresh) {
-    const cachedResult = tryBuildFromCachedRecord(
+    const cachedResult = tryBuildFromCachedRecord({
       cleanUsername,
       cachedRecord,
       currentSemester,
       lastPulled,
-      'cache'
-    );
+      mode: 'cache',
+    });
     if (cachedResult) return cachedResult;
   }
 
@@ -81,25 +82,25 @@ export async function getStudentTimetableCalendar(
     }
 
     if (Array.isArray(fetched.rawList) && fetched.rawList.length > 0) {
-      const resultObj = buildTimetableResultFromRawData(
+      const resultObj = buildTimetableResultFromRawData({
         cleanUsername,
-        fetched.rawList,
+        rawList: fetched.rawList,
         currentSemester,
-        {
+        options: {
           isConfigured: true,
           isLiveSync: true,
           isCachedDb: false,
           lastSyncAt: new Date().toISOString(),
-        }
-      );
+        },
+      });
 
-      await persistTimetableSyncSuccess(
-        extAccount!.id,
+      await persistTimetableSyncSuccess({
+        extAccountId: extAccount!.id,
         cleanUsername,
         fetched,
         currentSemester,
-        resultObj
-      );
+        resultObj,
+      });
 
       return resultObj;
     }
@@ -119,23 +120,23 @@ export async function getStudentTimetableCalendar(
 
   // Nếu SAI USERNAME / PASSWORD -> Chặn truy cập và trả về errorType INVALID_CREDENTIALS
   if (authErrorDetected || extAccount?.status === 'ERROR') {
-    return buildInvalidCredentialsResult(
+    return buildInvalidCredentialsResult({
       cleanUsername,
       currentSemester,
-      extAccount?.lastSyncAt,
-      authErrorMessage
-    );
+      lastSyncAt: extAccount?.lastSyncAt,
+      authErrorMessage,
+    });
   }
 
   // Fallback 1: Trả về dữ liệu từ bảng StudentTimetableRecord đã lưu trước đó nếu có (khi mạng QLDTTX gặp sự cố)
   if (cachedRecord && cachedRecord.rawData) {
-    const fallbackResult = tryBuildFromCachedRecord(
+    const fallbackResult = tryBuildFromCachedRecord({
       cleanUsername,
       cachedRecord,
       currentSemester,
       lastPulled,
-      'fallback'
-    );
+      mode: 'fallback',
+    });
     if (fallbackResult) return fallbackResult;
   }
 

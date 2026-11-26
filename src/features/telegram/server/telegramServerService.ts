@@ -14,11 +14,20 @@ export {
   sendRawTelegramMessage,
   sendRawTelegramDocument,
 } from './telegram-server-service/rawApi';
+export type {
+  SendRawTelegramMessageParams,
+  SendRawTelegramDocumentParams,
+} from './telegram-server-service/rawApi';
 
 export {
   sendTelegramMessage,
   sendTelegramDocument,
   sendTestNotification,
+} from './telegram-server-service/messaging';
+export type {
+  SendTelegramMessageParams,
+  SendTelegramDocumentParams,
+  SendTestNotificationParams,
 } from './telegram-server-service/messaging';
 
 export {
@@ -26,6 +35,7 @@ export {
   createTelegramForumTopic,
   resolveTelegramChatInfo,
 } from './telegram-server-service/chatInfo';
+export type { CreateTelegramForumTopicParams } from './telegram-server-service/chatInfo';
 
 export { pullForumTopics } from './telegram-server-service/forumTopics';
 

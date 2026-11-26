@@ -151,8 +151,8 @@ export async function syncAllDevSequences(devPrisma: PrismaClient): Promise<numb
           );
         `, seq_name);
         count++;
-      } catch {
-        // Bỏ qua lỗi cấp quyền sequence nếu có
+      } catch (caughtError) {
+        console.warn(`[dev-schema-reset] Non-fatal error:`, caughtError);
       }
     }
   }

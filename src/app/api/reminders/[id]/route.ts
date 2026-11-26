@@ -27,7 +27,12 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const updated = await updateReminder(reminderId, user.username, body, user.isAdmin);
+    const updated = await updateReminder({
+      id: reminderId,
+      username: user.username,
+      input: body,
+      isAdmin: user.isAdmin,
+    });
 
     runPendingReminderAlerts().catch(() => {});
 

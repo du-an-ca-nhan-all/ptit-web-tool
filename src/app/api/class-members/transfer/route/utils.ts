@@ -17,12 +17,19 @@ export function appendStudentNote(existingNote: string | null | undefined, newNo
   return existingNote ? `${existingNote} • ${newNote}` : newNote;
 }
 
-export function resolveExcludeStatus(
-  actionType: string,
-  actionReason: string,
-  cleanCurrentClass: string,
-  targetClass?: any
-): { targetTrangThai: string; statusNote: string } {
+export interface ResolveExcludeStatusParams {
+  actionType: string;
+  actionReason: string;
+  cleanCurrentClass: string;
+  targetClass?: any;
+}
+
+export function resolveExcludeStatus({
+  actionType,
+  actionReason,
+  cleanCurrentClass,
+  targetClass,
+}: ResolveExcludeStatusParams): { targetTrangThai: string; statusNote: string } {
   if (actionType === 'BAO_LUU') {
     return {
       targetTrangThai: 'BAO_LUU',

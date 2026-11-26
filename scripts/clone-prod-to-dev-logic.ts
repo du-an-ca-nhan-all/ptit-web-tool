@@ -123,7 +123,12 @@ async function main() {
 
     // 10. Nạp dữ liệu động từ PROD sang DEV
     console.log('\n[5/6] Đang nạp dữ liệu từ PROD sang DEV theo thứ tự ràng buộc khoá ngoại...');
-    const copiedRecords = await copyTablesData(prodPrisma, devPrisma, sortedTables, tableCounts);
+    const copiedRecords = await copyTablesData({
+      prodPrisma,
+      devPrisma,
+      sortedTables,
+      tableCounts,
+    });
 
     // 11. Tự động đồng bộ Sequences trên Database DEV
     console.log('\n[6/6] Đang tự động quét & đồng bộ tất cả auto-increment sequences trên DEV...');

@@ -61,8 +61,13 @@ export async function dispatchQldtExamScheduleChanges(params: {
       try {
         const { token: effectiveToken } = await resolveEffectiveBotToken(sub.botToken);
         if (effectiveToken && sub.chatId) {
-          const res = await sendTelegramMessage(effectiveToken, sub.chatId, userMessageHtml, {
-            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          const res = await sendTelegramMessage({
+            botToken: effectiveToken,
+            chatId: sub.chatId,
+            text: userMessageHtml,
+            options: {
+              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            },
           });
           userSent = res.success;
         }
@@ -78,12 +83,19 @@ export async function dispatchQldtExamScheduleChanges(params: {
         const { token: adminToken } = await resolveEffectiveBotToken(adminConfig.botToken || undefined);
         if (adminToken) {
           const adminNoticeHtml = `🔔 <b>[BIẾN ĐỘNG LỊCH THI QLDTTX] SINH VIÊN: ${username}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> | Lớp: <b>${maLop}</b>\n📊 Số môn biến động: <b>${changes.length}</b> môn${changeListHtml}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Thời gian quét: ${timeStr}</i>`;
-          await sendTelegramMessage(adminToken, adminConfig.chatId, adminNoticeHtml, {
-            threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,
+          await sendTelegramMessage({
+            botToken: adminToken,
+            chatId: adminConfig.chatId,
+            text: adminNoticeHtml,
+            options: {
+              threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,
+            },
           });
         }
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[qldtExamChanges] Non-fatal error:`, caughtError);
+    }
 
     return { sent: userSent, totalChanges: changes.length };
   } catch (err: any) {

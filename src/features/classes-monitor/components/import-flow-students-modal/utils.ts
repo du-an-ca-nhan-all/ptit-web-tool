@@ -11,13 +11,21 @@ function isTruthyCellValue(raw: unknown): boolean {
   return val === '1' || val === 'true' || val === 'có' || val === 'bật' || val === 'yes';
 }
 
-export function parseRowsToStudents(
-  rows: any[][],
-  monitorUsername: string,
-  selectedClass: string,
-  classStudentMap: Map<string, FollowerStudentItem>,
-  defaults: ParseStudentDefaults
-): ParsedFlowStudent[] {
+export interface ParseRowsToStudentsParams {
+  rows: any[][];
+  monitorUsername: string;
+  selectedClass: string;
+  classStudentMap: Map<string, FollowerStudentItem>;
+  defaults: ParseStudentDefaults;
+}
+
+export function parseRowsToStudents({
+  rows,
+  monitorUsername,
+  selectedClass,
+  classStudentMap,
+  defaults,
+}: ParseRowsToStudentsParams): ParsedFlowStudent[] {
   if (!rows || rows.length === 0) return [];
 
   const normMonitor = monitorUsername.trim().toUpperCase();

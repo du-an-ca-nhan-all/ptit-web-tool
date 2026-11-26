@@ -9,12 +9,19 @@ export function normalizeCode(value?: string | null): string {
   return String(value || '').trim().toUpperCase();
 }
 
-export function makeRoomKey(
-  maMH: string,
-  mapThi: string,
-  ngayThi: string,
-  gioThi: string
-): string {
+export interface MakeRoomKeyParams {
+  maMH: string;
+  mapThi: string;
+  ngayThi: string;
+  gioThi: string;
+}
+
+export function makeRoomKey({
+  maMH,
+  mapThi,
+  ngayThi,
+  gioThi,
+}: MakeRoomKeyParams): string {
   return [
     normalizeCode(maMH),
     normalizeCode(mapThi),
@@ -58,7 +65,12 @@ export function collectUniqueRooms(
 
   for (const rec of records) {
     if (!rec.maMH || !rec.mapThi || !rec.ngayThi) continue;
-    const key = makeRoomKey(rec.maMH, rec.mapThi, rec.ngayThi, rec.gioThi || '');
+    const key = makeRoomKey({
+      maMH: rec.maMH,
+      mapThi: rec.mapThi,
+      ngayThi: rec.ngayThi,
+      gioThi: rec.gioThi || '',
+    });
     if (!uniqueRooms.has(key)) {
       uniqueRooms.set(key, {
         maMH: rec.maMH,
@@ -84,12 +96,12 @@ export function buildRoomTotalMap(
   const roomTotalMap = new Map<string, Set<string>>();
 
   for (const row of roomRows) {
-    const key = makeRoomKey(
-      row.maMH || '',
-      row.mapThi || '',
-      row.ngayThi || '',
-      row.gioThi || ''
-    );
+    const key = makeRoomKey({
+      maMH: row.maMH || '',
+      mapThi: row.mapThi || '',
+      ngayThi: row.ngayThi || '',
+      gioThi: row.gioThi || '',
+    });
     const stId = normalizeCode(row.maSV);
     if (!stId) continue;
     if (!roomTotalMap.has(key)) {

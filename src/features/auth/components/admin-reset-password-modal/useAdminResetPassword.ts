@@ -64,7 +64,7 @@ export function useAdminResetPassword({
           setLop(data.student.maLop || '');
         }
       } catch (err) {
-        // ignore
+        console.warn(`[useAdminResetPassword] Non-fatal error:`, err);
       } finally {
         setIsLookingUp(false);
       }

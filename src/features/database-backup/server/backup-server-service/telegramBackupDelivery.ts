@@ -55,9 +55,15 @@ export async function sendBackupToTelegram(params?: {
 
     const caption = `🐘 <b>BẢN SAO LƯU DATABASE POSTGRESQL (.sql)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Tổng số bản ghi:</b> ${stats.totalRecords.toLocaleString('vi-VN')}\n📋 <b>Bao gồm:</b> ${stats.tableBreakdown.length} bảng dữ liệu PostgreSQL\n💾 <b>Dung lượng file:</b> ${sizeFormatted}\n⏰ <b>Thời gian:</b> <i>${timeDisplay}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <i>File SQL Dump chuẩn PostgreSQL - Tự động nhận diện toàn bộ cấu trúc bảng & khôi phục tức thì.</i>`;
 
-    const sendRes = await sendTelegramDocument(botToken, chatId, sqlBuffer, filename, {
-      threadId: threadId ? Number(threadId) : undefined,
-      caption,
+    const sendRes = await sendTelegramDocument({
+      botToken,
+      chatId,
+      fileBuffer: sqlBuffer,
+      filename,
+      options: {
+        threadId: threadId ? Number(threadId) : undefined,
+        caption,
+      },
     });
 
     results.push({ file: filename, format: 'sql', result: sendRes });

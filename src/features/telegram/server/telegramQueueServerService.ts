@@ -32,17 +32,26 @@ export {
   setTelegramQueuePaused,
 } from './telegram-queue-server-service/controls';
 
+export interface EnqueueTelegramMessageParams {
+  botToken: string;
+  chatId: string;
+  text: string;
+  options?: TelegramQueueItemOptions;
+  priority?: TelegramMessagePriority;
+  maxAttempts?: number;
+}
+
 /**
  * Enqueue a Telegram Text Message
  */
-export function enqueueTelegramMessage(
-  botToken: string,
-  chatId: string,
-  text: string,
-  options?: TelegramQueueItemOptions,
-  priority: TelegramMessagePriority = 'NORMAL',
-  maxAttempts: number = MAX_QUEUE_RETRIES_DEFAULT
-): Promise<TelegramSendResult> {
+export function enqueueTelegramMessage({
+  botToken,
+  chatId,
+  text,
+  options,
+  priority = 'NORMAL',
+  maxAttempts = MAX_QUEUE_RETRIES_DEFAULT,
+}: EnqueueTelegramMessageParams): Promise<TelegramSendResult> {
   const state = getQueueState();
   state.itemCounter++;
   const id = `tg_msg_${Date.now()}_${state.itemCounter}`;
@@ -72,18 +81,28 @@ export function enqueueTelegramMessage(
   });
 }
 
+export interface EnqueueTelegramDocumentParams {
+  botToken: string;
+  chatId: string;
+  fileBuffer: Buffer | Uint8Array;
+  filename: string;
+  options?: TelegramQueueItemOptions;
+  priority?: TelegramMessagePriority;
+  maxAttempts?: number;
+}
+
 /**
  * Enqueue a Telegram Document / File
  */
-export function enqueueTelegramDocument(
-  botToken: string,
-  chatId: string,
-  fileBuffer: Buffer | Uint8Array,
-  filename: string,
-  options?: TelegramQueueItemOptions,
-  priority: TelegramMessagePriority = 'NORMAL',
-  maxAttempts: number = MAX_QUEUE_RETRIES_DEFAULT
-): Promise<TelegramSendResult> {
+export function enqueueTelegramDocument({
+  botToken,
+  chatId,
+  fileBuffer,
+  filename,
+  options,
+  priority = 'NORMAL',
+  maxAttempts = MAX_QUEUE_RETRIES_DEFAULT,
+}: EnqueueTelegramDocumentParams): Promise<TelegramSendResult> {
   const state = getQueueState();
   state.itemCounter++;
   const id = `tg_doc_${Date.now()}_${state.itemCounter}`;

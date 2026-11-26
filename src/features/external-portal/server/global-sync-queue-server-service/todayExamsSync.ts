@@ -69,7 +69,9 @@ export async function checkAndQueueTodayExamsSync(
             dueUsernames.push(rec.username);
           }
         }
-      } catch {}
+      } catch (caughtError) {
+        console.warn(`[todayExamsSync] Non-fatal error:`, caughtError);
+      }
     }
 
     if (dueUsernames.length > 0) {

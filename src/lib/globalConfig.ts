@@ -182,7 +182,9 @@ export async function getAllGlobalConfigs(): Promise<
     let parsed: any = item.value;
     try {
       parsed = JSON.parse(item.value);
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[globalConfig] Non-fatal error:`, caughtError);
+    }
 
     return {
       id: item.id,

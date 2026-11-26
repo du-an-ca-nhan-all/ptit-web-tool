@@ -2,13 +2,20 @@ import { getStoredEnvelopeAssignments } from '../envelopeAssignmentConfig';
 import { getPricingConfig, getSessionPriceOverrides } from './storage';
 import type { PricingConfig } from './types';
 
-export const getDefaultRoomPrice = (
-  subject: string,
-  subjectCode: string,
-  room: string,
-  examFormat: string = '',
-  customConfig?: PricingConfig
-): number => {
+export interface GetDefaultRoomPriceParams {
+  subject: string;
+  subjectCode: string;
+  room: string;
+  examFormat?: string;
+  customConfig?: PricingConfig;
+}
+
+export const getDefaultRoomPrice = ({
+  subject,
+  room,
+  examFormat = '',
+  customConfig,
+}: GetDefaultRoomPriceParams): number => {
   const config = customConfig || getPricingConfig();
   const subjectLower = (subject || '').toLowerCase();
   const formatLower = (examFormat || '').toLowerCase();
@@ -30,15 +37,25 @@ export const getDefaultRoomPrice = (
   return config.commonRoom;
 };
 
-export const calculateRoomPrice = (
-  subject: string,
-  subjectCode: string,
-  room: string,
-  examFormat: string = '',
-  sessionKey?: string,
-  customConfig?: PricingConfig,
-  overrides?: Record<string, number>
-): number => {
+export interface CalculateRoomPriceParams {
+  subject: string;
+  subjectCode: string;
+  room: string;
+  examFormat?: string;
+  sessionKey?: string;
+  customConfig?: PricingConfig;
+  overrides?: Record<string, number>;
+}
+
+export const calculateRoomPrice = ({
+  subject,
+  subjectCode,
+  room,
+  examFormat = '',
+  sessionKey,
+  customConfig,
+  overrides,
+}: CalculateRoomPriceParams): number => {
   // 1. Kiểm tra nếu phòng/buổi thi này có mức giá tùy chỉnh riêng
   if (sessionKey) {
     const sessionOverrides = overrides || getSessionPriceOverrides();
@@ -57,7 +74,9 @@ export const calculateRoomPrice = (
       ) {
         return Number(assignments[sessionKey].customPrice);
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[calculator] Non-fatal error:`, caughtError);
+    }
 
     try {
       if (typeof window !== 'undefined') {
@@ -75,10 +94,12 @@ export const calculateRoomPrice = (
           }
         }
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[calculator] Non-fatal error:`, caughtError);
+    }
   }
 
-  return getDefaultRoomPrice(subject, subjectCode, room, examFormat, customConfig);
+  return getDefaultRoomPrice({ subject, subjectCode, room, examFormat, customConfig });
 };
 
 export const formatCurrency = (amount: number): string => {

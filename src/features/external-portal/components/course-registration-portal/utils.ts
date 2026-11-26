@@ -10,12 +10,19 @@ export function buildRegisteredSubjectCodeMap(dsKqdkmh: any[]): Map<string, stri
   return map;
 }
 
-export function groupAndFilterOpenCourses(
-  dsNhomTo: any[],
-  searchQuery: string,
-  statusFilter: CourseStatusFilter,
-  registeredSubjectCodeMap: Map<string, string>
-): GroupedSubject[] {
+export interface GroupAndFilterOpenCoursesParams {
+  dsNhomTo: any[];
+  searchQuery: string;
+  statusFilter: CourseStatusFilter;
+  registeredSubjectCodeMap: Map<string, string>;
+}
+
+export function groupAndFilterOpenCourses({
+  dsNhomTo,
+  searchQuery,
+  statusFilter,
+  registeredSubjectCodeMap,
+}: GroupAndFilterOpenCoursesParams): GroupedSubject[] {
   const groups = dsNhomTo || [];
   const query = searchQuery.trim().toLowerCase();
 
@@ -66,12 +73,19 @@ export function groupAndFilterOpenCourses(
   });
 }
 
-export function filterFlatOpenCourses(
-  dsNhomTo: any[],
-  searchQuery: string,
-  statusFilter: CourseStatusFilter,
-  registeredSubjectCodeMap: Map<string, string>
-): any[] {
+export interface FilterFlatOpenCoursesParams {
+  dsNhomTo: any[];
+  searchQuery: string;
+  statusFilter: CourseStatusFilter;
+  registeredSubjectCodeMap: Map<string, string>;
+}
+
+export function filterFlatOpenCourses({
+  dsNhomTo,
+  searchQuery,
+  statusFilter,
+  registeredSubjectCodeMap,
+}: FilterFlatOpenCoursesParams): any[] {
   const groups = dsNhomTo || [];
   const query = searchQuery.trim().toLowerCase();
 

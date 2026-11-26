@@ -103,34 +103,34 @@ async function processNextQueueItem() {
       let result: TelegramSendResult;
 
       if (item.type === 'message') {
-        result = await sendRawTelegramMessage(
-          item.botToken,
-          item.chatId,
-          item.text || '',
-          item.options
-        );
+        result = await sendRawTelegramMessage({
+          botToken: item.botToken,
+          chatId: item.chatId,
+          text: item.text || '',
+          options: item.options,
+        });
       } else {
-        result = await sendRawTelegramDocument(
-          item.botToken,
-          item.chatId,
-          item.fileBuffer || Buffer.alloc(0),
-          item.filename || 'file.bin',
-          item.options
-        );
+        result = await sendRawTelegramDocument({
+          botToken: item.botToken,
+          chatId: item.chatId,
+          fileBuffer: item.fileBuffer || Buffer.alloc(0),
+          filename: item.filename || 'file.bin',
+          options: item.options,
+        });
       }
 
       const durationMs = Date.now() - startTime;
       const completedAt = new Date().toISOString();
 
       if (result.success) {
-        handleSendSuccess(state, item, result, durationMs, completedAt);
+        handleSendSuccess({ state, item, result, durationMs, completedAt });
       } else {
-        handleSendFailureResult(state, item, result, durationMs, completedAt);
+        handleSendFailureResult({ state, item, result, durationMs, completedAt });
       }
     } catch (err: any) {
       const durationMs = Date.now() - startTime;
       const completedAt = new Date().toISOString();
-      handleSendException(state, item, err, durationMs, completedAt);
+      handleSendException({ state, item, err, durationMs, completedAt });
     } finally {
       state.activeSending.delete(item.id);
       state.activeChats.delete(item.chatId);

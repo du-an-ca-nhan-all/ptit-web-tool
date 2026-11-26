@@ -92,7 +92,13 @@ export function computeSettlementData({
     }
 
     const totalStudents = allClassesInRoom.reduce((acc, c) => acc + c.count, 0);
-    const roomPrice = calculateRoomPrice(session.subject, session.subjectCode, session.room, session.examFormat, session.id);
+    const roomPrice = calculateRoomPrice({
+      subject: session.subject,
+      subjectCode: session.subjectCode,
+      room: session.room,
+      examFormat: session.examFormat,
+      sessionKey: session.id,
+    });
     const pricePerStudent = totalStudents > 0 ? roomPrice / totalStudents : 0;
 
     let isSessionInvolved = false;

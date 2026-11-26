@@ -75,7 +75,7 @@ export async function checkAndDispatchSlinkAnnouncements(options: {
         const { token } = await refreshAndPersistSlinkAccountToken(extAccount);
 
         // Chỉ lấy các thông báo đang CHƯA ĐỌC trên Cổng S-Link (unreadOnly = true)
-        const notifRes = await getSlinkNotifications(token, 1, 30, true);
+        const notifRes = await getSlinkNotifications({ accessToken: token, page: 1, limit: 30, unreadOnly: true });
         const rawAnnouncements = notifRes?.data?.result || [];
 
         // Lọc kỹ lại đảm bảo chỉ gửi thông báo đang được đánh dấu là chưa đọc trên S-Link (!item.read)
@@ -146,8 +146,13 @@ export async function checkAndDispatchSlinkAnnouncements(options: {
 
           const messageHtml = `📢 <b>THÔNG BÁO MỚI TỪ PTIT S-LINK</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${escapeTelegramHtml(studentName)}</b> (<code>${escapeTelegramHtml(sub.username)}</code>)\n📌 <b>${escapeTelegramHtml(cleanTitle)}</b>\n\n${cleanSummary ? `📝 <i>${escapeTelegramHtml(cleanSummary)}</i>\n\n` : ''}🏛️ Đơn vị gửi: <b>${escapeTelegramHtml(senderDisplay)}</b>\n🗓️ Thời gian: <b>${escapeTelegramHtml(dateDisplay)}</b>\n🔗 <a href="https://slink.ptit.edu.vn/">Mở cổng PTIT S-Link</a>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Tự động quét định kỳ: ${intervalHours} tiếng/lần</i>`;
 
-          const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
-            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          const sendRes = await sendTelegramMessage({
+            botToken: effectiveToken,
+            chatId: sub.chatId,
+            text: messageHtml,
+            options: {
+              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            },
           });
 
           if (sendRes.success) {

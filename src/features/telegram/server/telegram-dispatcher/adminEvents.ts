@@ -35,8 +35,13 @@ export async function dispatchNewUserRegistered(params: {
 
     const messageHtml = `✨ <b>[THÔNG BÁO] ${isAutoApproved ? 'TỰ ĐỘNG KÍCH HOẠT TÀI KHOẢN MỚI' : 'CÓ NGƯỜI ĐĂNG KÝ TÀI KHOẢN MỚI'}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Họ và tên: <b>${params.fullName}</b>\n🎓 Mã sinh viên: <code>${params.username}</code>\n🏫 Lớp học: <b>${params.lop || 'Chưa phân lớp'}</b>\n📱 Số điện thoại: <code>${params.phoneNumber || 'Chưa cập nhật'}</code>\n📝 Trạng thái: ${statusBadge}\n${params.note ? `💬 Ghi chú: <i>${params.note}</i>\n` : ''}${params.ip ? `🌐 Địa chỉ IP: <code>${params.ip}</code>\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Thời gian: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>\n🛡️ <i>Cổng quản trị PTIT EduSync</i>`;
 
-    const sendRes = await sendTelegramMessage(effectiveToken, adminConfig.chatId, messageHtml, {
-      threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,
+    const sendRes = await sendTelegramMessage({
+      botToken: effectiveToken,
+      chatId: adminConfig.chatId,
+      text: messageHtml,
+      options: {
+        threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,
+      },
     });
 
     return { sent: sendRes.success, error: sendRes.error };
@@ -90,8 +95,13 @@ export async function dispatchDatabaseExportOrBackup(params: {
 
     const messageHtml = `💾 <b>[HỆ THỐNG] ${actionTitle}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n${params.filename ? `📁 Tên file: <code>${params.filename}</code>\n` : ''}${sizeStr ? `📦 Kích thước: <b>${sizeStr}</b>\n` : ''}${params.adminUsername ? `👤 Người thực hiện: <b>${params.adminUsername}</b> (Admin)\n` : ''}${params.description ? `📝 Chi tiết: <i>${params.description}</i>\n` : ''}${statsHtml}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Thời gian: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>\n🛡️ <i>Cơ sở dữ liệu PostgreSQL - PTIT EduSync</i>`;
 
-    const sendRes = await sendTelegramMessage(effectiveToken, adminConfig.chatId, messageHtml, {
-      threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,
+    const sendRes = await sendTelegramMessage({
+      botToken: effectiveToken,
+      chatId: adminConfig.chatId,
+      text: messageHtml,
+      options: {
+        threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,
+      },
     });
 
     return { sent: sendRes.success, error: sendRes.error };
@@ -127,8 +137,13 @@ export async function dispatchDatabaseRestore(params: {
 
     const messageHtml = `🔄 <b>[CẢNH BÁO] PHỤC HỒI CƠ SỞ DỮ LIỆU (DATABASE RESTORE)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📁 File nguồn: <code>${params.filename}</code>\n👤 Quản trị viên: <b>${params.adminUsername}</b>\n🏷️ Định dạng: <b>${params.format || 'PostgreSQL'}</b>\n📊 Kết quả: <b>${statusStr}</b>\n${params.error ? `⚠️ Chi tiết lỗi: <code>${params.error}</code>\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Thời gian: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>\n🛡️ <i>PTIT EduSync Security Monitor</i>`;
 
-    const sendRes = await sendTelegramMessage(effectiveToken, adminConfig.chatId, messageHtml, {
-      threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,
+    const sendRes = await sendTelegramMessage({
+      botToken: effectiveToken,
+      chatId: adminConfig.chatId,
+      text: messageHtml,
+      options: {
+        threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,
+      },
     });
 
     return { sent: sendRes.success, error: sendRes.error };
@@ -162,8 +177,13 @@ export async function dispatchExamBatchImportedToAdmin(params: {
     const nowVN = getVietnamTime();
     const messageHtml = `📥 <b>[THÔNG BÁO] IMPORT ĐỢT THI MỚI THÀNH CÔNG</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🏷️ Đợt thi: <b>${params.batchName}</b> (<code>${params.batchCode}</code>)\n👤 Người import: <b>${params.adminUsername}</b> (Admin)\n📊 Tổng số bản ghi thi: <b>${params.totalRecords.toLocaleString('vi-VN')}</b>\n👥 Tổng số sinh viên liên quan: <b>${params.totalStudents.toLocaleString('vi-VN')}</b> sinh viên\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Thời gian: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>\n🛡️ <i>PTIT EduSync System Notice</i>`;
 
-    const sendRes = await sendTelegramMessage(effectiveToken, adminConfig.chatId, messageHtml, {
-      threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,
+    const sendRes = await sendTelegramMessage({
+      botToken: effectiveToken,
+      chatId: adminConfig.chatId,
+      text: messageHtml,
+      options: {
+        threadId: adminConfig.threadId ? Number(adminConfig.threadId) : undefined,
+      },
     });
 
     return { sent: sendRes.success, error: sendRes.error };

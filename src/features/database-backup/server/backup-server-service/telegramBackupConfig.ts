@@ -139,8 +139,13 @@ export async function testBackupTelegramTarget(params?: {
   const timeStr = now.toLocaleTimeString('vi-VN') + ' ' + now.toLocaleDateString('vi-VN');
   const message = `🔔 <b>KIỂM TRA KẾT NỐI SAO LƯU TELEGRAM (POSTGRESQL)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n✅ <b>Trạng thái:</b> Kết nối thành công!\n📌 <b>Kênh/Nhóm/Chat:</b> <code>${chatId}</code>${threadId ? ` (Topic: <code>${threadId}</code>)` : ''}\n⏰ <b>Thời gian test:</b> <i>${timeStr}</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🐘 <i>Sẵn sàng nhận file sao lưu PostgreSQL (.sql) từ PTIT Exam Portal.</i>`;
 
-  const sendRes = await sendTelegramMessage(botToken, chatId, message, {
-    threadId: threadId ? Number(threadId) : undefined,
+  const sendRes = await sendTelegramMessage({
+    botToken,
+    chatId,
+    text: message,
+    options: {
+      threadId: threadId ? Number(threadId) : undefined,
+    },
   });
 
   const existing = await getGlobalConfig<BackupTelegramConfigValue>(GLOBAL_CONFIG_KEYS.BACKUP_TELEGRAM);

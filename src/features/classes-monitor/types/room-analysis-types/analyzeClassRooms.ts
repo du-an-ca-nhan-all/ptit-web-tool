@@ -46,7 +46,12 @@ export function analyzeClassRooms(params: {
   const classRoomStudents = new Map<string, Set<string>>();
   const reviewRoomStudents = new Map<string, Set<string>>();
   for (const rec of activeClassRecords) {
-    const rKey = buildRoomKey(rec.maMH, rec.mapThi, rec.ngayThi, rec.gioThi);
+    const rKey = buildRoomKey({
+      maMH: rec.maMH,
+      mapThi: rec.mapThi,
+      ngayThi: rec.ngayThi,
+      gioThi: rec.gioThi,
+    });
     if (!classRoomStudents.has(rKey)) classRoomStudents.set(rKey, new Set());
     classRoomStudents.get(rKey)!.add(rec.maSV);
 
@@ -64,7 +69,12 @@ export function analyzeClassRooms(params: {
 
   const analyzedRecords: AnalyzedStudentRecord[] = scopedRecords.map((rec) => {
     const subj = normalizeStr(rec.maMH);
-    const rKey = buildRoomKey(rec.maMH, rec.mapThi, rec.ngayThi, rec.gioThi);
+    const rKey = buildRoomKey({
+      maMH: rec.maMH,
+      mapThi: rec.mapThi,
+      ngayThi: rec.ngayThi,
+      gioThi: rec.gioThi,
+    });
     const monitorList = monitorBySubject.get(subj) || [];
 
     const classRoomCount = classRoomStudents.get(rKey)?.size ?? 0;
@@ -90,7 +100,13 @@ export function analyzeClassRooms(params: {
 
     // Check if student is in the exact same room/date/time as any of monitor's exams for this subject
     const sameRoomMatch = monitorList.find(
-      (m) => buildRoomKey(m.maMH, m.mapThi, m.ngayThi, m.gioThi) === rKey
+      (m) =>
+        buildRoomKey({
+          maMH: m.maMH,
+          mapThi: m.mapThi,
+          ngayThi: m.ngayThi,
+          gioThi: m.gioThi,
+        }) === rKey
     );
 
     if (sameRoomMatch) {
@@ -142,7 +158,13 @@ export function analyzeClassRooms(params: {
       const monitorList = monitorBySubject.get(subj) || [];
       const primaryMonitor = monitorList[0];
       const isMonitorRoom = monitorList.some(
-        (m) => buildRoomKey(m.maMH, m.mapThi, m.ngayThi, m.gioThi) === rec.roomKey
+        (m) =>
+          buildRoomKey({
+            maMH: m.maMH,
+            mapThi: m.mapThi,
+            ngayThi: m.ngayThi,
+            gioThi: m.gioThi,
+          }) === rec.roomKey
       );
 
       roomMap.set(rec.roomKey, {

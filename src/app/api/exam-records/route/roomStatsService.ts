@@ -21,7 +21,13 @@ export async function enrichWithRoomClassStats(
   for (const rec of formattedRecords) {
     if (!rec.MaMH || !rec.NgayThi || !rec.MAPTHI) continue;
     const bCode = rec.batchCode || '';
-    const key = makeRoomKey(bCode, rec.MaMH, rec.NgayThi, rec.GioThi || '', rec.MAPTHI);
+    const key = makeRoomKey({
+      batchCode: bCode,
+      maMH: rec.MaMH,
+      ngayThi: rec.NgayThi,
+      gioThi: rec.GioThi || '',
+      mapThi: rec.MAPTHI,
+    });
     if (!uniqueRoomConditions.has(key)) {
       uniqueRoomConditions.set(key, {
         ...(bCode ? { batchCode: bCode } : {}),
@@ -79,13 +85,13 @@ export async function enrichWithRoomClassStats(
   }
 
   for (const row of roomRows) {
-    const key = makeRoomKey(
-      row.batchCode || '',
-      row.maMH || '',
-      row.ngayThi || '',
-      row.gioThi || '',
-      row.mapThi || ''
-    );
+    const key = makeRoomKey({
+      batchCode: row.batchCode || '',
+      maMH: row.maMH || '',
+      ngayThi: row.ngayThi || '',
+      gioThi: row.gioThi || '',
+      mapThi: row.mapThi || '',
+    });
     const studentId = String(row.maSV || '').trim().toUpperCase();
     if (!studentId) continue;
     allStudentIds.add(studentId);
@@ -153,7 +159,13 @@ export async function enrichWithRoomClassStats(
   return formattedRecords.map((rec) => {
     if (!rec.MaMH || !rec.NgayThi || !rec.MAPTHI) return rec;
     const bCode = String(rec.batchCode || '').trim().toUpperCase();
-    const key = makeRoomKey(rec.batchCode || '', rec.MaMH, rec.NgayThi, rec.GioThi || '', rec.MAPTHI);
+    const key = makeRoomKey({
+      batchCode: rec.batchCode || '',
+      maMH: rec.MaMH,
+      ngayThi: rec.NgayThi,
+      gioThi: rec.GioThi || '',
+      mapThi: rec.MAPTHI,
+    });
     const totalSet = roomTotalMap.get(key);
     const myClass = String(rec.MaLop || '').trim().toUpperCase();
     const myMaSV = String(rec.MaSV || '').trim().toUpperCase();

@@ -67,8 +67,13 @@ export async function dispatchExamScheduleUpdated(params: {
 
       const messageHtml = `📅 <b>CẬP NHẬT LỊCH THI MỚI - PTIT EDUSYNC</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n🏫 Lớp: <b>${classCode}</b>\n🏷️ Đợt thi: <b>${batchName || batchCode || 'Đợt thi chính thức'}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 <b>DANH SÁCH MÔN THI (${exams.length} môn):</b>${examListHtml}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Cập nhật lúc: ${new Date().toLocaleTimeString('vi-VN')} - ${new Date().toLocaleDateString('vi-VN')}</i>`;
 
-      const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
-        threadId: sub.threadId ? Number(sub.threadId) : undefined,
+      const sendRes = await sendTelegramMessage({
+        botToken: effectiveToken,
+        chatId: sub.chatId,
+        text: messageHtml,
+        options: {
+          threadId: sub.threadId ? Number(sub.threadId) : undefined,
+        },
       });
 
       if (sendRes.success) sentCount++;
@@ -124,8 +129,13 @@ export async function dispatchExamPostponed(params: {
 
     const messageHtml = `⚠️ <b>BIẾN ĐỘNG LỊCH THI - PTIT EDUSYNC</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${username}</code>)\n📚 Môn thi: <b>${subjectName || subjectCode || 'Môn học'}</b> (<code>${subjectCode || ''}</code>)\n📌 Trạng thái: ${statusText}\n${examDate ? `🗓️ Ngày thi: <b>${examDate}</b> | Ca: <b>${examTime || ''}</b>\n` : ''}${examRoom ? `🏛️ Phòng thi: <code>${examRoom}</code>\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━\n🔔 <i>Vui lòng kiểm tra lại lịch thi trên hệ thống hoặc liên hệ Lớp trưởng/Cố vấn học tập nếu có thắc mắc.</i>`;
 
-    const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
-      threadId: sub.threadId ? Number(sub.threadId) : undefined,
+    const sendRes = await sendTelegramMessage({
+      botToken: effectiveToken,
+      chatId: sub.chatId,
+      text: messageHtml,
+      options: {
+        threadId: sub.threadId ? Number(sub.threadId) : undefined,
+      },
     });
 
     return { sent: sendRes.success };
@@ -178,8 +188,13 @@ export async function dispatchClassActivityAnnouncement(params: {
 
       const messageHtml = `👥 <b>THÔNG BÁO LỚP HỌC: ${classCode}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📌 <b>${title}</b>\n\n${message}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Người gửi: <b>${authorName || 'Ban cán sự lớp'}</b>\n⏰ <i>Gửi lúc: ${new Date().toLocaleTimeString('vi-VN')} - ${new Date().toLocaleDateString('vi-VN')}</i>`;
 
-      const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
-        threadId: sub.threadId ? Number(sub.threadId) : undefined,
+      const sendRes = await sendTelegramMessage({
+        botToken: effectiveToken,
+        chatId: sub.chatId,
+        text: messageHtml,
+        options: {
+          threadId: sub.threadId ? Number(sub.threadId) : undefined,
+        },
       });
 
       if (sendRes.success) sentCount++;

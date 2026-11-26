@@ -209,7 +209,13 @@ export function useStudentGrades(
   const semesters = useMemo(() => data?.semesters || [], [data]);
 
   const filteredSemesters = useMemo(
-    () => filterSemesters(semesters, selectedSemester, selectedGradeFilter, searchQuery),
+    () =>
+      filterSemesters({
+        semesters,
+        selectedSemester,
+        selectedGradeFilter,
+        searchQuery,
+      }),
     [semesters, selectedSemester, selectedGradeFilter, searchQuery]
   );
 

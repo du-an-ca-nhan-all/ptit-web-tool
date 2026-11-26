@@ -54,20 +54,25 @@ export async function getChatInfo(
   }
 }
 
+export interface CreateTelegramForumTopicParams {
+  botToken: string;
+  chatId: string;
+  name: string;
+  iconColor?: number;
+  iconCustomEmojiId?: string;
+}
+
 /**
  * Create a new Forum Topic in a supergroup (requires bot to have admin rights)
  */
 export async function createTelegramForumTopic(
-  botToken: string,
-  chatId: string,
-  name: string,
-  iconColor?: number,
-  iconCustomEmojiId?: string
+  params: CreateTelegramForumTopicParams
 ): Promise<{
   success: boolean;
   topic?: TelegramForumTopic;
   error?: string;
 }> {
+  const { botToken, chatId, name, iconColor, iconCustomEmojiId } = params;
   const token = botToken?.trim();
   const chat = chatId?.trim();
   const topicName = name?.trim();
@@ -161,7 +166,9 @@ export async function resolveTelegramChatInfo(
     if (countRes.ok && countData.ok) {
       memberCount = countData.result;
     }
-  } catch {}
+  } catch (caughtError) {
+    console.warn(`[chatInfo] Non-fatal error:`, caughtError);
+  }
 
   // Try to check if bot is admin in the chat (if channel/supergroup)
   if (chat.type === 'channel' || chat.type === 'supergroup') {
@@ -172,7 +179,9 @@ export async function resolveTelegramChatInfo(
       if (adminsRes.ok && adminsData.ok && Array.isArray(adminsData.result)) {
         isBotAdmin = adminsData.result.some((adm: any) => adm.user?.is_bot && adm.status === 'administrator');
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[chatInfo] Non-fatal error:`, caughtError);
+    }
   }
 
   return {

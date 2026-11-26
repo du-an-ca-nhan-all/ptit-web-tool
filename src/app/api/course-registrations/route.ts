@@ -36,7 +36,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. ACTION: SINGLE PULL (Pull for one student: current registration + all past semesters)
-    return await handleSinglePullCourseRegistrations(req, authUser, effectiveUsername, reqClassCode);
+    return await handleSinglePullCourseRegistrations({
+      req,
+      authUser,
+      effectiveUsername,
+      reqClassCode,
+    });
   } catch (error: any) {
     console.error('Course registration action error:', error);
     return NextResponse.json({ error: error.message || 'Lỗi khi đồng bộ môn học từ QLDTTX' }, { status: 500 });

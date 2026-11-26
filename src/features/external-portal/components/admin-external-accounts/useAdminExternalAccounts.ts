@@ -62,7 +62,14 @@ export function useAdminExternalAccounts() {
   const classList = useMemo(() => extractClassList(accounts), [accounts]);
 
   const filteredAccounts = useMemo(
-    () => filterAccounts(accounts, searchQuery, selectedClass, selectedSystem, statusFilter),
+    () =>
+      filterAccounts({
+        accounts,
+        searchQuery,
+        selectedClass,
+        selectedSystem,
+        statusFilter,
+      }),
     [accounts, searchQuery, selectedClass, selectedSystem, statusFilter]
   );
 

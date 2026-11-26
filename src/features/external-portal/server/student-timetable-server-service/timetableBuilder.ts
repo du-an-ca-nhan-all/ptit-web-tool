@@ -1,12 +1,15 @@
 import { parseTkbDate, parseTkbString } from '@/src/features/telegram/server/telegramDispatcher';
 import { DOW_MAP } from './constants';
 import type {
-  BuildTimetableOptions,
+  BuilderContext,
+  BuildTimetableResultParams,
   NormalizedSubjectFields,
+  ProcessTkbStringItemParams,
   StudentTimetableCalendarResult,
   TimetableCalendarEvent,
   TimetableSubjectSummary,
 } from './types';
+export type { BuildTimetableResultParams, ProcessTkbStringItemParams } from './types';
 import {
   extractSubjectFields,
   formatIsoDate,
@@ -16,18 +19,8 @@ import {
   parsePeriodAndTime,
 } from './utils';
 
-interface BuilderContext {
-  events: TimetableCalendarEvent[];
-  subjectMap: Map<string, TimetableSubjectSummary>;
-  seenEventKeys: Set<string>;
-}
-
-function processTkbStringItem(
-  item: any,
-  tkbStr: string,
-  fields: NormalizedSubjectFields,
-  ctx: BuilderContext
-): void {
+function processTkbStringItem(params: ProcessTkbStringItemParams): void {
+  const { item, tkbStr, fields, ctx } = params;
   const { subjectName, subjectCode, group, classCode, room, onlineLink, lecturer, colorIndex } =
     fields;
   const parsedSegments = parseTkbString(tkbStr);
@@ -219,11 +212,9 @@ function processDirectJsonItem(
  * Xây dựng đối tượng kết quả Thời Khóa Biểu từ danh sách rawList
  */
 export function buildTimetableResultFromRawData(
-  cleanUsername: string,
-  rawList: any[],
-  currentSemester: number,
-  options: BuildTimetableOptions
+  params: BuildTimetableResultParams
 ): StudentTimetableCalendarResult {
+  const { cleanUsername, rawList, currentSemester, options } = params;
   const ctx: BuilderContext = {
     events: [],
     subjectMap: new Map<string, TimetableSubjectSummary>(),
@@ -237,7 +228,7 @@ export function buildTimetableResultFromRawData(
     // XỬ LÝ 1: Chuỗi tkb trong to_hoc.tkb hoặc item.tkb (VD: "Thứ 2 (tiết 13->15) từ 02/03/2026 đến 18/05/2026 Ph.Online")
     const tkbStr = item.tkb || item.to_hoc?.tkb;
     if (tkbStr && typeof tkbStr === 'string') {
-      processTkbStringItem(item, tkbStr, fields, ctx);
+      processTkbStringItem({ item, tkbStr, fields, ctx });
     } else {
       // XỬ LÝ 2: Item dạng đối tượng JSON trực tiếp (có ngay_hoc hoặc tuan_tu_ngay)
       processDirectJsonItem(item, fields, ctx);

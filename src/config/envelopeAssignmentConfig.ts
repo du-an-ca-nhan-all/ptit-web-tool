@@ -35,7 +35,9 @@ export function getStoredEnvelopeAssignments(): EnvelopeAssignmentsMap {
       memoryCache = JSON.parse(raw);
       return memoryCache || {};
     }
-  } catch {}
+  } catch (caughtError) {
+    console.warn(`[envelopeAssignmentConfig] Non-fatal error:`, caughtError);
+  }
   return {};
 }
 

@@ -123,8 +123,22 @@ export function formatExamRecord(r: any): FormattedExamRecord {
   };
 }
 
-export function makeRoomKey(b: string, mh: string, dt: string, tm: string, rm: string): string {
-  return `${b}|${mh}|${dt}|${tm}|${rm}`;
+export interface MakeExamRoomKeyParams {
+  batchCode: string;
+  maMH: string;
+  ngayThi: string;
+  gioThi: string;
+  mapThi: string;
+}
+
+export function makeRoomKey({
+  batchCode,
+  maMH,
+  ngayThi,
+  gioThi,
+  mapThi,
+}: MakeExamRoomKeyParams): string {
+  return `${batchCode}|${maMH}|${ngayThi}|${gioThi}|${mapThi}`;
 }
 
 export function sortMembersByName(

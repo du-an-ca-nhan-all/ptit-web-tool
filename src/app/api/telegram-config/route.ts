@@ -35,19 +35,19 @@ export async function POST(req: NextRequest) {
       username = targetUsername;
     }
 
-    const adminBotRes = await handleAdminBotAction(req, authUser, action, body);
+    const adminBotRes = await handleAdminBotAction({ req, authUser, action, body });
     if (adminBotRes) return adminBotRes;
 
-    const adminQueueRes = await handleAdminQueueAction(req, authUser, action, body);
+    const adminQueueRes = await handleAdminQueueAction({ req, authUser, action, body });
     if (adminQueueRes) return adminQueueRes;
 
-    const userConfigRes = await handleUserConfigAction(req, username, action, body);
+    const userConfigRes = await handleUserConfigAction({ req, username, action, body });
     if (userConfigRes) return userConfigRes;
 
-    const userCheckRes = await handleUserCheckAction(req, username, action, body);
+    const userCheckRes = await handleUserCheckAction({ req, username, action, body });
     if (userCheckRes) return userCheckRes;
 
-    const userChatRes = await handleUserChatAction(req, username, action, body);
+    const userChatRes = await handleUserChatAction({ req, username, action, body });
     if (userChatRes) return userChatRes;
 
     return NextResponse.json({ error: `Hành động ${action} không được hỗ trợ` }, { status: 400 });

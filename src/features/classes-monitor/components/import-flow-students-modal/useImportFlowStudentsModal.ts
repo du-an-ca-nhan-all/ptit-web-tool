@@ -73,10 +73,16 @@ export function useImportFlowStudentsModal({
   }, [isOpen]);
 
   const parseRows = (rows: any[][]) =>
-    parseRowsToStudents(rows, monitorUsername, selectedClass, classStudentMap, {
-      defaultIsEnabled,
-      defaultAllowRegister,
-      defaultAllowCancel,
+    parseRowsToStudents({
+      rows,
+      monitorUsername,
+      selectedClass,
+      classStudentMap,
+      defaults: {
+        defaultIsEnabled,
+        defaultAllowRegister,
+        defaultAllowCancel,
+      },
     });
 
   // Parse Text input

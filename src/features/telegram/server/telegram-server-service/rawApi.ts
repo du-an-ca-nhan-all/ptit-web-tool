@@ -50,19 +50,24 @@ export async function verifyTelegramBot(botToken: string): Promise<{
   }
 }
 
-/**
- * Raw Telegram API: Send message directly to Telegram Bot API without queuing
- */
-export async function sendRawTelegramMessage(
-  botToken: string,
-  chatId: string,
-  text: string,
+export interface SendRawTelegramMessageParams {
+  botToken: string;
+  chatId: string;
+  text: string;
   options?: {
     threadId?: string | number | null;
     parseMode?: 'HTML' | 'MarkdownV2' | 'Markdown';
     disableWebPagePreview?: boolean;
-  }
+  };
+}
+
+/**
+ * Raw Telegram API: Send message directly to Telegram Bot API without queuing
+ */
+export async function sendRawTelegramMessage(
+  params: SendRawTelegramMessageParams
 ): Promise<TelegramSendResult> {
+  const { botToken, chatId, text, options } = params;
   const token = botToken?.trim();
   const chat = chatId?.trim();
 
@@ -151,20 +156,25 @@ export async function sendRawTelegramMessage(
   }
 }
 
-/**
- * Raw Telegram API: Send document/file directly to Telegram Bot API without queuing
- */
-export async function sendRawTelegramDocument(
-  botToken: string,
-  chatId: string,
-  fileBuffer: Buffer | Uint8Array,
-  filename: string,
+export interface SendRawTelegramDocumentParams {
+  botToken: string;
+  chatId: string;
+  fileBuffer: Buffer | Uint8Array;
+  filename: string;
   options?: {
     threadId?: string | number | null;
     caption?: string;
     parseMode?: 'HTML' | 'MarkdownV2' | 'Markdown';
-  }
+  };
+}
+
+/**
+ * Raw Telegram API: Send document/file directly to Telegram Bot API without queuing
+ */
+export async function sendRawTelegramDocument(
+  params: SendRawTelegramDocumentParams
 ): Promise<TelegramSendResult> {
+  const { botToken, chatId, fileBuffer, filename, options } = params;
   const token = botToken?.trim();
   const chat = chatId?.trim();
 

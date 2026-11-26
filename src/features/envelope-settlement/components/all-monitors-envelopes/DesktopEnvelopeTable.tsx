@@ -53,19 +53,19 @@ export default function DesktopEnvelopeTable({
         <tbody className="divide-y divide-slate-100">
           {paginatedSessions.map((session, index) => {
             const itemIndex = (page - 1) * pageSize + index + 1;
-            const roomPrice = calculateRoomPrice(
-              session.subject,
-              session.subjectCode,
-              session.room,
-              session.examFormat,
-              session.id
-            );
-            const defaultRoomPrice = getDefaultRoomPrice(
-              session.subject,
-              session.subjectCode,
-              session.room,
-              session.examFormat
-            );
+            const roomPrice = calculateRoomPrice({
+              subject: session.subject,
+              subjectCode: session.subjectCode,
+              room: session.room,
+              examFormat: session.examFormat,
+              sessionKey: session.id,
+            });
+            const defaultRoomPrice = getDefaultRoomPrice({
+              subject: session.subject,
+              subjectCode: session.subjectCode,
+              room: session.room,
+              examFormat: session.examFormat,
+            });
             const isCustomPrice = roomPrice !== defaultRoomPrice;
 
             return (

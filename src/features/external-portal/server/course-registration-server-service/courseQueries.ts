@@ -23,7 +23,7 @@ export async function fetchOpenCourseGroupsFromQLDTTX(
     },
   };
 
-  const { parsed, accumulatedToken } = await postQldttxEndpoint(endpoint, body, account, tokenState);
+  const { parsed, accumulatedToken } = await postQldttxEndpoint({ endpoint, body, account, tokenState });
 
   if (parsed && parsed.result === false) {
     throw new Error(parsed.message || 'Không thể lấy danh sách nhóm tổ môn học mở');
@@ -60,7 +60,7 @@ export async function fetchRegisteredCoursesFromQLDTTX(
     is_Clear: false,
   };
 
-  const { parsed, accumulatedToken } = await postQldttxEndpoint(endpoint, body, account, tokenState);
+  const { parsed, accumulatedToken } = await postQldttxEndpoint({ endpoint, body, account, tokenState });
 
   const dataObj = parsed?.data || {};
   const courseList = Array.isArray(dataObj?.ds_kqdkmh) ? dataObj.ds_kqdkmh : [];

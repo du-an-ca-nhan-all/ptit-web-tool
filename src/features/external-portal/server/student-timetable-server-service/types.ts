@@ -77,3 +77,23 @@ export interface NormalizedSubjectFields {
   lecturer: string;
   colorIndex: number;
 }
+
+export interface BuilderContext {
+  events: TimetableCalendarEvent[];
+  subjectMap: Map<string, TimetableSubjectSummary>;
+  seenEventKeys: Set<string>;
+}
+
+export interface ProcessTkbStringItemParams {
+  item: any;
+  tkbStr: string;
+  fields: NormalizedSubjectFields;
+  ctx: BuilderContext;
+}
+
+export interface BuildTimetableResultParams {
+  cleanUsername: string;
+  rawList: any[];
+  currentSemester: number;
+  options: BuildTimetableOptions;
+}

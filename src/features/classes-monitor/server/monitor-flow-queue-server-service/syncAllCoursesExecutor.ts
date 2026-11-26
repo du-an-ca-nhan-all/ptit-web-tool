@@ -6,13 +6,21 @@ import {
 } from '@/src/features/external-portal/server/courseRegistrationServerService';
 import type { QldttxCredentials } from './types';
 
-export async function executeSyncAllCoursesItem(
-  item: any,
-  normMonitor: string,
-  normFollower: string,
-  svNganh: number,
-  creds: QldttxCredentials
-) {
+export interface ExecuteSyncAllCoursesItemParams {
+  item: any;
+  normMonitor: string;
+  normFollower: string;
+  svNganh: number;
+  creds: QldttxCredentials;
+}
+
+export async function executeSyncAllCoursesItem({
+  item,
+  normMonitor,
+  normFollower,
+  svNganh,
+  creds,
+}: ExecuteSyncAllCoursesItemParams) {
   // 1. Lấy danh sách môn của Lớp trưởng
   const monitorExtAcc = await prisma.externalAccount.findFirst({
     where: { username: normMonitor, systemKey: 'QLDTTX_PTTC1' },

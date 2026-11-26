@@ -71,7 +71,9 @@ export async function GET(req: NextRequest) {
           tuitionFee: mainReg.tuitionFee,
           lastPulledAt: mainReg.lastPulledAt?.toISOString() || null,
         };
-      } catch (e) {}
+      } catch (e) {
+        console.warn(`[route] Non-fatal error:`, e);
+      }
     }
 
     const allSubAccounts: any[] = [];
@@ -104,7 +106,9 @@ export async function GET(req: NextRequest) {
           tuitionFee: reg.tuitionFee,
           lastPulledAt: reg.lastPulledAt?.toISOString() || null,
         });
-      } catch (e) {}
+      } catch (e) {
+        console.warn(`[route] Non-fatal error:`, e);
+      }
     });
 
     let userSubAccount = null;

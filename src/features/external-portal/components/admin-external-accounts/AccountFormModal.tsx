@@ -60,13 +60,13 @@ export function AccountFormModal({
   onSubmit,
 }: AccountFormModalProps) {
   const isSlink = formData.systemKey === 'SLINK_PTIT';
-  const isTestPassed = isModalTestPassed(
+  const isTestPassed = isModalTestPassed({
     formData,
     modalTestStatus,
     lastTestedModalUser,
     lastTestedModalPass,
-    lastTestedModalRefreshToken
-  );
+    lastTestedModalRefreshToken,
+  });
 
   const systemShortLabel =
     formData.systemKey === 'LMS_PTTC1'

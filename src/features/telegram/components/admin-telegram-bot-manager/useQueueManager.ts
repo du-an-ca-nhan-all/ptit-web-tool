@@ -29,8 +29,8 @@ export function useQueueManager({
       if (res.ok && data.queueStats) {
         setQueueStats(data.queueStats);
       }
-    } catch {
-      // ignore
+    } catch (caughtError) {
+      console.warn(`[useQueueManager] Non-fatal error:`, caughtError);
     } finally {
       setIsFetchingQueue(false);
     }

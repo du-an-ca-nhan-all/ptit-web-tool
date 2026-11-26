@@ -8,12 +8,19 @@ import {
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { resolveEffectiveTokenOrResponse } from './helpers';
 
-export async function handleUserChatAction(
-  req: NextRequest,
-  username: string,
-  action: string,
-  body: any
-): Promise<NextResponse | null> {
+export interface UserChatActionParams {
+  req: NextRequest;
+  username: string;
+  action: string;
+  body: any;
+}
+
+export async function handleUserChatAction({
+  req,
+  username,
+  action,
+  body,
+}: UserChatActionParams): Promise<NextResponse | null> {
   // 3. ACTION: PULL FORUM TOPICS (Lấy danh sách topic từ nhóm)
   if (action === 'PULL_TOPICS') {
     const customToken = body.botToken?.trim() || null;
@@ -64,7 +71,12 @@ export async function handleUserChatAction(
     const tokenRes = await resolveEffectiveTokenOrResponse(customToken);
     if (tokenRes.errorResponse) return tokenRes.errorResponse;
 
-    const createRes = await createTelegramForumTopic(tokenRes.token, chatId, topicName, iconColor);
+    const createRes = await createTelegramForumTopic({
+      botToken: tokenRes.token,
+      chatId,
+      name: topicName,
+      iconColor,
+    });
     if (!createRes.success) {
       return NextResponse.json(
         {

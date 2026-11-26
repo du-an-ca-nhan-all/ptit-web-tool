@@ -61,12 +61,19 @@ export function calculateClassStats(activeStudents: any[]): ClassMemberStats {
   return { total, maleCount, femaleCount, totalExams, avgExams };
 }
 
-export function exportClassMembersCsv(
-  filteredStudents: any[],
-  activeTab: ActiveTab,
-  selectedClass: string,
-  hasExamSchedule: boolean
-): void {
+export interface ExportClassMembersCsvParams {
+  filteredStudents: any[];
+  activeTab: ActiveTab;
+  selectedClass: string;
+  hasExamSchedule: boolean;
+}
+
+export function exportClassMembersCsv({
+  filteredStudents,
+  activeTab,
+  selectedClass,
+  hasExamSchedule,
+}: ExportClassMembersCsvParams): void {
   if (filteredStudents.length === 0) return;
   const headers = [
     'STT',

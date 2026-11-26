@@ -8,13 +8,21 @@ import { recordHistory } from './state';
 import { TelegramQueueInternalState, TelegramQueueItem } from './types';
 import { buildTextPreview, insertItemByPriority, isGroupOrChannelChat } from './utils';
 
-export function handleSendSuccess(
-  state: TelegramQueueInternalState,
-  item: TelegramQueueItem,
-  result: TelegramSendResult,
-  durationMs: number,
-  completedAt: string
-) {
+export interface HandleSendResultParams {
+  state: TelegramQueueInternalState;
+  item: TelegramQueueItem;
+  result: TelegramSendResult;
+  durationMs: number;
+  completedAt: string;
+}
+
+export function handleSendSuccess({
+  state,
+  item,
+  result,
+  durationMs,
+  completedAt,
+}: HandleSendResultParams) {
   const doneAt = Date.now();
   state.sentCount++;
   state.lastGlobalSendAt = doneAt;
@@ -54,13 +62,13 @@ export function handleSendSuccess(
   item.resolve?.(result);
 }
 
-export function handleSendFailureResult(
-  state: TelegramQueueInternalState,
-  item: TelegramQueueItem,
-  result: TelegramSendResult,
-  durationMs: number,
-  completedAt: string
-) {
+export function handleSendFailureResult({
+  state,
+  item,
+  result,
+  durationMs,
+  completedAt,
+}: HandleSendResultParams) {
   const errorCode = result.errorCode;
   const rawDesc = result.rawResponse?.description || result.error || '';
   const retryAfter = result.rawResponse?.parameters?.retry_after;

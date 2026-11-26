@@ -5,13 +5,20 @@ import { fetchAllSemestersCoursesFromQLDTTX } from '@/src/features/external-port
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { buildRegistrationStoragePayload } from './helpers';
 
+export interface SinglePullCourseRegistrationsParams {
+  req: NextRequest;
+  authUser: AuthUser;
+  effectiveUsername: string;
+  reqClassCode?: string;
+}
+
 // ACTION: SINGLE PULL (Pull for one student: current registration + all past semesters)
-export async function handleSinglePullCourseRegistrations(
-  req: NextRequest,
-  authUser: AuthUser,
-  effectiveUsername: string,
-  reqClassCode?: string
-) {
+export async function handleSinglePullCourseRegistrations({
+  req,
+  authUser,
+  effectiveUsername,
+  reqClassCode,
+}: SinglePullCourseRegistrationsParams) {
   const extAccount = await prisma.externalAccount.findFirst({
     where: {
       username: effectiveUsername,

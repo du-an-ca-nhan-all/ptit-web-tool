@@ -34,12 +34,17 @@ export async function resolveAccountToken(
   return { validToken, accumulatedToken };
 }
 
+export interface PostQldttxEndpointParams {
+  endpoint: string;
+  body: unknown;
+  account: QldttxAccountInput;
+  tokenState: ResolvedTokenState;
+}
+
 export async function postQldttxEndpoint(
-  endpoint: string,
-  body: unknown,
-  account: QldttxAccountInput,
-  tokenState: ResolvedTokenState
+  params: PostQldttxEndpointParams
 ): Promise<{ parsed: any; accumulatedToken: string | undefined }> {
+  const { endpoint, body, account, tokenState } = params;
   const url = `${QLDTTX_BASE_URL}${endpoint}`;
   const rawToken = tokenState.validToken.replace(/^Bearer\s+/i, '').trim();
   let accumulatedToken = tokenState.accumulatedToken;

@@ -119,7 +119,9 @@ export function mapRemuiCourses(
           const instObj = JSON.parse(c.instructor);
           instructor = instObj.name || '';
           instructorImg = instObj.picture || '';
-        } catch {}
+        } catch (caughtError) {
+          console.warn(`[courseParsers] Non-fatal error:`, caughtError);
+        }
       } else if (typeof c.instructor === 'object') {
         instructor = c.instructor.name || '';
         instructorImg = c.instructor.picture || '';

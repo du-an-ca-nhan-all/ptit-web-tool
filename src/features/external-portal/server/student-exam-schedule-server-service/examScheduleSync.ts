@@ -24,12 +24,17 @@ export function isQldtAuthErrorMessage(errMsg: string): boolean {
   );
 }
 
+export interface NotifyExamScheduleChangesParams {
+  cleanUsername: string;
+  cachedRecord: any;
+  allRawExamsList: any[];
+  semesterName?: string;
+}
+
 function notifyExamScheduleChangesIfDetected(
-  cleanUsername: string,
-  cachedRecord: any,
-  allRawExamsList: any[],
-  semesterName?: string
+  params: NotifyExamScheduleChangesParams
 ): void {
+  const { cleanUsername, cachedRecord, allRawExamsList, semesterName } = params;
   if (!cachedRecord?.rawData) return;
 
   try {
@@ -159,22 +164,27 @@ export async function syncAndPersistStudentExamSchedule(params: {
     noticeNoTuitionFee: firstNoticeNoTuitionFee,
   };
 
-  const resultObj = buildQldtExamResultFromRawData(
+  const resultObj = buildQldtExamResultFromRawData({
     cleanUsername,
-    currentSemesterExams,
-    targetHocKy,
-    semRes.semesters,
-    {
+    rawExams: currentSemesterExams,
+    currentSemester: targetHocKy,
+    semesters: semRes.semesters,
+    options: {
       isConfigured: true,
       isLiveSync: true,
       isCachedDb: false,
       lastSyncAt: new Date().toISOString(),
       noticeNoTuitionFee: firstNoticeNoTuitionFee,
-    }
-  );
+    },
+  });
 
   // 3.3 Phát hiện biến động lịch thi TOÀN BỘ CÁC MÔN so với cache cũ và gửi thông báo Telegram
-  notifyExamScheduleChangesIfDetected(cleanUsername, cachedRecord, allRawExamsList, resultObj.semesterName);
+  notifyExamScheduleChangesIfDetected({
+    cleanUsername,
+    cachedRecord,
+    allRawExamsList,
+    semesterName: resultObj.semesterName,
+  });
 
   // 4. Lưu / Persist toàn bộ dữ liệu vào bảng StudentQldtExamRecord
   try {

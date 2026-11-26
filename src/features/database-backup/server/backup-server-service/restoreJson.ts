@@ -68,8 +68,8 @@ export async function restoreFromJsonDump(
   try {
     await prisma.$executeRawUnsafe(`SET session_replication_role = 'replica';`);
     replicaRoleSet = true;
-  } catch {
-    // Không sao, topological sort sẽ đảm bảo thứ tự
+  } catch (caughtError) {
+    console.warn(`[restoreJson] Non-fatal error:`, caughtError);
   }
 
   // 4. Xóa sạch dữ liệu cũ theo thứ tự con trước, cha sau

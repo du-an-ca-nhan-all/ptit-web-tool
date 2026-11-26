@@ -12,7 +12,14 @@ export function normalizeStr(val?: string | null): string {
   return String(val || '').trim().toUpperCase();
 }
 
-export function buildRoomKey(maMH: string, mapThi: string, ngayThi: string, gioThi: string): string {
+export interface BuildRoomKeyParams {
+  maMH: string;
+  mapThi: string;
+  ngayThi: string;
+  gioThi: string;
+}
+
+export function buildRoomKey({ maMH, mapThi, ngayThi, gioThi }: BuildRoomKeyParams): string {
   return [normalizeStr(maMH), normalizeStr(mapThi), String(ngayThi || '').trim(), String(gioThi || '').trim()].join(
     '|'
   );

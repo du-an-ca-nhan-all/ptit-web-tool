@@ -29,7 +29,9 @@ export function playAlertSoundEffect(type: AlertSoundType, soundEnabled: boolean
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.7);
     }
-  } catch {}
+  } catch (caughtError) {
+    console.warn(`[utils] Non-fatal error:`, caughtError);
+  }
 }
 
 export function createSniperLogEntry(

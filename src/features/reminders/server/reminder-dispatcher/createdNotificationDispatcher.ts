@@ -140,14 +140,14 @@ export async function sendReminderCreatedNotification(
             offsetLabels,
           });
 
-          const sendRes = await sendTelegramMessage(
-            effectiveToken,
-            sub.chatId,
-            messageHtml,
-            {
+          const sendRes = await sendTelegramMessage({
+            botToken: effectiveToken,
+            chatId: sub.chatId,
+            text: messageHtml,
+            options: {
               threadId: sub.threadId ? Number(sub.threadId) : undefined,
-            }
-          );
+            },
+          });
 
           if (sendRes.success) {
             sentCount++;

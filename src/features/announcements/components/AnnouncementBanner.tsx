@@ -35,7 +35,9 @@ export default function AnnouncementBanner({
       try {
         const saved = localStorage.getItem(`dismissed_banner_${a.id}`);
         if (saved) map[a.id] = saved;
-      } catch {}
+      } catch (caughtError) {
+        console.warn(`[AnnouncementBanner] Non-fatal error:`, caughtError);
+      }
     });
     setDismissedMap(map);
   }, [announcements]);
@@ -59,7 +61,9 @@ export default function AnnouncementBanner({
       if (currentIndex >= visibleAnnouncements.length - 1) {
         setCurrentIndex(0);
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[AnnouncementBanner] Non-fatal error:`, caughtError);
+    }
   };
 
   const handlePrev = () => {

@@ -89,7 +89,7 @@ export function buildGradeResultFromRawData(
   const graduationProgressRate = Math.min(100, Math.round((totalCreditsAccumulated / curriculumTargetCredits) * 100));
 
   const gradeDistribution = buildGradeDistribution(allCourses, gradeCounts, gpa4);
-  const targetGoals = buildTargetGoals(gpa4, gpa10, totalCreditsAccumulated, curriculumTargetCredits);
+  const targetGoals = buildTargetGoals({ gpa4, gpa10, totalCreditsAccumulated, curriculumTargetCredits });
 
   return {
     success: true,

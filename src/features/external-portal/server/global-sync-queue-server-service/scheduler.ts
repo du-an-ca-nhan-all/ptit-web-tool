@@ -30,7 +30,7 @@ export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boole
     let configModified = false;
 
     // 1. Job 1: Đồng bộ lịch học & TKB (Cấu hình giờ chạy riêng: config.timetableJob)
-    if (config.timetableJob && isJobDueToRun(config.timetableJob, currentHour, currentMinute, currentDateStr)) {
+    if (config.timetableJob && isJobDueToRun({ jobConfig: config.timetableJob, currentHour, currentMinute, currentDateStr })) {
       console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 1 (Lịch học) lúc ${config.timetableJob.scheduleTime} VN...`);
       const resTimetable = await enqueueSingleGlobalJobType({
         jobType: 'SYNC_TIMETABLE',
@@ -46,7 +46,7 @@ export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boole
     }
 
     // 2. Job 2: Đồng bộ Điểm & GPA (Cấu hình giờ chạy riêng: config.gradesJob)
-    if (config.gradesJob && isJobDueToRun(config.gradesJob, currentHour, currentMinute, currentDateStr)) {
+    if (config.gradesJob && isJobDueToRun({ jobConfig: config.gradesJob, currentHour, currentMinute, currentDateStr })) {
       console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 2 (Điểm số) lúc ${config.gradesJob.scheduleTime} VN...`);
       const resGrades = await enqueueSingleGlobalJobType({
         jobType: 'SYNC_GRADES',
@@ -62,7 +62,7 @@ export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boole
     }
 
     // 3. Job 3: Đồng bộ Kết quả LMS (Cấu hình giờ chạy riêng: config.lmsJob)
-    if (config.lmsJob && isJobDueToRun(config.lmsJob, currentHour, currentMinute, currentDateStr)) {
+    if (config.lmsJob && isJobDueToRun({ jobConfig: config.lmsJob, currentHour, currentMinute, currentDateStr })) {
       console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 3 (LMS) lúc ${config.lmsJob.scheduleTime} VN...`);
       const resLms = await enqueueSingleGlobalJobType({
         jobType: 'SYNC_LMS',
@@ -78,7 +78,7 @@ export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boole
     }
 
     // 4. Job 4: Đồng bộ Lịch thi cá nhân QLDTTX (Cấu hình giờ chạy riêng: config.examsJob - Mặc định 07:00 sáng VN)
-    if (config.examsJob && isJobDueToRun(config.examsJob, currentHour, currentMinute, currentDateStr)) {
+    if (config.examsJob && isJobDueToRun({ jobConfig: config.examsJob, currentHour, currentMinute, currentDateStr })) {
       console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 4 (Lịch thi 7h sáng) lúc ${config.examsJob.scheduleTime} VN...`);
       const resExams = await enqueueSingleGlobalJobType({
         jobType: 'SYNC_EXAMS',
@@ -94,7 +94,7 @@ export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boole
     }
 
     // 5. Job 5: Đồng bộ Kết quả học tập PTIT S-Link (Cấu hình giờ chạy riêng: config.slinkGradesJob - Mặc định 23:00 đêm VN)
-    if (config.slinkGradesJob && isJobDueToRun(config.slinkGradesJob, currentHour, currentMinute, currentDateStr)) {
+    if (config.slinkGradesJob && isJobDueToRun({ jobConfig: config.slinkGradesJob, currentHour, currentMinute, currentDateStr })) {
       console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 5 (Điểm S-Link) lúc ${config.slinkGradesJob.scheduleTime} VN...`);
       const resSlinkGrades = await enqueueSingleGlobalJobType({
         jobType: 'SYNC_SLINK_GRADES',
@@ -110,7 +110,7 @@ export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boole
     }
 
     // 6. Job 6: Đồng bộ Thông tin cá nhân Sinh viên QLHT (Cấu hình giờ chạy riêng: config.profileJob - Mặc định 22:30 đêm VN)
-    if (config.profileJob && isJobDueToRun(config.profileJob, currentHour, currentMinute, currentDateStr)) {
+    if (config.profileJob && isJobDueToRun({ jobConfig: config.profileJob, currentHour, currentMinute, currentDateStr })) {
       console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 6 (Hồ sơ SV QLHT) lúc ${config.profileJob.scheduleTime} VN...`);
       const resProfile = await enqueueSingleGlobalJobType({
         jobType: 'SYNC_PROFILE',

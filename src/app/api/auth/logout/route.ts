@@ -23,7 +23,9 @@ export async function POST(req: NextRequest) {
         },
       });
     }
-  } catch {}
+  } catch (caughtError) {
+    console.warn(`[route] Non-fatal error:`, caughtError);
+  }
 
   const response = NextResponse.json({ success: true, message: 'Đăng xuất thành công' });
   response.cookies.set('auth_token', '', {

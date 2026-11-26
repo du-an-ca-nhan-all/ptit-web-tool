@@ -98,7 +98,9 @@ export function savePricingConfig(config: Partial<PricingConfig>): PricingConfig
       headers: getAuthHeaders(),
       body: JSON.stringify(next),
     }).catch(() => {});
-  } catch {}
+  } catch (caughtError) {
+    console.warn(`[storage] Non-fatal error:`, caughtError);
+  }
   return next;
 }
 
@@ -116,7 +118,9 @@ export function resetPricingConfig(): PricingConfig {
       headers: getAuthHeaders(),
       body: JSON.stringify(DEFAULT_PRICING_CONFIG),
     }).catch(() => {});
-  } catch {}
+  } catch (caughtError) {
+    console.warn(`[storage] Non-fatal error:`, caughtError);
+  }
   return DEFAULT_PRICING_CONFIG;
 }
 
@@ -164,7 +168,9 @@ export function saveSessionPriceOverride(
         note: meta?.note,
       }),
     }).catch(() => {});
-  } catch {}
+  } catch (caughtError) {
+    console.warn(`[storage] Non-fatal error:`, caughtError);
+  }
 }
 
 export function removeSessionPriceOverride(sessionKey: string): void {
@@ -180,7 +186,9 @@ export function removeSessionPriceOverride(sessionKey: string): void {
       method: 'DELETE',
       headers: getAuthHeaders(),
     }).catch(() => {});
-  } catch {}
+  } catch (caughtError) {
+    console.warn(`[storage] Non-fatal error:`, caughtError);
+  }
 }
 
 export function clearAllSessionPriceOverrides(): void {
@@ -194,5 +202,7 @@ export function clearAllSessionPriceOverrides(): void {
       method: 'DELETE',
       headers: getAuthHeaders(),
     }).catch(() => {});
-  } catch {}
+  } catch (caughtError) {
+    console.warn(`[storage] Non-fatal error:`, caughtError);
+  }
 }

@@ -10,12 +10,19 @@ import { logActivity } from '@/src/features/activity-logs/server/activityLogServ
 import { saveTelegramAdminConfig } from '@/src/lib/globalConfig';
 import { AuthUser, resolveEffectiveTokenOrResponse } from './helpers';
 
-export async function handleAdminBotAction(
-  req: NextRequest,
-  authUser: AuthUser,
-  action: string,
-  body: any
-): Promise<NextResponse | null> {
+export interface AdminBotActionParams {
+  req: NextRequest;
+  authUser: AuthUser;
+  action: string;
+  body: any;
+}
+
+export async function handleAdminBotAction({
+  req,
+  authUser,
+  action,
+  body,
+}: AdminBotActionParams): Promise<NextResponse | null> {
   // ─────────────────────────────────────────────────────────────
   // GLOBAL SYSTEM BOT ACTIONS (ADMIN ONLY)
   // ─────────────────────────────────────────────────────────────
@@ -184,9 +191,14 @@ export async function handleAdminBotAction(
     const now = new Date();
     const testMsg = `🔔 <b>KIỂM TRA KẾT NỐI KÊNH ADMIN (telegram_admin)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🛡️ <b>PTIT EduSync Security & Management Hub</b>\n👤 Thực hiện bởi: <b>${authUser.username}</b> (Admin)\n📌 Chat ID: <code>${chatId}</code>${threadId ? `\n🏷️ Thread/Topic: <code>${threadId}</code>` : ''}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n✅ <i>Kết nối hoạt động bình thường! Kênh này sẵn sàng tiếp nhận notice người đăng ký mới, sao lưu & xuất DB, phục hồi dữ liệu...</i>\n⏰ <i>Thời gian: ${now.toLocaleTimeString('vi-VN')} - ${now.toLocaleDateString('vi-VN')}</i>`;
 
-    const sendRes = await sendTelegramMessage(tokenRes.token, chatId.trim(), testMsg, {
-      threadId: threadId ? Number(threadId) : undefined,
-      priority: 'HIGH',
+    const sendRes = await sendTelegramMessage({
+      botToken: tokenRes.token,
+      chatId: chatId.trim(),
+      text: testMsg,
+      options: {
+        threadId: threadId ? Number(threadId) : undefined,
+        priority: 'HIGH',
+      },
     });
 
     if (sendRes.success) {

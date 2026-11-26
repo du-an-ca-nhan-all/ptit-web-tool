@@ -19,12 +19,19 @@ const QLDTTX_INVALID_ERROR =
 const SLINK_INVALID_ERROR =
   'Chưa cấu hình tài khoản Cổng Thông Tin PTIT S-Link hoặc thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại tài khoản trước khi thực hiện.';
 
-export async function handleUserCheckAction(
-  req: NextRequest,
-  username: string,
-  action: string,
-  body: any
-): Promise<NextResponse | null> {
+export interface UserCheckActionParams {
+  req: NextRequest;
+  username: string;
+  action: string;
+  body: any;
+}
+
+export async function handleUserCheckAction({
+  req,
+  username,
+  action,
+  body,
+}: UserCheckActionParams): Promise<NextResponse | null> {
   // 2.5 ACTION: CHECK QLDTTX ANNOUNCEMENTS NOW (Kiểm tra thông báo QLDTTX tức thì)
   if (action === 'CHECK_QLDT_ANNOUNCEMENTS') {
     const extAccount = await findQldttxAccount(username);

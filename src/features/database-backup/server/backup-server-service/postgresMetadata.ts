@@ -150,8 +150,8 @@ export async function syncPostgresSequences(prismaClient = prisma): Promise<numb
             );
           `, seq_name);
           count++;
-        } catch {
-          // Bỏ qua lỗi cấp quyền nếu có
+        } catch (caughtError) {
+          console.warn(`[postgresMetadata] Non-fatal error:`, caughtError);
         }
       }
     }

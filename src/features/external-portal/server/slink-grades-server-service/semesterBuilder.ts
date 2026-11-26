@@ -67,7 +67,7 @@ export function buildProcessedSemesters(
     const processedCourses: StudentCourseGrade[] = [];
 
     for (const c of semCoursesRaw) {
-      const courseObj = parseCourseGrade(c, semesterId, semesterName, gradeCounts);
+      const courseObj = parseCourseGrade({ course: c, semesterId, semesterName, gradeCounts });
       processedCourses.push(courseObj);
       allCourses.push(courseObj);
     }

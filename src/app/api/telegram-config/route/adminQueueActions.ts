@@ -10,12 +10,19 @@ import {
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { AuthUser } from './helpers';
 
-export async function handleAdminQueueAction(
-  req: NextRequest,
-  authUser: AuthUser,
-  action: string,
-  body: any
-): Promise<NextResponse | null> {
+export interface AdminQueueActionParams {
+  req: NextRequest;
+  authUser: AuthUser;
+  action: string;
+  body: any;
+}
+
+export async function handleAdminQueueAction({
+  req,
+  authUser,
+  action,
+  body,
+}: AdminQueueActionParams): Promise<NextResponse | null> {
   // ─────────────────────────────────────────────────────────────
   // GLOBAL TELEGRAM QUEUE ACTIONS (ADMIN ONLY)
   // ─────────────────────────────────────────────────────────────

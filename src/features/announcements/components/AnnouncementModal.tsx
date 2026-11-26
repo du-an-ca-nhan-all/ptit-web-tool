@@ -51,7 +51,9 @@ export default function AnnouncementModal({
         if (dismissedTimestamp === a.updatedAt) {
           return false;
         }
-      } catch {}
+      } catch (caughtError) {
+        console.warn(`[AnnouncementModal] Non-fatal error:`, caughtError);
+      }
       return true;
     });
 
@@ -76,7 +78,9 @@ export default function AnnouncementModal({
       } else {
         localStorage.setItem(`dismissed_modal_${activeModalItem.id}`, activeModalItem.updatedAt);
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[AnnouncementModal] Non-fatal error:`, caughtError);
+    }
     setActiveModalItem(null);
   };
 

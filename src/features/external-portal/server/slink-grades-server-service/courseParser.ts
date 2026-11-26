@@ -26,12 +26,15 @@ export function createInitialGradeCounts(): GradeCountMap {
   };
 }
 
-export function parseCourseGrade(
-  c: any,
-  semesterId: string,
-  semesterName: string,
-  gradeCounts: GradeCountMap
-): StudentCourseGrade {
+export interface ParseCourseGradeParams {
+  course: any;
+  semesterId: string;
+  semesterName: string;
+  gradeCounts: GradeCountMap;
+}
+
+export function parseCourseGrade(params: ParseCourseGradeParams): StudentCourseGrade {
+  const { course: c, semesterId, semesterName, gradeCounts } = params;
   const subjectCode = String(c.maHocPhan || c.hocPhan?.ma || '').trim();
   const subjectName = String(c.hocPhan?.ten || c.tenLopHocPhan || subjectCode).trim();
   const group = String(c.soThuTuLop || c.tenLopHocPhan || '').trim();

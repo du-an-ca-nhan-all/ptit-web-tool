@@ -184,7 +184,9 @@ export function useAdminAnnouncements() {
         );
         fetchAnnouncements();
       }
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[useAdminAnnouncements] Non-fatal error:`, caughtError);
+    }
   };
 
   const handleDelete = async (id: number) => {

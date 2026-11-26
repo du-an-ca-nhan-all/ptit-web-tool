@@ -134,8 +134,8 @@ export async function exportDatabaseAsSqlDump(): Promise<string> {
         }
       }
     }
-  } catch {
-    // Silently ignore sequence error in dump generation
+  } catch (caughtError) {
+    console.warn(`[backupExport] Non-fatal error:`, caughtError);
   }
 
   lines.push('');

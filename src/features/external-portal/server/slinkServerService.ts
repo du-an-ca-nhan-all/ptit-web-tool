@@ -10,6 +10,7 @@ import {
   getSlinkNotifications,
   getSlinkUserInfo,
   markSlinkNotificationAsRead,
+  type GetSlinkNotificationsParams,
 } from './slink-server-service/slinkApi';
 import {
   refreshAllSlinkTokensPeriodic,
@@ -60,6 +61,7 @@ export {
   getSlinkNotifications,
   markSlinkNotificationAsRead,
 };
+export type { GetSlinkNotificationsParams };
 
 /**
  * Lấy hoặc đồng bộ danh sách thông báo và thông tin S-Link cho sinh viên dựa trên tài khoản trong DB
@@ -102,7 +104,7 @@ export async function getOrFetchStudentSlinkOverview(
       console.warn('[getOrFetchStudentSlinkOverview] Lỗi lấy thông tin user S-Link:', e.message);
       return null;
     }),
-    getSlinkNotifications(token, page, limit, unreadOnly).catch((e) => {
+    getSlinkNotifications({ accessToken: token, page, limit, unreadOnly }).catch((e) => {
       console.warn('[getOrFetchStudentSlinkOverview] Lỗi lấy thông báo S-Link:', e.message);
       return null;
     }),

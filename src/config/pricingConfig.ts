@@ -20,6 +20,11 @@ export {
   saveSessionPriceOverride,
 } from './pricing-config/storage';
 
+export type {
+  CalculateRoomPriceParams,
+  GetDefaultRoomPriceParams,
+} from './pricing-config/calculator';
+
 export {
   calculateRoomPrice,
   formatCurrency,

@@ -88,8 +88,13 @@ export async function runExamScheduleReminders(options: {
 
           const messageHtml = `⏰ <b>[NHẮC LỊCH THI] NGÀY MAI BẠN CÓ CA THI!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n🏫 Lớp: <b>${classCode}</b>\n🗓️ Ngày thi: <b>${tomorrowStr} (NGÀY MAI)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 <b>DANH SÁCH CA THI NGÀY MAI (${unreminded1DayExams.length} môn):</b>${examListHtml}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n💡 <i>Lời khuyên: Vui lòng chuẩn bị thẻ sinh viên, CCCD và có mặt trước giờ thi ít nhất 15 phút. Chúc bạn thi tốt!</i>\n⏰ <i>Nhắc nhở lúc: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>`;
 
-          const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
-            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          const sendRes = await sendTelegramMessage({
+            botToken: effectiveToken,
+            chatId: sub.chatId,
+            text: messageHtml,
+            options: {
+              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            },
           });
 
           if (sendRes.success) {
@@ -153,8 +158,13 @@ export async function runExamScheduleReminders(options: {
 
           const messageHtml = `☀️ <b>[LỊCH THI HÔM NAY - 7:00 SÁNG] CHÚC BẠN THI TỐT!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n🏫 Lớp: <b>${classCode}</b>\n🗓️ Ngày thi: <b>${todayStr} (HÔM NAY)</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 <b>DANH SÁCH CA THI HÔM NAY (${unremindedTodayExams.length} môn):</b>${examListHtml}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🚀 <i>Nhắc nhở: Hãy kiểm tra kỹ phòng thi, mang đầy đủ giấy tờ tùy thân và đồ dùng thi cử!</i>\n⏰ <i>Tự động phát lúc: 7:00 AM (Giờ Việt Nam)</i>`;
 
-          const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
-            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          const sendRes = await sendTelegramMessage({
+            botToken: effectiveToken,
+            chatId: sub.chatId,
+            text: messageHtml,
+            options: {
+              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            },
           });
 
           if (sendRes.success) {

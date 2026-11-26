@@ -79,7 +79,9 @@ export default function GlobalSyncQueueManager({
     try {
       await updateConfig(configForm);
       setIsConfigOpen(false);
-    } catch {}
+    } catch (caughtError) {
+      console.warn(`[GlobalSyncQueueManager] Non-fatal error:`, caughtError);
+    }
   };
 
   return (

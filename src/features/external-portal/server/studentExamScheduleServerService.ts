@@ -11,6 +11,8 @@ import {
 import {
   buildQldtExamResultFromRawData,
   buildResultFromCachedRawData,
+  type BuildQldtExamResultParams,
+  type BuildResultFromCachedRawDataParams,
 } from './student-exam-schedule-server-service/examNormalizer';
 import { detectExamScheduleChanges } from './student-exam-schedule-server-service/examDiffDetector';
 import {
@@ -27,6 +29,8 @@ export type {
   StudentQldtExamItem,
   StudentQldtSemester,
   StudentQldtExamScheduleResult,
+  BuildQldtExamResultParams,
+  BuildResultFromCachedRawDataParams,
 };
 
 export {
@@ -99,13 +103,13 @@ export async function getStudentQldtExamSchedule(
   // Trả về từ DB cache nếu còn hạn và không forceRefresh
   if (!options?.forceRefresh && isCacheFresh) {
     try {
-      return buildResultFromCachedRawData(
+      return buildResultFromCachedRawData({
         cleanUsername,
         cachedRecord,
         currentSemester,
         lastPulled,
-        options?.semesterId
-      );
+        requestedSemesterId: options?.semesterId,
+      });
     } catch (parseErr) {
       console.warn('[getStudentQldtExamSchedule] Parse rawData từ cache lỗi:', parseErr);
     }
@@ -169,13 +173,13 @@ export async function getStudentQldtExamSchedule(
   // Fallback 1: Trả về dữ liệu từ bảng StudentQldtExamRecord đã lưu trước đó nếu có (khi mạng QLDTTX gặp sự cố)
   if (cachedRecord && cachedRecord.rawData) {
     try {
-      return buildResultFromCachedRawData(
+      return buildResultFromCachedRawData({
         cleanUsername,
         cachedRecord,
         currentSemester,
         lastPulled,
-        options?.semesterId
-      );
+        requestedSemesterId: options?.semesterId,
+      });
     } catch (dbErr) {
       console.error('[getStudentQldtExamSchedule] Fallback StudentQldtExamRecord lỗi:', dbErr);
     }

@@ -132,7 +132,7 @@ export async function getStudentGrades(
           return fallbackResult;
         }
       } catch (fbErr) {
-        // Continue to error return
+        console.warn(`[studentGradesServerService] Non-fatal error:`, fbErr);
       }
 
       return createEmptyGradesResult({

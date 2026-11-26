@@ -43,12 +43,19 @@ export const getRelativeSyncTime = (dateStr?: string | null) => {
   }
 };
 
-export const filterSemesters = (
-  semesters: SemesterGradeSummary[],
-  selectedSemester: string,
-  selectedGradeFilter: string,
-  searchQuery: string
-): SemesterGradeSummary[] => {
+export interface FilterSemestersParams {
+  semesters: SemesterGradeSummary[];
+  selectedSemester: string;
+  selectedGradeFilter: string;
+  searchQuery: string;
+}
+
+export const filterSemesters = ({
+  semesters,
+  selectedSemester,
+  selectedGradeFilter,
+  searchQuery,
+}: FilterSemestersParams): SemesterGradeSummary[] => {
   return semesters
     .filter((sem) => selectedSemester === 'ALL' || sem.semesterId === selectedSemester)
     .map((sem) => {

@@ -138,8 +138,13 @@ export async function dispatchNearestClassScheduleNotification(options: {
         if (options.forceSend) {
           const empty10DaysMsg = `📚 <b>[LỊCH HỌC 10 NGÀY TỚI] THỜI KHÓA BIỂU PTIT</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n🏫 Lớp: <b>${classCode}</b>\n\n📌 <i>Đã quét thời khóa biểu cổng trường: Trong ${maxDays} ngày tới bạn không có ca học nào trên hệ thống.</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ <i>Quét lúc: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>`;
 
-          const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, empty10DaysMsg, {
-            threadId: sub.threadId ? Number(sub.threadId) : undefined,
+          const sendRes = await sendTelegramMessage({
+            botToken: effectiveToken,
+            chatId: sub.chatId,
+            text: empty10DaysMsg,
+            options: {
+              threadId: sub.threadId ? Number(sub.threadId) : undefined,
+            },
           });
 
           if (sendRes.success) {
@@ -172,8 +177,13 @@ export async function dispatchNearestClassScheduleNotification(options: {
 
       const messageHtml = `📚 <b>[LỊCH HỌC GẦN NHẤT] THỜI KHÓA BIỂU PTIT</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Sinh viên: <b>${studentName}</b> (<code>${sub.username}</code>)\n🏫 Lớp: <b>${classCode}</b>\n🗓️ Ngày học gần nhất: <b>${nearest.dowName}, ngày ${nearest.dateStr}</b> (<i>${offsetText}</i>)\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 <b>DANH SÁCH CA HỌC (${nearest.sessions.length} ca):</b>${sessionListHtml}\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🔔 <i>Hệ thống tự động quét lịch học trong ${maxDays} ngày tới. Chúc bạn học tập tốt!</i>\n⏰ <i>Quét lúc: ${nowVN.toLocaleTimeString('vi-VN')} - ${nowVN.toLocaleDateString('vi-VN')}</i>`;
 
-      const sendRes = await sendTelegramMessage(effectiveToken, sub.chatId, messageHtml, {
-        threadId: sub.threadId ? Number(sub.threadId) : undefined,
+      const sendRes = await sendTelegramMessage({
+        botToken: effectiveToken,
+        chatId: sub.chatId,
+        text: messageHtml,
+        options: {
+          threadId: sub.threadId ? Number(sub.threadId) : undefined,
+        },
       });
 
       if (sendRes.success) {

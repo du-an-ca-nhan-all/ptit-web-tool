@@ -127,7 +127,7 @@ export function useClassMembersData({
 
   // Export CSV
   const handleExportCSV = () => {
-    exportClassMembersCsv(filteredStudents, activeTab, selectedClass, hasExamSchedule);
+    exportClassMembersCsv({ filteredStudents, activeTab, selectedClass, hasExamSchedule });
   };
 
   return {

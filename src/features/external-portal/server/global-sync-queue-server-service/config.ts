@@ -60,15 +60,18 @@ export function getNormalizedGlobalSyncConfig(
   };
 }
 
+export interface IsJobDueToRunParams {
+  jobConfig: { isEnabled: boolean; scheduleTime: string; lastSyncDate?: string | null };
+  currentHour: number;
+  currentMinute: number;
+  currentDateStr: string;
+}
+
 /**
  * Kiểm tra xem 1 Job đã đến giờ chạy theo cấu hình riêng của nó hay chưa
  */
-export function isJobDueToRun(
-  jobConfig: { isEnabled: boolean; scheduleTime: string; lastSyncDate?: string | null },
-  currentHour: number,
-  currentMinute: number,
-  currentDateStr: string
-): boolean {
+export function isJobDueToRun(params: IsJobDueToRunParams): boolean {
+  const { jobConfig, currentHour, currentMinute, currentDateStr } = params;
   if (jobConfig.isEnabled === false) return false;
   if (jobConfig.lastSyncDate === currentDateStr) return false;
 

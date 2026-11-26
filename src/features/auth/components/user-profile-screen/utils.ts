@@ -113,13 +113,21 @@ export function buildSaveExternalAccountPayload(
   };
 }
 
-export function validateTestExternalAccount(
-  sys: any,
-  targetUser: string,
-  targetPass: string,
-  targetRefreshToken: string,
-  isSlink: boolean
-): string | null {
+export interface ValidateTestExternalAccountParams {
+  sys: any;
+  targetUser: string;
+  targetPass: string;
+  targetRefreshToken: string;
+  isSlink: boolean;
+}
+
+export function validateTestExternalAccount({
+  sys,
+  targetUser,
+  targetPass,
+  targetRefreshToken,
+  isSlink,
+}: ValidateTestExternalAccountParams): string | null {
   if (isSlink) {
     if (!targetRefreshToken && !sys.hasRefreshToken) {
       return 'Vui lòng nhập Refresh Token OAuth của PTIT S-Link trước khi kiểm tra';
@@ -137,13 +145,21 @@ export function validateTestExternalAccount(
   return null;
 }
 
-export function buildTestExternalAccountPayload(
-  sys: any,
-  targetUser: string,
-  targetPass: string,
-  targetRefreshToken: string,
-  isSlink: boolean
-) {
+export interface BuildTestExternalAccountPayloadParams {
+  sys: any;
+  targetUser: string;
+  targetPass: string;
+  targetRefreshToken: string;
+  isSlink: boolean;
+}
+
+export function buildTestExternalAccountPayload({
+  sys,
+  targetUser,
+  targetPass,
+  targetRefreshToken,
+  isSlink,
+}: BuildTestExternalAccountPayloadParams) {
   if (isSlink) {
     return {
       action: 'TEST',

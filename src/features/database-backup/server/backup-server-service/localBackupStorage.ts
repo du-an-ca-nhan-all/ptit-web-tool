@@ -58,8 +58,8 @@ export function listLocalBackups(): LocalBackupFile[] {
         sizeFormatted: formatBytes(stat.size),
         createdAt: stat.mtime.toISOString(),
       });
-    } catch {
-      // Ignore file stat errors
+    } catch (caughtError) {
+      console.warn(`[localBackupStorage] Non-fatal error:`, caughtError);
     }
   }
 

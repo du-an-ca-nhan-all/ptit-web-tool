@@ -53,7 +53,7 @@ export function parseSlinkRichStats(record: any) {
           inProgressCount++;
       }
     } catch (e) {
-      // Ignore parse error
+      console.warn(`[gradeStatsParser] Non-fatal error:`, e);
     }
   }
 
@@ -139,7 +139,7 @@ export function parseQlhtRichStats(record: any) {
         }
       }
     } catch (e) {
-      // Ignore JSON parse error
+      console.warn(`[gradeStatsParser] Non-fatal error:`, e);
     }
   }
 
