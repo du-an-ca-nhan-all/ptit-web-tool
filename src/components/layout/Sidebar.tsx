@@ -237,7 +237,7 @@ export default function Sidebar({
                 </span>
               </div>
 
-              {/* Danh sách & Thành viên lớp */}
+              {/* Danh sách thành viên trong lớp */}
               <button
                 onClick={() => onTabChange('members')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-colors cursor-pointer ${
@@ -246,7 +246,8 @@ export default function Sidebar({
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
                 }`}
               >
-                <Users className="w-4 h-4 text-amber-400" /> Danh Sách & Điểm Danh
+                <Users className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-left">Danh Sách Thành Viên Trong Lớp</span>
               </button>
 
               {/* Cấu hình Flow Action */}
