@@ -24,8 +24,10 @@ import {
   Layers,
   Sparkles,
   KeyRound,
+  Upload,
 } from 'lucide-react';
 import AdminResetPasswordModal from '../../auth/components/AdminResetPasswordModal';
+import ImportClassMembersModal from './ImportClassMembersModal';
 
 interface ClassMembersProps {
   records: ExamRecord[];
@@ -77,6 +79,7 @@ export default function ClassMembers({
 
   // Receive Transfer Student Modal
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [searchGlobalQuery, setSearchGlobalQuery] = useState('');
   const [globalSearchResults, setGlobalSearchResults] = useState<any[]>([]);
   const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
@@ -646,20 +649,30 @@ export default function ClassMembers({
             </select>
           </div>
 
-          {/* Button Tiếp Nhận Sinh Viên - Chỉ hiện khi là Lớp Trưởng của lớp này hoặc Admin */}
+          {/* Button Tiếp Nhận Sinh Viên & Import Danh Sách - Chỉ hiện khi là Lớp Trưởng của lớp này hoặc Admin */}
           {canManageClass ? (
-            <button
-              onClick={() => {
-                setIsReceiveModalOpen(true);
-                setSearchGlobalQuery('');
-                setGlobalSearchResults([]);
-                setSelectedStudentToReceive(null);
-              }}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl transition-all shadow-md shadow-indigo-200 whitespace-nowrap cursor-pointer hover:scale-[1.02]"
-              title="Tiếp nhận sinh viên chuyển biên chế vào lớp này"
-            >
-              <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Tiếp Nhận SV
-            </button>
+            <>
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl transition-all shadow-md shadow-emerald-200 whitespace-nowrap cursor-pointer hover:scale-[1.02]"
+                title="Import danh sách thành viên lớp (tự động chuyển lớp & đánh dấu thôi học)"
+              >
+                <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Import DS
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsReceiveModalOpen(true);
+                  setSearchGlobalQuery('');
+                  setGlobalSearchResults([]);
+                  setSelectedStudentToReceive(null);
+                }}
+                className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl transition-all shadow-md shadow-indigo-200 whitespace-nowrap cursor-pointer hover:scale-[1.02]"
+                title="Tiếp nhận sinh viên chuyển biên chế vào lớp này"
+              >
+                <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Tiếp Nhận SV
+              </button>
+            </>
           ) : (
             <span
               className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 cursor-default"
@@ -2239,6 +2252,21 @@ export default function ClassMembers({
         initialClass={resetPasswordStudent.lop}
         onSuccess={() => {
           showToast(`Đã cập nhật mật khẩu cho ${resetPasswordStudent.username}!`);
+        }}
+      />
+
+      {/* Import Class Members Modal */}
+      <ImportClassMembersModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        selectedClass={selectedClass}
+        existingActiveStudents={activeStudents}
+        onImportSuccess={(message) => {
+          showToast(message, 'success');
+          fetchClassMembers();
+          if (onReloadMonitors) {
+            onReloadMonitors();
+          }
         }}
       />
     </div>
