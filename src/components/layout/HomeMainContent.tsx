@@ -1,169 +1,62 @@
 'use client';
 
 import React from 'react';
-import { CalendarDays, RefreshCw, Layers, Power } from 'lucide-react';
-import { UserProfileScreen, AdminRegistrationManager } from '../../features/auth';
 import {
-  UploadSection,
-  AllExamsSchedule,
-  StudentPersonalExamSchedule,
-  ExamBatchManagement,
-  type FilterState,
-  type SortKey,
-  type SortDirection,
-} from '../../features/exam-schedule';
-import {
-  ClassMonitorTools,
-  ClassMembers,
-  MonitorsList,
-  AllStudentsList,
-  MonitorFlowManager,
-  ExamReviewRegistrationManager,
-  MonitorRoomAnalysis,
-} from '../../features/classes-monitor';
-import {
-  AllMonitorsEnvelopes,
-  SettlementManager,
-} from '../../features/envelope-settlement';
-import {
-  StudentCourseRegistration,
-  CourseRegistrationPortal,
-  AdminExternalAccounts,
-  GlobalSyncQueueManager,
-} from '../../features/external-portal';
-import { AdminTelegramBotManager } from '../../features/telegram';
-import {
-  AdminAnnouncementsManager,
   AnnouncementBanner,
   AnnouncementModal,
 } from '../../features/announcements';
-import { ActivityLogsManager } from '../../features/activity-logs';
-import { DatabaseBackupManager } from '../../features/database-backup';
 import { DashboardOverview } from '../../features/dashboard';
-import { RemindersManager } from '../../features/reminders';
 import Footer from './Footer';
-import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../../types';
-import { NavigationTab, ProfileSubTab, TabChangeOptions } from '../../types/navigation';
-import { buildSessions } from '../../utils/dataModel';
-import { AnnouncementItem } from '../../features/announcements';
+import type { NavigationTab, ProfileSubTab } from '../../types/navigation';
+import type { HomeMainContentProps } from './home-main-content/types';
+import { renderAdminAndUserTabs } from './home-main-content/renderAdminAndUserTabs';
+import { renderClassAndMonitorTabs } from './home-main-content/renderClassAndMonitorTabs';
+import { ExamScheduleFallbackView } from './home-main-content/ExamScheduleFallbackView';
 
-interface HomeMainContentProps {
-  isLoading: boolean;
-  activeTab: NavigationTab;
-  currentUser: LoginUser | null;
-  effectiveUser: LoginUser | null;
-  records: ExamRecord[];
-  setRecords: React.Dispatch<React.SetStateAction<ExamRecord[]>>;
-  sessions: ExamSession[];
-  setSessions: React.Dispatch<React.SetStateAction<ExamSession[]>>;
-  examBatches: ExamBatchItem[];
-  activeBatch: ExamBatchItem | null;
-  setActiveBatch: (batch: ExamBatchItem | null) => void;
-  loginUsers: LoginUser[];
-  monitorClass: string;
-  setMonitorClass: (className: string) => void;
-  filters: FilterState;
-  setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
-  sortConfig: { key: SortKey; direction: SortDirection } | null;
-  setSortConfig: React.Dispatch<
-    React.SetStateAction<{ key: SortKey; direction: SortDirection } | null>
-  >;
-  selectedExamRoom: ExamRecord | null;
-  setSelectedExamRoom: (room: ExamRecord | null) => void;
-  setConfirmStudentId: (id: string | null) => void;
-  setConfirmClassCode: (code: string | null) => void;
-  setSearchInput: (val: string) => void;
-  setIsClassGroupOpen: (open: boolean) => void;
-  userRoles: string[];
-  activeRole: string;
-  handleSelectRole: (role: string) => void;
-  handleLogout: () => Promise<void>;
-  handleTabChange: (tab: NavigationTab, subTab?: ProfileSubTab, options?: TabChangeOptions) => void;
-  handleImpersonate: (username: string) => Promise<void>;
-  handleToggleExamPostpone: (record: ExamRecord, newStatus: boolean) => Promise<void>;
-  loadDataFromApi: (batchCode?: string) => Promise<void>;
-  fetchMonitorsData: () => Promise<void>;
-  isLoadingMonitors?: boolean;
-  fetchCourseCompareData: () => void;
-  courseCompareData: { main: any; subAccount: any; allSubAccounts?: any[] } | null;
-  isAdmin: boolean;
-  canAccessMonitorTools: boolean;
-  canImpersonate: boolean;
-  hasActiveBatch: boolean;
-  hasExamSchedule: boolean;
-  baseRecords?: ExamRecord[];
-  filteredRecords?: ExamRecord[];
-  classes: string[];
-  subjects: { code: string; name: string }[];
-  dates: string[];
-  setCurrentUser: (user: LoginUser | null) => void;
-  page: number;
-  setPage: (page: number) => void;
-  pageSize: number;
-  setPageSize: (size: number) => void;
-  totalRecords: number;
-  totalPages: number;
-  profileSubTab?: ProfileSubTab;
-  setProfileSubTab?: (subTab: ProfileSubTab) => void;
-  announcements?: AnnouncementItem[];
-}
+export default function HomeMainContent(props: HomeMainContentProps) {
+  const {
+    isLoading,
+    activeTab,
+    effectiveUser,
+    handleTabChange,
+    announcements = [],
+  } = props;
 
-export default function HomeMainContent({
-  isLoading,
-  activeTab,
-  currentUser,
-  effectiveUser,
-  records,
-  setRecords,
-  sessions,
-  setSessions,
-  examBatches,
-  activeBatch,
-  setActiveBatch,
-  loginUsers,
-  monitorClass,
-  setMonitorClass,
-  filters,
-  setFilters,
-  sortConfig,
-  setSortConfig,
-  selectedExamRoom,
-  setSelectedExamRoom,
-  setConfirmStudentId,
-  setConfirmClassCode,
-  setSearchInput,
-  setIsClassGroupOpen,
-  userRoles,
-  activeRole,
-  handleSelectRole,
-  handleLogout,
-  handleTabChange,
-  handleImpersonate,
-  handleToggleExamPostpone,
-  loadDataFromApi,
-  fetchMonitorsData,
-  isLoadingMonitors = false,
-  fetchCourseCompareData,
-  courseCompareData,
-  isAdmin,
-  canAccessMonitorTools,
-  canImpersonate,
-  hasActiveBatch,
-  hasExamSchedule,
-  classes,
-  subjects,
-  dates,
-  setCurrentUser,
-  page,
-  setPage,
-  pageSize,
-  setPageSize,
-  totalRecords,
-  totalPages,
-  profileSubTab,
-  setProfileSubTab,
-  announcements = [],
-}: HomeMainContentProps) {
+  const renderBody = () => {
+    if (activeTab === 'dashboard' && effectiveUser) {
+      return (
+        <DashboardOverview
+          currentUser={effectiveUser}
+          onNavigateTab={(tab, subTab, options) =>
+            handleTabChange(
+              tab as NavigationTab,
+              subTab as ProfileSubTab,
+              options,
+            )
+          }
+        />
+      );
+    }
+
+    if (isLoading) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-sm text-slate-500 font-medium">
+            Đang tải dữ liệu từ máy chủ...
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      renderAdminAndUserTabs(props) ??
+      renderClassAndMonitorTabs(props) ?? (
+        <ExamScheduleFallbackView {...props} />
+      )
+    );
+  };
+
   return (
     <section className="flex-1 flex flex-col min-h-0 overflow-y-auto">
       {/* Global Active Announcement Banner */}
@@ -178,305 +71,7 @@ export default function HomeMainContent({
         onNavigateTab={(tab) => handleTabChange(tab as NavigationTab)}
       />
 
-      {activeTab === 'dashboard' && effectiveUser ? (
-        <DashboardOverview
-          currentUser={effectiveUser}
-          onNavigateTab={(tab, subTab, options) =>
-            handleTabChange(tab as NavigationTab, subTab as ProfileSubTab, options)
-          }
-        />
-      ) : isLoading ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm text-slate-500 font-medium">Đang tải dữ liệu từ máy chủ...</p>
-        </div>
-      ) : activeTab === 'profile' && currentUser ? (
-        <UserProfileScreen
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          hasExamSchedule={hasExamSchedule}
-          onNavigateTab={(tab) => handleTabChange(tab as NavigationTab)}
-          userRoles={userRoles}
-          activeRole={activeRole}
-          onSelectRole={handleSelectRole}
-          activeSubTab={profileSubTab}
-          onSubTabChange={setProfileSubTab}
-          onProfileUpdated={(updatedUser) => {
-            setCurrentUser(updatedUser);
-            localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-          }}
-        />
-      ) : activeTab === 'course_registration' && effectiveUser ? (
-        <CourseRegistrationPortal
-          currentUser={effectiveUser}
-          onNavigateTab={(tab, subTab) =>
-            handleTabChange(tab as NavigationTab, subTab as ProfileSubTab)
-          }
-        />
-      ) : activeTab === 'registered_courses' && effectiveUser ? (
-        <StudentCourseRegistration
-          currentUser={effectiveUser}
-          initialSubTab="COURSES"
-          onNavigateTab={(tab, subTab) =>
-            handleTabChange(tab as NavigationTab, subTab as ProfileSubTab)
-          }
-          courseCompareData={courseCompareData}
-          onReloadCourseCompare={fetchCourseCompareData}
-        />
-      ) : activeTab === 'course_compare' && effectiveUser ? (
-        <StudentCourseRegistration
-          currentUser={effectiveUser}
-          initialSubTab="COMPARE"
-          onNavigateTab={(tab, subTab) =>
-            handleTabChange(tab as NavigationTab, subTab as ProfileSubTab)
-          }
-          courseCompareData={courseCompareData}
-          onReloadCourseCompare={fetchCourseCompareData}
-        />
-      ) : activeTab === 'reminders' && effectiveUser ? (
-        <RemindersManager
-          currentUser={effectiveUser}
-          onNavigateToTelegramConfig={() => handleTabChange('profile', 'TELEGRAM')}
-          onNavigateToCalendar={() => handleTabChange('profile', 'SCHEDULE')}
-        />
-      ) : activeTab === 'external_accounts_admin' && isAdmin ? (
-        <AdminExternalAccounts currentUser={effectiveUser!} />
-      ) : activeTab === 'global_jobs' && isAdmin ? (
-        <GlobalSyncQueueManager currentUser={effectiveUser!} />
-      ) : activeTab === 'activity_logs' && isAdmin ? (
-        <ActivityLogsManager currentUser={effectiveUser!} />
-      ) : activeTab === 'telegram_admin' && isAdmin ? (
-        <AdminTelegramBotManager currentUser={effectiveUser!} />
-      ) : activeTab === 'user_registrations' && isAdmin ? (
-        <AdminRegistrationManager currentUser={effectiveUser!} />
-      ) : activeTab === 'database_backup' && isAdmin ? (
-        <DatabaseBackupManager currentUser={effectiveUser!} />
-      ) : activeTab === 'announcements_admin' && isAdmin ? (
-        <AdminAnnouncementsManager currentUser={effectiveUser!} />
-      ) : activeTab === 'batches' ? (
-        <ExamBatchManagement
-          currentUser={effectiveUser!}
-          initialBatches={examBatches}
-          initialActiveBatch={activeBatch}
-          onBatchChanged={(batch) => {
-            setActiveBatch(batch);
-            loadDataFromApi(batch.code);
-          }}
-        />
-      ) : activeTab === 'monitors_list' ? (
-        <MonitorsList
-          users={loginUsers}
-          currentUser={effectiveUser}
-          onReload={fetchMonitorsData}
-          isLoading={isLoadingMonitors || isLoading}
-          onClassClick={(classCode) => {
-            handleTabChange('members', undefined, { monitorClass: classCode });
-            setIsClassGroupOpen(true);
-          }}
-        />
-      ) : activeTab === 'all_students' ? (
-        <AllStudentsList
-          currentUser={effectiveUser}
-          onSelectStudentSchedule={(studentId) => {
-            handleTabChange('schedule', undefined, { search: studentId });
-          }}
-          onImpersonate={canImpersonate ? handleImpersonate : undefined}
-          onClassClick={(classCode) => {
-            handleTabChange('members', undefined, { monitorClass: classCode });
-            setIsClassGroupOpen(true);
-          }}
-        />
-      ) : activeTab === 'members' ? (
-        <ClassMembers
-          records={records}
-          selectedClass={monitorClass}
-          onClassChange={setMonitorClass}
-          currentUser={effectiveUser}
-          loginUsers={loginUsers}
-          hasExamSchedule={hasExamSchedule}
-          onImpersonate={canImpersonate ? handleImpersonate : undefined}
-          onTogglePostpone={handleToggleExamPostpone}
-          onReloadMonitors={fetchMonitorsData}
-          onSelectStudentSchedule={(studentId) => {
-            handleTabChange('schedule', undefined, { search: studentId });
-          }}
-        />
-      ) : activeTab === 'monitor_flow' && (isAdmin || canAccessMonitorTools) ? (
-        <MonitorFlowManager
-          currentUser={effectiveUser!}
-          availableClasses={classes}
-          initialClassCode={monitorClass}
-          onNavigateTab={(tab, subTab) =>
-            handleTabChange(tab as NavigationTab, subTab as ProfileSubTab)
-          }
-        />
-      ) : activeTab === 'exam_review' && (isAdmin || canAccessMonitorTools) ? (
-        <ExamReviewRegistrationManager
-          currentUser={effectiveUser!}
-          availableClasses={classes}
-          initialClassCode={monitorClass}
-          examBatches={examBatches}
-          activeBatch={activeBatch}
-        />
-      ) : activeTab === 'room_analysis' && (isAdmin || canAccessMonitorTools) ? (
-        <MonitorRoomAnalysis
-          currentUser={effectiveUser!}
-          availableClasses={classes}
-          initialClassCode={monitorClass}
-          examBatches={examBatches}
-          activeBatch={activeBatch}
-          onSelectStudentSchedule={(studentId) => {
-            handleTabChange('schedule', undefined, { search: studentId });
-          }}
-        />
-      ) : activeTab === 'monitor' ? (
-        <ClassMonitorTools
-          records={records}
-          selectedClass={monitorClass}
-          onClassChange={setMonitorClass}
-        />
-      ) : activeTab === 'envelope_all' || activeTab === 'envelope' ? (
-        <AllMonitorsEnvelopes
-          records={records}
-          sessions={sessions}
-          loginUsers={loginUsers}
-          isAdmin={isAdmin}
-        />
-      ) : activeTab === 'settlement' ? (
-        <SettlementManager
-          records={records}
-          sessions={sessions}
-          loginUsers={loginUsers}
-          onTogglePostpone={handleToggleExamPostpone}
-          isAdmin={isAdmin}
-        />
-      ) : !hasActiveBatch && activeTab === 'schedule' ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto my-auto animate-in fade-in duration-300">
-          <div className="w-16 h-16 bg-amber-50 border border-amber-200 rounded-3xl flex items-center justify-center text-amber-600 mb-4 shadow-sm">
-            <Power className="w-8 h-8" />
-          </div>
-          <h3 className="text-xl font-black text-slate-800 mb-2">Hệ Thống Thi Đang Tạm Đóng</h3>
-          <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-            Hiện tại tất cả các đợt thi đã được tạm khóa hoặc kết thúc. Màn hình tra cứu lịch thi sẽ tự động hiển thị trở lại khi Quản trị viên kích hoạt đợt thi mới.
-          </p>
-          {isAdmin && (
-            <button
-              onClick={() => handleTabChange('batches')}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-200 flex items-center gap-2 cursor-pointer"
-            >
-              <Layers className="w-4 h-4" /> Đi đến Quản Lý Đợt Thi
-            </button>
-          )}
-        </div>
-      ) : activeTab === 'personal_schedule' && effectiveUser ? (
-        <StudentPersonalExamSchedule
-          currentUser={effectiveUser}
-          onNavigateToExternalAccounts={() => handleTabChange('profile')}
-          records={records}
-          totalRecords={totalRecords}
-          page={page}
-          setPage={setPage}
-          pageSize={pageSize}
-          setPageSize={setPageSize}
-          totalPages={totalPages}
-          sortConfig={sortConfig}
-          setSortConfig={setSortConfig}
-          filters={filters}
-          setFilters={setFilters}
-          classes={classes}
-          subjects={subjects}
-          dates={dates}
-          selectedExamRoom={selectedExamRoom}
-          setSelectedExamRoom={setSelectedExamRoom}
-          setConfirmStudentId={setConfirmStudentId}
-          setConfirmClassCode={setConfirmClassCode}
-          handleToggleExamPostpone={handleToggleExamPostpone}
-          canAccessMonitorTools={canAccessMonitorTools}
-          isLoadingBatchData={isLoading}
-          activeBatch={activeBatch}
-          loadDataFromApi={loadDataFromApi}
-        />
-      ) : activeTab === 'schedule' ? (
-        <AllExamsSchedule
-          records={records}
-          totalRecords={totalRecords}
-          page={page}
-          setPage={setPage}
-          pageSize={pageSize}
-          setPageSize={setPageSize}
-          totalPages={totalPages}
-          sortConfig={sortConfig}
-          setSortConfig={setSortConfig}
-          filters={filters}
-          setFilters={setFilters}
-          classes={classes}
-          subjects={subjects}
-          dates={dates}
-          selectedExamRoom={selectedExamRoom}
-          setSelectedExamRoom={setSelectedExamRoom}
-          setConfirmStudentId={setConfirmStudentId}
-          setConfirmClassCode={setConfirmClassCode}
-          handleToggleExamPostpone={handleToggleExamPostpone}
-          canAccessMonitorTools={canAccessMonitorTools}
-          isLoading={isLoading}
-          activeBatch={activeBatch}
-          loadDataFromApi={loadDataFromApi}
-        />
-      ) : records.length === 0 && totalRecords === 0 ? (
-        isAdmin ? (
-          <UploadSection
-            onDataLoaded={(loadedData) => {
-              setRecords(loadedData);
-              setSessions(buildSessions(loadedData));
-            }}
-            onRefreshFromDb={() => loadDataFromApi()}
-          />
-        ) : (
-          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center flex flex-col items-center justify-center animate-in fade-in duration-200">
-            <div className="w-16 h-16 bg-blue-50 border border-blue-200 rounded-3xl flex items-center justify-center text-blue-600 mb-4 shadow-sm">
-              <CalendarDays className="w-8 h-8" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Chưa Có Dữ Liệu Lịch Thi</h3>
-            <p className="text-sm text-slate-500 max-w-md mb-6">
-              Hiện tại chưa có dữ liệu lịch thi cho đợt thi này. Vui lòng thử tải lại dữ liệu hoặc quay lại sau.
-            </p>
-            <button
-              onClick={() => loadDataFromApi(activeBatch?.code)}
-              disabled={isLoading}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-200 flex items-center gap-2 cursor-pointer"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Đang tải lại...' : 'Tải lại dữ liệu'}
-            </button>
-          </div>
-        )
-      ) : (
-        <AllExamsSchedule
-          records={records}
-          totalRecords={totalRecords}
-          page={page}
-          setPage={setPage}
-          pageSize={pageSize}
-          setPageSize={setPageSize}
-          totalPages={totalPages}
-          sortConfig={sortConfig}
-          setSortConfig={setSortConfig}
-          filters={filters}
-          setFilters={setFilters}
-          classes={classes}
-          subjects={subjects}
-          dates={dates}
-          selectedExamRoom={selectedExamRoom}
-          setSelectedExamRoom={setSelectedExamRoom}
-          setConfirmStudentId={setConfirmStudentId}
-          setConfirmClassCode={setConfirmClassCode}
-          handleToggleExamPostpone={handleToggleExamPostpone}
-          canAccessMonitorTools={canAccessMonitorTools}
-          isLoading={isLoading}
-          activeBatch={activeBatch}
-          loadDataFromApi={loadDataFromApi}
-        />
-      )}
+      {renderBody()}
 
       {/* Spacing & Admin Contact Footer */}
       {!isLoading && <Footer />}

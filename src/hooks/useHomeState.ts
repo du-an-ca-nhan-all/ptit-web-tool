@@ -1,76 +1,31 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { FilterState, SortKey, SortDirection } from '../features/exam-schedule';
-import { ExamRecord, LoginUser, ExamSession, ExamBatchItem } from '../types';
-import {
-  NavigationTab,
-  ProfileSubTab,
-  TabChangeOptions,
-  getInitialHomeState,
-  getNavigationPath,
-} from '../types/navigation';
-import { buildSessions } from '../utils/dataModel';
+import { useMemo, useEffect } from 'react';
+import { ExamBatchItem } from '../types';
+import { getInitialHomeState } from '../types/navigation';
 import { fetchPricingFromBackend } from '../config/pricingConfig';
-import { AnnouncementItem } from '../features/announcements';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { useExamBatches } from '../features/exam-schedule/hooks/useExamBatches';
 import { useClassMonitor } from '../features/classes-monitor/hooks/useClassMonitor';
 import { useExternalPortalData } from '../features/external-portal/hooks/useExternalPortalData';
 import { useAnnouncements } from '../features/announcements/hooks/useAnnouncements';
+import { useHomeNavigation } from './use-home-state/useHomeNavigation';
+import { useHomeExamRecords } from './use-home-state/useHomeExamRecords';
+import { useHomeAuthActions } from './use-home-state/useHomeAuthActions';
 
 export function useHomeState() {
   const initialState = useMemo(getInitialHomeState, []);
 
   // 1. Domain sub-hooks
-  const {
-    currentUser,
-    setCurrentUser,
-    activeRole,
-    setActiveRole,
-    userRoles,
-    isAdmin,
-    isMonitor,
-    canAccessMonitorTools,
-    canImpersonate,
-    effectiveUser,
-    authError,
-    setAuthError,
-    isVerifyingAuth,
-    logout,
-  } = useAuth();
+  const auth = useAuth();
+  const batches = useExamBatches();
+  const monitor = useClassMonitor(initialState.monitorClass);
+  const externalPortal = useExternalPortalData();
+  const { announcements } = useAnnouncements();
 
-  const {
-    examBatches,
-    setExamBatches,
-    activeBatch,
-    setActiveBatch,
-    hasActiveBatch,
-  } = useExamBatches();
-
-  const {
-    monitorClass,
-    setMonitorClass,
-    loginUsers,
-    setLoginUsers,
-    confirmStudentId,
-    setConfirmStudentId,
-    confirmClassCode,
-    setConfirmClassCode,
-    isClassGroupOpen,
-    setIsClassGroupOpen,
-    isLoadingMonitors,
-    fetchMonitorsData,
-  } = useClassMonitor(initialState.monitorClass);
-
-  const {
-    courseCompareData,
-    fetchCourseCompareData,
-  } = useExternalPortalData();
-
-  const {
-    announcements,
-  } = useAnnouncements();
+  const { currentUser, setCurrentUser } = auth;
+  const { setExamBatches, activeBatch, setActiveBatch } = batches;
+  const { monitorClass, setMonitorClass, fetchMonitorsData } = monitor;
 
   // Set default monitorClass from currentUser only if empty
   useEffect(() => {
@@ -79,414 +34,42 @@ export function useHomeState() {
     }
   }, [currentUser?.lop, monitorClass, setMonitorClass]);
 
-  // 2. Local Exam Schedule & Table States
-  const [records, setRecords] = useState<ExamRecord[]>([]);
-  const [sessions, setSessions] = useState<ExamSession[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Pagination states
-  const [page, setPage] = useState<number>(initialState.page || 1);
-  const [pageSize, setPageSize] = useState(25);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-
-  // Navigation tabs
-  const [activeTab, setActiveTab] = useState<NavigationTab>(initialState.tab);
-  const [profileSubTab, setProfileSubTab] = useState<ProfileSubTab>(initialState.profileSubTab || 'OVERVIEW');
-  const [isMounted, setIsMounted] = useState(false);
-
-  // Filters & Sorting
-  const [filters, setFilters] = useState<FilterState>({
-    search: initialState.search,
-    classCode: initialState.classCode,
-    subjectCode: initialState.subjectCode,
-    date: initialState.date,
-  });
-  const [searchInput, setSearchInput] = useState(initialState.search);
-  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
-    key: initialState.sortKey,
-    direction: initialState.sortDir,
-  });
-  const [selectedExamRoom, setSelectedExamRoom] = useState<ExamRecord | null>(null);
-
-  const [filterMeta, setFilterMeta] = useState<{
-    classes: string[];
-    subjects: { code: string; name: string }[];
-    dates: string[];
-  }>({
-    classes: [],
-    subjects: [],
-    dates: [],
+  // 2. Navigation, Filters, Sorting & Pagination
+  const nav = useHomeNavigation({
+    initialState,
+    isAdmin: auth.isAdmin,
+    canAccessMonitorTools: auth.canAccessMonitorTools,
+    monitorClass,
+    setMonitorClass,
+    currentUser,
   });
 
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [profileInitialTab, setProfileInitialTab] = useState<'PROFILE' | 'EXTERNAL_ACCOUNTS'>('PROFILE');
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  // 3. Exam Schedule & Records
+  const examRecords = useHomeExamRecords({
+    activeBatch,
+    filters: nav.filters,
+    sortConfig: nav.sortConfig,
+    activeTab: nav.activeTab,
+    effectiveUser: auth.effectiveUser,
+    monitorClass,
+    page: nav.page,
+    pageSize: nav.pageSize,
+  });
 
-  // Impersonation state
-  const [showImpersonateModal, setShowImpersonateModal] = useState(false);
-  const [impersonateTargetInput, setImpersonateTargetInput] = useState('');
-  const [isImpersonating, setIsImpersonating] = useState(false);
-  const [isRevertingImpersonate, setIsRevertingImpersonate] = useState(false);
-  const [impersonateError, setImpersonateError] = useState('');
+  // 4. Role Switching, Impersonation & Logout
+  const authActions = useHomeAuthActions({
+    currentUser,
+    setCurrentUser,
+    activeRole: auth.activeRole,
+    setActiveRole: auth.setActiveRole,
+    userRoles: auth.userRoles,
+    activeTab: nav.activeTab,
+    handleTabChange: nav.handleTabChange,
+    setMonitorClass,
+  });
 
-  // Reset page to 1 only when filter/sort criteria change after initial mount
-  const isFirstFilterChange = useRef(true);
-  useEffect(() => {
-    if (isFirstFilterChange.current) {
-      isFirstFilterChange.current = false;
-      return;
-    }
-    setPage(1);
-  }, [filters.search, filters.classCode, filters.subjectCode, filters.date, sortConfig]);
-
-  const hasExamSchedule = hasActiveBatch && ((activeBatch?.totalRecords ?? 0) > 0 || totalRecords > 0 || records.length > 0);
-
-  // Tab change handler
-  const handleTabChange = useCallback(
-    (
-      tab: NavigationTab,
-      subTab?: ProfileSubTab,
-      options?: TabChangeOptions
-    ) => {
-      const adminOnlyTabs: NavigationTab[] = [
-        'batches',
-        'external_accounts_admin',
-        'global_jobs',
-        'activity_logs',
-        'telegram_admin',
-        'user_registrations',
-        'database_backup',
-        'announcements_admin',
-      ];
-      if (adminOnlyTabs.includes(tab) && !isAdmin) {
-        return;
-      }
-      const monitorOnlyTabs: NavigationTab[] = [
-        'members',
-        'monitor_flow',
-        'exam_review',
-        'room_analysis',
-        'monitor',
-        'envelope',
-        'envelope_all',
-        'settlement',
-      ];
-      if (monitorOnlyTabs.includes(tab) && !canAccessMonitorTools) {
-        return;
-      }
-
-      if (tab !== activeTab || options) {
-        if (!options?.preserveFilters) {
-          const newSearch = options?.search ?? '';
-          const newClassCode = options?.classCode ?? '';
-          const newSubjectCode = options?.subjectCode ?? '';
-          const newDate = options?.date ?? '';
-          const newPage = options?.page ?? 1;
-
-          setSearchInput(newSearch);
-          setFilters({
-            search: newSearch,
-            classCode: newClassCode,
-            subjectCode: newSubjectCode,
-            date: newDate,
-          });
-          setPage(newPage);
-          setSelectedExamRoom(null);
-          setSortConfig({ key: 'DateTime', direction: 'asc' });
-
-          if (options?.monitorClass !== undefined) {
-            setMonitorClass(options.monitorClass);
-          } else if (tab === 'members' || tab === 'monitor') {
-            if (!monitorClass && currentUser?.lop) {
-              setMonitorClass(currentUser.lop);
-            }
-          }
-        }
-      }
-
-      setActiveTab(tab);
-      if (tab === 'profile') {
-        if (subTab) {
-          setProfileSubTab(subTab);
-        }
-        if (options?.source && typeof window !== 'undefined') {
-          const url = new URL(window.location.href);
-          url.searchParams.set('source', options.source);
-          window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
-        }
-      }
-      setIsMobileMenuOpen(false);
-    },
-    [activeTab, isAdmin, canAccessMonitorTools, monitorClass, currentUser, setMonitorClass]
-  );
-
-  // Role select handler
-  const handleSelectRole = useCallback((newRole: string) => {
-    if (!userRoles.includes(newRole)) return;
-    setActiveRole(newRole);
-    if (currentUser) {
-      localStorage.setItem('active_role_' + currentUser.username, newRole);
-    }
-
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      fetch('/api/activity-logs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          action: 'SWITCH_ROLE',
-          targetType: 'ROLE',
-          targetId: newRole,
-          description: `Chuyển vai trò làm việc sang ${
-            newRole === 'admin'
-              ? '👑 Quản Trị Viên (Admin)'
-              : newRole === 'lop_truong'
-              ? '🛡️ Lớp Trưởng'
-              : '🎓 Sinh Viên'
-          }`,
-          metadata: { previousRole: activeRole, newRole },
-        }),
-      }).catch(() => {});
-    } catch {}
-
-    if (newRole === 'sinh_vien') {
-      const monitorAdminTabs: NavigationTab[] = [
-        'batches',
-        'external_accounts_admin',
-        'global_jobs',
-        'activity_logs',
-        'telegram_admin',
-        'user_registrations',
-        'database_backup',
-        'announcements_admin',
-        'members',
-        'monitor_flow',
-        'exam_review',
-        'room_analysis',
-        'monitor',
-        'envelope',
-        'envelope_all',
-        'settlement',
-      ];
-      if (monitorAdminTabs.includes(activeTab)) {
-        handleTabChange('personal_schedule');
-      }
-    } else if (newRole === 'lop_truong') {
-      const adminOnlyTabs: NavigationTab[] = [
-        'batches',
-        'external_accounts_admin',
-        'global_jobs',
-        'activity_logs',
-        'telegram_admin',
-        'user_registrations',
-        'database_backup',
-        'announcements_admin',
-      ];
-      if (adminOnlyTabs.includes(activeTab)) {
-        handleTabChange('members');
-      }
-    }
-  }, [userRoles, setActiveRole, currentUser, activeRole, activeTab, handleTabChange]);
-
-const TABS_REQUIRING_EXAM_RECORDS: NavigationTab[] = [
-  'schedule',
-  'personal_schedule',
-  'members',
-  'monitor',
-  'envelope',
-  'envelope_all',
-  'settlement',
-];
-
-  // Load data from API for active batch
-  const loadDataFromApi = useCallback(async (batchCodeArg?: string) => {
-    if (!TABS_REQUIRING_EXAM_RECORDS.includes(activeTab)) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      let currentBatchCode = batchCodeArg;
-      if (!currentBatchCode && activeBatch) {
-        currentBatchCode = activeBatch.code;
-      }
-
-      const params = new URLSearchParams();
-      if (currentBatchCode && currentBatchCode !== 'ALL') {
-        params.set('batchCode', currentBatchCode);
-      }
-      if (filters.search) params.set('search', filters.search);
-      if (filters.classCode && filters.classCode !== 'ALL') params.set('classCode', filters.classCode);
-      if (filters.subjectCode && filters.subjectCode !== 'ALL') params.set('subjectCode', filters.subjectCode);
-      if (filters.date && filters.date !== 'ALL') params.set('date', filters.date);
-
-      if (sortConfig?.key) {
-        params.set('sortKey', sortConfig.key);
-        params.set('sortDir', sortConfig.direction);
-      }
-
-      if (activeTab === 'personal_schedule' && effectiveUser?.username) {
-        params.set('maSV', effectiveUser.username);
-        params.set('includeClassmatesCount', 'true');
-      } else if ((activeTab === 'members' || activeTab === 'monitor') && monitorClass && monitorClass !== 'ALL') {
-        params.set('classCode', monitorClass);
-      }
-
-      const isPagedTab = activeTab === 'schedule' || activeTab === 'personal_schedule';
-      if (isPagedTab) {
-        params.set('page', String(page));
-        params.set('limit', String(pageSize));
-      } else {
-        params.set('all', 'true');
-      }
-
-      const res = await fetch(`/api/exam-records?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        const rawRecords: ExamRecord[] = data.records || [];
-        setRecords(rawRecords);
-        setTotalRecords(data.total || rawRecords.length);
-        setTotalPages(data.totalPages || 1);
-        setSessions(buildSessions(rawRecords));
-      }
-    } catch (err) {
-      console.error('Error loading exam records:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeBatch, filters, sortConfig, activeTab, effectiveUser, monitorClass, page, pageSize]);
-
-  // Toggle postponement
-  const handleToggleExamPostpone = useCallback(
-    async (record: ExamRecord, newStatus: boolean) => {
-      try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-        const res = await fetch('/api/exam-records', {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            id: record.id,
-            maSV: record.MaSV,
-            maMH: record.MaMH,
-            mapThi: record.MAPTHI,
-            ngayThi: record.NgayThi,
-            gioThi: record.GioThi,
-            isPostponed: newStatus,
-          }),
-        });
-
-        if (res.ok) {
-          setRecords((prev) =>
-            prev.map((r) => {
-              if (
-                (record.id && r.id === record.id) ||
-                (r.MaSV === record.MaSV &&
-                  r.MaMH === record.MaMH &&
-                  r.MAPTHI === record.MAPTHI &&
-                  r.NgayThi === record.NgayThi &&
-                  r.GioThi === record.GioThi)
-              ) {
-                return { ...r, isPostponed: newStatus };
-              }
-              return r;
-            })
-          );
-        }
-      } catch (err) {
-        console.error('Error toggling postponement:', err);
-      }
-    },
-    []
-  );
-
-  // Impersonate handlers
-  const handleImpersonate = useCallback(async (targetUsername: string) => {
-    setIsImpersonating(true);
-    setImpersonateError('');
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      const res = await fetch('/api/auth/impersonate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ targetUsername }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        if (data.token) {
-          localStorage.setItem('auth_token', data.token);
-        }
-        if (data.user) {
-          setCurrentUser(data.user);
-          localStorage.setItem('currentUser', JSON.stringify(data.user));
-          if (data.user.lop) setMonitorClass(data.user.lop);
-        }
-        setShowImpersonateModal(false);
-        setImpersonateTargetInput('');
-        handleTabChange('schedule');
-      } else {
-        setImpersonateError(data.error || 'Giả lập tài khoản thất bại');
-      }
-    } catch (err: any) {
-      setImpersonateError(err.message || 'Lỗi mạng khi giả lập tài khoản');
-    } finally {
-      setIsImpersonating(false);
-    }
-  }, [setCurrentUser, setMonitorClass, handleTabChange]);
-
-  const handleRevertImpersonate = useCallback(async () => {
-    setIsRevertingImpersonate(true);
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      const res = await fetch('/api/auth/revert-impersonate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        if (data.token) {
-          localStorage.setItem('auth_token', data.token);
-        }
-        if (data.user) {
-          setCurrentUser(data.user);
-          localStorage.setItem('currentUser', JSON.stringify(data.user));
-          if (data.user.lop) setMonitorClass(data.user.lop);
-        }
-        handleTabChange('schedule');
-      }
-    } catch (err) {
-      console.error('Error reverting impersonation:', err);
-    } finally {
-      setIsRevertingImpersonate(false);
-    }
-  }, [setCurrentUser, setMonitorClass, handleTabChange]);
-
-  // Logout handler
-  const handleLogout = useCallback(async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } catch {}
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('auth_token');
-    setCurrentUser(null);
-    window.location.href = '/';
-  }, [setCurrentUser]);
+  const { setIsMounted } = nav;
+  const { setIsLoading } = examRecords;
 
   // Initial mount load
   useEffect(() => {
@@ -506,135 +89,103 @@ const TABS_REQUIRING_EXAM_RECORDS: NavigationTab[] = [
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
-  }, [fetchMonitorsData, setExamBatches, setActiveBatch]);
+  }, [fetchMonitorsData, setExamBatches, setActiveBatch, setIsMounted, setIsLoading]);
 
-  // Load records when active batch or filters change
-  useEffect(() => {
-    if (activeBatch && TABS_REQUIRING_EXAM_RECORDS.includes(activeTab)) {
-      loadDataFromApi();
-    }
-  }, [activeBatch, filters, sortConfig, page, pageSize, activeTab, loadDataFromApi]);
-
-  // Sync browser URL
-  useEffect(() => {
-    if (!isMounted || typeof window === 'undefined') return;
-    const url = getNavigationPath(activeTab, profileSubTab, {
-      search: filters.search,
-      classCode: filters.classCode,
-      subjectCode: filters.subjectCode,
-      date: filters.date,
-      monitorClass,
-      page,
-    });
-    if (window.location.pathname + window.location.search !== url) {
-      window.history.replaceState(null, '', url);
-    }
-  }, [activeTab, profileSubTab, filters, monitorClass, page, isMounted]);
+  const hasExamSchedule =
+    batches.hasActiveBatch &&
+    ((activeBatch?.totalRecords ?? 0) > 0 ||
+      examRecords.totalRecords > 0 ||
+      examRecords.records.length > 0);
 
   return {
     // Mounting & Loading
-    isMounted,
-    isLoading,
-    setIsLoading,
+    isMounted: nav.isMounted,
+    isLoading: examRecords.isLoading,
+    setIsLoading: examRecords.setIsLoading,
 
     // Auth & Roles
     currentUser,
     setCurrentUser,
-    effectiveUser,
-    activeRole,
-    setActiveRole,
-    userRoles,
-    isAdmin,
-    isMonitor,
-    canAccessMonitorTools,
-    canImpersonate,
-    authError,
-    setAuthError,
-    isVerifyingAuth,
-    isRoleDropdownOpen,
-    setIsRoleDropdownOpen,
-    handleSelectRole,
-    handleLogout,
-
-    // Impersonation
-    showImpersonateModal,
-    setShowImpersonateModal,
-    impersonateTargetInput,
-    setImpersonateTargetInput,
-    isImpersonating,
-    isRevertingImpersonate,
-    impersonateError,
-    setImpersonateError,
-    handleImpersonate,
-    handleRevertImpersonate,
+    effectiveUser: auth.effectiveUser,
+    activeRole: auth.activeRole,
+    setActiveRole: auth.setActiveRole,
+    userRoles: auth.userRoles,
+    isAdmin: auth.isAdmin,
+    isMonitor: auth.isMonitor,
+    canAccessMonitorTools: auth.canAccessMonitorTools,
+    canImpersonate: auth.canImpersonate,
+    authError: auth.authError,
+    setAuthError: auth.setAuthError,
+    isVerifyingAuth: auth.isVerifyingAuth,
+    ...authActions,
 
     // Navigation & Tabs
-    activeTab,
-    setActiveTab,
-    profileSubTab,
-    setProfileSubTab,
-    isMobileMenuOpen,
-    setIsMobileMenuOpen,
-    isProfileOpen,
-    setIsProfileOpen,
-    profileInitialTab,
-    setProfileInitialTab,
-    handleTabChange,
+    activeTab: nav.activeTab,
+    setActiveTab: nav.setActiveTab,
+    profileSubTab: nav.profileSubTab,
+    setProfileSubTab: nav.setProfileSubTab,
+    isMobileMenuOpen: nav.isMobileMenuOpen,
+    setIsMobileMenuOpen: nav.setIsMobileMenuOpen,
+    isProfileOpen: nav.isProfileOpen,
+    setIsProfileOpen: nav.setIsProfileOpen,
+    profileInitialTab: nav.profileInitialTab,
+    setProfileInitialTab: nav.setProfileInitialTab,
+    handleTabChange: nav.handleTabChange,
 
     // Batches
-    examBatches,
+    examBatches: batches.examBatches,
     setExamBatches,
     activeBatch,
     setActiveBatch,
-    hasActiveBatch,
+    hasActiveBatch: batches.hasActiveBatch,
     hasExamSchedule,
 
     // Schedule & Records
-    records,
-    setRecords,
-    baseRecords: records,
-    filteredRecords: records,
-    sessions,
-    setSessions,
-    page,
-    setPage,
-    pageSize,
-    setPageSize,
-    totalRecords,
-    totalPages,
-    selectedExamRoom,
-    setSelectedExamRoom,
-    loadDataFromApi,
-    handleToggleExamPostpone,
+    records: examRecords.records,
+    setRecords: examRecords.setRecords,
+    baseRecords: examRecords.records,
+    filteredRecords: examRecords.records,
+    sessions: examRecords.sessions,
+    setSessions: examRecords.setSessions,
+    page: nav.page,
+    setPage: nav.setPage,
+    pageSize: nav.pageSize,
+    setPageSize: nav.setPageSize,
+    totalRecords: examRecords.totalRecords,
+    totalPages: examRecords.totalPages,
+    selectedExamRoom: nav.selectedExamRoom,
+    setSelectedExamRoom: nav.setSelectedExamRoom,
+    loadDataFromApi: examRecords.loadDataFromApi,
+    handleToggleExamPostpone: examRecords.handleToggleExamPostpone,
 
     // Filters & Sorting
-    filters,
-    setFilters,
-    searchInput,
-    setSearchInput,
-    sortConfig,
-    setSortConfig,
-    classes: filterMeta.classes,
-    subjects: filterMeta.subjects,
-    dates: filterMeta.dates,
+    filters: nav.filters,
+    setFilters: nav.setFilters,
+    searchInput: nav.searchInput,
+    setSearchInput: nav.setSearchInput,
+    sortConfig: nav.sortConfig,
+    setSortConfig: nav.setSortConfig,
+    classes: nav.filterMeta.classes,
+    subjects: nav.filterMeta.subjects,
+    dates: nav.filterMeta.dates,
 
     // Classes & Monitor
     monitorClass,
     setMonitorClass,
-    loginUsers,
-    setLoginUsers,
-    confirmStudentId,
-    setConfirmStudentId,
-    confirmClassCode,
-    setConfirmClassCode,
-    isClassGroupOpen,
-    setIsClassGroupOpen,
-    isLoadingMonitors,
+    loginUsers: monitor.loginUsers,
+    setLoginUsers: monitor.setLoginUsers,
+    confirmStudentId: monitor.confirmStudentId,
+    setConfirmStudentId: monitor.setConfirmStudentId,
+    confirmClassCode: monitor.confirmClassCode,
+    setConfirmClassCode: monitor.setConfirmClassCode,
+    isClassGroupOpen: monitor.isClassGroupOpen,
+    setIsClassGroupOpen: monitor.setIsClassGroupOpen,
+    isLoadingMonitors: monitor.isLoadingMonitors,
     fetchMonitorsData,
 
     // External Portal & Course Compare
-    courseCompareData,
-    fetchCourseCompareData,
+    courseCompareData: externalPortal.courseCompareData,
+    fetchCourseCompareData: externalPortal.fetchCourseCompareData,
 
     // Announcements
     announcements,

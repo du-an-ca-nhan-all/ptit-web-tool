@@ -1,26 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import {
-  Shield,
-  Phone,
-  GraduationCap,
-  Crown,
-  Search,
-  Users,
-  ArrowRightLeft,
-  UserCheck,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-} from 'lucide-react';
-import { LoginUser } from '../types/class.types';
-
-interface MonitorsListProps {
-  users: LoginUser[];
-  onClassClick?: (classCode: string) => void;
-  currentUser?: LoginUser | null;
-  onReload?: () => void;
-  isLoading?: boolean;
-}
+import React from 'react';
+import { Crown, Search, RefreshCw } from 'lucide-react';
+import { MonitorsListProps } from './monitors-list/types';
+import { useMonitorsList } from './monitors-list/useMonitorsList';
+import { MonitorCard } from './monitors-list/MonitorCard';
+import { MonitorsPagination } from './monitors-list/MonitorsPagination';
 
 export default function MonitorsList({
   users,
@@ -29,66 +12,22 @@ export default function MonitorsList({
   onReload,
   isLoading = false,
 }: MonitorsListProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(12);
-
-  const isAdmin = Boolean(
-    currentUser?.isAdmin ||
-    currentUser?.activeRole === 'admin' ||
-    (currentUser?.role === 'admin' && !currentUser?.activeRole)
-  );
-
-  const monitors = useMemo(() => {
-    return users.filter(
-      (user) =>
-        user.role === 'lop_truong' ||
-        (user.role && user.role.includes('lop_truong')) ||
-        user.isMonitor
-    );
-  }, [users]);
-
-  const filteredMonitors = useMemo(() => {
-    if (!searchQuery.trim()) return monitors;
-    const q = searchQuery.trim().toLowerCase();
-    return monitors.filter((m) => {
-      const name = (m.fullName || '').toLowerCase();
-      const user = (m.username || '').toLowerCase();
-      const lop = (m.lop || '').toLowerCase();
-      const phone = (m.phoneNumber || '').toLowerCase();
-      return name.includes(q) || user.includes(q) || lop.includes(q) || phone.includes(q);
-    });
-  }, [monitors, searchQuery]);
-
-  // Reset to page 1 on search or page size change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, pageSize]);
-
-  // Pagination math
-  const totalItems = filteredMonitors.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const validPage = Math.min(currentPage, totalPages);
-  const startIndex = (validPage - 1) * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, totalItems);
-  const pagedMonitors = filteredMonitors.slice(startIndex, endIndex);
-
-  // Page numbers with ellipsis
-  const pageNumbers = useMemo(() => {
-    const pages: (number | string)[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (validPage > 3) pages.push('...');
-      const start = Math.max(2, validPage - 1);
-      const end = Math.min(totalPages - 1, validPage + 1);
-      for (let i = start; i <= end; i++) pages.push(i);
-      if (validPage < totalPages - 2) pages.push('...');
-      pages.push(totalPages);
-    }
-    return pages;
-  }, [totalPages, validPage]);
+  const {
+    searchQuery,
+    setSearchQuery,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    monitors,
+    filteredMonitors,
+    totalItems,
+    totalPages,
+    validPage,
+    startIndex,
+    endIndex,
+    pagedMonitors,
+    pageNumbers,
+  } = useMonitorsList(users, currentUser);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-7xl mx-auto w-full">
@@ -187,145 +126,24 @@ export default function MonitorsList({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {pagedMonitors.map((monitor, index) => (
-              <div
+              <MonitorCard
                 key={monitor.username || index}
-                className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-all flex flex-col justify-between group hover:border-amber-200"
-              >
-                <div>
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-50 border-2 border-amber-100 flex items-center justify-center text-amber-700 font-black text-sm shrink-0 shadow-xs">
-                      {monitor.fullName ? monitor.fullName.charAt(0) : monitor.username.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="font-extrabold text-slate-800 text-sm truncate">
-                          {monitor.fullName || 'Chưa cập nhật tên'}
-                        </h3>
-                        <span className="p-0.5 text-amber-500">
-                          <Crown className="w-3.5 h-3.5 fill-amber-400" />
-                        </span>
-                      </div>
-                      <div className="text-[11px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg inline-block mt-1">
-                        {monitor.username}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 font-medium flex items-center gap-1.5">
-                        <GraduationCap className="w-3.5 h-3.5 text-slate-400" /> Lớp quản lý:
-                      </span>
-                      {monitor.lop ? (
-                        onClassClick ? (
-                          <button
-                            onClick={() => onClassClick(monitor.lop!)}
-                            className="font-bold text-blue-600 hover:underline cursor-pointer bg-blue-50 px-2 py-0.5 rounded"
-                          >
-                            {monitor.lop}
-                          </button>
-                        ) : (
-                          <span className="font-bold text-slate-700">{monitor.lop}</span>
-                        )
-                      ) : (
-                        <span className="text-slate-400 italic text-[11px]">Chưa gán lớp</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 font-medium flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-slate-400" /> Số điện thoại:
-                      </span>
-                      {monitor.phoneNumber ? (
-                        <a
-                          href={`tel:${monitor.phoneNumber}`}
-                          className="font-bold text-slate-700 hover:text-indigo-600 transition-colors"
-                        >
-                          {monitor.phoneNumber}
-                        </a>
-                      ) : (
-                        <span className="text-slate-400 italic text-[11px]">Chưa có</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 font-medium flex items-center gap-1.5">
-                        <Shield className="w-3.5 h-3.5 text-slate-400" /> Vai trò:
-                      </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                        {monitor.role === 'admin'
-                          ? '👑 Quản Trị Viên'
-                          : '🛡️ Lớp Trưởng'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {onClassClick && monitor.lop && (
-                  <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-end">
-                    <button
-                      onClick={() => onClassClick(monitor.lop!)}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 hover:gap-1.5 transition-all cursor-pointer"
-                    >
-                      <span>Xem chi tiết danh sách lớp</span>
-                      <ArrowRightLeft className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
+                monitor={monitor}
+                onClassClick={onClassClick}
+              />
             ))}
           </div>
         )}
 
         {/* Pagination Footer */}
         {filteredMonitors.length > 0 && totalPages > 1 && (
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
-            <div className="text-xs text-slate-500 font-medium">
-              Trang <span className="font-bold text-slate-800">{validPage}</span> / <span className="font-bold text-slate-800">{totalPages}</span> (Tổng {totalItems} cán bộ lớp)
-            </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap justify-center">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={validPage <= 1}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold"
-                title="Trang trước"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Trước</span>
-              </button>
-
-              {pageNumbers.map((p, idx) =>
-                typeof p === 'number' ? (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentPage(p)}
-                    className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
-                      p === validPage
-                        ? 'bg-amber-500 text-white shadow-md shadow-amber-200'
-                        : 'border border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ) : (
-                  <span key={idx} className="px-1 text-xs text-slate-400 font-bold">
-                    ...
-                  </span>
-                )
-              )}
-
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={validPage >= totalPages}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold"
-                title="Trang sau"
-              >
-                <span className="hidden sm:inline">Sau</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
+          <MonitorsPagination
+            validPage={validPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageNumbers={pageNumbers}
+            onPageChange={setCurrentPage}
+          />
         )}
       </div>
     </div>

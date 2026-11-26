@@ -1,44 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidateTag } from 'next/cache';
-import { prisma } from '@/src/lib/prisma';
-import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin } from '@/src/lib/auth';
-import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { checkIsAdmin } from '@/src/lib/auth';
 import { examBatchService } from '@/src/features/exam-schedule/server/examBatchServerService';
-
-async function getAuthUser(req: NextRequest) {
-  let authUser = await getCurrentUserFromCookie();
-  if (!authUser) {
-    const authHeader = req.headers.get('authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      authUser = await verifyAuthToken(token);
-    }
-  }
-  return authUser;
-}
-
-async function generateUniqueBatchCode(name: string): Promise<string> {
-  const normalized = name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 32);
-
-  const baseCode = normalized || `DOT_THI_${Date.now()}`;
-  let candidate = baseCode;
-  let counter = 2;
-
-  while (await prisma.examBatch.findUnique({ where: { code: candidate }, select: { id: true } })) {
-    candidate = `${baseCode}_${counter}`;
-    counter += 1;
-  }
-
-  return candidate;
-}
+import type { ExamBatchActionBody, ExamBatchActionContext } from './route/types';
+import { getAuthUser } from './route/utils';
+import { handleCreateBatch, handleDeleteBatch, handleUpdateBatch } from './route/manageActions';
+import { handleSetActiveBatch, handleToggleBatch } from './route/statusActions';
 
 // GET /api/exam-batches
 // Returns all exam batches with summary statistics (Cached)
@@ -69,260 +35,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { action, code, name, semester, academicYear, startDate, endDate, description, isActive } = body;
+    const body = (await req.json()) as ExamBatchActionBody;
+    const ctx: ExamBatchActionContext = { req, authUser, body };
 
-    // 1. ACTION: CREATE
-    if (action === 'CREATE') {
-      const cleanName = name ? String(name).trim() : '';
-      if (!cleanName) {
-        return NextResponse.json({ error: 'Tên đợt thi (name) là bắt buộc' }, { status: 400 });
-      }
-
-      const rawCode = code ? String(code).trim().toUpperCase() : '';
-      let cleanCode = rawCode;
-
-      if (cleanCode) {
-        const existing = await prisma.examBatch.findUnique({ where: { code: cleanCode } });
-        if (existing) {
-          return NextResponse.json({ error: `Mã đợt thi ${cleanCode} đã tồn tại` }, { status: 400 });
-        }
-      } else {
-        cleanCode = await generateUniqueBatchCode(cleanName);
-      }
-
-      if (isActive) {
-        // Deactivate all others
-        await prisma.examBatch.updateMany({ data: { isActive: false } });
-      }
-
-      const newBatch = await prisma.examBatch.create({
-        data: {
-          code: cleanCode,
-          name: cleanName,
-          semester: semester ? String(semester).trim() : null,
-          academicYear: academicYear ? String(academicYear).trim() : null,
-          startDate: startDate ? String(startDate).trim() : null,
-          endDate: endDate ? String(endDate).trim() : null,
-          description: description ? String(description).trim() : null,
-          isActive: isActive !== undefined ? !!isActive : true,
-        },
-      });
-
-      await logActivity({
-        req,
-        userId: authUser.id,
-        username: authUser.username,
-        userRole: authUser.role,
-        action: 'CREATE_BATCH',
-        targetType: 'EXAM_BATCH',
-        targetId: cleanCode,
-        description: `Tạo mới đợt thi: ${newBatch.name} (Mã: ${cleanCode})`,
-        metadata: { cleanCode, name, semester, academicYear, isActive },
-      });
-
-      revalidateTag('exam-batches', { expire: 0 });
-      revalidateTag('metadata-filters', { expire: 0 });
-
-      return NextResponse.json({
-        success: true,
-        message: `Đã tạo thành công đợt thi ${newBatch.name}`,
-        batch: newBatch,
-      });
+    if (body.action === 'CREATE') {
+      return await handleCreateBatch(ctx);
     }
-
-    // 2. ACTION: SET_ACTIVE
-    if (action === 'SET_ACTIVE') {
-      if (!code) {
-        return NextResponse.json({ error: 'Mã đợt thi (code) là bắt buộc' }, { status: 400 });
-      }
-
-      const cleanCode = String(code).trim().toUpperCase();
-
-      // Deactivate all
-      await prisma.examBatch.updateMany({ data: { isActive: false } });
-
-      // Activate target
-      const activated = await prisma.examBatch.update({
-        where: { code: cleanCode },
-        data: { isActive: true },
-      });
-
-      await logActivity({
-        req,
-        userId: authUser.id,
-        username: authUser.username,
-        userRole: authUser.role,
-        action: 'SET_ACTIVE_BATCH',
-        targetType: 'EXAM_BATCH',
-        targetId: cleanCode,
-        description: `Đặt đợt thi "${activated.name}" (${cleanCode}) làm đợt thi mặc định kích hoạt`,
-      });
-
-      revalidateTag('exam-batches', { expire: 0 });
-      revalidateTag('metadata-filters', { expire: 0 });
-
-      return NextResponse.json({
-        success: true,
-        message: `Đã đặt đợt thi "${activated.name}" làm đợt thi mặc định`,
-        batch: activated,
-      });
+    if (body.action === 'SET_ACTIVE') {
+      return await handleSetActiveBatch(ctx);
     }
-
-    // 3. ACTION: TOGGLE (Bật / Tắt đợt thi)
-    if (action === 'TOGGLE') {
-      if (!code) {
-        return NextResponse.json({ error: 'Mã đợt thi (code) là bắt buộc' }, { status: 400 });
-      }
-
-      const cleanCode = String(code).trim().toUpperCase();
-      const current = await prisma.examBatch.findUnique({ where: { code: cleanCode } });
-      if (!current) {
-        return NextResponse.json({ error: 'Không tìm thấy đợt thi' }, { status: 404 });
-      }
-
-      const newActive = !current.isActive;
-      const updated = await prisma.examBatch.update({
-        where: { code: cleanCode },
-        data: { isActive: newActive },
-      });
-
-      await logActivity({
-        req,
-        userId: authUser.id,
-        username: authUser.username,
-        userRole: authUser.role,
-        action: 'TOGGLE_BATCH_STATUS',
-        targetType: 'EXAM_BATCH',
-        targetId: cleanCode,
-        description: newActive
-          ? `BẬT trạng thái đợt thi "${updated.name}" (${cleanCode})`
-          : `TẮT trạng thái đợt thi "${updated.name}" (${cleanCode})`,
-      });
-
-      revalidateTag('exam-batches', { expire: 0 });
-      revalidateTag('metadata-filters', { expire: 0 });
-
-      return NextResponse.json({
-        success: true,
-        message: newActive
-          ? `Đã BẬT đợt thi "${updated.name}"`
-          : `Đã TẮT đợt thi "${updated.name}"`,
-        batch: updated,
-      });
+    if (body.action === 'TOGGLE') {
+      return await handleToggleBatch(ctx);
     }
-
-    // 4. ACTION: UPDATE
-    if (action === 'UPDATE') {
-      if (!code) {
-        return NextResponse.json({ error: 'Mã đợt thi (code) là bắt buộc' }, { status: 400 });
-      }
-
-      const cleanCode = String(code).trim().toUpperCase();
-
-      if (isActive) {
-        await prisma.examBatch.updateMany({ data: { isActive: false } });
-      }
-
-      const updated = await prisma.examBatch.update({
-        where: { code: cleanCode },
-        data: {
-          name: name ? String(name).trim() : undefined,
-          semester: semester !== undefined ? String(semester).trim() : undefined,
-          academicYear: academicYear !== undefined ? String(academicYear).trim() : undefined,
-          startDate: startDate !== undefined ? String(startDate).trim() : undefined,
-          endDate: endDate !== undefined ? String(endDate).trim() : undefined,
-          description: description !== undefined ? String(description).trim() : undefined,
-          isActive: isActive !== undefined ? !!isActive : undefined,
-        },
-      });
-
-      await logActivity({
-        req,
-        userId: authUser.id,
-        username: authUser.username,
-        userRole: authUser.role,
-        action: 'UPDATE_BATCH',
-        targetType: 'EXAM_BATCH',
-        targetId: cleanCode,
-        description: `Cập nhật thông tin đợt thi: ${updated.name} (${cleanCode})`,
-        metadata: { cleanCode, name, semester, academicYear, isActive },
-      });
-
-      revalidateTag('exam-batches', { expire: 0 });
-      revalidateTag('metadata-filters', { expire: 0 });
-
-      return NextResponse.json({
-        success: true,
-        message: `Đã cập nhật thông tin đợt thi ${updated.name}`,
-        batch: updated,
-      });
+    if (body.action === 'UPDATE') {
+      return await handleUpdateBatch(ctx);
     }
-
-    // 5. ACTION: DELETE
-    if (action === 'DELETE') {
-      if (!code) {
-        return NextResponse.json({ error: 'Mã đợt thi (code) là bắt buộc' }, { status: 400 });
-      }
-
-      const cleanCode = String(code).trim().toUpperCase();
-
-      // Đợt thi luôn luôn tồn tại ít nhất 1 đợt
-      const totalCount = await prisma.examBatch.count();
-      if (totalCount <= 1) {
-        return NextResponse.json(
-          { error: 'Hệ thống luôn yêu cầu phải có ít nhất 1 đợt thi. Bạn không thể xóa đợt thi duy nhất còn lại.' },
-          { status: 400 }
-        );
-      }
-
-      const deleteRecords = body.deleteRecords === true;
-
-      if (deleteRecords) {
-        // Delete associated exam records
-        await prisma.examRecord.deleteMany({ where: { batchCode: cleanCode } });
-      } else {
-        // Detach batchCode from exam records (preserve records)
-        await prisma.examRecord.updateMany({
-          where: { batchCode: cleanCode },
-          data: { batchCode: null },
-        });
-      }
-
-      await prisma.examBatch.delete({ where: { code: cleanCode } });
-
-      // If active batch was deleted, activate the latest remaining batch if any
-      const activeRemaining = await prisma.examBatch.findFirst({ where: { isActive: true } });
-      if (!activeRemaining) {
-        const latest = await prisma.examBatch.findFirst({ orderBy: { createdAt: 'desc' } });
-        if (latest) {
-          await prisma.examBatch.update({ where: { id: latest.id }, data: { isActive: true } });
-        }
-      }
-
-      await logActivity({
-        req,
-        userId: authUser.id,
-        username: authUser.username,
-        userRole: authUser.role,
-        action: 'DELETE_BATCH',
-        targetType: 'EXAM_BATCH',
-        targetId: cleanCode,
-        description: deleteRecords
-          ? `Xóa đợt thi ${cleanCode} và toàn bộ dữ liệu lịch thi liên quan`
-          : `Xóa đợt thi ${cleanCode} (bảo lưu dữ liệu lịch thi)`,
-        metadata: { cleanCode, deleteRecords },
-      });
-
-      revalidateTag('exam-batches', { expire: 0 });
-      revalidateTag('metadata-filters', { expire: 0 });
-
-      return NextResponse.json({
-        success: true,
-        message: deleteRecords
-          ? `Đã xóa đợt thi ${cleanCode} và toàn bộ dữ liệu lịch thi liên quan`
-          : `Đã xóa đợt thi ${cleanCode} (dữ liệu lịch thi vẫn được bảo lưu an toàn)`,
-      });
+    if (body.action === 'DELETE') {
+      return await handleDeleteBatch(ctx);
     }
 
     return NextResponse.json({ error: 'Hành động không hợp lệ' }, { status: 400 });

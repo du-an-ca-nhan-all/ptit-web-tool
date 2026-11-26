@@ -1,17 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import {
-  User as UserIcon,
-  Award,
-  Globe,
-  Send,
-  CalendarDays,
-  ShieldCheck,
-  Lock,
-  BookOpen,
-} from 'lucide-react';
-import { LoginUser, ExamRecord } from '../types/auth.types';
+import React, { useState } from 'react';
+import { ExamRecord } from '../types/auth.types';
 import { ProfileSubTab } from '../../../types/navigation';
 import { ProfileHeroBanner } from './Profile/ProfileHeroBanner';
 import { ProfileOverviewTab } from './Profile/ProfileOverviewTab';
@@ -19,19 +9,12 @@ import { ProfileSecurityTab } from './Profile/ProfileSecurityTab';
 import { ProfileExternalAccountsTab } from './Profile/ProfileExternalAccountsTab';
 import { TelegramConfigSection } from '../../telegram';
 import { StudentTimetableCalendar, StudentGradesView, LmsCoursesView } from '../../external-portal';
+import { UserProfileScreenProps } from './user-profile-screen/types';
+import { useProfileEditor } from './user-profile-screen/useProfileEditor';
+import { useExternalAccounts } from './user-profile-screen/useExternalAccounts';
+import { ProfileSubTabsNav } from './user-profile-screen/ProfileSubTabsNav';
 
-export interface UserProfileScreenProps {
-  currentUser: LoginUser & { student?: any };
-  onLogout: () => void;
-  onProfileUpdated?: (updatedUser: any) => void;
-  hasExamSchedule?: boolean;
-  onNavigateTab?: (tab: string) => void;
-  userRoles?: string[];
-  activeRole?: string;
-  onSelectRole?: (role: string) => void;
-  activeSubTab?: ProfileSubTab;
-  onSubTabChange?: (subTab: ProfileSubTab) => void;
-}
+export type { UserProfileScreenProps };
 
 export default function UserProfileScreen({
   currentUser,
@@ -54,34 +37,43 @@ export default function UserProfileScreen({
     onSubTabChange?.(subTab);
   };
 
-  // Edit personal profile state
-  const [isEditing, setIsEditing] = useState(false);
-  const [phone, setPhone] = useState(student?.soDienThoai || currentUser?.phoneNumber || '');
-  const [note, setNote] = useState(student?.ghiChu || '');
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSyncingProfile, setIsSyncingProfile] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // External Accounts state
-  const [externalAccounts, setExternalAccounts] = useState<any[]>([]);
-  const [isLoadingExternal, setIsLoadingExternal] = useState(false);
-  const [extForm, setExtForm] = useState<{
-    [key: string]: {
-      username: string;
-      password: string;
-      refreshToken?: string;
-      validatedAccessToken?: string;
-      showPass: boolean;
-      isSaving: boolean;
-      isTesting: boolean;
-      testStatus?: 'IDLE' | 'TESTING' | 'SUCCESS' | 'FAILED';
-      testMessage?: string;
-      lastTestedUser?: string;
-      lastTestedPass?: string;
-      lastTestedRefreshToken?: string;
-    };
-  }>({});
+  const {
+    isEditing,
+    setIsEditing,
+    phone,
+    setPhone,
+    note,
+    setNote,
+    isSaving,
+    isSyncingProfile,
+    handleSaveProfile,
+    handleSyncProfileFromQlht,
+  } = useProfileEditor({
+    currentUser,
+    student,
+    onProfileUpdated,
+    setSuccessMsg,
+    setErrorMsg,
+  });
+
+  const {
+    externalAccounts,
+    isLoadingExternal,
+    extForm,
+    setExtForm,
+    configuredCount,
+    fetchExternalAccounts,
+    handleSaveExternalAccount,
+    handleTestConnection,
+    handleDeleteExternalAccount,
+  } = useExternalAccounts({
+    currentUsername: currentUser.username,
+    setSuccessMsg,
+    setErrorMsg,
+  });
 
   const currentEffectiveRole =
     activeRole || (currentUser?.isAdmin ? 'admin' : currentUser?.isMonitor ? 'lop_truong' : 'sinh_vien');
@@ -93,408 +85,6 @@ export default function UserProfileScreen({
   const ngaySinh = student?.ngaySinh || 'Chưa cập nhật';
   const trangThai = student?.trangThai || 'DANG_HOC';
   const exams: ExamRecord[] = student?.exams || [];
-
-  // Fetch External Accounts
-  const fetchExternalAccounts = async () => {
-    setIsLoadingExternal(true);
-    try {
-      const res = await fetch('/api/external-accounts');
-      const data = await res.json();
-      if (res.ok && data.accounts) {
-        setExternalAccounts(data.accounts);
-        setExtForm((prev: any) => {
-          const formState: any = { ...prev };
-          data.accounts.forEach((acc: any) => {
-            const defaultUser =
-              acc.systemKey === 'SLINK_PTIT'
-                ? acc.extUsername || ''
-                : acc.extUsername || currentUser.username;
-            formState[acc.systemKey] = {
-              username: prev[acc.systemKey]?.username || defaultUser,
-              password: prev[acc.systemKey]?.password || '',
-              refreshToken: prev[acc.systemKey]?.refreshToken || '',
-              validatedAccessToken: prev[acc.systemKey]?.validatedAccessToken || '',
-              showPass: prev[acc.systemKey]?.showPass || false,
-              isSaving: false,
-              isTesting: false,
-              testStatus: prev[acc.systemKey]?.testStatus || 'IDLE',
-              testMessage: prev[acc.systemKey]?.testMessage || '',
-              lastTestedUser: prev[acc.systemKey]?.lastTestedUser || '',
-              lastTestedPass: prev[acc.systemKey]?.lastTestedPass || '',
-              lastTestedRefreshToken: prev[acc.systemKey]?.lastTestedRefreshToken || '',
-            };
-          });
-          return formState;
-        });
-      }
-    } catch (err) {
-      console.error('Fetch external accounts error:', err);
-    } finally {
-      setIsLoadingExternal(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchExternalAccounts();
-  }, []);
-
-  // Save profile info (phone & note)
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    try {
-      const res = await fetch('/api/auth/me', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          soDienThoai: phone.trim(),
-          ghiChu: note.trim(),
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setSuccessMsg('Đã lưu thông tin cá nhân thành công!');
-        setIsEditing(false);
-        if (onProfileUpdated) {
-          onProfileUpdated({
-            ...currentUser,
-            phoneNumber: phone.trim(),
-            student: {
-              ...student,
-              soDienThoai: phone.trim(),
-              ghiChu: note.trim(),
-            },
-          });
-        }
-        setTimeout(() => setSuccessMsg(''), 4000);
-      } else {
-        setErrorMsg(data.error || 'Có lỗi xảy ra khi lưu.');
-      }
-    } catch (err: any) {
-      setErrorMsg('Không thể kết nối đến máy chủ.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Sync student info from QLHT (w-locsinhvieninfo)
-  const handleSyncProfileFromQlht = async () => {
-    setIsSyncingProfile(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      const res = await fetch('/api/auth/me', {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      const data = await res.json();
-      if (res.ok && data.success && data.student) {
-        setSuccessMsg(data.message || 'Đã đồng bộ thông tin cá nhân từ Cổng QLHT thành công!');
-        if (data.student.soDienThoai) {
-          setPhone(data.student.soDienThoai);
-        }
-        if (onProfileUpdated) {
-          onProfileUpdated({
-            ...currentUser,
-            phoneNumber: data.student.soDienThoai || currentUser.phoneNumber,
-            student: {
-              ...student,
-              ngaySinh: data.student.ngaySinh ?? student.ngaySinh ?? null,
-              gioiTinh: data.student.gioiTinh ?? student.gioiTinh ?? null,
-              soDienThoai: data.student.soDienThoai ?? student.soDienThoai ?? null,
-              soCMND: data.student.soCMND ?? student.soCMND ?? null,
-              email1: data.student.email1 ?? student.email1 ?? null,
-              email2: data.student.email2 ?? student.email2 ?? null,
-              noiSinh: data.student.noiSinh ?? student.noiSinh ?? null,
-              quocTich: data.student.quocTich ?? student.quocTich ?? null,
-            },
-          });
-        }
-        setTimeout(() => setSuccessMsg(''), 4000);
-      } else {
-        setErrorMsg(data.error || 'Không thể đồng bộ thông tin từ QLHT.');
-      }
-    } catch {
-      setErrorMsg('Không thể kết nối đến máy chủ để đồng bộ thông tin.');
-    } finally {
-      setIsSyncingProfile(false);
-    }
-  };
-
-  // Save / Connect External Account
-  const handleSaveExternalAccount = async (sys: any) => {
-    setErrorMsg('');
-    setSuccessMsg('');
-    const isSlink = sys.systemKey === 'SLINK_PTIT';
-    const form = extForm[sys.systemKey] || {
-      username: sys.extUsername || currentUser.username || '',
-      password: '',
-      refreshToken: '',
-      validatedAccessToken: '',
-      showPass: false,
-      isSaving: false,
-      isTesting: false,
-      testStatus: 'IDLE' as const,
-      testMessage: '',
-      lastTestedUser: '',
-      lastTestedPass: '',
-      lastTestedRefreshToken: '',
-    };
-
-    if (isSlink) {
-      if (!form.refreshToken || !form.refreshToken.trim()) {
-        setErrorMsg('Vui lòng nhập Refresh Token OAuth của PTIT S-Link');
-        return;
-      }
-      const isTestPassed =
-        form.testStatus === 'SUCCESS' &&
-        form.refreshToken.trim() === form.lastTestedRefreshToken;
-
-      if (!isTestPassed) {
-        setErrorMsg('Yêu cầu bấm "Kiểm Tra Kết Nối" thành công trước khi có thể lưu cấu hình.');
-        return;
-      }
-    } else {
-      if (!form.username || !form.username.trim()) {
-        setErrorMsg('Vui lòng nhập tên đăng nhập hệ thống');
-        return;
-      }
-      if (!form.password || !form.password.trim()) {
-        setErrorMsg('Vui lòng nhập mật khẩu tài khoản hệ thống ngoài');
-        return;
-      }
-
-      const isTestPassed =
-        form.testStatus === 'SUCCESS' &&
-        form.username.trim() === form.lastTestedUser &&
-        form.password.trim() === form.lastTestedPass;
-
-      if (!isTestPassed) {
-        setErrorMsg('Yêu cầu bấm "Kiểm Tra Kết Nối" thành công trước khi có thể lưu cấu hình.');
-        return;
-      }
-    }
-
-    setExtForm((prev) => ({
-      ...prev,
-      [sys.systemKey]: { ...prev[sys.systemKey], isSaving: true },
-    }));
-
-    try {
-      const res = await fetch('/api/external-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          isSlink
-            ? {
-                action: 'SAVE',
-                systemKey: sys.systemKey,
-                systemName: sys.systemName,
-                systemUrl: sys.systemUrl,
-                extUsername: form.username?.trim() || '',
-                refreshToken: form.refreshToken?.trim() || '',
-                accessToken: form.validatedAccessToken || '',
-              }
-            : {
-                action: 'SAVE',
-                systemKey: sys.systemKey,
-                systemName: sys.systemName,
-                systemUrl: sys.systemUrl,
-                extUsername: form.username.trim(),
-                extPassword: form.password.trim(),
-              }
-        ),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setSuccessMsg(data.message || 'Lưu cấu hình tài khoản thành công!');
-        fetchExternalAccounts();
-        setTimeout(() => setSuccessMsg(''), 4000);
-      } else {
-        setErrorMsg(data.error || 'Có lỗi xảy ra khi lưu tài khoản');
-      }
-    } catch (err) {
-      setErrorMsg('Lỗi kết nối máy chủ');
-    } finally {
-      setExtForm((prev) => ({
-        ...prev,
-        [sys.systemKey]: { ...prev[sys.systemKey], isSaving: false },
-      }));
-    }
-  };
-
-  // Test Connection
-  const handleTestConnection = async (sys: any) => {
-    setErrorMsg('');
-    setSuccessMsg('');
-    const isSlink = sys.systemKey === 'SLINK_PTIT';
-    const form = extForm[sys.systemKey] || {
-      username: sys.extUsername || currentUser.username || '',
-      password: '',
-      refreshToken: '',
-      validatedAccessToken: '',
-      showPass: false,
-      isSaving: false,
-      isTesting: false,
-      testStatus: 'IDLE' as const,
-      testMessage: '',
-      lastTestedUser: '',
-      lastTestedPass: '',
-      lastTestedRefreshToken: '',
-    };
-
-    const targetUser = form.username ? form.username.trim() : sys.extUsername || '';
-    const targetPass = form.password ? form.password.trim() : '';
-    const targetRefreshToken = form.refreshToken ? form.refreshToken.trim() : '';
-
-    if (isSlink) {
-      if (!targetRefreshToken && !sys.hasRefreshToken) {
-        setErrorMsg('Vui lòng nhập Refresh Token OAuth của PTIT S-Link trước khi kiểm tra');
-        return;
-      }
-    } else {
-      if (!targetUser) {
-        setErrorMsg('Vui lòng nhập tên đăng nhập / mã sinh viên trước khi kiểm tra');
-        return;
-      }
-      if (!targetPass && !sys.hasPassword) {
-        setErrorMsg('Vui lòng nhập mật khẩu tài khoản trước khi kiểm tra');
-        return;
-      }
-    }
-
-    setExtForm((prev) => ({
-      ...prev,
-      [sys.systemKey]: {
-        ...prev[sys.systemKey],
-        isTesting: true,
-        testStatus: 'TESTING',
-        testMessage: '',
-      },
-    }));
-
-    try {
-      const res = await fetch('/api/external-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          isSlink
-            ? {
-                action: 'TEST',
-                systemKey: sys.systemKey,
-                systemName: sys.systemName,
-                systemUrl: sys.systemUrl,
-                extUsername: targetUser,
-                refreshToken: targetRefreshToken || undefined,
-              }
-            : {
-                action: 'TEST',
-                systemKey: sys.systemKey,
-                systemName: sys.systemName,
-                systemUrl: sys.systemUrl,
-                extUsername: targetUser,
-                extPassword: targetPass,
-              }
-        ),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        const nextRefreshToken = isSlink ? (data.refreshToken || targetRefreshToken) : '';
-        const nextUsername = isSlink ? (data.detectedUsername || targetUser) : targetUser;
-        setExtForm((prev) => ({
-          ...prev,
-          [sys.systemKey]: {
-            ...prev[sys.systemKey],
-            username: nextUsername,
-            ...(isSlink && nextRefreshToken ? { refreshToken: nextRefreshToken } : {}),
-            ...(isSlink && data.token ? { validatedAccessToken: data.token } : {}),
-            isTesting: false,
-            testStatus: 'SUCCESS',
-            testMessage: data.message || 'Kiểm tra kết nối và xác thực tài khoản thành công!',
-            lastTestedUser: nextUsername,
-            lastTestedPass: targetPass,
-            lastTestedRefreshToken: nextRefreshToken,
-          },
-        }));
-        setSuccessMsg(data.message || 'Kiểm tra kết nối thành công! Đã mở khóa nút Lưu.');
-        setTimeout(() => setSuccessMsg(''), 4000);
-      } else {
-        const errMsg = data.error || 'Kiểm tra kết nối thất bại.';
-        setExtForm((prev) => ({
-          ...prev,
-          [sys.systemKey]: {
-            ...prev[sys.systemKey],
-            isTesting: false,
-            testStatus: 'FAILED',
-            testMessage: errMsg,
-            lastTestedUser: '',
-            lastTestedPass: '',
-            lastTestedRefreshToken: '',
-            validatedAccessToken: '',
-          },
-        }));
-        setErrorMsg(errMsg);
-      }
-      if (sys.isConfigured && !targetRefreshToken) {
-        fetchExternalAccounts();
-      }
-    } catch (err) {
-      const errMsg = 'Lỗi kết nối máy chủ khi kiểm tra tài khoản.';
-      setExtForm((prev) => ({
-        ...prev,
-        [sys.systemKey]: {
-          ...prev[sys.systemKey],
-          isTesting: false,
-          testStatus: 'FAILED',
-          testMessage: errMsg,
-          lastTestedUser: '',
-          lastTestedPass: '',
-        },
-      }));
-      setErrorMsg(errMsg);
-      if (sys.isConfigured) {
-        fetchExternalAccounts();
-      }
-    }
-  };
-
-  // Delete External Account
-  const handleDeleteExternalAccount = async (sys: any) => {
-    if (!confirm(`Bạn có chắc chắn muốn hủy liên kết tài khoản ${sys.systemName}?`)) return;
-    setErrorMsg('');
-    setSuccessMsg('');
-    try {
-      const res = await fetch('/api/external-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'DELETE',
-          systemKey: sys.systemKey,
-          systemName: sys.systemName,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setSuccessMsg(data.message);
-        fetchExternalAccounts();
-        setTimeout(() => setSuccessMsg(''), 4000);
-      } else {
-        setErrorMsg(data.error || 'Có lỗi xảy ra');
-      }
-    } catch (err) {
-      setErrorMsg('Lỗi kết nối máy chủ');
-    }
-  };
-
-  const configuredCount = externalAccounts.filter((a) => a.isConfigured).length;
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6 animate-in fade-in duration-200">
@@ -514,107 +104,11 @@ export default function UserProfileScreen({
       />
 
       {/* Screen Sub-Tabs Navigation */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl p-1 sm:p-1.5 border border-slate-200 shadow-xs flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none scroll-smooth -mx-1 sm:mx-0 px-2 sm:px-1.5">
-        <button
-          onClick={() => setActiveSubTab('OVERVIEW')}
-          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap ${
-            activeSubTab === 'OVERVIEW'
-              ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          <span>Thông Tin Học Vụ</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('SCHEDULE')}
-          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
-            activeSubTab === 'SCHEDULE'
-              ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          <span>Lịch Học & TKB</span>
-          {configuredCount === 0 ? (
-            <Lock className="w-3 h-3 text-amber-500 opacity-80" />
-          ) : (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white"></span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('GRADES')}
-          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
-            activeSubTab === 'GRADES'
-              ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          <span>Bảng Điểm & Kết Quả</span>
-          {configuredCount === 0 ? (
-            <Lock className="w-3 h-3 text-amber-500 opacity-80" />
-          ) : (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white"></span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('LMS')}
-          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
-            activeSubTab === 'LMS'
-              ? 'bg-sky-600 text-white shadow-xs shadow-sky-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          <span>Học Tập LMS</span>
-          {configuredCount > 0 && (
-            <span className="w-2 h-2 rounded-full bg-sky-400 ring-2 ring-white"></span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('EXTERNAL_ACCOUNTS')}
-          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
-            activeSubTab === 'EXTERNAL_ACCOUNTS'
-              ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          <span>Liên Kết Cổng Trường</span>
-          {configuredCount > 0 && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white"></span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('TELEGRAM')}
-          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap relative ${
-            activeSubTab === 'TELEGRAM'
-              ? 'bg-sky-600 text-white shadow-xs shadow-sky-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          <span>Cấu Hình Telegram</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('SECURITY')}
-          className={`shrink-0 py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap ${
-            activeSubTab === 'SECURITY'
-              ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          <span>Bảo Mật & Mật Khẩu</span>
-        </button>
-      </div>
+      <ProfileSubTabsNav
+        activeSubTab={activeSubTab}
+        configuredCount={configuredCount}
+        onSelectSubTab={setActiveSubTab}
+      />
 
       {/* SUB-TAB 1: OVERVIEW & PERSONAL INFO */}
       {activeSubTab === 'OVERVIEW' && (
