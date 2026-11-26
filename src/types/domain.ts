@@ -26,6 +26,7 @@ export interface ExamRecord {
   MaDotThi: string;
   TenDotThi: string;
   batchCode?: string;
+  studentStatus?: string; // 'DANG_HOC' | 'BAO_LUU' | 'NGHI_HOC' | 'CHUYEN_LOP' | 'LOAI_BO'
   isPostponed?: boolean; // true nếu không thi môn này hoặc hoãn thi (không chia tiền đầu người)
   roomClassmateCount?: number; // Số sinh viên cùng lớp trong phòng thi này (tính cả bản thân)
   roomTotalCount?: number; // Tổng số sinh viên trong phòng thi này

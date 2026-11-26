@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { X, Search, Users, MapPin, Calendar, Clock, BookOpen, GraduationCap, Copy, Check } from 'lucide-react';
 import { ExamRecord, ExamSession } from '../../../types';
+import { isActiveClassMember } from '../../../utils/dataModel';
 
 interface RoomStudentsModalProps {
   isOpen: boolean;
@@ -36,11 +37,12 @@ export default function RoomStudentsModal({
   const roomRecords = useMemo(() => {
     if (!session) return [];
     if (session.records && session.records.length > 0) {
-      return session.records;
+      return session.records.filter(isActiveClassMember);
     }
     if (records && records.length > 0) {
       return records.filter(
         (r) =>
+          isActiveClassMember(r) &&
           (r.MAPTHI === session.room || r.MAPTHI === (session as any).MAPTHI) &&
           (r.NgayThi === session.date || r.NgayThi === (session as any).NgayThi) &&
           (r.GioThi === session.time || r.GioThi === (session as any).GioThi) &&

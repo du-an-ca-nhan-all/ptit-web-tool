@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { ExamRecord, LoginUser, ExamSession, isUserMonitor } from '../../../types';
+import { isActiveClassMember } from '../../../utils/dataModel';
 import { DollarSign, ChevronDown, ChevronUp, FileText, ArrowDownLeft, ArrowUpRight, CheckCircle2, User, X, Mail, Users, Search, Settings, Hand } from 'lucide-react';
 import { calculateRoomPrice, formatCurrency, fetchPricingFromBackend } from '../../../config/pricingConfig';
 import {
@@ -118,6 +119,7 @@ export default function SettlementManager({ records, sessions = [], loginUsers =
     const subject = sess.subject || sess.TenMH;
     return records.filter(
       r =>
+        isActiveClassMember(r) &&
         r.MAPTHI === room &&
         r.NgayThi === date &&
         r.GioThi === time &&

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, User, Users, Check, Mail, Coffee, Hand, Search, UserCheck, DollarSign, RotateCcw, Tag } from 'lucide-react';
 import { ExamRecord, ExamSession, LoginUser, isUserMonitor } from '../../../types';
+import { isActiveClassMember } from '../../../utils/dataModel';
 import { EnvelopeAssignment, SaveEnvelopeOptions } from '../../../config/envelopeAssignmentConfig';
 import { getDefaultRoomPrice, formatCurrency } from '../../../config/pricingConfig';
 
@@ -107,9 +108,10 @@ export default function AssignEnvelopeModal({
     // Map of maSV -> full name & room status
     const studentMap = new Map<string, { maSV: string; name: string; inRoom: boolean }>();
 
-    // 1. Students in this current exam room
+    // 1. Students in this current exam room (chỉ lấy SV đang học thuộc quản lý của lớp)
     if (session?.records) {
       session.records.forEach((r) => {
+        if (!isActiveClassMember(r)) return;
         if (r.MaLop && r.MaLop.trim().toUpperCase() === cleanCls && r.MaSV) {
           const name = r.HoDem ? `${r.HoDem} ${r.Ten || ''}`.trim() : (r.Ten || r.MaSV);
           studentMap.set(r.MaSV, { maSV: r.MaSV, name, inRoom: true });
@@ -117,8 +119,9 @@ export default function AssignEnvelopeModal({
       });
     }
 
-    // 2. Other students of this class in the batch
+    // 2. Other students of this class in the batch (chỉ lấy SV đang học thuộc quản lý của lớp)
     records.forEach((r) => {
+      if (!isActiveClassMember(r)) return;
       if (r.MaLop && r.MaLop.trim().toUpperCase() === cleanCls && r.MaSV && !studentMap.has(r.MaSV)) {
         const name = r.HoDem ? `${r.HoDem} ${r.Ten || ''}`.trim() : (r.Ten || r.MaSV);
         studentMap.set(r.MaSV, { maSV: r.MaSV, name, inRoom: false });

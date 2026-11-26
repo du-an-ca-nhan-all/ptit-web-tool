@@ -1,9 +1,20 @@
 import { ExamRecord, ExamSession, SessionClassCount } from '../types';
 
+/**
+ * Kiểm tra sinh viên có đang thuộc diện đang theo học (DANG_HOC) dưới sự quản lý của lớp trưởng không.
+ * Bỏ qua các trạng thái thôi học (NGHI_HOC), bảo lưu (BAO_LUU), chuyển lớp (CHUYEN_LOP), loại bỏ (LOAI_BO).
+ */
+export function isActiveClassMember(record: ExamRecord): boolean {
+  return !record.studentStatus || record.studentStatus === 'DANG_HOC';
+}
+
 export function buildSessions(records: ExamRecord[]): ExamSession[] {
   const sessionMap = new Map<string, ExamSession>();
 
   records.forEach(r => {
+    // Bỏ qua sinh viên đã thôi học / bảo lưu / không còn thuộc quản lý của lớp trưởng
+    if (!isActiveClassMember(r)) return;
+
     const key = `${r.MAPTHI}|${r.NgayThi}|${r.GioThi}|${r.TenMH}`;
     if (!sessionMap.has(key)) {
       sessionMap.set(key, {

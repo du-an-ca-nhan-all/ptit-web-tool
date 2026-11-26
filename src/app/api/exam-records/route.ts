@@ -130,6 +130,7 @@ export async function GET(req: NextRequest) {
       MaDotThi: r.maDotThi || r.batchCode || '',
       TenDotThi: r.tenDotThi || '',
       batchCode: r.batchCode || '',
+      studentStatus: r.student?.trangThai || 'DANG_HOC',
       isPostponed: Boolean(r.isPostponed),
     });
 
