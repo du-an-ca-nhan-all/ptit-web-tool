@@ -13,42 +13,28 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
-export const registerSchema = z
-  .object({
-    username: z
-      .string()
-      .min(3, 'Mã sinh viên phải có ít nhất 3 ký tự')
-      .max(50, 'Mã sinh viên không được vượt quá 50 ký tự')
-      .transform((val) => val.trim().toUpperCase()),
-    password: z
-      .string()
-      .min(6, 'Mật khẩu phải có độ dài tối thiểu 6 ký tự để đảm bảo an toàn'),
-    confirmPassword: z.string().optional(),
-    phoneNumber: z
-      .string()
-      .trim()
-      .max(20, 'Số điện thoại không hợp lệ')
-      .optional()
-      .nullable(),
-    note: z
-      .string()
-      .trim()
-      .max(500, 'Ghi chú không được vượt quá 500 ký tự')
-      .optional()
-      .nullable(),
-  })
-  .refine(
-    (data) => {
-      if (data.confirmPassword && data.password !== data.confirmPassword) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: 'Mật khẩu nhập lại không trùng khớp',
-      path: ['confirmPassword'],
-    }
-  );
+export const registerSchema = z.object({
+  username: z
+    .string()
+    .min(3, 'Mã sinh viên phải có ít nhất 3 ký tự')
+    .max(50, 'Mã sinh viên không được vượt quá 50 ký tự')
+    .transform((val) => val.trim().toUpperCase()),
+  password: z
+    .string()
+    .min(1, 'Vui lòng nhập mật khẩu Cổng QLDTTX (QLHT)'),
+  phoneNumber: z
+    .string()
+    .trim()
+    .max(20, 'Số điện thoại không hợp lệ')
+    .optional()
+    .nullable(),
+  note: z
+    .string()
+    .trim()
+    .max(500, 'Ghi chú không được vượt quá 500 ký tự')
+    .optional()
+    .nullable(),
+});
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 

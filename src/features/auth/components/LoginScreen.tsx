@@ -59,10 +59,8 @@ export default function LoginScreen({
   const [regUsername, setRegUsername] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regNote, setRegNote] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
-  const [showRegConfirm, setShowRegConfirm] = useState(false);
   const [regSuccessMsg, setRegSuccessMsg] = useState('');
   const [isAutoApproved, setIsAutoApproved] = useState(false);
   const [regError, setRegError] = useState('');
@@ -166,23 +164,13 @@ export default function LoginScreen({
     setRegSuccessMsg('');
     setIsAutoApproved(false);
 
-    if (!regUsername.trim() || !regPassword) {
-      setRegError('Vui lòng điền Mã sinh viên và Mật khẩu');
+    if (!regUsername.trim() || !regPassword.trim()) {
+      setRegError('Vui lòng điền Mã sinh viên và Mật khẩu Cổng QLHT');
       return;
     }
 
     if (studentLookupError) {
       setRegError(studentLookupError);
-      return;
-    }
-
-    if (regPassword.length < 6) {
-      setRegError('Mật khẩu phải có độ dài tối thiểu 6 ký tự');
-      return;
-    }
-
-    if (regPassword !== regConfirmPassword) {
-      setRegError('Mật khẩu nhập lại không trùng khớp');
       return;
     }
 
@@ -195,7 +183,6 @@ export default function LoginScreen({
         body: JSON.stringify({
           username: regUsername.trim(),
           password: regPassword.trim(),
-          confirmPassword: regConfirmPassword.trim(),
           phoneNumber: regPhone.trim() || undefined,
           note: regNote.trim() || undefined,
         }),
@@ -204,19 +191,16 @@ export default function LoginScreen({
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setIsAutoApproved(Boolean(data.autoApproved));
+        setIsAutoApproved(true);
         setRegSuccessMsg(
           data.message ||
-            (data.autoApproved
-              ? 'Tài khoản của bạn đã được TỰ ĐỘNG KÍCH HOẠT và liên kết QLHT thành công!'
-              : 'Đăng ký tài khoản thành công! Yêu cầu của bạn đang chờ Quản trị viên xét duyệt.')
+            'Tài khoản của bạn đã được TỰ ĐỘNG KÍCH HOẠT và liên kết QLHT thành công!'
         );
         // Clear form
         setRegPassword('');
-        setRegConfirmPassword('');
         setRegNote('');
       } else {
-        setRegError(data.error || 'Đăng ký không thành công. Vui lòng thử lại.');
+        setRegError(data.error || 'Đăng ký không thành công. Vui lòng kiểm tra lại mật khẩu QLHT.');
       }
     } catch (err: any) {
       console.error('Register error:', err);
@@ -592,56 +576,32 @@ export default function LoginScreen({
                   </div>
                 </div>
 
-                {/* Password fields */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Mật Khẩu Mới <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showRegPassword ? 'text' : 'password'}
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        className="block w-full pl-3 pr-9 py-2 sm:py-2.5 border border-slate-300 rounded-xl bg-slate-50 text-sm sm:text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-                        placeholder="Tối thiểu 6 ký tự"
-                        required
-                        disabled={isRegistering}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowRegPassword(!showRegPassword)}
-                        className="absolute inset-y-0 right-0 w-9 h-full flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                        aria-label={showRegPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                      >
-                        {showRegPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
+                {/* QLHT Password field */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Mật Khẩu Cổng QLHT (qldttx.pttc1.edu.vn) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-3.5 w-3.5 text-slate-400" />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Nhập Lại Mật Khẩu <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showRegConfirm ? 'text' : 'password'}
-                        value={regConfirmPassword}
-                        onChange={(e) => setRegConfirmPassword(e.target.value)}
-                        className="block w-full pl-3 pr-9 py-2 sm:py-2.5 border border-slate-300 rounded-xl bg-slate-50 text-sm sm:text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
-                        placeholder="Nhập lại mật khẩu..."
-                        required
-                        disabled={isRegistering}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowRegConfirm(!showRegConfirm)}
-                        className="absolute inset-y-0 right-0 w-9 h-full flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                        aria-label={showRegConfirm ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                      >
-                        {showRegConfirm ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
+                    <input
+                      type={showRegPassword ? 'text' : 'password'}
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      className="block w-full pl-9 pr-9 py-2 sm:py-2.5 border border-slate-300 rounded-xl bg-slate-50 text-sm sm:text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                      placeholder="Nhập đúng mật khẩu tài khoản Cổng QLHT"
+                      required
+                      disabled={isRegistering}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute inset-y-0 right-0 w-9 h-full flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                      aria-label={showRegPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    >
+                      {showRegPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                 </div>
 
@@ -659,11 +619,11 @@ export default function LoginScreen({
                   />
                 </div>
 
-                {/* Instant Activation Tip Banner */}
+                {/* Mandatory QLHT Verification Banner */}
                 <div className="p-2.5 sm:p-3 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-xl border border-indigo-200/80 text-xs text-slate-700 flex items-start gap-2 shadow-2xs">
                   <Zap className="w-4 h-4 text-amber-500 fill-amber-400 shrink-0 mt-0.5" />
                   <span className="leading-snug">
-                    <strong className="text-indigo-900">Mẹo kích hoạt tức thì:</strong> Nhập mật khẩu trùng khớp với <strong>Cổng QLDTTX (QLHT)</strong> để hệ thống <strong>tự động kích hoạt tài khoản & liên kết QLHT ngay lập tức</strong> mà không cần chờ Admin duyệt.
+                    <strong className="text-indigo-900">Xác thực tự động qua QLHT:</strong> Bắt buộc nhập đúng mật khẩu đang sử dụng trên <strong>Cổng QLDTTX (qldttx.pttc1.edu.vn)</strong> để hệ thống xác thực, <strong>tự động kích hoạt & liên kết QLHT ngay lập tức</strong>.
                   </span>
                 </div>
 
@@ -675,12 +635,12 @@ export default function LoginScreen({
                   {isRegistering ? (
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span className="text-xs">Đang kiểm tra & kích hoạt...</span>
+                      <span className="text-xs">Đang xác thực QLHT & kích hoạt...</span>
                     </div>
                   ) : (
                     <>
                       <UserPlus className="w-4 h-4" />
-                      <span>Gửi Yêu Cầu Đăng Ký</span>
+                      <span>Xác Thực & Kích Hoạt Tài Khoản</span>
                     </>
                   )}
                 </button>
