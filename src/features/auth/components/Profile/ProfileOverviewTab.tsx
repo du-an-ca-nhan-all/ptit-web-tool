@@ -14,6 +14,11 @@ import {
   CalendarDays,
   Globe,
   BookOpen,
+  RefreshCw,
+  Mail,
+  CreditCard,
+  MapPin,
+  Flag,
 } from 'lucide-react';
 import { LoginUser } from '../../types/auth.types';
 
@@ -31,6 +36,8 @@ interface ProfileOverviewTabProps {
   isEditing: boolean;
   setIsEditing: (val: boolean) => void;
   isSaving: boolean;
+  isSyncingProfile?: boolean;
+  onSyncProfileFromQlht?: () => void;
   onSaveProfile: (e: React.FormEvent) => void;
   onLogout: () => void;
   hasExamSchedule?: boolean;
@@ -52,6 +59,8 @@ export function ProfileOverviewTab({
   isEditing,
   setIsEditing,
   isSaving,
+  isSyncingProfile = false,
+  onSyncProfileFromQlht,
   onSaveProfile,
   onLogout,
   hasExamSchedule = false,
@@ -76,13 +85,27 @@ export function ProfileOverviewTab({
           </div>
 
           {!isEditing && (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="w-full sm:w-auto px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl sm:rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>Chỉnh Sửa SĐT / Ghi Chú</span>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              {onSyncProfileFromQlht && (
+                <button
+                  type="button"
+                  onClick={onSyncProfileFromQlht}
+                  disabled={isSyncingProfile}
+                  className="flex-1 sm:flex-initial px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60 text-emerald-700 text-xs font-bold rounded-xl sm:rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0 border border-emerald-200/70"
+                  title="Đồng bộ ngày sinh, giới tính, SĐT, CMND, email, nơi sinh, quốc tịch từ cổng QLHT"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingProfile ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingProfile ? 'Đang đồng bộ...' : 'Đồng Bộ QLHT'}</span>
+                </button>
+              )}
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex-1 sm:flex-initial px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl sm:rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Chỉnh Sửa SĐT / Ghi Chú</span>
+              </button>
+            </div>
           )}
         </div>
 
@@ -179,6 +202,46 @@ export function ProfileOverviewTab({
               <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 {phone || <span className="text-slate-400 font-normal italic">Chưa cập nhật</span>}
+              </span>
+            </div>
+
+            <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+              <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Số CMND / CCCD</span>
+              <span className="font-mono font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                {student?.soCMND || <span className="text-slate-400 font-normal italic">Chưa cập nhật</span>}
+              </span>
+            </div>
+
+            <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+              <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Email 1</span>
+              <span className="font-medium text-slate-800 text-xs sm:text-sm flex items-center gap-1.5 break-all">
+                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                {student?.email1 || <span className="text-slate-400 font-normal italic">Chưa cập nhật</span>}
+              </span>
+            </div>
+
+            <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+              <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Email 2</span>
+              <span className="font-medium text-slate-800 text-xs sm:text-sm flex items-center gap-1.5 break-all">
+                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                {student?.email2 || <span className="text-slate-400 font-normal italic">Chưa cập nhật</span>}
+              </span>
+            </div>
+
+            <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+              <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Nơi sinh</span>
+              <span className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                {student?.noiSinh || <span className="text-slate-400 font-normal italic">Chưa cập nhật</span>}
+              </span>
+            </div>
+
+            <div className="p-3.5 sm:p-4 bg-slate-50/80 hover:bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-100/80 transition-colors">
+              <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider block mb-1">Quốc tịch</span>
+              <span className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
+                <Flag className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                {student?.quocTich || <span className="text-slate-400 font-normal italic">Chưa cập nhật</span>}
               </span>
             </div>
 

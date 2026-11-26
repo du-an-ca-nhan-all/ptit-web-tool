@@ -66,6 +66,11 @@ model Student {
   maLop        String?      // Mã lớp học quản lý chính (Ví dụ: D25TXCN11-K)
   trangThai    String?      @default("DANG_HOC") // 'DANG_HOC' | 'BAO_LUU' | 'NGHI_HOC' | 'CHUYEN_LOP'
   soDienThoai  String?      // SĐT liên hệ
+  soCMND       String?      // Số CMND / CCCD (đồng bộ từ QLHT)
+  email1       String?      // Email 1 (đồng bộ từ QLHT)
+  email2       String?      // Email 2 (đồng bộ từ QLHT)
+  noiSinh      String?      // Nơi sinh (đồng bộ từ QLHT)
+  quocTich     String?      // Quốc tịch (đồng bộ từ QLHT)
   ghiChu       String?      // Ghi chú (lý do chuyển lớp, bảo lưu, phân công...)
   
   // Quan hệ 1-1 với User

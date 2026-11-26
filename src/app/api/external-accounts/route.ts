@@ -3,6 +3,7 @@ import { prisma } from '@/src/lib/prisma';
 import { getCurrentUserFromCookie, verifyAuthToken } from '@/src/lib/auth';
 import { AVAILABLE_EXTERNAL_SYSTEMS } from '@/src/types';
 import { loginAndGetToken, validateToken, getValidTokenOrRefresh } from '@/src/features/external-portal/server/qldttxServerService';
+import { syncStudentProfileFromQLDTTX } from '@/src/features/external-portal/server/studentProfileSyncService';
 import { loginLMS, validateLmsToken, getValidLmsTokenOrRefresh } from '@/src/features/external-portal/server/lmsServerService';
 import {
   refreshSlinkToken,
@@ -238,6 +239,19 @@ export async function POST(req: NextRequest) {
               syncMessage: `Đã lấy và xác thực Session/Token ${acc.systemKey} thành công.`,
             },
           });
+
+          if (acc.systemKey === 'QLDTTX_PTTC1') {
+            await syncStudentProfileFromQLDTTX({
+              username: acc.username,
+              token: freshToken,
+              extUsername: acc.extUsername,
+              extPassword: acc.extPassword,
+              skipIfNoAccount: true,
+            }).catch((syncErr) => {
+              console.warn(`[BATCH_TEST] Auto sync QLHT profile failed for ${acc.username}:`, syncErr?.message || syncErr);
+            });
+          }
+
           successCount++;
         } catch (err: any) {
           await prisma.externalAccount.update({
@@ -525,6 +539,21 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      let profileSynced = false;
+      if (systemKey === 'QLDTTX_PTTC1' && fetchedToken) {
+        try {
+          const syncRes = await syncStudentProfileFromQLDTTX({
+            username: effectiveUsername,
+            token: fetchedToken,
+            extUsername: cleanUsername,
+            extPassword: cleanPassword,
+          });
+          profileSynced = syncRes.synced;
+        } catch (syncErr: any) {
+          console.warn(`[SAVE_EXTERNAL_ACCOUNT] Auto sync QLHT profile failed for ${effectiveUsername}:`, syncErr?.message || syncErr);
+        }
+      }
+
       await logActivity({
         req,
         userId: authUser.id,
@@ -533,14 +562,15 @@ export async function POST(req: NextRequest) {
         action: 'SAVE_EXTERNAL_ACCOUNT',
         targetType: 'EXTERNAL_ACCOUNT',
         targetId: effectiveUsername,
-        description: `Lưu cấu hình liên kết ${finalSystemName} cho ${effectiveUsername} thành công${fetchedToken ? ' (Đã cấp Token/Session)' : ''}`,
-        metadata: { effectiveUsername, systemKey, status, hasToken: !!fetchedToken },
+        description: `Lưu cấu hình liên kết ${finalSystemName} cho ${effectiveUsername} thành công${fetchedToken ? ' (Đã cấp Token/Session)' : ''}${profileSynced ? ' & đã đồng bộ thông tin cá nhân' : ''}`,
+        metadata: { effectiveUsername, systemKey, status, hasToken: !!fetchedToken, profileSynced },
       });
 
       return NextResponse.json({
         success: true,
-        message: `Đã kết nối và lưu cấu hình tài khoản ${finalSystemName} (${effectiveUsername}) thành công!`,
+        message: `Đã kết nối và lưu cấu hình tài khoản ${finalSystemName} (${effectiveUsername}) thành công!${profileSynced ? ' Đã tự động đồng bộ thông tin cá nhân từ QLHT.' : ''}`,
         hasToken: !!account.token,
+        profileSynced,
         account: {
           systemKey: account.systemKey,
           systemName: account.systemName,
@@ -779,6 +809,19 @@ export async function POST(req: NextRequest) {
             },
           });
 
+          let profileSynced = false;
+          try {
+            const syncRes = await syncStudentProfileFromQLDTTX({
+              username: effectiveUsername,
+              token: validToken,
+              extUsername: existing.extUsername,
+              extPassword: existing.extPassword,
+            });
+            profileSynced = syncRes.synced;
+          } catch (syncErr: any) {
+            console.warn(`[TEST_EXTERNAL_ACCOUNT] Auto sync QLHT profile failed for ${effectiveUsername}:`, syncErr?.message || syncErr);
+          }
+
           await logActivity({
             req,
             userId: authUser.id,
@@ -787,17 +830,18 @@ export async function POST(req: NextRequest) {
             action: 'TEST_EXTERNAL_ACCOUNT',
             targetType: 'EXTERNAL_ACCOUNT',
             targetId: effectiveUsername,
-            description: `Kiểm tra/làm mới kết nối ${finalSystemName} cho ${effectiveUsername}: Thành công (${isNew ? 'Cấp token mới' : 'Token hợp lệ'})`,
-            metadata: { effectiveUsername, isNew },
+            description: `Kiểm tra/làm mới kết nối ${finalSystemName} cho ${effectiveUsername}: Thành công (${isNew ? 'Cấp token mới' : 'Token hợp lệ'}${profileSynced ? ', đã đồng bộ hồ sơ' : ''})`,
+            metadata: { effectiveUsername, isNew, profileSynced },
           });
 
           return NextResponse.json({
             success: true,
             message: isNew
-              ? `Đã lấy Token mới thành công cho ${existing.extUsername}!`
-              : `Token hiện tại còn sống và hợp lệ!`,
+              ? `Đã lấy Token mới thành công cho ${existing.extUsername}!${profileSynced ? ' Đã đồng bộ thông tin cá nhân.' : ''}`
+              : `Token hiện tại còn sống và hợp lệ!${profileSynced ? ' Đã đồng bộ thông tin cá nhân.' : ''}`,
             token: updated.token,
             isNew,
+            profileSynced,
             lastSyncAt: updated.lastSyncAt?.toISOString(),
           });
         } catch (loginErr: any) {

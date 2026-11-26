@@ -4,6 +4,7 @@ import { verifyPassword, createAuthToken, checkIsAdmin, checkIsMonitor, getUserR
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { loginSchema, validateZod } from '@/src/features/auth/schemas/auth.schema';
 import { getClientIp, checkRateLimit, createRateLimitExceededResponse } from '@/src/lib/rate-limiter';
+import { syncStudentProfileFromQLDTTX } from '@/src/features/external-portal/server/studentProfileSyncService';
 
 export async function POST(req: NextRequest) {
   try {
@@ -99,6 +100,14 @@ export async function POST(req: NextRequest) {
       await prisma.user.update({
         where: { id: user.id },
         data: { lastLogin: new Date() },
+      });
+
+      // Tự động đồng bộ thông tin sinh viên từ QLHT sau khi đăng nhập (không chặn luồng đăng nhập)
+      syncStudentProfileFromQLDTTX({
+        username: user.username,
+        skipIfNoAccount: true,
+      }).catch((syncErr) => {
+        console.warn(`[Login] Auto sync QLHT profile failed for ${user.username}:`, syncErr?.message || syncErr);
       });
 
       const isAdmin = checkIsAdmin(user.role);

@@ -3,6 +3,7 @@ import { getCurrentUserFromCookie, verifyAuthToken, checkIsAdmin, checkIsMonitor
 import { prisma } from '@/src/lib/prisma';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
 import { ACTIVITY_LOG_ACTIONS } from '@/src/features/activity-logs/types/activityLogActions';
+import { syncStudentProfileFromQLDTTX } from '@/src/features/external-portal/server/studentProfileSyncService';
 
 export async function GET(req: NextRequest) {
   try {
@@ -59,10 +60,15 @@ export async function GET(req: NextRequest) {
               hoLot: user.student.hoLot || '',
               ten: user.student.ten || '',
               hoTen: user.student.hoTen || `${user.student.hoLot || ''} ${user.student.ten || ''}`.trim(),
-              gioiTinh: user.student.gioiTinh || 'Nam',
-              ngaySinh: user.student.ngaySinh || '',
+              gioiTinh: user.student.gioiTinh || null,
+              ngaySinh: user.student.ngaySinh || null,
               maLop: user.student.maLop || '',
-              soDienThoai: user.student.soDienThoai || '',
+              soDienThoai: user.student.soDienThoai || null,
+              soCMND: user.student.soCMND || null,
+              email1: user.student.email1 || null,
+              email2: user.student.email2 || null,
+              noiSinh: user.student.noiSinh || null,
+              quocTich: user.student.quocTich || null,
               ghiChu: user.student.ghiChu || '',
               examCount: user.student.examRecords.length,
               exams: user.student.examRecords.map((r) => ({
@@ -135,5 +141,58 @@ export async function PUT(req: NextRequest) {
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    let authUser = await getCurrentUserFromCookie();
+
+    if (!authUser) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        authUser = await verifyAuthToken(token);
+      }
+    }
+
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const syncRes = await syncStudentProfileFromQLDTTX({
+      username: authUser.username,
+      skipIfNoAccount: false,
+    });
+
+    if (!syncRes.synced || !syncRes.student) {
+      return NextResponse.json(
+        { error: 'Không thể đồng bộ thông tin sinh viên từ QLHT' },
+        { status: 400 }
+      );
+    }
+
+    await logActivity({
+      req,
+      userId: authUser.id,
+      username: authUser.username,
+      userRole: authUser.role,
+      action: ACTIVITY_LOG_ACTIONS.UPDATE_MY_PROFILE,
+      targetType: 'STUDENT',
+      targetId: authUser.username,
+      description: `${authUser.username} đã đồng bộ thông tin cá nhân từ Cổng QLHT`,
+      metadata: { source: 'QLDTTX_PTTC1' },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Đã đồng bộ thông tin cá nhân từ Cổng QLHT thành công!',
+      student: syncRes.student,
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message || 'Lỗi khi đồng bộ thông tin từ QLHT' },
+      { status: 400 }
+    );
   }
 }

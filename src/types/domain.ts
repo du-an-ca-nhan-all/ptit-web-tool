@@ -102,11 +102,16 @@ export interface StudentProfile {
   hoLot?: string;
   ten?: string;
   hoTen?: string;
-  gioiTinh?: string;
-  ngaySinh?: string;
+  gioiTinh?: string | null;
+  ngaySinh?: string | null;
   maLop?: string;
   trangThai?: string; // 'DANG_HOC' | 'BAO_LUU' | 'NGHI_HOC' | 'CHUYEN_LOP'
-  soDienThoai?: string;
+  soDienThoai?: string | null;
+  soCMND?: string | null;
+  email1?: string | null;
+  email2?: string | null;
+  noiSinh?: string | null;
+  quocTich?: string | null;
   ghiChu?: string;
 }
 

@@ -9,6 +9,7 @@ import {
   hashSHA512,
 } from '@/src/lib/auth';
 import { logActivity } from '@/src/features/activity-logs/server/activityLogServerService';
+import { syncStudentProfileFromQLDTTX } from '@/src/features/external-portal/server/studentProfileSyncService';
 import { NextRequest } from 'next/server';
 
 export interface LoginResult {
@@ -77,6 +78,14 @@ export const authServerService = {
     await prisma.user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
+    });
+
+    // Tự động đồng bộ thông tin sinh viên từ QLHT sau khi đăng nhập (không chặn luồng đăng nhập)
+    syncStudentProfileFromQLDTTX({
+      username: user.username,
+      skipIfNoAccount: true,
+    }).catch((syncErr) => {
+      console.warn(`[authServerService.login] Auto sync QLHT profile failed for ${user.username}:`, syncErr?.message || syncErr);
     });
 
     const isAdmin = checkIsAdmin(user.role);
