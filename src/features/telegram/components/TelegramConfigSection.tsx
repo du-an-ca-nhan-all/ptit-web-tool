@@ -1480,7 +1480,7 @@ export default function TelegramConfigSection({
                         ? 'Yêu cầu cấu hình & test Telegram thành công.'
                         : !isSlinkAvailable
                         ? isSlinkError
-                          ? 'Mật khẩu S-Link sai/hết hạn. Cần cập nhật lại.'
+                          ? 'Refresh Token S-Link hết hạn hoặc không hợp lệ. Cần cập nhật lại.'
                           : 'Yêu cầu liên kết tài khoản PTIT S-Link.'
                         : 'slink.ptit.edu.vn (Tự động đánh dấu đã đọc sau khi gửi)'}
                     </div>

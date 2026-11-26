@@ -974,7 +974,7 @@ export async function getStudentSlinkGrades(
           where: { id: extAccount!.id },
           data: {
             status: 'ERROR',
-            syncMessage: 'Đăng nhập S-Link thất bại: Tài khoản hoặc mật khẩu không chính xác.',
+            syncMessage: 'Phiên PTIT S-Link đã hết hạn hoặc Refresh Token không hợp lệ. Vui lòng cập nhật lại Refresh Token.',
           },
         })
         .catch(() => {});

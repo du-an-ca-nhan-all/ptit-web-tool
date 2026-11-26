@@ -22,11 +22,9 @@ import {
   Sparkles,
   ArrowRight,
   Smartphone,
-  KeyRound,
 } from 'lucide-react';
 import { LoginUser } from '../../types/auth.types';
 import { SlinkConnectionGuide } from '@/src/features/external-portal/components/SlinkConnectionGuide';
-import SlinkForgotPasswordModal from '@/src/features/external-portal/components/SlinkForgotPasswordModal';
 
 interface ProfileExternalAccountsTabProps {
   currentUser: LoginUser;
@@ -68,7 +66,6 @@ export function ProfileExternalAccountsTab({
 }: ProfileExternalAccountsTabProps) {
   // Quản lý trạng thái mở form chỉnh sửa cho từng hệ thống (systemKey)
   const [editingSystems, setEditingSystems] = useState<Record<string, boolean>>({});
-  const [isSlinkForgotModalOpen, setIsSlinkForgotModalOpen] = useState(false);
 
   const handleStartEdit = (sys: any) => {
     setEditingSystems((prev) => ({ ...prev, [sys.systemKey]: true }));
@@ -741,13 +738,6 @@ export function ProfileExternalAccountsTab({
           })}
         </div>
       )}
-
-      {/* S-Link Forgot Password Modal */}
-      <SlinkForgotPasswordModal
-        isOpen={isSlinkForgotModalOpen}
-        onClose={() => setIsSlinkForgotModalOpen(false)}
-        defaultUsername={extForm['SLINK_PTIT']?.username || ''}
-      />
     </div>
   );
 }

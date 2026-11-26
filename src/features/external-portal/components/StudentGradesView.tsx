@@ -623,11 +623,13 @@ export default function StudentGradesView({
               <span>{dataSource === 'SLINK' ? 'Lỗi Xác Thực Tài Khoản PTIT S-Link' : 'Lỗi Xác Thực Tài Khoản QLDTTX'}</span>
             </div>
             <h3 className="text-xl font-black text-slate-800 tracking-tight">
-              Tài Khoản Hoặc Mật Khẩu Không Chính Xác
+              {dataSource === 'SLINK'
+                ? 'Refresh Token PTIT S-Link Đã Hết Hạn Hoặc Không Hợp Lệ'
+                : 'Tài Khoản Hoặc Mật Khẩu Không Chính Xác'}
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
               {dataSource === 'SLINK'
-                ? 'Không thể đăng nhập vào cổng PTIT S-Link để lấy dữ liệu bảng điểm. Vui lòng kiểm tra lại tài khoản và mật khẩu S-Link.'
+                ? 'Không thể xác thực phiên PTIT S-Link để lấy dữ liệu bảng điểm. Vui lòng cập nhật lại Refresh Token OAuth mới từ slink.ptit.edu.vn.'
                 : 'Không thể đăng nhập vào cổng QLDTTX để lấy dữ liệu bảng điểm. Vui lòng kiểm tra lại mã sinh viên và mật khẩu.'}
             </p>
           </div>
@@ -638,7 +640,7 @@ export default function StudentGradesView({
                 onClick={onNavigateToExternalAccounts}
                 className="px-6 py-3 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white rounded-2xl text-xs font-bold transition shadow-lg shadow-rose-600/30 flex items-center gap-2 cursor-pointer active:scale-98"
               >
-                <span>{dataSource === 'SLINK' ? 'Cập Nhật Lại Mật Khẩu S-Link' : 'Cập Nhật Lại Mật Khẩu QLDTTX'}</span>
+                <span>{dataSource === 'SLINK' ? 'Cập Nhật Refresh Token S-Link' : 'Cập Nhật Lại Mật Khẩu QLDTTX'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}

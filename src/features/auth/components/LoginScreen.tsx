@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import { LoginUser, ExamRecord } from '../types/auth.types';
 import { usePWAContext } from '../../../components/pwa/PWAProvider';
-import SlinkForgotPasswordModal from '@/src/features/external-portal/components/SlinkForgotPasswordModal';
 import ForgotPasswordModal from './ForgotPasswordModal';
 
 interface LoginScreenProps {
@@ -48,7 +47,6 @@ export default function LoginScreen({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(initialError || '');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSlinkModalOpen, setIsSlinkModalOpen] = useState(false);
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   useEffect(() => {
@@ -409,14 +407,6 @@ export default function LoginScreen({
                     <KeyRound className="w-3 h-3" />
                     <span>Quên mật khẩu EduSync (QLHT)</span>
                   </button>
-                  <span className="text-slate-300">•</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsSlinkModalOpen(true)}
-                    className="text-purple-600 font-semibold hover:underline cursor-pointer"
-                  >
-                    Quên mật khẩu S-Link
-                  </button>
                 </div>
               </div>
             </form>
@@ -752,13 +742,6 @@ export default function LoginScreen({
           </div>
         </div>
       </div>
-
-      {/* S-Link Forgot Password Modal */}
-      <SlinkForgotPasswordModal
-        isOpen={isSlinkModalOpen}
-        onClose={() => setIsSlinkModalOpen(false)}
-        defaultUsername=""
-      />
 
       {/* Portal Forgot Password Modal (QLHT) */}
       <ForgotPasswordModal

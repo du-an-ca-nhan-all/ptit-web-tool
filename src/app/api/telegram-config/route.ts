@@ -165,7 +165,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const isSlinkConfigured = !!(slinkAccount && (slinkAccount.token || slinkAccount.extPassword));
+    const isSlinkConfigured = !!(slinkAccount && (slinkAccount.token || slinkAccount.refreshToken));
     const slinkStatus = {
       isConfigured: isSlinkConfigured,
       status: slinkAccount?.status || 'DISCONNECTED',
@@ -666,7 +666,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const isSlinkValid = !!(slinkAccount && (slinkAccount.token || slinkAccount.extPassword) && slinkAccount.status !== 'ERROR');
+      const isSlinkValid = !!(slinkAccount && (slinkAccount.token || slinkAccount.refreshToken) && slinkAccount.status !== 'ERROR');
       const safeNotifySlinkAnnouncements = isSlinkValid ? notifySlinkAnnouncements : false;
 
       let botUsername: string | null = null;
@@ -788,7 +788,7 @@ export async function POST(req: NextRequest) {
           ],
         },
       });
-      const isSlinkValid = !!(slinkAccount && (slinkAccount.token || slinkAccount.extPassword) && slinkAccount.status !== 'ERROR');
+      const isSlinkValid = !!(slinkAccount && (slinkAccount.token || slinkAccount.refreshToken) && slinkAccount.status !== 'ERROR');
       if (!isSlinkValid) {
         return NextResponse.json(
           {
