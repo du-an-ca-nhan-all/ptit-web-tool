@@ -4,6 +4,7 @@ import { getStudentGrades } from './studentGradesServerService';
 import { getOrFetchStudentLmsOverview } from './lmsServerService';
 import { getStudentQldtExamSchedule } from './studentExamScheduleServerService';
 import { getStudentSlinkGrades } from './slinkGradesServerService';
+import { syncStudentProfileFromQLDTTX } from './studentProfileSyncService';
 import {
   getGlobalConfig,
   setGlobalConfig,
@@ -28,7 +29,7 @@ export async function enqueueGlobalSyncJob(options: EnqueueGlobalSyncOptions) {
   const triggeredBy = options.triggeredBy || 'ADMIN_MANUAL';
   const scheduledTime = options.scheduledTime || '22:00';
 
-  // Nếu chọn SYNC_ALL -> Tách thành 5 batches riêng biệt (Lịch học, Bảng điểm QLDTTX, LMS, Lịch thi, Điểm S-Link)
+  // Nếu chọn SYNC_ALL -> Tách thành 6 batches riêng biệt (Lịch học, Bảng điểm QLDTTX, LMS, Lịch thi, Điểm S-Link, Hồ sơ SV)
   if (options.jobType === 'SYNC_ALL') {
     const resTimetable = await enqueueSingleGlobalJobType({
       ...options,
@@ -55,17 +56,23 @@ export async function enqueueGlobalSyncJob(options: EnqueueGlobalSyncOptions) {
       jobType: 'SYNC_SLINK_GRADES',
       title: options.title ? `${options.title} - Điểm S-Link` : undefined,
     });
+    const resProfile = await enqueueSingleGlobalJobType({
+      ...options,
+      jobType: 'SYNC_PROFILE',
+      title: options.title ? `${options.title} - Hồ sơ SV` : undefined,
+    });
 
     return {
       success: true,
-      message: `Đã đưa 5 đợt đồng bộ (Lịch học, Điểm số QLDTTX, LMS, Lịch thi, Điểm S-Link) vào hàng đợi ngầm.`,
-      batches: [resTimetable, resGrades, resLms, resExams, resSlink],
+      message: `Đã đưa 6 đợt đồng bộ (Lịch học, Điểm số QLDTTX, LMS, Lịch thi, Điểm S-Link, Hồ sơ SV) vào hàng đợi ngầm.`,
+      batches: [resTimetable, resGrades, resLms, resExams, resSlink, resProfile],
       totalItems:
         (resTimetable.totalItems || 0) +
         (resGrades.totalItems || 0) +
         (resLms.totalItems || 0) +
         (resExams.totalItems || 0) +
-        (resSlink.totalItems || 0),
+        (resSlink.totalItems || 0) +
+        (resProfile.totalItems || 0),
     };
   }
 
@@ -595,6 +602,53 @@ async function processSingleGlobalSyncItem(item: any) {
         });
       }
     }
+
+    // 6. TÁC VỤ 6: ĐỒNG BỘ THÔNG TIN CÁ NHÂN SINH VIÊN TỪ QLHT (w-locsinhvieninfo)
+    else if (jobType === 'SYNC_PROFILE') {
+      const res = await syncStudentProfileFromQLDTTX({
+        username: normUsername,
+        token: extAcc.token,
+        extUsername: extAcc.extUsername,
+        extPassword: extAcc.extPassword || undefined,
+      });
+
+      if (res.synced && res.student) {
+        const filledFields = [
+          res.student.ngaySinh ? 'Ngày sinh' : null,
+          res.student.gioiTinh ? 'Giới tính' : null,
+          res.student.soDienThoai ? 'SĐT' : null,
+          res.student.soCMND ? 'CMND' : null,
+          res.student.email1 ? 'Email 1' : null,
+          res.student.email2 ? 'Email 2' : null,
+          res.student.noiSinh ? 'Nơi sinh' : null,
+          res.student.quocTich ? 'Quốc tịch' : null,
+        ].filter(Boolean);
+
+        const msg = `Đã đồng bộ hồ sơ QLHT (${filledFields.length}/8 trường có dữ liệu: ${filledFields.join(', ') || 'trống'})`;
+
+        await prisma.globalSyncQueueItem.update({
+          where: { id: item.id },
+          data: {
+            status: 'SUCCESS',
+            resultMessage: msg,
+            resultData: JSON.stringify(res.student),
+            finishedAt: new Date(),
+          },
+        });
+      } else {
+        await prisma.globalSyncQueueItem.update({
+          where: { id: item.id },
+          data: {
+            status: res.reason === 'STUDENT_NOT_FOUND' ? 'SKIPPED' : 'FAILED',
+            resultMessage:
+              res.reason === 'STUDENT_NOT_FOUND'
+                ? 'Bỏ qua: Không tìm thấy hồ sơ sinh viên trong bảng Student'
+                : 'Không thể đồng bộ thông tin sinh viên từ QLHT',
+            finishedAt: new Date(),
+          },
+        });
+      }
+    }
   } catch (err: any) {
     const errorMsg = err.message || 'Lỗi không xác định khi thực hiện đồng bộ';
     await prisma.globalSyncQueueItem.update({
@@ -714,6 +768,13 @@ export function getNormalizedGlobalSyncConfig(rawConfig?: GlobalNightlySyncConfi
       lastSyncDate: rawConfig?.slinkGradesJob?.lastSyncDate || null,
       lastSyncAt: rawConfig?.slinkGradesJob?.lastSyncAt || null,
       lastStatus: rawConfig?.slinkGradesJob?.lastStatus || null,
+    },
+    profileJob: {
+      isEnabled: rawConfig?.profileJob?.isEnabled ?? true,
+      scheduleTime: rawConfig?.profileJob?.scheduleTime || '22:30', // 22h30 đêm hàng ngày
+      lastSyncDate: rawConfig?.profileJob?.lastSyncDate || null,
+      lastSyncAt: rawConfig?.profileJob?.lastSyncAt || null,
+      lastStatus: rawConfig?.profileJob?.lastStatus || null,
     },
     customJobs: rawConfig?.customJobs || {},
   };
@@ -927,6 +988,22 @@ export async function runGlobalNightlySyncScheduler(): Promise<{ executed: boole
       config.slinkGradesJob.lastSyncDate = currentDateStr;
       config.slinkGradesJob.lastSyncAt = new Date().toISOString();
       config.slinkGradesJob.lastStatus = resSlinkGrades.success ? 'SUCCESS' : 'FAILED';
+      configModified = true;
+    }
+
+    // 6. Job 6: Đồng bộ Thông tin cá nhân Sinh viên QLHT (Cấu hình giờ chạy riêng: config.profileJob - Mặc định 22:30 đêm VN)
+    if (config.profileJob && isJobDueToRun(config.profileJob, currentHour, currentMinute, currentDateStr)) {
+      console.log(`⏰ [Global Job Scheduler] Kích hoạt Job 6 (Hồ sơ SV QLHT) lúc ${config.profileJob.scheduleTime} VN...`);
+      const resProfile = await enqueueSingleGlobalJobType({
+        jobType: 'SYNC_PROFILE',
+        title: `Tự động đồng bộ Hồ sơ SV QLHT (${config.profileJob.scheduleTime} ${currentDateStr})`,
+        triggeredBy: 'SYSTEM_CRON',
+        scheduledTime: config.profileJob.scheduleTime,
+      });
+      batchesCreated.push(resProfile);
+      config.profileJob.lastSyncDate = currentDateStr;
+      config.profileJob.lastSyncAt = new Date().toISOString();
+      config.profileJob.lastStatus = resProfile.success ? 'SUCCESS' : 'FAILED';
       configModified = true;
     }
 

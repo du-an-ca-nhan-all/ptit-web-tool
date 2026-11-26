@@ -203,6 +203,18 @@ export async function POST(req: NextRequest) {
           ...currentConfig.lmsJob,
           ...(config.lmsJob || {}),
         },
+        examsJob: {
+          ...currentConfig.examsJob,
+          ...(config.examsJob || {}),
+        },
+        slinkGradesJob: {
+          ...currentConfig.slinkGradesJob,
+          ...(config.slinkGradesJob || {}),
+        },
+        profileJob: {
+          ...currentConfig.profileJob,
+          ...(config.profileJob || {}),
+        },
       };
 
       await setGlobalConfig(

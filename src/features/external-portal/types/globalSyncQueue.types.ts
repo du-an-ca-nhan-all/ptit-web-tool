@@ -4,6 +4,7 @@ export type GlobalJobType =
   | 'SYNC_LMS'
   | 'SYNC_EXAMS'
   | 'SYNC_SLINK_GRADES'
+  | 'SYNC_PROFILE'
   | 'SYNC_TODAY_EXAMS'
   | 'SYNC_ALL';
 
@@ -57,6 +58,13 @@ export const GLOBAL_JOB_DEFINITIONS: Record<
     description: 'Kéo kết quả học tập, điểm chi tiết & GPA từ Cổng PTIT S-Link cho toàn bộ sinh viên',
     icon: 'Award',
   },
+  SYNC_PROFILE: {
+    key: 'SYNC_PROFILE',
+    name: 'Đồng Bộ Thông Tin Cá Nhân Sinh Viên (QLHT)',
+    shortName: 'Đồng bộ Hồ sơ SV',
+    description: 'Kéo ngày sinh, giới tính, SĐT, CMND/CCCD, Email 1/2, nơi sinh & quốc tịch từ Cổng QLHT',
+    icon: 'UserCheck',
+  },
   SYNC_TODAY_EXAMS: {
     key: 'SYNC_TODAY_EXAMS',
     name: 'Quét Ca Thi Hôm Nay (QLDTTX)',
@@ -66,9 +74,9 @@ export const GLOBAL_JOB_DEFINITIONS: Record<
   },
   SYNC_ALL: {
     key: 'SYNC_ALL',
-    name: 'Đồng Bộ Toàn Diện (Lịch học + Điểm + LMS + Lịch thi + S-Link)',
+    name: 'Đồng Bộ Toàn Diện (Lịch học + Điểm + LMS + Lịch thi + S-Link + Hồ sơ SV)',
     shortName: 'Đồng bộ Tất cả',
-    description: 'Đồng bộ đồng thời tất cả tác vụ: Lịch học, Điểm số QLDTTX, Khóa học LMS, Lịch thi và Điểm S-Link',
+    description: 'Đồng bộ đồng thời tất cả tác vụ: Lịch học, Điểm số QLDTTX, Khóa học LMS, Lịch thi, Điểm S-Link và Hồ sơ sinh viên QLHT',
     icon: 'Layers',
   },
 };

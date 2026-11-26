@@ -25,6 +25,7 @@ import {
   Globe,
   Sliders,
   Award,
+  UserCheck,
 } from 'lucide-react';
 import { LoginUser } from '../../../types';
 import {
@@ -90,6 +91,10 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
       isEnabled: config?.slinkGradesJob?.isEnabled !== false,
       scheduleTime: config?.slinkGradesJob?.scheduleTime || '23:00',
     },
+    profileJob: {
+      isEnabled: config?.profileJob?.isEnabled !== false,
+      scheduleTime: config?.profileJob?.scheduleTime || '22:30',
+    },
   });
 
   const openConfigModal = () => {
@@ -114,6 +119,10 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
       slinkGradesJob: {
         isEnabled: config?.slinkGradesJob?.isEnabled !== false,
         scheduleTime: config?.slinkGradesJob?.scheduleTime || '23:00',
+      },
+      profileJob: {
+        isEnabled: config?.profileJob?.isEnabled !== false,
+        scheduleTime: config?.profileJob?.scheduleTime || '22:30',
       },
     });
     setIsConfigOpen(true);
@@ -235,8 +244,9 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               <strong className="text-indigo-600 font-semibold"> 1. Lịch học ({config?.timetableJob?.scheduleTime || '22:00'})</strong>, 
               <strong className="text-emerald-600 font-semibold"> 2. Điểm & GPA ({config?.gradesJob?.scheduleTime || '22:00'})</strong>, 
               <strong className="text-purple-600 font-semibold"> 3. LMS ({config?.lmsJob?.scheduleTime || '22:00'})</strong>, 
-              <strong className="text-amber-600 font-semibold"> 4. Lịch thi ({config?.examsJob?.scheduleTime || '07:00'})</strong>, và 
-              <strong className="text-violet-600 font-semibold"> 5. S-Link ({config?.slinkGradesJob?.scheduleTime || '23:00'})</strong>.
+              <strong className="text-amber-600 font-semibold"> 4. Lịch thi ({config?.examsJob?.scheduleTime || '07:00'})</strong>, 
+              <strong className="text-violet-600 font-semibold"> 5. S-Link ({config?.slinkGradesJob?.scheduleTime || '23:00'})</strong>, và 
+              <strong className="text-sky-600 font-semibold"> 6. Hồ sơ SV ({config?.profileJob?.scheduleTime || '22:30'})</strong>.
             </p>
           </div>
 
@@ -272,8 +282,8 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
           </div>
         </div>
 
-        {/* 6 QUICK ACTION TRIGGER CARDS (1 col on mobile, 2 on sm, 3 on lg, 6 on xl) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-slate-100">
+        {/* 7 QUICK ACTION TRIGGER CARDS (1 col on mobile, 2 on sm, 3 on lg, 4 on xl) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-slate-100">
           {/* JOB 1: LỊCH HỌC */}
           <div className="p-3.5 sm:p-4 bg-gradient-to-br from-indigo-50 to-blue-50/50 border border-indigo-100 rounded-2xl flex flex-col justify-between hover:shadow-xs transition-all">
             <div>
@@ -449,7 +459,42 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
             </button>
           </div>
 
-          {/* ALL 5 JOBS */}
+          {/* JOB 6: HỒ SƠ SINH VIÊN QLHT */}
+          <div className="p-3.5 sm:p-4 bg-gradient-to-br from-sky-50 to-cyan-50/50 border border-sky-200 rounded-2xl flex flex-col justify-between hover:shadow-xs transition-all">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  6
+                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 bg-sky-100 text-sky-800 rounded-md">
+                    QLHT
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-md flex items-center gap-0.5">
+                    <Clock className="w-2.5 h-2.5" />
+                    {config?.profileJob?.scheduleTime || '22:30'}
+                  </span>
+                </div>
+              </div>
+              <h4 className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4 text-sky-600 shrink-0" />
+                <span>Job 6: Hồ Sơ SV QLHT</span>
+              </h4>
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-1 line-clamp-2">
+                Đồng bộ ngày sinh, giới tính, SĐT, CMND, Email 1/2, nơi sinh &amp; quốc tịch từ QLHT.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => enqueueJob({ jobType: 'SYNC_PROFILE' })}
+              disabled={isSubmitting}
+              className="mt-3 sm:mt-4 w-full py-2 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50 active:scale-98"
+            >
+              <Zap className="w-3.5 h-3.5" /> Đồng Bộ Hồ Sơ SV
+            </button>
+          </div>
+
+          {/* ALL 6 JOBS */}
           <div className="p-3.5 sm:p-4 bg-gradient-to-br from-slate-900 to-indigo-950 text-white border border-slate-800 rounded-2xl flex flex-col justify-between hover:shadow-xs transition-all">
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -457,7 +502,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                   ★
                 </span>
                 <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 rounded-md">
-                  Tất Cả 5 Job
+                  Tất Cả 6 Job
                 </span>
               </div>
               <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
@@ -465,7 +510,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                 <span>Đồng Bộ Toàn Diện</span>
               </h4>
               <p className="text-[11px] sm:text-xs text-slate-300 mt-1 line-clamp-2">
-                Tự động đồng bộ Lịch học, Điểm QLDTTX, Khóa học LMS, Lịch thi và Điểm S-Link.
+                Tự động đồng bộ Lịch học, Điểm QLDTTX, Khóa học LMS, Lịch thi, Điểm S-Link và Hồ sơ SV.
               </p>
             </div>
             <button
@@ -474,7 +519,7 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
               disabled={isSubmitting}
               className="mt-3 sm:mt-4 w-full py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 active:from-blue-700 active:to-indigo-800 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50 active:scale-98"
             >
-              <Sparkles className="w-3.5 h-3.5" /> Kích Hoạt Cả 5 Job
+              <Sparkles className="w-3.5 h-3.5" /> Kích Hoạt Cả 6 Job
             </button>
           </div>
         </div>
@@ -1245,6 +1290,54 @@ export default function GlobalSyncQueueManager({ currentUser }: GlobalSyncQueueM
                           })
                         }
                         className="w-24 sm:w-32 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-center"
+                      />
+                      <span className="text-[10px] sm:text-[11px] text-slate-400">(HH:mm)</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 6. JOB HỒ SƠ SINH VIÊN QLHT */}
+                <div className="p-3 sm:p-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl space-y-2.5 sm:space-y-3 hover:border-sky-300 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold text-xs shrink-0">
+                        <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">Job 6: Thông Tin Cá Nhân Sinh Viên (QLHT)</div>
+                        <div className="text-[10px] text-slate-500">Đồng bộ ngày sinh, giới tính, SĐT, CMND, Email, nơi sinh, quốc tịch</div>
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={configForm.profileJob.isEnabled}
+                        onChange={(e) =>
+                          setConfigForm({
+                            ...configForm,
+                            profileJob: { ...configForm.profileJob, isEnabled: e.target.checked },
+                          })
+                        }
+                        className="w-4 h-4 accent-sky-600 rounded cursor-pointer"
+                      />
+                      <span>Bật</span>
+                    </label>
+                  </div>
+
+                  {configForm.profileJob.isEnabled && (
+                    <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-3 pt-2 border-t border-slate-100">
+                      <label className="text-xs font-medium text-slate-600 shrink-0">Giờ chạy:</label>
+                      <input
+                        type="text"
+                        placeholder="22:30"
+                        value={configForm.profileJob.scheduleTime}
+                        onChange={(e) =>
+                          setConfigForm({
+                            ...configForm,
+                            profileJob: { ...configForm.profileJob, scheduleTime: e.target.value },
+                          })
+                        }
+                        className="w-24 sm:w-32 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 text-center"
                       />
                       <span className="text-[10px] sm:text-[11px] text-slate-400">(HH:mm)</span>
                     </div>
