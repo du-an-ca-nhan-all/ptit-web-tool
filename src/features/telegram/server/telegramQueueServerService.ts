@@ -41,6 +41,8 @@ export interface TelegramQueueStats {
   isPaused: boolean;
   minGlobalIntervalMs: number;
   minPerChatIntervalMs: number;
+  minGroupChatIntervalMs: number;
+  maxGroupMsgsPerMinute: number;
   maxRetriesDefault: number;
   maxRetries429: number;
   lastSentAt: string | null;
@@ -79,7 +81,11 @@ export interface TelegramQueueItem {
 export interface TelegramQueueInternalState {
   queue: TelegramQueueItem[];
   activeSending: Set<string>;
+  activeChats: Set<string>;
+  isProcessingTick: boolean;
   lastSentAtByChat: Map<string, number>;
+  recentGroupSendsByChat: Map<string, number[]>;
+  consecutive429ByChat: Map<string, number>;
   lastGlobalSendAt: number;
   globalRateLimitedUntil: number;
   perChatRateLimitedUntil: Map<string, number>;
@@ -103,12 +109,29 @@ const PRIORITY_WEIGHTS: Record<TelegramMessagePriority, number> = {
 };
 
 // Telegram API limits:
-// Global limit: max 30 msg/sec per bot. We use 50ms interval (~20 msg/sec max).
-const MIN_GLOBAL_INTERVAL_MS = 50;
-// Per chat limit: max 1 msg/sec per chat. We use 1100ms interval for safety.
+// 1. Global limit: max 30 msg/sec per bot -> dùng 60ms (~16 msg/sec)
+const MIN_GLOBAL_INTERVAL_MS = 60;
+// 2. Private chat (chatId > 0): max 1 msg/sec -> dùng 1100ms
 const MIN_PER_CHAT_INTERVAL_MS = 1100;
+// 3. Group / Supergroup / Channel (chatId < 0, vd: -100...):
+//    Telegram giới hạn tối đa 20 msg/phút cho cùng 1 nhóm -> dùng 3200ms (~18.7 msg/phút)
+//    + sliding window tối đa 18 msg trong 60 giây để tránh 429 khi gửi dồn dập.
+const MIN_GROUP_CHAT_INTERVAL_MS = 3200;
+const GROUP_WINDOW_MS = 60_000;
+const MAX_GROUP_MSGS_PER_MINUTE = 18;
 // Maximum recent history kept in memory
 const MAX_HISTORY_ITEMS = 100;
+
+function isGroupOrChannelChat(chatId: string): boolean {
+  return String(chatId || '').trim().startsWith('-');
+}
+
+function getEffectiveChatIntervalMs(chatId: string, consecutive429: number): number {
+  const base = isGroupOrChannelChat(chatId) ? MIN_GROUP_CHAT_INTERVAL_MS : MIN_PER_CHAT_INTERVAL_MS;
+  if (consecutive429 <= 0) return base;
+  // Adaptive backoff nhẹ cho chat vừa dính 429: +1.5s mỗi lần liên tiếp (tối đa +9s)
+  return base + Math.min(consecutive429, 6) * 1500;
+}
 
 /**
  * Get or initialize the global singleton queue state
@@ -119,7 +142,11 @@ function getQueueState(): TelegramQueueInternalState {
     g.__telegramQueueState = {
       queue: [],
       activeSending: new Set<string>(),
+      activeChats: new Set<string>(),
+      isProcessingTick: false,
       lastSentAtByChat: new Map<string, number>(),
+      recentGroupSendsByChat: new Map<string, number[]>(),
+      consecutive429ByChat: new Map<string, number>(),
       lastGlobalSendAt: 0,
       globalRateLimitedUntil: 0,
       perChatRateLimitedUntil: new Map<string, number>(),
@@ -133,7 +160,12 @@ function getQueueState(): TelegramQueueInternalState {
       itemCounter: 0,
     };
   }
-  return g.__telegramQueueState;
+  const state = g.__telegramQueueState as TelegramQueueInternalState;
+  if (!state.activeChats) state.activeChats = new Set<string>();
+  if (typeof state.isProcessingTick !== 'boolean') state.isProcessingTick = false;
+  if (!state.recentGroupSendsByChat) state.recentGroupSendsByChat = new Map<string, number[]>();
+  if (!state.consecutive429ByChat) state.consecutive429ByChat = new Map<string, number>();
+  return state;
 }
 
 /**
@@ -208,152 +240,342 @@ async function processNextQueueItem() {
     return;
   }
 
+  // Tránh chạy song song nhiều tick cùng lúc (ngăn race condition bắn đồng thời nhiều tin vào 1 chat)
+  if (state.isProcessingTick) {
+    return;
+  }
+
   if (state.queue.length === 0) {
     state.isWorkerRunning = false;
     return;
   }
 
+  state.isProcessingTick = true;
   state.isWorkerRunning = true;
   const now = Date.now();
 
-  // 1. Check if global rate limit is active
-  if (state.globalRateLimitedUntil > now) {
-    const waitTime = state.globalRateLimitedUntil - now + 50;
-    triggerWorker(waitTime);
-    return;
-  }
-
-  // 2. Check global minimum interval
-  const timeSinceLastGlobal = now - state.lastGlobalSendAt;
-  if (timeSinceLastGlobal < MIN_GLOBAL_INTERVAL_MS) {
-    const waitTime = MIN_GLOBAL_INTERVAL_MS - timeSinceLastGlobal;
-    triggerWorker(waitTime);
-    return;
-  }
-
-  // 3. Find the best ready item in the queue:
-  // Must satisfy:
-  // - scheduledFor <= now
-  // - Not currently sending to this chat (state.activeSending)
-  // - Chat rate limit cool-down has passed
-  // - At least MIN_PER_CHAT_INTERVAL_MS passed since last message to this chatId
-  let readyItemIndex = -1;
-  let minWaitUntilNextReady = Infinity;
-
-  for (let i = 0; i < state.queue.length; i++) {
-    const item = state.queue[i];
-
-    if (item.scheduledFor > now) {
-      minWaitUntilNextReady = Math.min(minWaitUntilNextReady, item.scheduledFor - now);
-      continue;
-    }
-
-    const chatRateLimitUntil = state.perChatRateLimitedUntil.get(item.chatId) || 0;
-    if (chatRateLimitUntil > now) {
-      minWaitUntilNextReady = Math.min(minWaitUntilNextReady, chatRateLimitUntil - now);
-      continue;
-    }
-
-    const lastSentToChat = state.lastSentAtByChat.get(item.chatId) || 0;
-    const timeSinceChatSent = now - lastSentToChat;
-    if (timeSinceChatSent < MIN_PER_CHAT_INTERVAL_MS) {
-      const waitChat = MIN_PER_CHAT_INTERVAL_MS - timeSinceChatSent;
-      minWaitUntilNextReady = Math.min(minWaitUntilNextReady, waitChat);
-      continue;
-    }
-
-    // Found ready item!
-    readyItemIndex = i;
-    break;
-  }
-
-  // If no item is ready right now, schedule next tick for the earliest ready item
-  if (readyItemIndex === -1) {
-    const safeDelay = Math.max(50, Math.min(minWaitUntilNextReady === Infinity ? 500 : minWaitUntilNextReady, 5000));
-    triggerWorker(safeDelay);
-    return;
-  }
-
-  // Extract the ready item
-  const [item] = state.queue.splice(readyItemIndex, 1);
-  item.status = 'SENDING';
-  state.activeSending.add(item.id);
-
-  const startTime = Date.now();
-
   try {
-    let result: TelegramSendResult;
-
-    if (item.type === 'message') {
-      result = await sendRawTelegramMessage(
-        item.botToken,
-        item.chatId,
-        item.text || '',
-        item.options
-      );
-    } else {
-      result = await sendRawTelegramDocument(
-        item.botToken,
-        item.chatId,
-        item.fileBuffer || Buffer.alloc(0),
-        item.filename || 'file.bin',
-        item.options
-      );
+    // 1. Check if global rate limit is active
+    if (state.globalRateLimitedUntil > now) {
+      const waitTime = state.globalRateLimitedUntil - now + 100;
+      state.isProcessingTick = false;
+      triggerWorker(waitTime);
+      return;
     }
 
-    const durationMs = Date.now() - startTime;
-    const completedAt = new Date().toISOString();
+    // 2. Check global minimum interval
+    const timeSinceLastGlobal = now - state.lastGlobalSendAt;
+    if (timeSinceLastGlobal < MIN_GLOBAL_INTERVAL_MS) {
+      const waitTime = MIN_GLOBAL_INTERVAL_MS - timeSinceLastGlobal;
+      state.isProcessingTick = false;
+      triggerWorker(waitTime);
+      return;
+    }
 
-    if (result.success) {
-      // SUCCESS
-      state.sentCount++;
-      state.lastGlobalSendAt = Date.now();
-      state.lastSentAtByChat.set(item.chatId, Date.now());
+    // 3. Find the best ready item in the queue:
+    // Must satisfy:
+    // - scheduledFor <= now
+    // - Not currently sending to this chatId (state.activeChats)
+    // - Chat rate limit cool-down has passed
+    // - At least effective per-chat interval (1.1s private / 3.2s+ group) passed since last message to this chatId
+    // - For group/supergroup/channel: sliding window <= 18 messages / 60s
+    let readyItemIndex = -1;
+    let minWaitUntilNextReady = Infinity;
 
-      recordHistory({
-        id: item.id,
-        type: item.type,
-        chatId: item.chatId,
-        threadId: item.options?.threadId,
-        priority: item.priority,
-        status: 'SUCCESS',
-        attempts: item.attempts + 1,
-        textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
-        filename: item.filename,
-        durationMs,
-        completedAt,
-      });
+    for (let i = 0; i < state.queue.length; i++) {
+      const item = state.queue[i];
 
-      item.status = 'SUCCESS';
-      item.resolve?.(result);
-    } else {
-      // HANDLE ERROR
-      const errorCode = result.errorCode;
-      const rawDesc = result.rawResponse?.description || result.error || '';
-      const retryAfter = result.rawResponse?.parameters?.retry_after;
+      if (item.scheduledFor > now) {
+        minWaitUntilNextReady = Math.min(minWaitUntilNextReady, item.scheduledFor - now);
+        continue;
+      }
 
-      // 1. Rate limited by Telegram (HTTP 429 Too Many Requests)
-      if (errorCode === 429 || typeof retryAfter === 'number' || rawDesc.toLowerCase().includes('too many requests')) {
-        let pauseSeconds = typeof retryAfter === 'number' ? retryAfter : 0;
-        if (!pauseSeconds) {
-          const match = rawDesc.match(/retry after (\d+)/i);
-          if (match && match[1]) {
-            pauseSeconds = parseInt(match[1], 10);
+      if (state.activeChats.has(item.chatId)) {
+        minWaitUntilNextReady = Math.min(minWaitUntilNextReady, 250);
+        continue;
+      }
+
+      const chatRateLimitUntil = state.perChatRateLimitedUntil.get(item.chatId) || 0;
+      if (chatRateLimitUntil > now) {
+        minWaitUntilNextReady = Math.min(minWaitUntilNextReady, chatRateLimitUntil - now);
+        continue;
+      }
+
+      const consecutive429 = state.consecutive429ByChat.get(item.chatId) || 0;
+      const requiredChatInterval = getEffectiveChatIntervalMs(item.chatId, consecutive429);
+      const lastSentToChat = state.lastSentAtByChat.get(item.chatId) || 0;
+      const timeSinceChatSent = now - lastSentToChat;
+      if (timeSinceChatSent < requiredChatInterval) {
+        const waitChat = requiredChatInterval - timeSinceChatSent;
+        minWaitUntilNextReady = Math.min(minWaitUntilNextReady, waitChat);
+        continue;
+      }
+
+      // Enforce sliding window 18 msg / 60s cho Group/Supergroup/Channel (-100...)
+      if (isGroupOrChannelChat(item.chatId)) {
+        const rawTimestamps = state.recentGroupSendsByChat.get(item.chatId) || [];
+        const activeWindow = rawTimestamps.filter((ts) => now - ts < GROUP_WINDOW_MS);
+        state.recentGroupSendsByChat.set(item.chatId, activeWindow);
+
+        if (activeWindow.length >= MAX_GROUP_MSGS_PER_MINUTE) {
+          const oldestTs = activeWindow[0];
+          const waitWindow = Math.max(500, GROUP_WINDOW_MS - (now - oldestTs) + 200);
+          minWaitUntilNextReady = Math.min(minWaitUntilNextReady, waitWindow);
+          continue;
+        }
+      }
+
+      // Found ready item!
+      readyItemIndex = i;
+      break;
+    }
+
+    // If no item is ready right now, schedule next tick for the earliest ready item
+    if (readyItemIndex === -1) {
+      const safeDelay = Math.max(100, Math.min(minWaitUntilNextReady === Infinity ? 500 : minWaitUntilNextReady, 5000));
+      state.isProcessingTick = false;
+      triggerWorker(safeDelay);
+      return;
+    }
+
+    // Extract the ready item and reserve timestamps IMMEDIATELY before awaiting network I/O
+    const [item] = state.queue.splice(readyItemIndex, 1);
+    item.status = 'SENDING';
+    state.activeSending.add(item.id);
+    state.activeChats.add(item.chatId);
+    state.lastGlobalSendAt = now;
+    state.lastSentAtByChat.set(item.chatId, now);
+
+    const startTime = Date.now();
+
+    try {
+      let result: TelegramSendResult;
+
+      if (item.type === 'message') {
+        result = await sendRawTelegramMessage(
+          item.botToken,
+          item.chatId,
+          item.text || '',
+          item.options
+        );
+      } else {
+        result = await sendRawTelegramDocument(
+          item.botToken,
+          item.chatId,
+          item.fileBuffer || Buffer.alloc(0),
+          item.filename || 'file.bin',
+          item.options
+        );
+      }
+
+      const durationMs = Date.now() - startTime;
+      const completedAt = new Date().toISOString();
+
+      if (result.success) {
+        // SUCCESS
+        const doneAt = Date.now();
+        state.sentCount++;
+        state.lastGlobalSendAt = doneAt;
+        state.lastSentAtByChat.set(item.chatId, doneAt);
+
+        // Giảm dần adaptive backoff khi gửi thành công
+        const prev429 = state.consecutive429ByChat.get(item.chatId) || 0;
+        if (prev429 > 0) {
+          state.consecutive429ByChat.set(item.chatId, prev429 - 1);
+        }
+
+        // Ghi nhận vào sliding window 60s cho group/supergroup
+        if (isGroupOrChannelChat(item.chatId)) {
+          const timestamps = state.recentGroupSendsByChat.get(item.chatId) || [];
+          timestamps.push(doneAt);
+          state.recentGroupSendsByChat.set(
+            item.chatId,
+            timestamps.filter((ts) => doneAt - ts < GROUP_WINDOW_MS)
+          );
+        }
+
+        recordHistory({
+          id: item.id,
+          type: item.type,
+          chatId: item.chatId,
+          threadId: item.options?.threadId,
+          priority: item.priority,
+          status: 'SUCCESS',
+          attempts: item.attempts + 1,
+          textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
+          filename: item.filename,
+          durationMs,
+          completedAt,
+        });
+
+        item.status = 'SUCCESS';
+        item.resolve?.(result);
+      } else {
+        // HANDLE ERROR
+        const errorCode = result.errorCode;
+        const rawDesc = result.rawResponse?.description || result.error || '';
+        const retryAfter = result.rawResponse?.parameters?.retry_after;
+
+        // 1. Rate limited by Telegram (HTTP 429 Too Many Requests)
+        if (errorCode === 429 || typeof retryAfter === 'number' || rawDesc.toLowerCase().includes('too many requests')) {
+          let pauseSeconds = typeof retryAfter === 'number' ? retryAfter : 0;
+          if (!pauseSeconds) {
+            const match = rawDesc.match(/retry after (\d+)/i);
+            if (match && match[1]) {
+              pauseSeconds = parseInt(match[1], 10);
+            }
+          }
+          pauseSeconds = Math.max(pauseSeconds || 5, 3);
+          const pauseMs = pauseSeconds * 1000 + 1500; // Thêm 1.5s đệm an toàn tránh đụng lại 429 ngay lập tức
+
+          const prev429 = state.consecutive429ByChat.get(item.chatId) || 0;
+          state.consecutive429ByChat.set(item.chatId, Math.min(prev429 + 1, 6));
+
+          state.rateLimitPauses++;
+          // Chỉ tạm dừng chat bị 429 theo đúng Retry-After; global chỉ giãn nhẹ 1s để không chặn các chat cá nhân khác
+          state.perChatRateLimitedUntil.set(item.chatId, Date.now() + pauseMs);
+          state.globalRateLimitedUntil = Math.max(state.globalRateLimitedUntil, Date.now() + 1000);
+
+          console.warn(
+            `⚠️ [Telegram Queue] Hit rate limit 429 on chat ${item.chatId}. Pausing chat for ${pauseSeconds}s (+1.5s buffer, streak=${prev429 + 1})`
+          );
+
+          const current429Retries = item.retryCount429 || 0;
+
+          if (current429Retries < MAX_QUEUE_RETRIES_429) {
+            item.retryCount429 = current429Retries + 1;
+            item.attempts++;
+            item.status = 'PENDING';
+            item.scheduledFor = Date.now() + pauseMs;
+            insertItemByPriority(state.queue, item);
+
+            recordHistory({
+              id: item.id,
+              type: item.type,
+              chatId: item.chatId,
+              threadId: item.options?.threadId,
+              priority: item.priority,
+              status: 'RETRYING',
+              attempts: item.attempts,
+              textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
+              filename: item.filename,
+              error: `Rate limit 429 (Tạm dừng chat ${pauseSeconds}s, thử lại lần ${item.retryCount429}/${MAX_QUEUE_RETRIES_429})`,
+              durationMs,
+              completedAt,
+            });
+          } else {
+            // Max attempts reached on 429 (1000 retries)
+            state.failedCount++;
+            item.status = 'FAILED';
+            recordHistory({
+              id: item.id,
+              type: item.type,
+              chatId: item.chatId,
+              threadId: item.options?.threadId,
+              priority: item.priority,
+              status: 'FAILED',
+              attempts: item.attempts + 1,
+              textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
+              filename: item.filename,
+              error: `Rate limit 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
+              durationMs,
+              completedAt,
+            });
+            item.resolve?.({
+              ...result,
+              error: `Rate limit 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
+            });
+          }
+        } else {
+          // 2. Other errors: check if transient/retryable
+          const isFatalError =
+            errorCode === 400 ||
+            errorCode === 401 ||
+            errorCode === 403 ||
+            rawDesc.toLowerCase().includes('chat not found') ||
+            rawDesc.toLowerCase().includes('bot was blocked') ||
+            rawDesc.toLowerCase().includes('unauthorized') ||
+            rawDesc.toLowerCase().includes('can\'t parse');
+
+          const maxRetries = item.maxAttempts ?? MAX_QUEUE_RETRIES_DEFAULT;
+          const currentGeneralRetries = item.retryCountGeneral || 0;
+
+          if (!isFatalError && currentGeneralRetries < maxRetries) {
+            // Transient network / 5xx error: Exponential backoff
+            item.retryCountGeneral = currentGeneralRetries + 1;
+            item.attempts++;
+            item.status = 'PENDING';
+            const backoffDelay = Math.min(30000, 1000 * Math.pow(1.5, Math.min(currentGeneralRetries, 8)));
+            item.scheduledFor = Date.now() + backoffDelay;
+            insertItemByPriority(state.queue, item);
+
+            recordHistory({
+              id: item.id,
+              type: item.type,
+              chatId: item.chatId,
+              threadId: item.options?.threadId,
+              priority: item.priority,
+              status: 'RETRYING',
+              attempts: item.attempts,
+              textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
+              filename: item.filename,
+              error: `${result.error || 'Lỗi mạng'} (Thử lại lần ${item.retryCountGeneral}/${maxRetries})`,
+              durationMs,
+              completedAt,
+            });
+          } else {
+            // Permanent failure or exhausted retries
+            state.failedCount++;
+            item.status = 'FAILED';
+
+            const failReason = isFatalError
+              ? (result.error || 'Lỗi không thể gửi')
+              : `${result.error || 'Gửi thất bại'}: Đã thử lại tối đa ${maxRetries} lần không thành công`;
+
+            recordHistory({
+              id: item.id,
+              type: item.type,
+              chatId: item.chatId,
+              threadId: item.options?.threadId,
+              priority: item.priority,
+              status: 'FAILED',
+              attempts: item.attempts + 1,
+              textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
+              filename: item.filename,
+              error: failReason,
+              durationMs,
+              completedAt,
+            });
+
+            item.resolve?.(result);
           }
         }
-        pauseSeconds = Math.max(pauseSeconds || 5, 2);
-        const pauseMs = pauseSeconds * 1000 + 500;
+      }
+    } catch (err: any) {
+      const durationMs = Date.now() - startTime;
+      const completedAt = new Date().toISOString();
+
+      const isErr429 =
+        err?.status === 429 ||
+        (typeof err?.message === 'string' &&
+          (err.message.includes('429') || err.message.toLowerCase().includes('too many requests')));
+
+      if (isErr429) {
+        let pauseSeconds = 5;
+        const match = typeof err?.message === 'string' ? err.message.match(/retry after (\d+)/i) : null;
+        if (match && match[1]) {
+          pauseSeconds = Math.max(parseInt(match[1], 10), 3);
+        }
+        const pauseMs = pauseSeconds * 1000 + 1500;
+
+        const prev429 = state.consecutive429ByChat.get(item.chatId) || 0;
+        state.consecutive429ByChat.set(item.chatId, Math.min(prev429 + 1, 6));
 
         state.rateLimitPauses++;
-        state.globalRateLimitedUntil = Date.now() + pauseMs;
         state.perChatRateLimitedUntil.set(item.chatId, Date.now() + pauseMs);
-
-        console.warn(
-          `⚠️ [Telegram Queue] Hit rate limit 429 on chat ${item.chatId}. Pausing queue for ${pauseSeconds}s (Retry-After)`
-        );
+        state.globalRateLimitedUntil = Math.max(state.globalRateLimitedUntil, Date.now() + 1000);
 
         const current429Retries = item.retryCount429 || 0;
-
         if (current429Retries < MAX_QUEUE_RETRIES_429) {
           item.retryCount429 = current429Retries + 1;
           item.attempts++;
@@ -371,16 +593,11 @@ async function processNextQueueItem() {
             attempts: item.attempts,
             textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
             filename: item.filename,
-            error: `Rate limit 429 (Tạm dừng ${pauseSeconds}s, thử lại lần ${item.retryCount429}/${MAX_QUEUE_RETRIES_429})`,
+            error: `Ngoại lệ 429: ${err.message || 'Too Many Requests'} (Tạm dừng chat ${pauseSeconds}s, thử lại lần ${item.retryCount429}/${MAX_QUEUE_RETRIES_429})`,
             durationMs,
             completedAt,
           });
-
-          // Schedule next worker tick after pause
-          triggerWorker(pauseMs + 50);
-          return;
         } else {
-          // Max attempts reached on 429 (1000 retries)
           state.failedCount++;
           item.status = 'FAILED';
           recordHistory({
@@ -393,37 +610,26 @@ async function processNextQueueItem() {
             attempts: item.attempts + 1,
             textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
             filename: item.filename,
-            error: `Rate limit 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
+            error: `Ngoại lệ 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
             durationMs,
             completedAt,
           });
+
           item.resolve?.({
-            ...result,
-            error: `Rate limit 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
+            success: false,
+            error: `Lỗi 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
           });
-          return;
         }
       } else {
-        // 2. Other errors: check if transient/retryable
-        const isFatalError =
-          errorCode === 400 ||
-          errorCode === 401 ||
-          errorCode === 403 ||
-          rawDesc.toLowerCase().includes('chat not found') ||
-          rawDesc.toLowerCase().includes('bot was blocked') ||
-          rawDesc.toLowerCase().includes('unauthorized') ||
-          rawDesc.toLowerCase().includes('can\'t parse');
-
         const maxRetries = item.maxAttempts ?? MAX_QUEUE_RETRIES_DEFAULT;
         const currentGeneralRetries = item.retryCountGeneral || 0;
 
-        if (!isFatalError && currentGeneralRetries < maxRetries) {
-          // Transient network / 5xx error: Exponential backoff
+        if (currentGeneralRetries < maxRetries) {
           item.retryCountGeneral = currentGeneralRetries + 1;
           item.attempts++;
           item.status = 'PENDING';
           const backoffDelay = Math.min(30000, 1000 * Math.pow(1.5, Math.min(currentGeneralRetries, 8)));
-          item.scheduledFor = Date.now() + backoffDelay;
+          item.scheduledFor = Date.now() + Math.max(2000, backoffDelay);
           insertItemByPriority(state.queue, item);
 
           recordHistory({
@@ -436,21 +642,13 @@ async function processNextQueueItem() {
             attempts: item.attempts,
             textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
             filename: item.filename,
-            error: `${result.error || 'Lỗi mạng'} (Thử lại lần ${item.retryCountGeneral}/${maxRetries})`,
+            error: `Ngoại lệ: ${err.message || 'Lỗi không xác định'} (Thử lại lần ${item.retryCountGeneral}/${maxRetries})`,
             durationMs,
             completedAt,
           });
-
-          triggerWorker(MIN_GLOBAL_INTERVAL_MS);
-          return;
         } else {
-          // Permanent failure or exhausted retries
           state.failedCount++;
           item.status = 'FAILED';
-
-          const failReason = isFatalError
-            ? (result.error || 'Lỗi không thể gửi')
-            : `${result.error || 'Gửi thất bại'}: Đã thử lại tối đa ${maxRetries} lần không thành công`;
 
           recordHistory({
             id: item.id,
@@ -462,142 +660,31 @@ async function processNextQueueItem() {
             attempts: item.attempts + 1,
             textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
             filename: item.filename,
-            error: failReason,
+            error: `Ngoại lệ: ${err.message || 'Lỗi không xác định'} (Đã thử lại tối đa ${maxRetries} lần không thành công)`,
             durationMs,
             completedAt,
           });
 
-          item.resolve?.(result);
+          item.resolve?.({
+            success: false,
+            error: `Lỗi ngoại lệ khi gửi: ${err.message || 'Lỗi không xác định'}`,
+          });
         }
       }
-    }
-  } catch (err: any) {
-    const durationMs = Date.now() - startTime;
-    const completedAt = new Date().toISOString();
-
-    const isErr429 =
-      err?.status === 429 ||
-      (typeof err?.message === 'string' &&
-        (err.message.includes('429') || err.message.toLowerCase().includes('too many requests')));
-
-    if (isErr429) {
-      let pauseSeconds = 5;
-      const match = typeof err?.message === 'string' ? err.message.match(/retry after (\d+)/i) : null;
-      if (match && match[1]) {
-        pauseSeconds = Math.max(parseInt(match[1], 10), 2);
-      }
-      const pauseMs = pauseSeconds * 1000 + 500;
-
-      state.rateLimitPauses++;
-      state.globalRateLimitedUntil = Date.now() + pauseMs;
-      state.perChatRateLimitedUntil.set(item.chatId, Date.now() + pauseMs);
-
-      const current429Retries = item.retryCount429 || 0;
-      if (current429Retries < MAX_QUEUE_RETRIES_429) {
-        item.retryCount429 = current429Retries + 1;
-        item.attempts++;
-        item.status = 'PENDING';
-        item.scheduledFor = Date.now() + pauseMs;
-        insertItemByPriority(state.queue, item);
-
-        recordHistory({
-          id: item.id,
-          type: item.type,
-          chatId: item.chatId,
-          threadId: item.options?.threadId,
-          priority: item.priority,
-          status: 'RETRYING',
-          attempts: item.attempts,
-          textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
-          filename: item.filename,
-          error: `Ngoại lệ 429: ${err.message || 'Too Many Requests'} (Tạm dừng ${pauseSeconds}s, thử lại lần ${item.retryCount429}/${MAX_QUEUE_RETRIES_429})`,
-          durationMs,
-          completedAt,
-        });
-
-        triggerWorker(pauseMs + 50);
-        return;
-      } else {
-        state.failedCount++;
-        item.status = 'FAILED';
-        recordHistory({
-          id: item.id,
-          type: item.type,
-          chatId: item.chatId,
-          threadId: item.options?.threadId,
-          priority: item.priority,
-          status: 'FAILED',
-          attempts: item.attempts + 1,
-          textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
-          filename: item.filename,
-          error: `Ngoại lệ 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
-          durationMs,
-          completedAt,
-        });
-
-        item.resolve?.({
-          success: false,
-          error: `Lỗi 429: Đã thử lại tối đa ${MAX_QUEUE_RETRIES_429} lần không thành công`,
-        });
-        return;
-      }
-    }
-
-    const maxRetries = item.maxAttempts ?? MAX_QUEUE_RETRIES_DEFAULT;
-    const currentGeneralRetries = item.retryCountGeneral || 0;
-
-    if (currentGeneralRetries < maxRetries) {
-      item.retryCountGeneral = currentGeneralRetries + 1;
-      item.attempts++;
-      item.status = 'PENDING';
-      const backoffDelay = Math.min(30000, 1000 * Math.pow(1.5, Math.min(currentGeneralRetries, 8)));
-      item.scheduledFor = Date.now() + Math.max(2000, backoffDelay);
-      insertItemByPriority(state.queue, item);
-
-      recordHistory({
-        id: item.id,
-        type: item.type,
-        chatId: item.chatId,
-        threadId: item.options?.threadId,
-        priority: item.priority,
-        status: 'RETRYING',
-        attempts: item.attempts,
-        textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
-        filename: item.filename,
-        error: `Ngoại lệ: ${err.message || 'Lỗi không xác định'} (Thử lại lần ${item.retryCountGeneral}/${maxRetries})`,
-        durationMs,
-        completedAt,
-      });
-    } else {
-      state.failedCount++;
-      item.status = 'FAILED';
-
-      recordHistory({
-        id: item.id,
-        type: item.type,
-        chatId: item.chatId,
-        threadId: item.options?.threadId,
-        priority: item.priority,
-        status: 'FAILED',
-        attempts: item.attempts + 1,
-        textPreview: item.text ? item.text.replace(/<[^>]*>/g, '').substring(0, 80) : undefined,
-        filename: item.filename,
-        error: `Ngoại lệ: ${err.message || 'Lỗi không xác định'} (Đã thử lại tối đa ${maxRetries} lần không thành công)`,
-        durationMs,
-        completedAt,
-      });
-
-      item.resolve?.({
-        success: false,
-        error: `Lỗi ngoại lệ khi gửi: ${err.message || 'Lỗi không xác định'}`,
-      });
+    } finally {
+      state.activeSending.delete(item.id);
+      state.activeChats.delete(item.chatId);
     }
   } finally {
-    state.activeSending.delete(item.id);
+    state.isProcessingTick = false;
   }
 
-  // Trigger next tick immediately with minimum global delay
-  triggerWorker(MIN_GLOBAL_INTERVAL_MS);
+  // Trigger next tick with minimum global delay
+  if (state.queue.length > 0 && !state.isPaused) {
+    triggerWorker(MIN_GLOBAL_INTERVAL_MS);
+  } else {
+    state.isWorkerRunning = false;
+  }
 }
 
 /**
@@ -745,6 +832,8 @@ export function getTelegramQueueStats(): TelegramQueueStats {
     isPaused: state.isPaused,
     minGlobalIntervalMs: MIN_GLOBAL_INTERVAL_MS,
     minPerChatIntervalMs: MIN_PER_CHAT_INTERVAL_MS,
+    minGroupChatIntervalMs: MIN_GROUP_CHAT_INTERVAL_MS,
+    maxGroupMsgsPerMinute: MAX_GROUP_MSGS_PER_MINUTE,
     maxRetriesDefault: MAX_QUEUE_RETRIES_DEFAULT,
     maxRetries429: MAX_QUEUE_RETRIES_429,
     lastSentAt: state.lastGlobalSendAt ? new Date(state.lastGlobalSendAt).toISOString() : null,
